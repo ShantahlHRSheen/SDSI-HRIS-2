@@ -5,47 +5,7 @@ export interface ModuleStub {
   planned: string[];
 }
 
-export const MODULE_STUBS: Record<string, ModuleStub> = {
-  payroll: {
-    title: "Payroll Processing",
-    description: "The full computation → HR review → manual adjustment → approval → lock → payslip workflow described in the build spec.",
-    specSection: "§4.6, §5",
-    planned: ["Automatic computation from attendance + approved leave/OT", "Manual line-item overrides (audit-logged)", "Payroll lock workflow", "Configurable, versioned SSS/PhilHealth/Pag-IBIG/withholding-tax tables"],
-  },
-  payslips: {
-    title: "Payslip Management",
-    description: "Auto-generated, optionally password-protected PDF payslips with full history per employee and automatic email delivery.",
-    specSection: "§4.7",
-    planned: ["PDF payslip generation (react-pdf / pdf-lib)", "Password protection option", "Auto-email on release", "Full payslip history per employee"],
-  },
-  vouchers: {
-    title: "Allowance Vouchers",
-    description: "Generation, printing, and history/summary of allowance vouchers for project-based and other non-regular personnel.",
-    specSection: "§4.9",
-    planned: ["Voucher generation per period", "Print-friendly voucher layout", "History and summary per recipient"],
-  },
-  "gov-reports": {
-    title: "Government Reports",
-    description: "SSS, PhilHealth, Pag-IBIG contribution reports and BIR reports including Form 2316, in exportable PDF/CSV/Excel formats.",
-    specSection: "§4.10",
-    planned: ["SSS / PhilHealth / Pag-IBIG contribution reports", "BIR Form 2316 generation", "Exportable PDF / CSV / Excel formats — exact layouts to be verified against current government forms before go-live"],
-  },
-  "thirteenth-month": {
-    title: "13th Month Pay",
-    description: "Forecasted and actual 13th month pay computation, with history per employee and year.",
-    specSection: "§4.11",
-    planned: ["Forecasted computation (mid-year projection)", "Actual computation at year-end", "Per-employee, per-year history"],
-  },
-  notifications: {
-    title: "Notification Center",
-    description: "In-app and email notifications for approvals, payroll release, evaluation schedules, and announcements.",
-    specSection: "§4.19",
-    planned: ["Unified in-app notification feed (preview shown in the top bar bell icon)", "Email delivery via Supabase SMTP / Resend", "Per-user notification preferences"],
-  },
-  "org-chart": {
-    title: "Organization Chart",
-    description: "An interactive org chart derived from the supervisor relationships already modeled in the Employee Directory.",
-    specSection: "§4.17",
-    planned: ["Interactive expandable tree view, company-wide and per-branch", "Auto-derived from `supervisor_id`, with manual override for org chart uploads"],
-  },
-};
+// All build-spec modules now have real pages — nothing left to stub. Kept as
+// a typed lookup (and /modules/[slug] as a fallback for an unrecognized URL)
+// in case a future module is scaffolded as a stub before being built out.
+export const MODULE_STUBS: Record<string, ModuleStub> = {};

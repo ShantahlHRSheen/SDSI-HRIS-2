@@ -30,6 +30,8 @@ import type {
   DisciplinaryRecord,
   Employee,
   GeneratedBirForm,
+  GeneratedPayslip,
+  GeneratedVoucher,
   Holiday,
   LeaveRequest,
   LeaveType,
@@ -61,6 +63,8 @@ interface PersistedState {
   leaveRequests: LeaveRequest[];
   overtimeRequests: OvertimeRequest[];
   correctionRequests: AttendanceCorrectionRequest[];
+  generatedPayslips: GeneratedPayslip[];
+  generatedVouchers: GeneratedVoucher[];
 }
 
 function defaultState(): PersistedState {
@@ -82,6 +86,8 @@ function defaultState(): PersistedState {
     leaveRequests: LEAVE_REQUESTS,
     overtimeRequests: OVERTIME_REQUESTS,
     correctionRequests: CORRECTION_REQUESTS,
+    generatedPayslips: [],
+    generatedVouchers: [],
   };
 }
 
@@ -114,6 +120,8 @@ interface HrisContextShape {
   leaveRequests: LeaveRequest[];
   overtimeRequests: OvertimeRequest[];
   correctionRequests: AttendanceCorrectionRequest[];
+  generatedPayslips: GeneratedPayslip[];
+  generatedVouchers: GeneratedVoucher[];
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
@@ -163,6 +171,9 @@ interface HrisContextShape {
 
   fileCorrectionRequest: (input: Omit<AttendanceCorrectionRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
   decideCorrectionRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
+
+  addGeneratedPayslip: (input: Omit<GeneratedPayslip, "id" | "generatedAt" | "generatedBy">) => void;
+  addGeneratedVoucher: (input: Omit<GeneratedVoucher, "id" | "generatedAt" | "generatedBy">) => void;
 }
 
 const HrisContext = createContext<HrisContextShape | null>(null);
@@ -438,6 +449,30 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, demoUsers],
   );
 
+  const addGeneratedPayslip: HrisContextShape["addGeneratedPayslip"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const entry: GeneratedPayslip = { ...input, id: nextId("ps"), generatedAt: TODAY, generatedBy: actor?.name ?? "System" };
+        return { ...prev, generatedPayslips: [entry, ...prev.generatedPayslips] };
+      });
+      logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
+    },
+    [logAudit, demoUsers],
+  );
+
+  const addGeneratedVoucher: HrisContextShape["addGeneratedVoucher"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const entry: GeneratedVoucher = { ...input, id: nextId("vo"), generatedAt: TODAY, generatedBy: actor?.name ?? "System" };
+        return { ...prev, generatedVouchers: [entry, ...prev.generatedVouchers] };
+      });
+      logAudit("Allowance Vouchers", "generate", `Generated voucher for period ${input.periodId}`);
+    },
+    [logAudit, demoUsers],
+  );
+
   const value: HrisContextShape = {
     ready,
     currentUser,
@@ -460,6 +495,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     leaveRequests: state.leaveRequests,
     overtimeRequests: state.overtimeRequests,
     correctionRequests: state.correctionRequests,
+    generatedPayslips: state.generatedPayslips,
+    generatedVouchers: state.generatedVouchers,
     addEvaluation,
     setEvaluationStatus,
     addDisciplinaryRecord,
@@ -494,6 +531,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     decideOvertimeRequest,
     fileCorrectionRequest,
     decideCorrectionRequest,
+    addGeneratedPayslip,
+    addGeneratedVoucher,
   };
 
   return <HrisContext.Provider value={value}>{children}</HrisContext.Provider>;

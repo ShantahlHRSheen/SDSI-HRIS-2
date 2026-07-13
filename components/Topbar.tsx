@@ -5,20 +5,16 @@ import { useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { ROLE_LABELS } from "@/lib/types";
+import { buildNotifications, relativeTime } from "@/lib/notifications";
 import { Badge } from "./Badge";
 
-const MOCK_NOTIFICATIONS = [
-  { id: 1, text: "Leave request from Sales Associate approved by supervisor.", time: "2h ago" },
-  { id: 2, text: "Payroll period Jul 1–15 has been locked.", time: "1d ago" },
-  { id: 3, text: "Contract for Sales Consultant (Davao) expires in 8 days.", time: "1d ago" },
-  { id: 4, text: "New company announcement posted: Mid-Year Evaluations.", time: "3d ago" },
-];
-
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const { currentUser, logout } = useHris();
+  const { currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes, logout } = useHris();
   const router = useRouter();
   const [userMenu, setUserMenu] = useState(false);
   const [notifMenu, setNotifMenu] = useState(false);
+
+  const notifications = buildNotifications({ currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes });
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border-hairline)] bg-[var(--surface-1)]/95 px-4 backdrop-blur">
@@ -38,17 +34,30 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             aria-label="Notifications"
           >
             <Bell size={19} />
-            <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[var(--status-critical)]" />
+            {notifications.length > 0 && <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[var(--status-critical)]" />}
           </button>
           {notifMenu && (
             <div className="absolute right-0 mt-2 w-80 max-w-[85vw] rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-2 shadow-lg">
               <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-muted)] uppercase">Notifications</div>
-              {MOCK_NOTIFICATIONS.map((n) => (
-                <div key={n.id} className="rounded-lg px-2 py-2 text-sm hover:bg-[var(--gridline)]/40">
-                  <div className="text-[var(--text-primary)]">{n.text}</div>
-                  <div className="mt-0.5 text-xs text-[var(--text-muted)]">{n.time}</div>
-                </div>
-              ))}
+              {notifications.length === 0 ? (
+                <div className="px-2 py-3 text-center text-xs text-[var(--text-muted)]">You&rsquo;re all caught up.</div>
+              ) : (
+                notifications.slice(0, 6).map((n) => (
+                  <div key={n.id} className="rounded-lg px-2 py-2 text-sm hover:bg-[var(--gridline)]/40">
+                    <div className="text-[var(--text-primary)]">{n.text}</div>
+                    <div className="mt-0.5 text-xs text-[var(--text-muted)]">{relativeTime(n.date)}</div>
+                  </div>
+                ))
+              )}
+              <button
+                onClick={() => {
+                  setNotifMenu(false);
+                  router.push("/modules/notifications");
+                }}
+                className="mt-1 w-full rounded-lg px-2 py-1.5 text-center text-xs font-medium text-[var(--series-1)] hover:bg-[var(--gridline)]/40"
+              >
+                View all
+              </button>
             </div>
           )}
         </div>

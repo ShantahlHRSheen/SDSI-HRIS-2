@@ -24,7 +24,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Dashboard", href: "/dashboard", roles: ALL_ROLES, built: true },
       { label: "Bulletin Board", href: "/bulletin", roles: ALL_ROLES, built: true },
       { label: "Employee Directory", href: "/employees", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin", "payroll_officer"], built: true },
-      { label: "Org Chart", href: "/modules/org-chart", roles: ALL_ROLES, built: false },
+      { label: "Org Chart", href: "/modules/org-chart", roles: ALL_ROLES, built: true },
     ],
   },
   {
@@ -49,12 +49,12 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Payroll & Compliance",
     items: [
-      { label: "Payroll Processing", href: "/modules/payroll", roles: ["hr_admin", "payroll_officer"], built: false },
-      { label: "Payroll (Read-only)", href: "/modules/payroll", roles: ["sr_accounting_assistant", "treasurer", "cfo"], built: false },
-      { label: "Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "employee"], built: false },
-      { label: "Allowance Vouchers", href: "/modules/vouchers", roles: ["payroll_officer", "hr_admin"], built: false },
-      { label: "Government Reports", href: "/modules/gov-reports", roles: ["hr_admin", "payroll_officer"], built: false },
-      { label: "13th Month Pay", href: "/modules/thirteenth-month", roles: ["hr_admin", "payroll_officer"], built: false },
+      { label: "Payroll Processing", href: "/modules/payroll", roles: ["hr_admin", "payroll_officer"], built: true },
+      { label: "Payroll (Read-only)", href: "/modules/payroll", roles: ["sr_accounting_assistant", "treasurer", "cfo", "upper_management"], built: true },
+      { label: "Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "cfo", "upper_management", "employee"], built: true },
+      { label: "Allowance Vouchers", href: "/modules/vouchers", roles: ["payroll_officer", "hr_admin"], built: true },
+      { label: "Government Reports", href: "/modules/gov-reports", roles: ["hr_admin", "payroll_officer"], built: true },
+      { label: "13th Month Pay", href: "/modules/thirteenth-month", roles: ["hr_admin", "payroll_officer"], built: true },
     ],
   },
   {
@@ -69,7 +69,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "System",
     items: [
       { label: "Audit Trail", href: "/audit", roles: ["hr_admin", "sys_admin"], built: true },
-      { label: "Notifications", href: "/modules/notifications", roles: ALL_ROLES, built: false },
+      { label: "Notifications", href: "/modules/notifications", roles: ALL_ROLES, built: true },
       { label: "System Administration", href: "/admin/branches", roles: ["sys_admin", "hr_admin"], built: true },
     ],
   },

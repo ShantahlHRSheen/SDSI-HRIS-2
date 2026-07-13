@@ -256,6 +256,24 @@ export interface AttendanceCorrectionRequest extends ApprovableRequest {
   requestedTimeOut: string | null;
 }
 
+export interface GeneratedPayslip {
+  id: string;
+  periodId: string;
+  employeeId: string;
+  generatedBy: string;
+  generatedAt: string;
+  summary: Record<string, number>;
+}
+
+export interface GeneratedVoucher {
+  id: string;
+  periodId: string;
+  employeeId: string;
+  amount: number;
+  generatedBy: string;
+  generatedAt: string;
+}
+
 export type DailyAttendanceStatus = "present" | "late" | "absent" | "leave";
 
 export interface DailyAttendanceRecord {
