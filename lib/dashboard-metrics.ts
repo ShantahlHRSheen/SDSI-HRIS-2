@@ -28,22 +28,6 @@ export function recentResignations(employees: Employee[], withinDays = 30) {
     .sort((a, b) => daysBetween(a.statusChangedAt ?? TODAY, TODAY) - daysBetween(b.statusChangedAt ?? TODAY, TODAY));
 }
 
-export function dueForRegularization(employees: Employee[], withinDays = 45) {
-  return activeEmployees(employees)
-    .filter((e) => e.employmentStatus === "probationary" && e.probationEndsAt)
-    .map((e) => ({ employee: e, daysUntil: daysBetween(TODAY, e.probationEndsAt as string) }))
-    .filter((x) => x.daysUntil <= withinDays)
-    .sort((a, b) => a.daysUntil - b.daysUntil);
-}
-
-export function expiringContracts(employees: Employee[], withinDays = 45) {
-  return activeEmployees(employees)
-    .filter((e) => (e.employmentStatus === "freelance" || e.employmentStatus === "project_based" || e.employmentStatus === "consultant") && e.contractEnd)
-    .map((e) => ({ employee: e, daysUntil: daysBetween(TODAY, e.contractEnd as string) }))
-    .filter((x) => x.daysUntil <= withinDays)
-    .sort((a, b) => a.daysUntil - b.daysUntil);
-}
-
 function nextBirthdayDays(birthdate: string): number {
   const [, mm, dd] = birthdate.split("-").map(Number);
   const todayDate = new Date(TODAY + "T00:00:00Z");
@@ -101,21 +85,6 @@ export function estimatedEmployerContributions(employees: Employee[]) {
     philhealth: Math.round(base * 0.025),
     pagibig: Math.round(base * 0.02),
   };
-}
-
-export function attendanceSnapshot(employees: Employee[]) {
-  const total = activeEmployees(employees).length;
-  const present = Math.round(total * 0.91);
-  const late = Math.round(total * 0.05);
-  const absent = Math.max(total - present - late, 0);
-  const rate = total ? Math.round((present / total) * 1000) / 10 : 0;
-  return { total, present, late, absent, rate, otHours: Math.round(total * 1.8) };
-}
-
-export function attendanceTrend() {
-  const base = [0.93, 0.9, 0.94, 0.88, 0.91, 0.95, 0.89, 0.92];
-  const labels = ["Jun 1", "Jun 8", "Jun 15", "Jun 22", "Jun 29", "Jul 6", "Jul 8", "Jul 13"];
-  return base.map((r, i) => ({ label: labels[i], value: Math.round(r * 1000) / 10 }));
 }
 
 export function employeeDisplayName(e: Employee) {

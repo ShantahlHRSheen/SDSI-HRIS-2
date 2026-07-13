@@ -9,7 +9,7 @@ export default function BranchesAdminPage() {
   return (
     <EntityManager<Branch>
       title="Branches"
-      subtitle="10 branches currently configured across the Philippines."
+      subtitle={`${branches.length} branches currently configured across the Philippines.`}
       items={branches}
       onAdd={addBranch}
       onUpdate={updateBranch}

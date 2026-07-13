@@ -43,10 +43,10 @@ export const MODULE_STUBS: Record<string, ModuleStub> = {
     planned: ["PDF payslip generation (react-pdf / pdf-lib)", "Password protection option", "Auto-email on release", "Full payslip history per employee"],
   },
   vouchers: {
-    title: "Allowance Vouchers (Freelancers)",
-    description: "Generation, printing, and history/summary of allowance vouchers for freelance and project-based personnel.",
+    title: "Allowance Vouchers",
+    description: "Generation, printing, and history/summary of allowance vouchers for project-based and other non-regular personnel.",
     specSection: "§4.9",
-    planned: ["Voucher generation per period", "Print-friendly voucher layout", "History and summary per freelancer"],
+    planned: ["Voucher generation per period", "Print-friendly voucher layout", "History and summary per recipient"],
   },
   "gov-reports": {
     title: "Government Reports",
@@ -60,15 +60,9 @@ export const MODULE_STUBS: Record<string, ModuleStub> = {
     specSection: "§4.11",
     planned: ["Forecasted computation (mid-year projection)", "Actual computation at year-end", "Per-employee, per-year history"],
   },
-  reports: {
-    title: "Payroll Reports",
-    description: "Payroll register/summary, breakdowns by branch/department/position, payroll expense report, and employer contribution summaries.",
-    specSection: "§4.8",
-    planned: ["Payroll register & summary", "Breakdown by branch / department / position", "Payroll expense report", "Allowance voucher summary"],
-  },
   notifications: {
     title: "Notification Center",
-    description: "In-app and email notifications for approvals, payroll release, contract expiration, regularization reminders, evaluation schedules, and announcements.",
+    description: "In-app and email notifications for approvals, payroll release, evaluation schedules, and announcements.",
     specSection: "§4.19",
     planned: ["Unified in-app notification feed (preview shown in the top bar bell icon)", "Email delivery via Supabase SMTP / Resend", "Per-user notification preferences"],
   },

@@ -7,11 +7,10 @@ export type Role =
   | "dept_head"
   | "employee"
   | "upper_management"
-  | "freelancer"
   | "sys_admin";
 
 export const ROLE_LABELS: Record<Role, string> = {
-  hr_admin: "HR Administrator",
+  hr_admin: "HR Manager",
   payroll_officer: "Payroll Officer",
   sr_accounting_assistant: "Sr. Accounting Assistant",
   treasurer: "Corporate Treasurer",
@@ -19,7 +18,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   dept_head: "Department Head",
   employee: "Employee",
   upper_management: "Upper Management",
-  freelancer: "Freelancer",
   sys_admin: "System Administrator",
 };
 

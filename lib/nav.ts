@@ -14,7 +14,7 @@ export interface NavSection {
 
 const ALL_ROLES: Role[] = [
   "hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo",
-  "dept_head", "employee", "upper_management", "freelancer", "sys_admin",
+  "dept_head", "employee", "upper_management", "sys_admin",
 ];
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -34,9 +34,16 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Leave Management", href: "/modules/leave", roles: ["hr_admin", "dept_head", "employee"], built: false },
       { label: "Overtime", href: "/modules/overtime", roles: ["hr_admin", "dept_head", "employee"], built: false },
       { label: "Attendance Corrections", href: "/modules/corrections", roles: ["hr_admin", "dept_head", "employee"], built: false },
-      { label: "Contract Monitoring", href: "/contracts", roles: ["hr_admin", "upper_management", "sys_admin"], built: true },
       { label: "Performance Evaluations", href: "/evaluations", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
+    ],
+  },
+  {
+    title: "Reports & Analytics",
+    items: [
+      { label: "Attendance Report", href: "/reports/attendance", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin"], built: true },
+      { label: "Overtime Report", href: "/reports/overtime", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin"], built: true },
+      { label: "Payroll Expense Report", href: "/reports/payroll-expense", roles: ["hr_admin", "payroll_officer", "upper_management", "sr_accounting_assistant", "treasurer", "cfo", "sys_admin"], built: true },
     ],
   },
   {
@@ -45,10 +52,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Payroll Processing", href: "/modules/payroll", roles: ["hr_admin", "payroll_officer"], built: false },
       { label: "Payroll (Read-only)", href: "/modules/payroll", roles: ["sr_accounting_assistant", "treasurer", "cfo"], built: false },
       { label: "Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "employee"], built: false },
-      { label: "Allowance Vouchers", href: "/modules/vouchers", roles: ["payroll_officer", "freelancer", "hr_admin"], built: false },
+      { label: "Allowance Vouchers", href: "/modules/vouchers", roles: ["payroll_officer", "hr_admin"], built: false },
       { label: "Government Reports", href: "/modules/gov-reports", roles: ["hr_admin", "payroll_officer"], built: false },
       { label: "13th Month Pay", href: "/modules/thirteenth-month", roles: ["hr_admin", "payroll_officer"], built: false },
-      { label: "Payroll Reports", href: "/modules/reports", roles: ["hr_admin", "payroll_officer", "upper_management", "sr_accounting_assistant", "treasurer", "cfo"], built: false },
     ],
   },
   {

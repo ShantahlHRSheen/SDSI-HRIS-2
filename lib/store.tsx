@@ -101,9 +101,6 @@ interface HrisContextShape {
   addDisciplinaryRecord: (input: Omit<DisciplinaryRecord, "id">) => void;
   setDisciplinaryStatus: (id: string, status: DisciplinaryRecord["status"]) => void;
 
-  markRegularized: (employeeId: string) => void;
-  renewContract: (employeeId: string, newEndDate: string) => void;
-
   addAnnouncement: (input: Omit<Announcement, "id" | "postedAt">) => void;
 
   addBranch: (input: Omit<Branch, "id">) => void;
@@ -246,37 +243,6 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit],
   );
 
-  const markRegularized: HrisContextShape["markRegularized"] = useCallback(
-    (employeeId) => {
-      setState((prev) => ({
-        ...prev,
-        employees: prev.employees.map((e) =>
-          e.id === employeeId
-            ? { ...e, employmentStatus: "regular", dateRegularized: TODAY, probationEndsAt: null }
-            : e,
-        ),
-      }));
-      logAudit("Contract Monitoring", "regularize", `Employee ${employeeId} marked regular`, "probationary", "regular");
-    },
-    [logAudit],
-  );
-
-  const renewContract: HrisContextShape["renewContract"] = useCallback(
-    (employeeId, newEndDate) => {
-      let prevEnd = "";
-      setState((prev) => ({
-        ...prev,
-        employees: prev.employees.map((e) => {
-          if (e.id !== employeeId) return e;
-          prevEnd = e.contractEnd ?? "";
-          return { ...e, contractEnd: newEndDate };
-        }),
-      }));
-      logAudit("Contract Monitoring", "renew", `Contract renewed for employee ${employeeId}`, prevEnd, newEndDate);
-    },
-    [logAudit],
-  );
-
   const addAnnouncement: HrisContextShape["addAnnouncement"] = useCallback(
     (input) => {
       const entry: Announcement = { ...input, id: nextId("an"), postedAt: TODAY };
@@ -370,8 +336,6 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     setEvaluationStatus,
     addDisciplinaryRecord,
     setDisciplinaryStatus,
-    markRegularized,
-    renewContract,
     addAnnouncement,
     addBranch: branchCrud.add,
     updateBranch: branchCrud.update,

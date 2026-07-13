@@ -78,8 +78,8 @@ export const DEPARTMENTS: Department[] = [
 
 export const POSITIONS: Position[] = [
   { id: "ps-president", title: "President", departmentId: "dp-exec" },
-  { id: "ps-vp-ops", title: "VP for Operations", departmentId: "dp-exec" },
-  { id: "ps-hr-admin", title: "HR Administrator", departmentId: "dp-hr" },
+  { id: "ps-vp-ops", title: "Vice Chairperson", departmentId: "dp-exec" },
+  { id: "ps-hr-admin", title: "HR Manager", departmentId: "dp-hr" },
   { id: "ps-hr-officer", title: "HR Officer", departmentId: "dp-hr" },
   { id: "ps-hr-assistant", title: "HR Assistant", departmentId: "dp-hr" },
   { id: "ps-payroll-officer", title: "Payroll Officer", departmentId: "dp-fin" },
@@ -94,6 +94,7 @@ export const POSITIONS: Position[] = [
   { id: "ps-sales-mgr", title: "Branch Sales Manager", departmentId: "dp-sales" },
   { id: "ps-sales-assoc", title: "Sales Associate", departmentId: "dp-sales" },
   { id: "ps-sales-consultant", title: "Sales Consultant", departmentId: "dp-sales" },
+  { id: "ps-cashier", title: "Cashier", departmentId: "dp-sales" },
   { id: "ps-ops-mgr", title: "Branch Operations Manager", departmentId: "dp-ops" },
   { id: "ps-ops-staff", title: "Operations Staff", departmentId: "dp-ops" },
   { id: "ps-wh-sup", title: "Warehouse Supervisor", departmentId: "dp-wh" },
@@ -236,13 +237,13 @@ const president = buildEmployee({
   birthMonth: 3, birthDay: 12, birthYear: 1968,
 });
 const vpOps = buildEmployee({
-  id: "emp-002", firstName: "Isabel", lastName: "Garcia", branchId: "br-mnl", departmentId: "dp-exec",
+  id: "emp-002", firstName: "Sheilah A.", lastName: "Magdadaro", branchId: "br-mnl", departmentId: "dp-exec",
   positionId: "ps-vp-ops", supervisorId: president.id, employmentStatus: "regular", dateHired: "2011-05-16",
   dateRegularized: "2011-11-16", payrollType: "monthly", monthlySalary: 180000, roles: ["upper_management"],
   birthMonth: 7, birthDay: 20, birthYear: 1975,
 });
 const hrAdmin = buildEmployee({
-  id: "emp-003", firstName: "Maria", lastName: "Santos", branchId: "br-mnl", departmentId: "dp-hr",
+  id: "emp-003", firstName: "Sheena", lastName: "Evangelista", branchId: "br-mnl", departmentId: "dp-hr",
   positionId: "ps-hr-admin", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2014-01-20",
   dateRegularized: "2014-07-20", payrollType: "monthly", monthlySalary: 75000, roles: ["hr_admin"],
   birthMonth: 7, birthDay: 28, birthYear: 1982,
@@ -266,19 +267,19 @@ const payrollOfficer = buildEmployee({
   birthMonth: 11, birthDay: 3, birthYear: 1986,
 });
 const srAcctg = buildEmployee({
-  id: "emp-007", firstName: "Ana", lastName: "Reyes", branchId: "br-mnl", departmentId: "dp-fin",
+  id: "emp-007", firstName: "Wendie", lastName: "Halog", branchId: "br-mnl", departmentId: "dp-fin",
   positionId: "ps-sr-acctg", supervisorId: payrollOfficer.id, employmentStatus: "regular", dateHired: "2016-08-22",
   dateRegularized: "2017-02-22", payrollType: "monthly", monthlySalary: 42000, roles: ["sr_accounting_assistant"],
   birthMonth: 5, birthDay: 30, birthYear: 1988,
 });
 const treasurer = buildEmployee({
-  id: "emp-008", firstName: "Roberto", lastName: "Lim", branchId: "br-mnl", departmentId: "dp-fin",
+  id: "emp-008", firstName: "Joan Mariette", lastName: "Santarina", branchId: "br-mnl", departmentId: "dp-fin",
   positionId: "ps-treasurer", supervisorId: president.id, employmentStatus: "regular", dateHired: "2010-04-05",
   dateRegularized: "2010-10-05", payrollType: "monthly", monthlySalary: 120000, roles: ["treasurer"],
   birthMonth: 12, birthDay: 18, birthYear: 1972,
 });
 const cfo = buildEmployee({
-  id: "emp-009", firstName: "Elena", lastName: "Cruz", branchId: "br-mnl", departmentId: "dp-fin",
+  id: "emp-009", firstName: "Maricris", lastName: "Barlinan", branchId: "br-mnl", departmentId: "dp-fin",
   positionId: "ps-cfo", supervisorId: president.id, employmentStatus: "regular", dateHired: "2009-09-14",
   dateRegularized: "2010-03-14", payrollType: "monthly", monthlySalary: 200000, roles: ["cfo"],
   birthMonth: 7, birthDay: 5, birthYear: 1970,
@@ -336,7 +337,7 @@ const BRANCH_TEMPLATE: BranchSlotTemplate[] = [
   { slot: "opsManager", position: "ps-ops-mgr", departmentId: "dp-ops", reportsTo: "vp", employmentStatus: "regular", roles: ["dept_head", "employee"], payrollType: "monthly" },
   { slot: "sales1", position: "ps-sales-assoc", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "regular", roles: ["employee"], payrollType: "daily" },
   { slot: "sales2", position: "ps-sales-assoc", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "probationary", roles: ["employee"], payrollType: "daily" },
-  { slot: "consultant", position: "ps-sales-consultant", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "freelance", roles: ["freelancer"], payrollType: "daily" },
+  { slot: "consultant", position: "ps-sales-consultant", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "freelance", roles: ["employee"], payrollType: "daily" },
   { slot: "opsStaff", position: "ps-ops-staff", departmentId: "dp-ops", reportsTo: "opsManager", employmentStatus: "regular", roles: ["employee"], payrollType: "daily" },
   { slot: "warehouseSup", position: "ps-wh-sup", departmentId: "dp-wh", reportsTo: "opsManager", employmentStatus: "regular", roles: ["dept_head", "employee"], payrollType: "monthly" },
   { slot: "csr", position: "ps-csr", departmentId: "dp-cs", reportsTo: "opsManager", employmentStatus: "project_based", roles: ["employee"], payrollType: "daily" },
@@ -344,7 +345,6 @@ const BRANCH_TEMPLATE: BranchSlotTemplate[] = [
 ];
 
 export const DEPT_HEAD_IDS: Record<string, { salesManager: string; opsManager: string }> = {};
-export const FREELANCER_IDS: string[] = [];
 export const RANK_AND_FILE_SAMPLE_ID_BY_BRANCH: Record<string, string> = {};
 
 BRANCHES.forEach((branch, branchIdx) => {
@@ -427,7 +427,6 @@ BRANCHES.forEach((branch, branchIdx) => {
     EMPLOYEES.push(emp);
 
     if (tpl.slot === "sales1") RANK_AND_FILE_SAMPLE_ID_BY_BRANCH[branch.id] = id;
-    if (tpl.slot === "consultant") FREELANCER_IDS.push(id);
   });
   DEPT_HEAD_IDS[branch.id] = { salesManager: slotIds.salesManager, opsManager: slotIds.opsManager };
 });
@@ -437,18 +436,33 @@ EMPLOYEES.find((e) => e.id === "emp-ceb-sales1")!.birthdate = "1992-07-16";
 EMPLOYEES.find((e) => e.id === "emp-dvo-opsStaff")!.birthdate = "1989-07-19";
 EMPLOYEES.find((e) => e.id === "emp-bag-adminStaff")!.birthdate = "1994-07-31";
 
+// named for the demo-user roster below, distinct from the auto-generated staff pool
+const deptManagerEmployee = EMPLOYEES.find((e) => e.id === "emp-ceb-salesManager")!;
+deptManagerEmployee.firstName = "Marlyn";
+deptManagerEmployee.lastName = "Leonardo";
+
+// Cabanatuan is a newly-opened branch — kept out of BRANCH_TEMPLATE's auto-staffing
+// loop above so it doesn't get a full generated roster, and added here with a
+// single named employee instead.
+BRANCHES.push({ id: "br-cbt", name: "Cabanatuan", code: "CBT", address: "Maharlika Highway, Cabanatuan City" });
+const reynalyn = buildEmployee({
+  id: "emp-cbt-cashier", firstName: "Reynalyn", lastName: "Alfonso", branchId: "br-cbt", departmentId: "dp-sales",
+  positionId: "ps-cashier", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2025-09-15",
+  dateRegularized: "2026-03-15", payrollType: "daily", dailyRate: 560, roles: ["employee"],
+  birthMonth: 10, birthDay: 4, birthYear: 1998,
+});
+EMPLOYEES.push(reynalyn);
+
 // --- Demo login users -----------------------------------------------------
 export const DEMO_USERS: DemoUser[] = [
-  { id: "u-hr", employeeId: hrAdmin.id, name: "Maria Santos", title: "HR Administrator", roles: ["hr_admin"], initials: "MS" },
+  { id: "u-hr", employeeId: hrAdmin.id, name: "Sheena Evangelista", title: "HR Manager", roles: ["hr_admin"], initials: "SE" },
   { id: "u-payroll", employeeId: payrollOfficer.id, name: "Juan Dela Cruz", title: "Payroll Officer", roles: ["payroll_officer"], initials: "JD" },
-  { id: "u-acctg", employeeId: srAcctg.id, name: "Ana Reyes", title: "Sr. Accounting Assistant", roles: ["sr_accounting_assistant"], initials: "AR" },
-  { id: "u-treasurer", employeeId: treasurer.id, name: "Roberto Lim", title: "Corporate Treasurer", roles: ["treasurer"], initials: "RL" },
-  { id: "u-cfo", employeeId: cfo.id, name: "Elena Cruz", title: "Chief Finance Officer", roles: ["cfo"], initials: "EC" },
-  { id: "u-depthead", employeeId: "emp-ceb-salesManager", name: EMPLOYEES.find((e) => e.id === "emp-ceb-salesManager")!.firstName + " " + EMPLOYEES.find((e) => e.id === "emp-ceb-salesManager")!.lastName, title: "Branch Sales Manager (Cebu)", roles: ["dept_head", "employee"], initials: "BM" },
-  { id: "u-employee", employeeId: "emp-qc-sales1", name: EMPLOYEES.find((e) => e.id === "emp-qc-sales1")!.firstName + " " + EMPLOYEES.find((e) => e.id === "emp-qc-sales1")!.lastName, title: "Sales Associate (Quezon City)", roles: ["employee"], initials: "SA" },
-  { id: "u-upper", employeeId: vpOps.id, name: "Isabel Garcia", title: "VP for Operations", roles: ["upper_management"], initials: "IG" },
-  { id: "u-freelancer", employeeId: "emp-dvo-consultant", name: EMPLOYEES.find((e) => e.id === "emp-dvo-consultant")!.firstName + " " + EMPLOYEES.find((e) => e.id === "emp-dvo-consultant")!.lastName, title: "Sales Consultant (Davao)", roles: ["freelancer"], initials: "FL" },
-  { id: "u-sysadmin", employeeId: sysAdmin.id, name: "Patricia Uy", title: "System Administrator", roles: ["sys_admin"], initials: "PU" },
+  { id: "u-acctg", employeeId: srAcctg.id, name: "Wendie Halog", title: "Sr. Accounting Assistant", roles: ["sr_accounting_assistant"], initials: "WH" },
+  { id: "u-treasurer", employeeId: treasurer.id, name: "Joan Mariette Santarina", title: "Corporate Treasurer", roles: ["treasurer"], initials: "JS" },
+  { id: "u-cfo", employeeId: cfo.id, name: "Maricris Barlinan", title: "Chief Finance Officer", roles: ["cfo"], initials: "MB" },
+  { id: "u-depthead", employeeId: "emp-ceb-salesManager", name: "Marlyn Leonardo", title: "Branch Sales Manager (Cebu)", roles: ["dept_head", "employee"], initials: "ML" },
+  { id: "u-employee", employeeId: "emp-cbt-cashier", name: "Reynalyn Alfonso", title: "Cashier (Cabanatuan Branch)", roles: ["employee"], initials: "RA" },
+  { id: "u-upper", employeeId: vpOps.id, name: "Sheilah A. Magdadaro", title: "Vice Chairperson", roles: ["upper_management"], initials: "SM" },
 ];
 
 // --- Performance evaluations ------------------------------------------------
@@ -530,21 +544,21 @@ discEmployees.forEach((e, i) => {
 
 // --- Audit logs --------------------------------------------------------------
 export const AUDIT_LOGS: AuditLog[] = [
-  { id: "al-1", userId: hrAdmin.id, userName: "Maria Santos", module: "Employee 201 File", action: "update", description: "Updated contact details", previousValue: "0917xxxxxxx", newValue: "0918xxxxxxx", createdAt: addDays(TODAY, -20) },
+  { id: "al-1", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "Employee 201 File", action: "update", description: "Updated contact details", previousValue: "0917xxxxxxx", newValue: "0918xxxxxxx", createdAt: addDays(TODAY, -20) },
   { id: "al-2", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payroll", action: "lock", description: "Locked payroll period 2026-07-01 to 2026-07-15", previousValue: "open", newValue: "locked", createdAt: addDays(TODAY, -2) },
-  { id: "al-3", userId: hrAdmin.id, userName: "Maria Santos", module: "Leave Management", action: "approve", description: "Approved Vacation Leave request", previousValue: "pending", newValue: "approved", createdAt: addDays(TODAY, -6) },
-  { id: "al-4", userId: sysAdmin.id, userName: "Patricia Uy", module: "System Administration", action: "create", description: "Added new work schedule: Flexi", previousValue: null, newValue: "Flexi 09:00-18:00", createdAt: addDays(TODAY, -30) },
-  { id: "al-5", userId: hrAdmin.id, userName: "Maria Santos", module: "Discipline", action: "create", description: "Issued written warning", previousValue: null, newValue: "written_warning", createdAt: addDays(TODAY, -14) },
-  { id: "al-6", userId: "emp-ceb-salesManager", userName: "Branch Sales Manager", module: "Overtime", action: "approve", description: "Approved 3 OT hours", previousValue: "pending", newValue: "approved (3 hrs)", createdAt: addDays(TODAY, -4) },
-  { id: "al-7", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payslips", action: "generate", description: "Generated payslips for 104 employees", previousValue: null, newValue: "104 payslips", createdAt: addDays(TODAY, -16) },
-  { id: "al-8", userId: hrAdmin.id, userName: "Maria Santos", module: "Contract Monitoring", action: "notify", description: "Sent expiration reminder for 5 contracts", previousValue: null, newValue: "5 notifications sent", createdAt: addDays(TODAY, -1) },
+  { id: "al-3", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "Leave Management", action: "approve", description: "Approved Vacation Leave request", previousValue: "pending", newValue: "approved", createdAt: addDays(TODAY, -6) },
+  { id: "al-4", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "System Administration", action: "create", description: "Added new work schedule: Flexi", previousValue: null, newValue: "Flexi 09:00-18:00", createdAt: addDays(TODAY, -30) },
+  { id: "al-5", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "Discipline", action: "create", description: "Issued written warning", previousValue: null, newValue: "written_warning", createdAt: addDays(TODAY, -14) },
+  { id: "al-6", userId: "emp-ceb-salesManager", userName: "Marlyn Leonardo", module: "Overtime", action: "approve", description: "Approved 3 OT hours", previousValue: "pending", newValue: "approved (3 hrs)", createdAt: addDays(TODAY, -4) },
+  { id: "al-7", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payslips", action: "generate", description: "Generated payslips for 105 employees", previousValue: null, newValue: "105 payslips", createdAt: addDays(TODAY, -16) },
+  { id: "al-8", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payroll Reports", action: "generate", description: "Generated monthly employer payroll expense report for June 2026", previousValue: null, newValue: "report generated", createdAt: addDays(TODAY, -1) },
 ];
 
 // --- Announcements -----------------------------------------------------------
 export const ANNOUNCEMENTS: Announcement[] = [
-  { id: "an-1", title: "Mid-Year Performance Evaluations Now Open", body: "Department heads may begin conducting Semi-Annual 2026 evaluations for their direct reports. Deadline for submission is July 31.", category: "memo", postedBy: "Maria Santos", postedAt: addDays(TODAY, -3), expiresAt: addDays(TODAY, 20) },
-  { id: "an-2", title: "Ninoy Aquino Day — August 21 (Special Non-Working)", body: "Please plan attendance encoding and payroll cut-offs around the August 21 special non-working holiday.", category: "holiday", postedBy: "Patricia Uy", postedAt: addDays(TODAY, -1), expiresAt: "2026-08-22" },
-  { id: "an-3", title: "Company Town Hall — August 5", body: "All branches are invited to join the Q2 town hall via video conference. Details to follow from your branch manager.", category: "event", postedBy: "Isabel Garcia", postedAt: addDays(TODAY, -5), expiresAt: "2026-08-06" },
-  { id: "an-4", title: "Updated Leave Filing Policy", body: "Leave requests must now be filed at least 3 working days in advance except for emergency and sick leave.", category: "policy", postedBy: "Maria Santos", postedAt: addDays(TODAY, -10), expiresAt: null },
-  { id: "an-5", title: "Welcome New Hires — July 2026", body: "Join us in welcoming our newest team members across Marketing and HR this month!", category: "announcement", postedBy: "Maria Santos", postedAt: addDays(TODAY, -2), expiresAt: addDays(TODAY, 30) },
+  { id: "an-1", title: "Mid-Year Performance Evaluations Now Open", body: "Department heads may begin conducting Semi-Annual 2026 evaluations for their direct reports. Deadline for submission is July 31.", category: "memo", postedBy: "Sheena Evangelista", postedAt: addDays(TODAY, -3), expiresAt: addDays(TODAY, 20) },
+  { id: "an-2", title: "Ninoy Aquino Day — August 21 (Special Non-Working)", body: "Please plan attendance encoding and payroll cut-offs around the August 21 special non-working holiday.", category: "holiday", postedBy: "Sheena Evangelista", postedAt: addDays(TODAY, -1), expiresAt: "2026-08-22" },
+  { id: "an-3", title: "Company Town Hall — August 5", body: "All branches are invited to join the Q2 town hall via video conference. Details to follow from your branch manager.", category: "event", postedBy: "Sheilah A. Magdadaro", postedAt: addDays(TODAY, -5), expiresAt: "2026-08-06" },
+  { id: "an-4", title: "Updated Leave Filing Policy", body: "Leave requests must now be filed at least 3 working days in advance except for emergency and sick leave.", category: "policy", postedBy: "Sheena Evangelista", postedAt: addDays(TODAY, -10), expiresAt: null },
+  { id: "an-5", title: "Welcome New Hires — July 2026", body: "Join us in welcoming our newest team members across Marketing and HR this month!", category: "announcement", postedBy: "Sheena Evangelista", postedAt: addDays(TODAY, -2), expiresAt: addDays(TODAY, 30) },
 ];

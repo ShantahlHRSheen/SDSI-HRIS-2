@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Cake, Info, TrendingDown, TrendingUp, UserMinus, UserPlus } from "lucide-react";
+import { Cake, Clock3, Info, UserMinus, UserPlus } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -12,19 +12,24 @@ import { StackedHBar } from "@/components/charts/StackedHBar";
 import { TrendChart } from "@/components/charts/TrendChart";
 import {
   activeEmployees,
-  attendanceSnapshot,
-  attendanceTrend,
-  dueForRegularization,
   employmentStatusCounts,
-  estimatedEmployerContributions,
-  expiringContracts,
   newHires,
-  payrollExpenseByBranch,
   recentResignations,
-  totalMonthlyPayrollExpense,
   upcomingBirthdays,
 } from "@/lib/dashboard-metrics";
-import { branchName, departmentName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
+import {
+  attendanceTrendByMonth,
+  CURRENT_MONTH_KEY,
+  filterFacts,
+  getMonthlyFacts,
+  groupByBranch,
+  overtimeTrendByMonth,
+  payrollExpenseTrendByMonth,
+  summarizeAttendance,
+  summarizeOvertime,
+  summarizePayroll,
+} from "@/lib/monthly-analytics";
+import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -52,7 +57,7 @@ function variantFor(roles: string[]): "full" | "payroll" | "team" | "personal" {
 }
 
 export default function DashboardPage() {
-  const { currentUser, currentEmployee, employees, announcements } = useHris();
+  const { currentUser, currentEmployee, employees, branches, announcements } = useHris();
   const roles = currentUser?.roles ?? [];
   const variant = variantFor(roles);
 
@@ -63,22 +68,34 @@ export default function DashboardPage() {
     return employees;
   }, [variant, currentEmployee, employees]);
 
+  const branchFilter = variant === "team" && currentEmployee ? currentEmployee.branchId : undefined;
+  const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+
   if (variant === "personal") {
     return <PersonalDashboard employees={employees} announcements={announcements} />;
   }
 
   const active = activeEmployees(scoped);
   const statusCounts = employmentStatusCounts(scoped);
-  const attendance = attendanceSnapshot(scoped);
-  const trend = attendanceTrend();
-  const regularizations = dueForRegularization(scoped);
-  const contracts = expiringContracts(scoped);
   const birthdays = upcomingBirthdays(scoped);
   const hires = newHires(scoped);
   const resignations = recentResignations(scoped);
-  const branchExpense = payrollExpenseByBranch(scoped);
-  const totalExpense = totalMonthlyPayrollExpense(scoped);
-  const contributions = estimatedEmployerContributions(scoped);
+
+  const attendanceTrend = attendanceTrendByMonth(facts, employees, { branchId: branchFilter });
+  const currentAttendance = summarizeAttendance(filterFacts(facts, employees, { branchId: branchFilter, monthKey: CURRENT_MONTH_KEY }));
+
+  const overtimeTrend = overtimeTrendByMonth(facts, employees, { branchId: branchFilter });
+  const currentOvertime = summarizeOvertime(filterFacts(facts, employees, { branchId: branchFilter, monthKey: CURRENT_MONTH_KEY }));
+
+  const payrollTrend = payrollExpenseTrendByMonth(facts, employees, { branchId: branchFilter });
+  const currentPayroll = summarizePayroll(filterFacts(facts, employees, { branchId: branchFilter, monthKey: CURRENT_MONTH_KEY }));
+  const branchExpense = groupByBranch(
+    filterFacts(facts, employees, { monthKey: CURRENT_MONTH_KEY, branchId: branchFilter }),
+    employees,
+    branches,
+  )
+    .map((row) => ({ label: row.label, value: row.payroll.totalEmployerExpense }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <div>
@@ -97,80 +114,95 @@ export default function DashboardPage() {
             <StatTile label="On leave today" value={scoped.filter((e) => e.status === "on_leave").length.toString()} />
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-              <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Employment status mix</div>
-              <StackedHBar
-                totalLabel={`${active.length} total`}
-                segments={(Object.keys(statusCounts) as (keyof typeof statusCounts)[])
-                  .filter((k) => statusCounts[k] > 0)
-                  .map((k) => ({ key: k, label: STATUS_LABELS[k], value: statusCounts[k], color: STATUS_COLORS[k] }))}
-              />
-            </div>
-            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-              <div className="mb-3 flex flex-col gap-1.5 text-sm font-medium text-[var(--text-primary)] sm:flex-row sm:items-center sm:justify-between">
-                <span>Attendance rate — last 8 checkpoints</span>
-                <span><Badge tone="muted">Sample data · preview</Badge></span>
-              </div>
-              <TrendChart data={trend} valueFormatter={(v) => `${v}%`} />
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile label="Present today" value={attendance.present.toString()} hint={`of ${attendance.total}`} />
-            <StatTile label="Late today" value={attendance.late.toString()} deltaTone={attendance.late > 5 ? "bad" : "neutral"} />
-            <StatTile label="Absent today" value={attendance.absent.toString()} deltaTone={attendance.absent > 5 ? "bad" : "neutral"} />
-            <StatTile label="OT hours (period)" value={attendance.otHours.toString()} hint="hrs logged" />
+          <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Employment status mix</div>
+            <StackedHBar
+              totalLabel={`${active.length} total`}
+              segments={(Object.keys(statusCounts) as (keyof typeof statusCounts)[])
+                .filter((k) => statusCounts[k] > 0)
+                .map((k) => ({ key: k, label: STATUS_LABELS[k], value: statusCounts[k], color: STATUS_COLORS[k] }))}
+            />
           </div>
         </>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-          <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">
-            {variant === "team" ? "Team payroll cost equivalent" : "Monthly payroll expense by branch"}
+      {/* --- Monthly Attendance --------------------------------------------- */}
+      {variant !== "payroll" && (
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Monthly Attendance</h2>
+            <Link href="/reports/attendance" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
           </div>
-          <HBarChart data={branchExpense.length ? branchExpense : [{ label: currentEmployee ? branchName(currentEmployee.branchId) : "—", value: totalExpense }]} valueFormatter={(v) => formatCurrencyCompact(v)} />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatTile label="Present (this month)" value={currentAttendance.totalPresent.toLocaleString()} />
+            <StatTile label="Late (this month)" value={currentAttendance.totalLate.toLocaleString()} deltaTone={currentAttendance.totalLate > 40 ? "bad" : "neutral"} />
+            <StatTile label="Absent (this month)" value={currentAttendance.totalAbsent.toLocaleString()} deltaTone={currentAttendance.totalAbsent > 40 ? "bad" : "neutral"} />
+            <StatTile label="On leave (this month)" value={currentAttendance.totalLeave.toLocaleString()} />
+            <StatTile label="Attendance rate" value={`${currentAttendance.attendanceRate}%`} />
+          </div>
+          <div className="mt-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Attendance rate — last 6 months</div>
+            <TrendChart data={attendanceTrend} valueFormatter={(v) => `${v}%`} />
+          </div>
+        </section>
+      )}
+
+      {/* --- Monthly Overtime ------------------------------------------------ */}
+      {variant !== "payroll" && (
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-base font-semibold text-[var(--text-primary)]"><Clock3 size={16} /> Monthly Overtime</h2>
+            <Link href="/reports/overtime" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label="OT hours (this month)" value={currentOvertime.totalOtHours.toLocaleString()} />
+            <StatTile label="OT pay (this month)" value={formatCurrencyCompact(currentOvertime.totalOtPay)} />
+            <StatTile label="Avg hrs / employee" value={active.length ? (currentOvertime.totalOtHours / active.length).toFixed(1) : "0"} />
+            <StatTile label="Months tracked" value="6" hint="rolling window" />
+          </div>
+          <div className="mt-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">OT hours — last 6 months</div>
+            <TrendChart data={overtimeTrend} color="var(--series-2)" valueFormatter={(v) => `${v} hrs`} />
+          </div>
+        </section>
+      )}
+
+      {/* --- Monthly Employer Payroll Expense -------------------------------- */}
+      <section className="mt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Monthly Employer Payroll Expense</h2>
+          <Link href="/reports/payroll-expense" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
         </div>
-        <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-          <div className="mb-3 flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
-            Estimated employer contributions
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="Total employer expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense)} hint="this month" />
+          <StatTile label="Basic salary" value={formatCurrencyCompact(currentPayroll.basicSalary)} />
+          <StatTile label="Employer SSS + HDMF + PhilHealth" value={formatCurrencyCompact(currentPayroll.employerSSS + currentPayroll.employerHDMF + currentPayroll.employerPhilHealth)} />
+          <StatTile label="OT + Holiday + Leave pay" value={formatCurrencyCompact(currentPayroll.overtimePay + currentPayroll.holidayPay + currentPayroll.leavePay)} />
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 6 months</div>
+            <TrendChart data={payrollTrend} color="var(--series-1)" valueFormatter={(v) => formatCurrencyCompact(v)} />
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <StatTile compact label="SSS" value={formatCurrencyCompact(contributions.sss)} />
-            <StatTile compact label="PhilHealth" value={formatCurrencyCompact(contributions.philhealth)} />
-            <StatTile compact label="Pag-IBIG" value={formatCurrencyCompact(contributions.pagibig)} />
-          </div>
-          <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-[var(--gridline)]/30 p-2 text-xs text-[var(--text-secondary)]">
-            <Info size={14} className="mt-0.5 shrink-0" />
-            <span>
-              Illustrative estimate only. Real SSS / PhilHealth / Pag-IBIG contribution brackets change periodically —
-              configure verified, versioned rate tables in System Administration before relying on this for actual payroll.
-            </span>
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">
+              {variant === "team" ? "Team payroll expense (this month)" : "Payroll expense by branch (this month)"}
+            </div>
+            <HBarChart data={branchExpense} valueFormatter={(v) => formatCurrencyCompact(v)} />
           </div>
         </div>
-      </div>
+        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-[var(--gridline)]/30 p-2 text-xs text-[var(--text-secondary)]">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Employer expense = Basic Salary + Allowances + Overtime Pay + Holiday Pay + Leave Pay + Employer SSS + Employer
+            HDMF (Pag-IBIG) + Employer PhilHealth. Contribution percentages are illustrative placeholders — configure
+            verified, versioned rate tables in System Administration before relying on this for actual payroll.
+          </span>
+        </div>
+      </section>
 
       {variant !== "payroll" && (
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ListCard
-            title="Due for regularization"
-            icon={<TrendingUp size={16} />}
-            items={regularizations.map(({ employee, daysUntil }) => (
-              <PersonRow key={employee.id} employee={employee} right={<DueBadge days={daysUntil} />} />
-            ))}
-            emptyText="No probationary employees approaching their evaluation date."
-            href="/contracts"
-          />
-          <ListCard
-            title="Expiring contracts"
-            icon={<TrendingDown size={16} />}
-            items={contracts.map(({ employee, daysUntil }) => (
-              <PersonRow key={employee.id} employee={employee} right={<DueBadge days={daysUntil} />} />
-            ))}
-            emptyText="No freelance / project-based contracts expiring soon."
-            href="/contracts"
-          />
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <ListCard
             title="Upcoming birthdays"
             icon={<Cake size={16} />}
@@ -180,36 +212,28 @@ export default function DashboardPage() {
             emptyText="No birthdays in the next 30 days."
             href="/employees"
           />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-1">
-            <ListCard
-              title="New hires (60d)"
-              icon={<UserPlus size={16} />}
-              items={hires.map((e) => (
-                <PersonRow key={e.id} employee={e} right={<Badge tone="good">{formatDate(e.dateHired)}</Badge>} />
-              ))}
-              emptyText="No new hires in the last 60 days."
-              href="/employees"
-            />
-            <ListCard
-              title="Recent resignations (30d)"
-              icon={<UserMinus size={16} />}
-              items={resignations.map((e) => (
-                <PersonRow key={e.id} employee={e} right={<Badge tone="critical">{e.statusChangedAt ? formatDate(e.statusChangedAt) : ""}</Badge>} />
-              ))}
-              emptyText="No resignations in the last 30 days."
-              href="/employees"
-            />
-          </div>
+          <ListCard
+            title="New hires (60d)"
+            icon={<UserPlus size={16} />}
+            items={hires.map((e) => (
+              <PersonRow key={e.id} employee={e} right={<Badge tone="good">{formatDate(e.dateHired)}</Badge>} />
+            ))}
+            emptyText="No new hires in the last 60 days."
+            href="/employees"
+          />
+          <ListCard
+            title="Recent resignations (30d)"
+            icon={<UserMinus size={16} />}
+            items={resignations.map((e) => (
+              <PersonRow key={e.id} employee={e} right={<Badge tone="critical">{e.statusChangedAt ? formatDate(e.statusChangedAt) : ""}</Badge>} />
+            ))}
+            emptyText="No resignations in the last 30 days."
+            href="/employees"
+          />
         </div>
       )}
     </div>
   );
-}
-
-function DueBadge({ days }: { days: number }) {
-  if (days < 0) return <Badge tone="critical">Overdue {Math.abs(days)}d</Badge>;
-  if (days <= 15) return <Badge tone="warning">Due in {days}d</Badge>;
-  return <Badge tone="good">Due in {days}d</Badge>;
 }
 
 function PersonRow({ employee, right }: { employee: Employee; right: React.ReactNode }) {
@@ -269,7 +293,6 @@ function PersonalDashboard({ employees, announcements }: { employees: Employee[]
             <div className="space-y-1.5 text-sm text-[var(--text-secondary)]">
               <div><span className="text-[var(--text-muted)]">Position:</span> {positionTitle(emp.positionId)}</div>
               <div><span className="text-[var(--text-muted)]">Branch:</span> {branchName(emp.branchId)}</div>
-              <div><span className="text-[var(--text-muted)]">Department:</span> {departmentName(emp.departmentId)}</div>
               <div><span className="text-[var(--text-muted)]">Date hired:</span> {formatDate(emp.dateHired)}</div>
               <div><span className="text-[var(--text-muted)]">Status:</span> <Badge tone="info">{emp.employmentStatus}</Badge></div>
             </div>

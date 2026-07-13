@@ -45,7 +45,7 @@ export default function ModuleStubPage() {
           </ul>
         </div>
         <div className="mt-5 rounded-lg bg-[var(--gridline)]/30 p-3 text-xs text-[var(--text-secondary)]">
-          This demo focused depth on the Dashboards, Contract Monitoring, Performance Evaluations, Disciplinary Records,
+          This demo focused depth on the Dashboards &amp; Analytics, Performance Evaluations, Disciplinary Records,
           Audit Trail, and System Administration modules. This module is fully scoped in the build spec and is next in
           the build order (Section 9).
         </div>
