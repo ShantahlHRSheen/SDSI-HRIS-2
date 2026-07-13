@@ -224,3 +224,46 @@ export interface GeneratedBirForm {
   generatedAt: string;
   summary: Record<string, number>;
 }
+
+export type RequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+interface ApprovableRequest {
+  id: string;
+  employeeId: string;
+  reason: string;
+  status: RequestStatus;
+  filedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+export interface LeaveRequest extends ApprovableRequest {
+  leaveTypeId: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+}
+
+export interface OvertimeRequest extends ApprovableRequest {
+  date: string;
+  hours: number;
+}
+
+export interface AttendanceCorrectionRequest extends ApprovableRequest {
+  date: string;
+  requestedTimeIn: string | null;
+  requestedTimeOut: string | null;
+}
+
+export type DailyAttendanceStatus = "present" | "late" | "absent" | "leave";
+
+export interface DailyAttendanceRecord {
+  date: string;
+  dayLabel: string;
+  status: DailyAttendanceStatus;
+  timeIn: string | null;
+  timeOut: string | null;
+  lateMinutes: number;
+  otHours: number;
+}

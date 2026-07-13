@@ -5,12 +5,15 @@ import {
   ANNOUNCEMENTS,
   AUDIT_LOGS,
   BRANCHES,
+  CORRECTION_REQUESTS,
   DEMO_USERS,
   DEPARTMENTS,
   DISCIPLINARY_RECORDS,
   EMPLOYEES,
   HOLIDAYS,
+  LEAVE_REQUESTS,
   LEAVE_TYPES,
+  OVERTIME_REQUESTS,
   PAYROLL_PERIODS,
   PERFORMANCE_EVALUATIONS,
   POSITIONS,
@@ -19,6 +22,7 @@ import {
 } from "./mock-data";
 import type {
   Announcement,
+  AttendanceCorrectionRequest,
   AuditLog,
   Branch,
   Department,
@@ -27,10 +31,13 @@ import type {
   Employee,
   GeneratedBirForm,
   Holiday,
+  LeaveRequest,
   LeaveType,
+  OvertimeRequest,
   PayrollPeriod,
   PerformanceEvaluation,
   Position,
+  RequestStatus,
   WorkSchedule,
 } from "./types";
 
@@ -51,6 +58,9 @@ interface PersistedState {
   leaveTypes: LeaveType[];
   payrollPeriods: PayrollPeriod[];
   generatedBirForms: GeneratedBirForm[];
+  leaveRequests: LeaveRequest[];
+  overtimeRequests: OvertimeRequest[];
+  correctionRequests: AttendanceCorrectionRequest[];
 }
 
 function defaultState(): PersistedState {
@@ -69,6 +79,9 @@ function defaultState(): PersistedState {
     leaveTypes: LEAVE_TYPES,
     payrollPeriods: PAYROLL_PERIODS,
     generatedBirForms: [],
+    leaveRequests: LEAVE_REQUESTS,
+    overtimeRequests: OVERTIME_REQUESTS,
+    correctionRequests: CORRECTION_REQUESTS,
   };
 }
 
@@ -98,6 +111,9 @@ interface HrisContextShape {
   leaveTypes: LeaveType[];
   payrollPeriods: PayrollPeriod[];
   generatedBirForms: GeneratedBirForm[];
+  leaveRequests: LeaveRequest[];
+  overtimeRequests: OvertimeRequest[];
+  correctionRequests: AttendanceCorrectionRequest[];
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
@@ -138,6 +154,15 @@ interface HrisContextShape {
   demoUsers: DemoUser[];
 
   addGeneratedBirForm: (input: Omit<GeneratedBirForm, "id" | "generatedAt" | "generatedBy">) => void;
+
+  fileLeaveRequest: (input: Omit<LeaveRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
+  decideLeaveRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
+
+  fileOvertimeRequest: (input: Omit<OvertimeRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
+  decideOvertimeRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
+
+  fileCorrectionRequest: (input: Omit<AttendanceCorrectionRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
+  decideCorrectionRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 }
 
 const HrisContext = createContext<HrisContextShape | null>(null);
@@ -338,6 +363,81 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, demoUsers],
   );
 
+  const fileLeaveRequest: HrisContextShape["fileLeaveRequest"] = useCallback(
+    (input) => {
+      const entry: LeaveRequest = { ...input, id: nextId("lv"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
+      setState((prev) => ({ ...prev, leaveRequests: [entry, ...prev.leaveRequests] }));
+      logAudit("Leave Management", "file", `Filed leave request (${input.days} day(s))`);
+    },
+    [logAudit],
+  );
+
+  const decideLeaveRequest: HrisContextShape["decideLeaveRequest"] = useCallback(
+    (id, decision, note) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        return {
+          ...prev,
+          leaveRequests: prev.leaveRequests.map((r) =>
+            r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
+          ),
+        };
+      });
+      logAudit("Leave Management", "decide", `Leave request ${decision}`);
+    },
+    [logAudit, demoUsers],
+  );
+
+  const fileOvertimeRequest: HrisContextShape["fileOvertimeRequest"] = useCallback(
+    (input) => {
+      const entry: OvertimeRequest = { ...input, id: nextId("ot"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
+      setState((prev) => ({ ...prev, overtimeRequests: [entry, ...prev.overtimeRequests] }));
+      logAudit("Overtime", "file", `Filed overtime request (${input.hours}h on ${input.date})`);
+    },
+    [logAudit],
+  );
+
+  const decideOvertimeRequest: HrisContextShape["decideOvertimeRequest"] = useCallback(
+    (id, decision, note) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        return {
+          ...prev,
+          overtimeRequests: prev.overtimeRequests.map((r) =>
+            r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
+          ),
+        };
+      });
+      logAudit("Overtime", "decide", `Overtime request ${decision}`);
+    },
+    [logAudit, demoUsers],
+  );
+
+  const fileCorrectionRequest: HrisContextShape["fileCorrectionRequest"] = useCallback(
+    (input) => {
+      const entry: AttendanceCorrectionRequest = { ...input, id: nextId("ac"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
+      setState((prev) => ({ ...prev, correctionRequests: [entry, ...prev.correctionRequests] }));
+      logAudit("Attendance Corrections", "file", `Filed attendance correction for ${input.date}`);
+    },
+    [logAudit],
+  );
+
+  const decideCorrectionRequest: HrisContextShape["decideCorrectionRequest"] = useCallback(
+    (id, decision, note) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        return {
+          ...prev,
+          correctionRequests: prev.correctionRequests.map((r) =>
+            r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
+          ),
+        };
+      });
+      logAudit("Attendance Corrections", "decide", `Correction request ${decision}`);
+    },
+    [logAudit, demoUsers],
+  );
+
   const value: HrisContextShape = {
     ready,
     currentUser,
@@ -357,6 +457,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     leaveTypes: state.leaveTypes,
     payrollPeriods: state.payrollPeriods,
     generatedBirForms: state.generatedBirForms,
+    leaveRequests: state.leaveRequests,
+    overtimeRequests: state.overtimeRequests,
+    correctionRequests: state.correctionRequests,
     addEvaluation,
     setEvaluationStatus,
     addDisciplinaryRecord,
@@ -385,6 +488,12 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     updateUserRoles,
     demoUsers,
     addGeneratedBirForm,
+    fileLeaveRequest,
+    decideLeaveRequest,
+    fileOvertimeRequest,
+    decideOvertimeRequest,
+    fileCorrectionRequest,
+    decideCorrectionRequest,
   };
 
   return <HrisContext.Provider value={value}>{children}</HrisContext.Provider>;

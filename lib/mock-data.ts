@@ -1,5 +1,6 @@
 import type {
   Announcement,
+  AttendanceCorrectionRequest,
   AuditLog,
   Branch,
   Department,
@@ -7,7 +8,9 @@ import type {
   DisciplinaryRecord,
   Employee,
   Holiday,
+  LeaveRequest,
   LeaveType,
+  OvertimeRequest,
   PayrollPeriod,
   PerformanceEvaluation,
   Position,
@@ -1079,6 +1082,39 @@ export const DEMO_USERS: DemoUser[] = [
   { id: "u-depthead", employeeId: opsManagerCbt.id, name: "Marlyn Leonardo", title: "Operations Manager (Cabanatuan Branch)", roles: ["dept_head", "employee"], initials: "ML" },
   { id: "u-employee", employeeId: cashierReynalyn.id, name: "Reynalyn Alfonso", title: "Cashier (Cabanatuan Branch)", roles: ["employee"], initials: "RA" },
   { id: "u-upper", employeeId: viceChair.id, name: "Sheilah A. Magdadaro", title: "Vice Chairperson", roles: ["upper_management"], initials: "SM" },
+];
+
+// --- Leave requests -----------------------------------------------------------
+export const LEAVE_REQUESTS: LeaveRequest[] = [
+  { id: "lv-1", employeeId: "emp-042", leaveTypeId: "lt-vl", startDate: addDays(TODAY, 7), endDate: addDays(TODAY, 9), days: 3, reason: "Family reunion out of town.", status: "pending", filedAt: addDays(TODAY, -1), decidedBy: null, decidedAt: null, decisionNote: null },
+  { id: "lv-2", employeeId: "emp-006", leaveTypeId: "lt-sl", startDate: addDays(TODAY, -8), endDate: addDays(TODAY, -7), days: 2, reason: "Flu with fever.", status: "approved", filedAt: addDays(TODAY, -9), decidedBy: "emp-005", decidedAt: addDays(TODAY, -8), decisionNote: "Get well soon." },
+  { id: "lv-3", employeeId: "emp-044", leaveTypeId: "lt-el", startDate: addDays(TODAY, -3), endDate: addDays(TODAY, -3), days: 1, reason: "Family emergency.", status: "approved", filedAt: addDays(TODAY, -3), decidedBy: "emp-045", decidedAt: addDays(TODAY, -3), decisionNote: "Approved." },
+  { id: "lv-4", employeeId: "emp-018", leaveTypeId: "lt-vl", startDate: "2026-06-15", endDate: "2026-06-16", days: 2, reason: "Personal travel.", status: "rejected", filedAt: "2026-06-05", decidedBy: "emp-017", decidedAt: "2026-06-06", decisionNote: "Insufficient sales floor coverage that week — please refile for a later date." },
+  { id: "lv-5", employeeId: "emp-043", leaveTypeId: "lt-bl", startDate: addDays(TODAY, -5), endDate: addDays(TODAY, -3), days: 3, reason: "Bereavement — immediate family.", status: "approved", filedAt: addDays(TODAY, -6), decidedBy: "emp-045", decidedAt: addDays(TODAY, -6), decisionNote: "Our condolences. Approved." },
+  { id: "lv-6", employeeId: "emp-039", leaveTypeId: "lt-vl", startDate: addDays(TODAY, 12), endDate: addDays(TODAY, 14), days: 3, reason: "Pre-planned vacation.", status: "pending", filedAt: addDays(TODAY, -2), decidedBy: null, decidedAt: null, decisionNote: null },
+  { id: "lv-7", employeeId: "emp-009", leaveTypeId: "lt-sl", startDate: addDays(TODAY, -13), endDate: addDays(TODAY, -13), days: 1, reason: "Dental procedure.", status: "approved", filedAt: addDays(TODAY, -14), decidedBy: "emp-005", decidedAt: addDays(TODAY, -13), decisionNote: "Approved." },
+  { id: "lv-8", employeeId: "emp-052", leaveTypeId: "lt-vl", startDate: addDays(TODAY, 4), endDate: addDays(TODAY, 4), days: 1, reason: "Sibling's wedding.", status: "pending", filedAt: addDays(TODAY, -1), decidedBy: null, decidedAt: null, decisionNote: null },
+  { id: "lv-9", employeeId: "emp-061", leaveTypeId: "lt-spl", startDate: addDays(TODAY, -20), endDate: addDays(TODAY, -20), days: 1, reason: "School enrollment for dependent.", status: "approved", filedAt: addDays(TODAY, -21), decidedBy: "emp-045", decidedAt: addDays(TODAY, -20), decisionNote: "Approved." },
+  { id: "lv-10", employeeId: "emp-019", leaveTypeId: "lt-el", startDate: addDays(TODAY, 2), endDate: addDays(TODAY, 2), days: 1, reason: "Utility repair at home requires my presence.", status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null },
+];
+
+// --- Overtime requests ---------------------------------------------------------
+export const OVERTIME_REQUESTS: OvertimeRequest[] = [
+  { id: "ot-1", employeeId: "emp-042", date: addDays(TODAY, -2), hours: 3, reason: "Month-end inventory count.", status: "approved", filedAt: addDays(TODAY, -2), decidedBy: "emp-045", decidedAt: addDays(TODAY, -1), decisionNote: "Approved." },
+  { id: "ot-2", employeeId: "emp-048", date: addDays(TODAY, -4), hours: 4, reason: "Warehouse stock reconciliation before audit.", status: "approved", filedAt: addDays(TODAY, -4), decidedBy: "emp-045", decidedAt: addDays(TODAY, -3), decisionNote: "Approved." },
+  { id: "ot-3", employeeId: "emp-055", date: addDays(TODAY, -1), hours: 2, reason: "Branch closing delayed by system upgrade.", status: "pending", filedAt: addDays(TODAY, -1), decidedBy: null, decidedAt: null, decisionNote: null },
+  { id: "ot-4", employeeId: "emp-006", date: addDays(TODAY, -6), hours: 2.5, reason: "Assisting with July payroll prep.", status: "approved", filedAt: addDays(TODAY, -6), decidedBy: "emp-005", decidedAt: addDays(TODAY, -5), decisionNote: "Approved." },
+  { id: "ot-5", employeeId: "emp-053", date: addDays(TODAY, -3), hours: 3, reason: "Restocking ahead of weekend promo.", status: "rejected", filedAt: addDays(TODAY, -3), decidedBy: "emp-045", decidedAt: addDays(TODAY, -2), decisionNote: "OT budget for the branch already met this period." },
+  { id: "ot-6", employeeId: "emp-029", date: addDays(TODAY, -7), hours: 2, reason: "Sales report backlog.", status: "approved", filedAt: addDays(TODAY, -7), decidedBy: "emp-012", decidedAt: addDays(TODAY, -6), decisionNote: "Approved." },
+  { id: "ot-7", employeeId: "emp-062", date: addDays(TODAY, 1), hours: 3, reason: "Coverage for branch inventory tomorrow.", status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null },
+];
+
+// --- Attendance correction requests --------------------------------------------
+export const CORRECTION_REQUESTS: AttendanceCorrectionRequest[] = [
+  { id: "ac-1", employeeId: "emp-042", date: addDays(TODAY, -5), requestedTimeIn: "08:00", requestedTimeOut: "17:00", reason: "Biometric device offline that morning; logged in manually with supervisor.", status: "approved", filedAt: addDays(TODAY, -5), decidedBy: "emp-045", decidedAt: addDays(TODAY, -4), decisionNote: "Confirmed with branch supervisor. Approved." },
+  { id: "ac-2", employeeId: "emp-054", date: addDays(TODAY, -2), requestedTimeIn: "08:00", requestedTimeOut: null, reason: "Forgot to time out — left through the back entrance.", status: "pending", filedAt: addDays(TODAY, -1), decidedBy: null, decidedAt: null, decisionNote: null },
+  { id: "ac-3", employeeId: "emp-057", date: addDays(TODAY, -9), requestedTimeIn: "06:00", requestedTimeOut: "15:00", reason: "Worked the early shift for a swapped schedule but system still shows default shift hours.", status: "approved", filedAt: addDays(TODAY, -9), decidedBy: "emp-045", decidedAt: addDays(TODAY, -8), decisionNote: "Shift swap confirmed. Approved." },
+  { id: "ac-4", employeeId: "emp-064", date: addDays(TODAY, -10), requestedTimeIn: "08:15", requestedTimeOut: "17:00", reason: "Traffic due to road closure; arrived slightly late but was not reflected correctly.", status: "rejected", filedAt: addDays(TODAY, -9), decidedBy: "emp-045", decidedAt: addDays(TODAY, -8), decisionNote: "Late arrival stands — no supporting certificate for road closure." },
 ];
 
 // --- Performance evaluations ------------------------------------------------

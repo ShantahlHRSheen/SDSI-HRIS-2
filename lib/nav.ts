@@ -30,10 +30,10 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Workforce",
     items: [
-      { label: "Attendance", href: "/modules/attendance", roles: ["hr_admin", "dept_head", "employee", "sys_admin"], built: false },
-      { label: "Leave Management", href: "/modules/leave", roles: ["hr_admin", "dept_head", "employee"], built: false },
-      { label: "Overtime", href: "/modules/overtime", roles: ["hr_admin", "dept_head", "employee"], built: false },
-      { label: "Attendance Corrections", href: "/modules/corrections", roles: ["hr_admin", "dept_head", "employee"], built: false },
+      { label: "Attendance", href: "/modules/attendance", roles: ALL_ROLES, built: true },
+      { label: "Leave Management", href: "/modules/leave", roles: ALL_ROLES, built: true },
+      { label: "Overtime", href: "/modules/overtime", roles: ALL_ROLES, built: true },
+      { label: "Attendance Corrections", href: "/modules/corrections", roles: ALL_ROLES, built: true },
       { label: "Performance Evaluations", href: "/evaluations", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
     ],

@@ -86,6 +86,22 @@ export function employeeHdmfNumber(employeeNumber: string): string {
   return maskedGovId(employeeNumber + "3", [4, 4, 4]);
 }
 
+// Inclusive count of Mon–Fri days between two dates, used to compute leave
+// duration from a filed start/end date range.
+export function businessDaysBetween(start: string, end: string): number {
+  const startDate = new Date(start + "T00:00:00Z");
+  const endDate = new Date(end + "T00:00:00Z");
+  if (endDate < startDate) return 0;
+  let count = 0;
+  const cursor = new Date(startDate);
+  while (cursor <= endDate) {
+    const dow = cursor.getUTCDay();
+    if (dow !== 0 && dow !== 6) count += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
+}
+
 export function initialsOf(name: string): string {
   return name
     .split(" ")

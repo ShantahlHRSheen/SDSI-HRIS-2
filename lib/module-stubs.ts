@@ -6,30 +6,6 @@ export interface ModuleStub {
 }
 
 export const MODULE_STUBS: Record<string, ModuleStub> = {
-  attendance: {
-    title: "Attendance Management",
-    description: "Manual encoding and CSV import of daily time records, with automatic computation of late/undertime minutes, holiday and rest-day work, and per-period summaries.",
-    specSection: "§4.2",
-    planned: ["Daily attendance encoding form + CSV import", "Attendance by payroll period / employee / branch reports", "Late & undertime automatic computation", "Biometric-ready data model (no hardware integration yet)"],
-  },
-  leave: {
-    title: "Leave Management",
-    description: "Leave filing with an Employee → Supervisor → HR approval chain, a shared leave calendar, and per-type credit/balance tracking.",
-    specSection: "§4.3",
-    planned: ["Leave filing form with medical certificate upload", "Approval / rejection / cancellation workflow", "Leave calendar & ledger", "Per-type balance tracking, configurable in System Administration"],
-  },
-  overtime: {
-    title: "Overtime Management",
-    description: "Overtime requests routed to the immediate supervisor, with approved hours feeding directly into payroll computation.",
-    specSection: "§4.4",
-    planned: ["OT request form", "Supervisor approval workflow", "OT history & summary by employee/branch", "Feed into payroll engine (§5)"],
-  },
-  corrections: {
-    title: "Attendance Correction",
-    description: "Employee-initiated correction requests for missing time in/out, incorrect time, wrong shift, or biometric failure.",
-    specSection: "§4.5",
-    planned: ["Correction request form with supporting document upload", "Employee → Supervisor → HR approval chain", "Correction history per employee"],
-  },
   payroll: {
     title: "Payroll Processing",
     description: "The full computation → HR review → manual adjustment → approval → lock → payslip workflow described in the build spec.",
