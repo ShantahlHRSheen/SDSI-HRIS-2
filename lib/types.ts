@@ -210,3 +210,15 @@ export interface DemoUser {
   roles: Role[];
   initials: string;
 }
+
+export type BirFormType = "1601c" | "2316";
+
+export interface GeneratedBirForm {
+  id: string;
+  formType: BirFormType;
+  period: string; // monthKey ("2026-07") for 1601-C, tax year ("2026") for 2316
+  employeeId: string | null; // null for 1601-C (company-wide)
+  generatedBy: string;
+  generatedAt: string;
+  summary: Record<string, number>;
+}

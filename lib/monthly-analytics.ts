@@ -74,6 +74,38 @@ export interface MonthlyEmployeeFact {
   employerHDMF: number;
   employerPhilHealth: number;
   totalEmployerExpense: number;
+
+  // --- Employee-side tax & mandatory deductions (for BIR forms / tax ledger) ---
+  employeeSSS: number;
+  employeeHDMF: number;
+  employeePhilHealth: number;
+  thirteenthMonthAccrual: number;
+  deMinimisBenefits: number;
+  otherBenefits: number;
+  grossCompensation: number;
+  nonTaxableCompensation: number;
+  taxableCompensation: number;
+  withholdingTax: number;
+  netPay: number;
+}
+
+// Monthly graduated withholding tax table (TRAIN law, effective 2023 onward).
+// ILLUSTRATIVE — BIR revises brackets/rates periodically; verify against the
+// current Revenue Regulation and configure as a versioned table before using
+// this for actual filings, per the build spec's guidance on statutory rates.
+const WITHHOLDING_TAX_TABLE = [
+  { over: 0, upTo: 20833, base: 0, rate: 0 },
+  { over: 20833, upTo: 33333, base: 0, rate: 0.15 },
+  { over: 33333, upTo: 66667, base: 1875, rate: 0.2 },
+  { over: 66667, upTo: 166667, base: 8541.8, rate: 0.25 },
+  { over: 166667, upTo: 666667, base: 33541.8, rate: 0.3 },
+  { over: 666667, upTo: Infinity, base: 183541.8, rate: 0.35 },
+];
+
+export function computeMonthlyWithholdingTax(taxableCompensation: number): number {
+  if (taxableCompensation <= 0) return 0;
+  const bracket = WITHHOLDING_TAX_TABLE.find((b) => taxableCompensation > b.over && taxableCompensation <= b.upTo) ?? WITHHOLDING_TAX_TABLE[WITHHOLDING_TAX_TABLE.length - 1];
+  return Math.round(bracket.base + (taxableCompensation - bracket.over) * bracket.rate);
 }
 
 function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
@@ -108,6 +140,28 @@ function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
   const totalEmployerExpense =
     Math.round(basicSalary) + allowances + overtimePay + holidayPay + leavePay + employerSSS + employerHDMF + employerPhilHealth;
 
+  // Employee-side mandatory contributions (illustrative rates — see the
+  // withholding-tax table note above; same caveat applies here).
+  const employeeSSS = Math.round(basicSalary * 0.045);
+  const employeeHDMF = Math.min(Math.round(basicSalary * 0.02), 200);
+  const employeePhilHealth = Math.round(basicSalary * 0.025);
+
+  const thirteenthMonthAccrual = Math.round(basicSalary / 12);
+  const deMinimisBenefits = 1500;
+  const otherBenefits = hash(seed + "ob") % 4 === 0 ? 1000 : 0;
+
+  const grossCompensation =
+    Math.round(basicSalary) + allowances + overtimePay + holidayPay + leavePay + thirteenthMonthAccrual + otherBenefits + deMinimisBenefits;
+
+  // Non-taxable: mandatory employee contributions, de minimis (within
+  // statutory ceilings), and 13th-month/other-benefits accrual (exempt up to
+  // the ₱90,000 annual cap — simplified here since this demo's data window
+  // rarely approaches that ceiling for a single employee).
+  const nonTaxableCompensation = employeeSSS + employeeHDMF + employeePhilHealth + deMinimisBenefits + thirteenthMonthAccrual;
+  const taxableCompensation = Math.max(grossCompensation - nonTaxableCompensation, 0);
+  const withholdingTax = computeMonthlyWithholdingTax(taxableCompensation);
+  const netPay = grossCompensation - withholdingTax - employeeSSS - employeeHDMF - employeePhilHealth;
+
   return {
     employeeId: employee.id,
     monthKey: month.key,
@@ -126,6 +180,17 @@ function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
     employerHDMF,
     employerPhilHealth,
     totalEmployerExpense,
+    employeeSSS,
+    employeeHDMF,
+    employeePhilHealth,
+    thirteenthMonthAccrual,
+    deMinimisBenefits,
+    otherBenefits,
+    grossCompensation,
+    nonTaxableCompensation,
+    taxableCompensation,
+    withholdingTax,
+    netPay,
   };
 }
 
@@ -197,6 +262,23 @@ export function summarizePayroll(facts: MonthlyEmployeeFact[]) {
     employerHDMF: facts.reduce((s, f) => s + f.employerHDMF, 0),
     employerPhilHealth: facts.reduce((s, f) => s + f.employerPhilHealth, 0),
     totalEmployerExpense: facts.reduce((s, f) => s + f.totalEmployerExpense, 0),
+  };
+}
+
+export function summarizeTax(facts: MonthlyEmployeeFact[]) {
+  return {
+    employeeCount: new Set(facts.map((f) => f.employeeId)).size,
+    grossCompensation: facts.reduce((s, f) => s + f.grossCompensation, 0),
+    nonTaxableCompensation: facts.reduce((s, f) => s + f.nonTaxableCompensation, 0),
+    taxableCompensation: facts.reduce((s, f) => s + f.taxableCompensation, 0),
+    employeeSSS: facts.reduce((s, f) => s + f.employeeSSS, 0),
+    employeeHDMF: facts.reduce((s, f) => s + f.employeeHDMF, 0),
+    employeePhilHealth: facts.reduce((s, f) => s + f.employeePhilHealth, 0),
+    thirteenthMonthAccrual: facts.reduce((s, f) => s + f.thirteenthMonthAccrual, 0),
+    deMinimisBenefits: facts.reduce((s, f) => s + f.deMinimisBenefits, 0),
+    otherBenefits: facts.reduce((s, f) => s + f.otherBenefits, 0),
+    withholdingTax: facts.reduce((s, f) => s + f.withholdingTax, 0),
+    netPay: facts.reduce((s, f) => s + f.netPay, 0),
   };
 }
 

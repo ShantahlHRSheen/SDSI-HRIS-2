@@ -58,6 +58,14 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "BIR",
+    items: [
+      { label: "BIR Form 1601-C", href: "/bir/1601c", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management"], built: true },
+      { label: "BIR Form 2316", href: "/bir/2316", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management", "employee"], built: true },
+      { label: "Employee Tax Ledger", href: "/bir/tax-ledger", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management"], built: true },
+    ],
+  },
+  {
     title: "System",
     items: [
       { label: "Audit Trail", href: "/audit", roles: ["hr_admin", "sys_admin"], built: true },

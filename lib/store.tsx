@@ -25,6 +25,7 @@ import type {
   DemoUser,
   DisciplinaryRecord,
   Employee,
+  GeneratedBirForm,
   Holiday,
   LeaveType,
   PayrollPeriod,
@@ -49,6 +50,7 @@ interface PersistedState {
   holidays: Holiday[];
   leaveTypes: LeaveType[];
   payrollPeriods: PayrollPeriod[];
+  generatedBirForms: GeneratedBirForm[];
 }
 
 function defaultState(): PersistedState {
@@ -66,6 +68,7 @@ function defaultState(): PersistedState {
     holidays: HOLIDAYS,
     leaveTypes: LEAVE_TYPES,
     payrollPeriods: PAYROLL_PERIODS,
+    generatedBirForms: [],
   };
 }
 
@@ -94,6 +97,7 @@ interface HrisContextShape {
   holidays: Holiday[];
   leaveTypes: LeaveType[];
   payrollPeriods: PayrollPeriod[];
+  generatedBirForms: GeneratedBirForm[];
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
@@ -132,6 +136,8 @@ interface HrisContextShape {
 
   updateUserRoles: (userId: string, roles: DemoUser["roles"]) => void;
   demoUsers: DemoUser[];
+
+  addGeneratedBirForm: (input: Omit<GeneratedBirForm, "id" | "generatedAt" | "generatedBy">) => void;
 }
 
 const HrisContext = createContext<HrisContextShape | null>(null);
@@ -314,6 +320,24 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit],
   );
 
+  const addGeneratedBirForm: HrisContextShape["addGeneratedBirForm"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const entry: GeneratedBirForm = {
+          ...input,
+          id: nextId("bir"),
+          generatedAt: TODAY,
+          generatedBy: actor?.name ?? "System",
+        };
+        return { ...prev, generatedBirForms: [entry, ...prev.generatedBirForms] };
+      });
+      const label = input.formType === "1601c" ? "BIR Form 1601-C" : "BIR Form 2316";
+      logAudit("BIR", "generate", `Generated ${label} for ${input.period}`);
+    },
+    [logAudit, demoUsers],
+  );
+
   const value: HrisContextShape = {
     ready,
     currentUser,
@@ -332,6 +356,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     holidays: state.holidays,
     leaveTypes: state.leaveTypes,
     payrollPeriods: state.payrollPeriods,
+    generatedBirForms: state.generatedBirForms,
     addEvaluation,
     setEvaluationStatus,
     addDisciplinaryRecord,
@@ -359,6 +384,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     addPayrollPeriod,
     updateUserRoles,
     demoUsers,
+    addGeneratedBirForm,
   };
 
   return <HrisContext.Provider value={value}>{children}</HrisContext.Provider>;

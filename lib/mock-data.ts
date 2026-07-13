@@ -15,8 +15,8 @@ import type {
   WorkSchedule,
 } from "./types";
 
-// Fixed "today" so the demo's relative dates (contracts expiring, birthdays,
-// regularization due) stay meaningful without depending on wall-clock time.
+// Fixed "today" so the demo's relative dates (birthdays, payroll periods, etc.)
+// stay meaningful without depending on wall-clock time.
 export const TODAY = "2026-07-13";
 
 function addDays(dateStr: string, days: number): string {

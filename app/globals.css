@@ -76,3 +76,33 @@ body {
 .glow-accent {
   box-shadow: 0 0 0 1px var(--accent-glow), 0 0 18px -2px var(--accent-glow);
 }
+
+/* Official documents (BIR forms) always print in plain black-on-white,
+   regardless of the app's dark theme, and print-preview hides everything
+   else on the page — sidebar, topbar, buttons — showing only the form. */
+.bir-print-area {
+  background: #ffffff;
+  color: #0b0b0b;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .bir-print-area,
+  .bir-print-area * {
+    visibility: visible;
+  }
+  .bir-print-area {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 18mm;
+    overflow: visible;
+    z-index: 9999;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

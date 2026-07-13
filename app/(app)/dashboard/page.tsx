@@ -307,6 +307,7 @@ function PersonalDashboard({ employees, announcements }: { employees: Employee[]
               { label: "File Overtime", href: "/modules/overtime" },
               { label: "Attendance Correction", href: "/modules/corrections" },
               { label: "View Payslips", href: "/modules/payslips" },
+              { label: "My BIR 2316", href: "/bir/2316" },
               { label: "Org Chart", href: "/modules/org-chart" },
               { label: "Bulletin Board", href: "/bulletin" },
             ].map((a) => (

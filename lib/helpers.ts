@@ -61,6 +61,31 @@ export function dueSoonLabel(days: number): { label: string; tone: "critical" | 
   return { label: `Due in ${days}d`, tone: "muted" };
 }
 
+// Deterministic masked-format government ID for demo purposes only (SSS,
+// PhilHealth, Pag-IBIG/HDMF, TIN). Shared by the 201 file profile page and
+// the BIR forms so the same employee always shows the same value everywhere.
+export function maskedGovId(seed: string, groups: number[]): string {
+  const digits = seed.replace(/\D/g, "").padEnd(10, "0");
+  let i = 0;
+  return groups.map((g) => digits.slice(i, (i += g))).join("-");
+}
+
+export function employeeTIN(employeeNumber: string): string {
+  return maskedGovId(employeeNumber + "4", [3, 3, 3]);
+}
+
+export function employeeSssNumber(employeeNumber: string): string {
+  return maskedGovId(employeeNumber + "1", [2, 7, 1]);
+}
+
+export function employeePhilHealthNumber(employeeNumber: string): string {
+  return maskedGovId(employeeNumber + "2", [2, 9, 1]);
+}
+
+export function employeeHdmfNumber(employeeNumber: string): string {
+  return maskedGovId(employeeNumber + "3", [4, 4, 4]);
+}
+
 export function initialsOf(name: string): string {
   return name
     .split(" ")

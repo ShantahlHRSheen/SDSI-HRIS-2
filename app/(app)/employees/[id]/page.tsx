@@ -4,14 +4,19 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Badge, type BadgeTone } from "@/components/Badge";
-import { branchName, departmentName, formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
+import {
+  branchName,
+  departmentName,
+  employeeHdmfNumber,
+  employeePhilHealthNumber,
+  employeeSssNumber,
+  employeeTIN,
+  formatCurrency,
+  formatDate,
+  fullName,
+  positionTitle,
+} from "@/lib/helpers";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
-
-function maskedId(seed: string, groups: number[]): string {
-  const digits = seed.replace(/\D/g, "").padEnd(10, "0");
-  let i = 0;
-  return groups.map((g) => digits.slice(i, (i += g))).join("-");
-}
 
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
@@ -78,10 +83,10 @@ export default function EmployeeProfilePage() {
         </Section>
 
         <Section title="Government IDs" note="Masked placeholder values for demo purposes only.">
-          <Row label="SSS" value={maskedId(employee.employeeNumber + "1", [2, 7, 1])} />
-          <Row label="PhilHealth" value={maskedId(employee.employeeNumber + "2", [2, 9, 1])} />
-          <Row label="Pag-IBIG" value={maskedId(employee.employeeNumber + "3", [4, 4, 4])} />
-          <Row label="TIN" value={maskedId(employee.employeeNumber + "4", [3, 3, 3])} />
+          <Row label="SSS" value={employeeSssNumber(employee.employeeNumber)} />
+          <Row label="PhilHealth" value={employeePhilHealthNumber(employee.employeeNumber)} />
+          <Row label="Pag-IBIG" value={employeeHdmfNumber(employee.employeeNumber)} />
+          <Row label="TIN" value={employeeTIN(employee.employeeNumber)} />
         </Section>
 
         <Section title="Bank Details" note="Masked placeholder values for demo purposes only.">
