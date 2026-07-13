@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
+import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 import { branchName, departmentName, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
@@ -18,10 +19,12 @@ const STATUS_TONE: Record<Employee["status"], BadgeTone> = {
 };
 
 export default function EmployeeDirectoryPage() {
-  const { employees, branches, departments } = useHris();
+  const { employees, branches, departments, currentUser, addEmployee } = useHris();
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
+  const [adding, setAdding] = useState(false);
+  const canEdit = currentUser?.roles.includes("hr_admin");
 
   const rows = useMemo(() => {
     return employees
@@ -33,7 +36,17 @@ export default function EmployeeDirectoryPage() {
 
   return (
     <div>
-      <PageHeader title="Employee Directory" subtitle={`${employees.length} employees across ${branches.length} branches — the 201 File module foundation.`} />
+      <PageHeader
+        title="Employee Directory"
+        subtitle={`${employees.length} employees across ${branches.length} branches — the 201 File module foundation.`}
+        actions={
+          canEdit && (
+            <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+              <Plus size={16} /> Add employee
+            </button>
+          )
+        }
+      />
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
@@ -83,6 +96,18 @@ export default function EmployeeDirectoryPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {adding && (
+        <EmployeeEditModal
+          employee={null}
+          employees={employees}
+          onClose={() => setAdding(false)}
+          onSave={(data) => {
+            addEmployee(data);
+            setAdding(false);
+          }}
+        />
       )}
     </div>
   );

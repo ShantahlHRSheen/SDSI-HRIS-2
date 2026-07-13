@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
+import Link from "next/link";
 import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import { computePayrollForPeriod, summarizePayrollLines } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
@@ -19,13 +20,16 @@ const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
 };
 
 export default function PayrollProcessingPage() {
-  const { employees, payrollPeriods, setPayrollPeriodStatus, generatedPayslips, addGeneratedPayslip, currentUser } = useHris();
+  const { employees, payrollPeriods, attendancePeriodRecords, leaveRequests, overtimeRequests, setPayrollPeriodStatus, generatedPayslips, addGeneratedPayslip, currentUser } = useHris();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
 
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
 
-  const lines = useMemo(() => (period ? computePayrollForPeriod(period, employees) : []), [period, employees]);
+  const lines = useMemo(
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests) : []),
+    [period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests],
+  );
   const summary = summarizePayrollLines(lines);
   const byId = new Map(employees.map((e) => [e.id, e]));
 
@@ -44,6 +48,7 @@ export default function PayrollProcessingPage() {
           overtimePay: line.overtimePay,
           holidayPay: line.holidayPay,
           leavePay: line.leavePay,
+          lateDeduction: line.lateDeduction,
           grossPay: line.grossPay,
           employeeSSS: line.employeeSSS,
           employeeHDMF: line.employeeHDMF,
@@ -59,10 +64,10 @@ export default function PayrollProcessingPage() {
   function exportCsv() {
     if (!period) return;
     const csv = toCsv(
-      ["Employee", "Branch", "Basic Pay", "Allowances", "OT Pay", "Holiday Pay", "Leave Pay", "Gross Pay", "Total Deductions", "Net Pay"],
+      ["Employee", "Branch", "Basic Pay", "Allowances", "OT Pay", "Holiday Pay", "Leave Pay", "Late Deduction", "Gross Pay", "Total Deductions", "Net Pay"],
       lines.map((l) => {
         const emp = byId.get(l.employeeId);
-        return [emp ? fullName(emp) : l.employeeId, emp ? branchName(emp.branchId) : "", l.basicPay, l.allowances, l.overtimePay, l.holidayPay, l.leavePay, l.grossPay, l.totalDeductions, l.netPay];
+        return [emp ? fullName(emp) : l.employeeId, emp ? branchName(emp.branchId) : "", l.basicPay, l.allowances, l.overtimePay, l.holidayPay, l.leavePay, l.lateDeduction, l.grossPay, l.totalDeductions, l.netPay];
       }),
     );
     downloadCsv(`payroll-${period.id}.csv`, csv);
@@ -122,10 +127,14 @@ export default function PayrollProcessingPage() {
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
             <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll register — {formatDate(period.start)} – {formatDate(period.end)}</div>
             {lines.length === 0 ? (
-              <EmptyState icon={Wallet} title="No active employees for this period" description="Payroll lines will appear here once attendance data is available." />
+              <EmptyState
+                icon={Wallet}
+                title="No attendance data for this period yet"
+                description="Import or manually enter this period's attendance in the Attendance module — payroll is computed directly from it."
+              />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-sm">
+                <table className="w-full min-w-[980px] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="px-3 py-2 font-medium">Employee</th>
@@ -135,6 +144,7 @@ export default function PayrollProcessingPage() {
                       <th className="px-3 py-2 font-medium">OT</th>
                       <th className="px-3 py-2 font-medium">Holiday</th>
                       <th className="px-3 py-2 font-medium">Leave</th>
+                      <th className="px-3 py-2 font-medium">Late Ded.</th>
                       <th className="px-3 py-2 font-medium">Gross</th>
                       <th className="px-3 py-2 font-medium">Deductions</th>
                       <th className="px-3 py-2 font-medium">Net pay</th>
@@ -153,6 +163,7 @@ export default function PayrollProcessingPage() {
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.overtimePay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.holidayPay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.leavePay)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.lateDeduction ? `-${formatCurrencyCompact(l.lateDeduction)}` : "—"}</td>
                           <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.grossPay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.totalDeductions)}</td>
                           <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.netPay)}</td>
@@ -164,6 +175,9 @@ export default function PayrollProcessingPage() {
                 </table>
               </div>
             )}
+            <div className="mt-3 text-right text-xs">
+              <Link href="/modules/attendance" className="text-[var(--series-1)] hover:underline">Manage attendance for this period →</Link>
+            </div>
           </div>
         </>
       )}

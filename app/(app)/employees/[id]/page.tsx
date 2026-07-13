@@ -1,7 +1,8 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import {
@@ -17,12 +18,15 @@ import {
   positionTitle,
 } from "@/lib/helpers";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
+import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { employees, evaluations, disciplinaryRecords } = useHris();
+  const { employees, evaluations, disciplinaryRecords, currentUser, updateEmployee } = useHris();
   const employee = employees.find((e) => e.id === params.id);
+  const [editing, setEditing] = useState(false);
+  const canEdit = currentUser?.roles.includes("hr_admin");
 
   if (!employee) {
     return (
@@ -42,7 +46,14 @@ export default function EmployeeProfilePage() {
 
   return (
     <div>
-      <button onClick={() => router.back()} className="mb-4 flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back to directory</button>
+      <div className="mb-4 flex items-center justify-between">
+        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back to directory</button>
+        {canEdit && (
+          <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
+            <Pencil size={14} /> Edit
+          </button>
+        )}
+      </div>
 
       <div className="mb-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xl font-semibold text-[var(--on-accent)]">
@@ -58,6 +69,18 @@ export default function EmployeeProfilePage() {
           </div>
         </div>
       </div>
+
+      {editing && (
+        <EmployeeEditModal
+          employee={employee}
+          employees={employees}
+          onClose={() => setEditing(false)}
+          onSave={(patch) => {
+            updateEmployee(employee.id, patch);
+            setEditing(false);
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Personal Information">

@@ -12,12 +12,15 @@ import { branchName, departmentName, formatCurrencyCompact, formatDate, fullName
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 
 export default function PayslipsPage() {
-  const { currentUser, currentEmployee, employees, branches, departments, payrollPeriods, generatedPayslips, addGeneratedPayslip } = useHris();
+  const { currentUser, currentEmployee, employees, branches, departments, payrollPeriods, attendancePeriodRecords, leaveRequests, overtimeRequests, generatedPayslips, addGeneratedPayslip } = useHris();
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; line: PayrollLine } | null>(null);
 
-  const lines = useMemo(() => (period ? computePayrollForPeriod(period, employees) : []), [period, employees]);
+  const lines = useMemo(
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests) : []),
+    [period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests],
+  );
   const lineByEmployee = new Map(lines.map((l) => [l.employeeId, l]));
 
   const isAdmin = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer", "cfo", "upper_management"].includes(r));
@@ -78,6 +81,7 @@ function summaryToLine(summary: Record<string, number>): PayrollLine {
     overtimePay: summary.overtimePay ?? 0,
     holidayPay: summary.holidayPay ?? 0,
     leavePay: summary.leavePay ?? 0,
+    lateDeduction: summary.lateDeduction ?? 0,
     grossPay: summary.grossPay ?? 0,
     employeeSSS: summary.employeeSSS ?? 0,
     employeeHDMF: summary.employeeHDMF ?? 0,
@@ -214,6 +218,7 @@ function AdminView({
         overtimePay: line.overtimePay,
         holidayPay: line.holidayPay,
         leavePay: line.leavePay,
+        lateDeduction: line.lateDeduction,
         grossPay: line.grossPay,
         employeeSSS: line.employeeSSS,
         employeeHDMF: line.employeeHDMF,

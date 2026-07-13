@@ -274,14 +274,25 @@ export interface GeneratedVoucher {
   generatedAt: string;
 }
 
-export type DailyAttendanceStatus = "present" | "late" | "absent" | "leave";
+export type AttendanceRecordSource = "import" | "manual";
 
-export interface DailyAttendanceRecord {
-  date: string;
-  dayLabel: string;
-  status: DailyAttendanceStatus;
-  timeIn: string | null;
-  timeOut: string | null;
-  lateMinutes: number;
-  otHours: number;
+// One row per employee per payroll period — the real, editable attendance
+// summary that drives Payroll Processing. Populated either by uploading the
+// company's per-period attendance-tracker export (its "Summary" tab) or by
+// direct HR/Payroll entry. Overtime pay and leave pay are NOT derived from
+// here — they come from the already-approved Overtime/Leave requests
+// elsewhere in the system, so there is only one source of truth for each.
+export interface AttendancePeriodRecord {
+  id: string;
+  periodId: string;
+  employeeId: string;
+  daysWorked: number;
+  holidayDays: number;
+  slDays: number;
+  vlDays: number;
+  lateAdjMinutes: number;
+  notes: string;
+  source: AttendanceRecordSource;
+  updatedBy: string;
+  updatedAt: string;
 }

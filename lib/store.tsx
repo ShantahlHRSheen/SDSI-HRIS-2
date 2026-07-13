@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   ANNOUNCEMENTS,
+  ATTENDANCE_PERIOD_RECORDS,
   AUDIT_LOGS,
   BRANCHES,
   CORRECTION_REQUESTS,
@@ -23,6 +24,7 @@ import {
 import type {
   Announcement,
   AttendanceCorrectionRequest,
+  AttendancePeriodRecord,
   AuditLog,
   Branch,
   Department,
@@ -65,6 +67,7 @@ interface PersistedState {
   correctionRequests: AttendanceCorrectionRequest[];
   generatedPayslips: GeneratedPayslip[];
   generatedVouchers: GeneratedVoucher[];
+  attendancePeriodRecords: AttendancePeriodRecord[];
 }
 
 function defaultState(): PersistedState {
@@ -88,6 +91,7 @@ function defaultState(): PersistedState {
     correctionRequests: CORRECTION_REQUESTS,
     generatedPayslips: [],
     generatedVouchers: [],
+    attendancePeriodRecords: ATTENDANCE_PERIOD_RECORDS,
   };
 }
 
@@ -122,6 +126,13 @@ interface HrisContextShape {
   correctionRequests: AttendanceCorrectionRequest[];
   generatedPayslips: GeneratedPayslip[];
   generatedVouchers: GeneratedVoucher[];
+  attendancePeriodRecords: AttendancePeriodRecord[];
+
+  updateEmployee: (id: string, patch: Partial<Omit<Employee, "id" | "employeeNumber">>) => void;
+  addEmployee: (input: Omit<Employee, "id" | "employeeNumber">) => void;
+
+  upsertAttendancePeriodRecord: (input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">) => void;
+  importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => void;
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
@@ -243,6 +254,69 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const currentEmployee = useMemo(
     () => (currentUser ? state.employees.find((e) => e.id === currentUser.employeeId) ?? null : null),
     [currentUser, state.employees],
+  );
+
+  const updateEmployee: HrisContextShape["updateEmployee"] = useCallback(
+    (id, patch) => {
+      setState((prev) => ({
+        ...prev,
+        employees: prev.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+      }));
+      logAudit("Employee 201 File", "update", `Updated employee record ${id}`);
+    },
+    [logAudit],
+  );
+
+  const addEmployee: HrisContextShape["addEmployee"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const seq = prev.employees.length + 1;
+        const entry: Employee = { ...input, id: nextId("emp"), employeeNumber: `SDSI-${String(seq).padStart(4, "0")}` };
+        return { ...prev, employees: [...prev.employees, entry] };
+      });
+      logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
+    },
+    [logAudit],
+  );
+
+  const upsertAttendancePeriodRecord: HrisContextShape["upsertAttendancePeriodRecord"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const existing = prev.attendancePeriodRecords.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
+        const entry: AttendancePeriodRecord = {
+          ...input,
+          id: existing?.id ?? nextId("att"),
+          source: "manual",
+          updatedBy: actor?.name ?? "System",
+          updatedAt: TODAY,
+        };
+        const rest = prev.attendancePeriodRecords.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId));
+        return { ...prev, attendancePeriodRecords: [entry, ...rest] };
+      });
+      logAudit("Attendance", "update", `Manually updated attendance for period ${input.periodId}`);
+    },
+    [logAudit, demoUsers],
+  );
+
+  const importAttendancePeriodRecords: HrisContextShape["importAttendancePeriodRecords"] = useCallback(
+    (periodId, rows) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const imported: AttendancePeriodRecord[] = rows.map((row) => ({
+          ...row,
+          id: nextId("att"),
+          periodId,
+          source: "import",
+          updatedBy: actor?.name ?? "System",
+          updatedAt: TODAY,
+        }));
+        const rest = prev.attendancePeriodRecords.filter((r) => r.periodId !== periodId);
+        return { ...prev, attendancePeriodRecords: [...imported, ...rest] };
+      });
+      logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
+    },
+    [logAudit, demoUsers],
   );
 
   const addEvaluation: HrisContextShape["addEvaluation"] = useCallback(
@@ -497,6 +571,11 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     correctionRequests: state.correctionRequests,
     generatedPayslips: state.generatedPayslips,
     generatedVouchers: state.generatedVouchers,
+    attendancePeriodRecords: state.attendancePeriodRecords,
+    updateEmployee,
+    addEmployee,
+    upsertAttendancePeriodRecord,
+    importAttendancePeriodRecords,
     addEvaluation,
     setEvaluationStatus,
     addDisciplinaryRecord,

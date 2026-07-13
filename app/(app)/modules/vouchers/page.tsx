@@ -12,12 +12,15 @@ import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/h
 import type { Employee, GeneratedVoucher, PayrollPeriod } from "@/lib/types";
 
 export default function AllowanceVouchersPage() {
-  const { employees, payrollPeriods, generatedVouchers, addGeneratedVoucher } = useHris();
+  const { employees, payrollPeriods, attendancePeriodRecords, leaveRequests, overtimeRequests, generatedVouchers, addGeneratedVoucher } = useHris();
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; amount: number } | null>(null);
 
-  const lines = useMemo(() => (period ? computePayrollForPeriod(period, employees) : []), [period, employees]);
+  const lines = useMemo(
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests) : []),
+    [period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests],
+  );
   const amountByEmployee = new Map(lines.map((l) => [l.employeeId, l.basicPay + l.allowances]));
 
   const recipients = employees.filter((e) => (e.employmentStatus === "freelance" || e.employmentStatus === "project_based") && (e.status === "active" || e.status === "on_leave"));
