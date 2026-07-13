@@ -1,17 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileCheck2, Lock, LockOpen, Wallet } from "lucide-react";
+import { FileCheck2, Lock, LockOpen, Pencil, Wallet } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
+import { Modal } from "@/components/Modal";
 import Link from "next/link";
 import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
-import { computePayrollForPeriod, summarizePayrollLines } from "@/lib/payroll";
+import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, type PayrollLine } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
-import type { PayrollPeriodStatus } from "@/lib/types";
+import type { Employee, PayrollLineOverride, PayrollPeriodStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
   open: "good",
@@ -20,18 +21,31 @@ const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
 };
 
 export default function PayrollProcessingPage() {
-  const { employees, payrollPeriods, attendancePeriodRecords, leaveRequests, overtimeRequests, setPayrollPeriodStatus, generatedPayslips, addGeneratedPayslip, currentUser } = useHris();
+  const {
+    employees,
+    payrollPeriods,
+    attendancePeriodRecords,
+    overtimeRequests,
+    payrollLineOverrides,
+    upsertPayrollLineOverride,
+    setPayrollPeriodStatus,
+    generatedPayslips,
+    addGeneratedPayslip,
+    currentUser,
+  } = useHris();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
 
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
+  const [editing, setEditing] = useState<Employee | null>(null);
 
   const lines = useMemo(
-    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests) : []),
-    [period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests],
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides) : []),
+    [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides],
   );
   const summary = summarizePayrollLines(lines);
   const byId = new Map(employees.map((e) => [e.id, e]));
+  const lineByEmployee = new Map(lines.map((l) => [l.employeeId, l]));
 
   const alreadyGenerated = period ? new Set(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => p.employeeId)) : new Set();
 
@@ -42,21 +56,7 @@ export default function PayrollProcessingPage() {
       addGeneratedPayslip({
         periodId: period.id,
         employeeId: line.employeeId,
-        summary: {
-          basicPay: line.basicPay,
-          allowances: line.allowances,
-          overtimePay: line.overtimePay,
-          holidayPay: line.holidayPay,
-          leavePay: line.leavePay,
-          lateDeduction: line.lateDeduction,
-          grossPay: line.grossPay,
-          employeeSSS: line.employeeSSS,
-          employeeHDMF: line.employeeHDMF,
-          employeePhilHealth: line.employeePhilHealth,
-          withholdingTax: line.withholdingTax,
-          totalDeductions: line.totalDeductions,
-          netPay: line.netPay,
-        },
+        summary: payrollLineToSummary(line),
       });
     });
   }
@@ -64,10 +64,52 @@ export default function PayrollProcessingPage() {
   function exportCsv() {
     if (!period) return;
     const csv = toCsv(
-      ["Employee", "Branch", "Basic Pay", "Allowances", "OT Pay", "Holiday Pay", "Leave Pay", "Late Deduction", "Gross Pay", "Total Deductions", "Net Pay"],
+      [
+        "Employee",
+        "Branch",
+        "Rate/Day",
+        "Days Working",
+        "Basic Pay",
+        "Lates/Undertime",
+        "Holiday Pay",
+        "VL Pay",
+        "SL Pay",
+        "OT Pay",
+        "Net Allowances",
+        "Gross Salary",
+        "SSS Contribution",
+        "SSS WISP",
+        "PhilHealth Contribution",
+        "Pag-IBIG Contribution",
+        "Withholding Tax",
+        "Total Mandatories",
+        "Other Deductions",
+        "Net Pay",
+      ],
       lines.map((l) => {
         const emp = byId.get(l.employeeId);
-        return [emp ? fullName(emp) : l.employeeId, emp ? branchName(emp.branchId) : "", l.basicPay, l.allowances, l.overtimePay, l.holidayPay, l.leavePay, l.lateDeduction, l.grossPay, l.totalDeductions, l.netPay];
+        return [
+          emp ? fullName(emp) : l.employeeId,
+          emp ? branchName(emp.branchId) : "",
+          l.ratePerDay,
+          l.daysWorking,
+          l.basicPay,
+          l.latesUndertime,
+          l.holidayPay,
+          l.vlPay,
+          l.slPay,
+          l.otPay,
+          l.netAllowances,
+          l.grossSalary,
+          l.sssContribution,
+          l.sssWisp,
+          l.philHealthContribution,
+          l.hdmfContribution,
+          l.withholdingTax,
+          l.totalMandatories,
+          l.totalDeductionsOtherThanMandatories,
+          l.netPay,
+        ];
       }),
     );
     downloadCsv(`payroll-${period.id}.csv`, csv);
@@ -77,7 +119,7 @@ export default function PayrollProcessingPage() {
     <div>
       <PageHeader
         title="Payroll Processing"
-        subtitle="Computed automatically from attendance, leave, and overtime records for the selected payroll period — no manual encoding."
+        subtitle="Computed automatically from attendance and approved overtime records for the selected payroll period — allowances, loans, and statutory contributions remain editable per employee."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={exportCsv} className="rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Export CSV</button>
@@ -111,6 +153,11 @@ export default function PayrollProcessingPage() {
           ))}
         </select>
         {period && <Badge tone={STATUS_TONE[period.status]}>{period.status}</Badge>}
+        {period && (
+          <span className="text-xs text-[var(--text-muted)]">
+            {lines[0]?.isSecondCutoff ? "2nd cutoff — mandatories deducted in full" : "1st cutoff — mandatories not deducted"}
+          </span>
+        )}
       </div>
 
       {!period ? (
@@ -134,21 +181,28 @@ export default function PayrollProcessingPage() {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm">
+                <table className="w-full min-w-[1400px] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="px-3 py-2 font-medium">Employee</th>
-                      <th className="px-3 py-2 font-medium">Branch</th>
+                      <th className="px-3 py-2 font-medium">Rate/Day</th>
                       <th className="px-3 py-2 font-medium">Basic</th>
-                      <th className="px-3 py-2 font-medium">Allowances</th>
-                      <th className="px-3 py-2 font-medium">OT</th>
+                      <th className="px-3 py-2 font-medium">Late</th>
                       <th className="px-3 py-2 font-medium">Holiday</th>
-                      <th className="px-3 py-2 font-medium">Leave</th>
-                      <th className="px-3 py-2 font-medium">Late Ded.</th>
+                      <th className="px-3 py-2 font-medium">VL</th>
+                      <th className="px-3 py-2 font-medium">SL</th>
+                      <th className="px-3 py-2 font-medium">OT</th>
+                      <th className="px-3 py-2 font-medium">Allowances</th>
                       <th className="px-3 py-2 font-medium">Gross</th>
-                      <th className="px-3 py-2 font-medium">Deductions</th>
+                      <th className="px-3 py-2 font-medium">SSS</th>
+                      <th className="px-3 py-2 font-medium">WISP</th>
+                      <th className="px-3 py-2 font-medium">PhilHealth</th>
+                      <th className="px-3 py-2 font-medium">HDMF</th>
+                      <th className="px-3 py-2 font-medium">WHT</th>
+                      <th className="px-3 py-2 font-medium">Other Ded.</th>
                       <th className="px-3 py-2 font-medium">Net pay</th>
                       <th className="px-3 py-2 font-medium">Payslip</th>
+                      <th className="px-3 py-2 font-medium"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,17 +211,30 @@ export default function PayrollProcessingPage() {
                       return (
                         <tr key={l.employeeId} className="border-b border-[var(--gridline)] last:border-0">
                           <td className="px-3 py-2 text-[var(--text-primary)]">{emp ? fullName(emp) : l.employeeId}</td>
-                          <td className="px-3 py-2 text-[var(--text-secondary)]">{emp ? branchName(emp.branchId) : "—"}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.ratePerDay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.basicPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.allowances)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.overtimePay)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.latesUndertime ? `-${formatCurrencyCompact(l.latesUndertime)}` : "—"}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.holidayPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.leavePay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.lateDeduction ? `-${formatCurrencyCompact(l.lateDeduction)}` : "—"}</td>
-                          <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.grossPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.totalDeductions)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.vlPay)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.slPay)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.otPay)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.netAllowances)}</td>
+                          <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.grossSalary)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssContribution)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssWisp)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.philHealthContribution)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfContribution)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.withholdingTax)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.totalDeductionsOtherThanMandatories)}</td>
                           <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.netPay)}</td>
                           <td className="px-3 py-2">{alreadyGenerated.has(l.employeeId) ? <Badge tone="good">Released</Badge> : <Badge tone="muted">Not released</Badge>}</td>
+                          <td className="px-3 py-2">
+                            {canManage && emp && (
+                              <button onClick={() => setEditing(emp)} className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                                <Pencil size={12} /> Edit
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -180,6 +247,213 @@ export default function PayrollProcessingPage() {
             </div>
           </div>
         </>
+      )}
+
+      {editing && period && (
+        <PayrollLineEditModal
+          employee={editing}
+          period={period}
+          line={lineByEmployee.get(editing.id) ?? null}
+          overrides={payrollLineOverrides}
+          onClose={() => setEditing(null)}
+          onSave={(input) => {
+            upsertPayrollLineOverride(input);
+            setEditing(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+type OverrideFormData = Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">;
+
+function defaultOverrideForm(periodId: string, employeeId: string, overrides: PayrollLineOverride[]): OverrideFormData {
+  const existing = overrides.find((o) => o.periodId === periodId && o.employeeId === employeeId);
+  if (existing) {
+    const rest: Partial<PayrollLineOverride> = { ...existing };
+    delete rest.id;
+    delete rest.updatedBy;
+    delete rest.updatedAt;
+    return rest as OverrideFormData;
+  }
+  return {
+    periodId,
+    employeeId,
+    travelAllowance: 0,
+    laundryAllowance: 0,
+    medicalCashAllowance: 0,
+    supervisorAllowance: 0,
+    cashAdvance: 0,
+    lsmBizLoan: 0,
+    lsmCoopLoan: 0,
+    shortages: 0,
+    sssLoan: 0,
+    hdmfLoan: 0,
+    adjustmentAdd: 0,
+    adjustmentDeduct: 0,
+    sssContributionOverride: null,
+    sssWispOverride: null,
+    philHealthContributionOverride: null,
+    hdmfContributionOverride: null,
+    withholdingTaxOverride: null,
+  };
+}
+
+function PayrollLineEditModal({
+  employee,
+  period,
+  line,
+  overrides,
+  onClose,
+  onSave,
+}: {
+  employee: Employee;
+  period: { id: string };
+  line: PayrollLine | null;
+  overrides: PayrollLineOverride[];
+  onClose: () => void;
+  onSave: (input: OverrideFormData) => void;
+}) {
+  const [form, setForm] = useState<OverrideFormData>(() => defaultOverrideForm(period.id, employee.id, overrides));
+
+  function setNum<K extends keyof OverrideFormData>(key: K, value: number) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setOverride<K extends "sssContributionOverride" | "sssWispOverride" | "philHealthContributionOverride" | "hdmfContributionOverride" | "withholdingTaxOverride">(
+    key: K,
+    value: number | null,
+  ) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Adjust payroll — ${fullName(employee)}`} wide>
+      <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
+        <FieldSection title="Allowances">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField label="Travel allowance" value={form.travelAllowance} onChange={(v) => setNum("travelAllowance", v)} />
+            <NumberField label="Laundry allowance" value={form.laundryAllowance} onChange={(v) => setNum("laundryAllowance", v)} />
+            <NumberField label="Medical cash allowance" value={form.medicalCashAllowance} onChange={(v) => setNum("medicalCashAllowance", v)} />
+            <NumberField label="Supervisor allowance" value={form.supervisorAllowance} onChange={(v) => setNum("supervisorAllowance", v)} />
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Daily allowance (₱{employee.dailyAllowance ?? 0}/day × days worked) comes from the employee record and is not set here.</p>
+        </FieldSection>
+
+        <FieldSection title="Loans / cash advance / shortages">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField label="Cash advance" value={form.cashAdvance} onChange={(v) => setNum("cashAdvance", v)} />
+            <NumberField label="LSM Biz Loan" value={form.lsmBizLoan} onChange={(v) => setNum("lsmBizLoan", v)} />
+            <NumberField label="LSM Coop Loan" value={form.lsmCoopLoan} onChange={(v) => setNum("lsmCoopLoan", v)} />
+            <NumberField label="Shortage deduction" value={form.shortages} onChange={(v) => setNum("shortages", v)} />
+            <NumberField label="SSS loan" value={form.sssLoan} onChange={(v) => setNum("sssLoan", v)} />
+            <NumberField label="Pag-IBIG (HDMF) loan" value={form.hdmfLoan} onChange={(v) => setNum("hdmfLoan", v)} />
+          </div>
+        </FieldSection>
+
+        <FieldSection title="Statutory contributions (auto-computed from Basis of Mandatories — override if needed)">
+          <div className="grid grid-cols-2 gap-3">
+            <OverrideField
+              label="SSS contribution"
+              auto={line?.sssContributionAuto ?? 0}
+              value={form.sssContributionOverride}
+              onChange={(v) => setOverride("sssContributionOverride", v)}
+            />
+            <OverrideField
+              label="SSS WISP"
+              auto={line?.sssWispAuto ?? 0}
+              value={form.sssWispOverride}
+              onChange={(v) => setOverride("sssWispOverride", v)}
+            />
+            <OverrideField
+              label="PhilHealth contribution"
+              auto={line?.philHealthContributionAuto ?? 0}
+              value={form.philHealthContributionOverride}
+              onChange={(v) => setOverride("philHealthContributionOverride", v)}
+            />
+            <OverrideField
+              label="Pag-IBIG (HDMF) contribution"
+              auto={line?.hdmfContributionAuto ?? 0}
+              value={form.hdmfContributionOverride}
+              onChange={(v) => setOverride("hdmfContributionOverride", v)}
+            />
+            <OverrideField
+              label="Withholding tax"
+              auto={line?.withholdingTax != null && form.withholdingTaxOverride == null ? line.withholdingTax : 0}
+              value={form.withholdingTaxOverride}
+              onChange={(v) => setOverride("withholdingTaxOverride", v)}
+            />
+          </div>
+          {!line?.isSecondCutoff && (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">This is the 1st cutoff of the month — SSS/WISP/PhilHealth/Pag-IBIG auto-compute to ₱0 and are deducted only on the 2nd cutoff, unless overridden here.</p>
+          )}
+        </FieldSection>
+
+        <FieldSection title="Adjustments">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField label="Adjustment (add)" value={form.adjustmentAdd} onChange={(v) => setNum("adjustmentAdd", v)} />
+            <NumberField label="Adjustment (deduct)" value={form.adjustmentDeduct} onChange={(v) => setNum("adjustmentDeduct", v)} />
+          </div>
+        </FieldSection>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
+          <button onClick={() => onSave(form)} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Save changes</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function FieldSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-2 text-xs font-semibold text-[var(--text-muted)] uppercase">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{label}</label>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+        className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
+      />
+    </div>
+  );
+}
+
+function OverrideField({ label, auto, value, onChange }: { label: string; auto: number; value: number | null; onChange: (v: number | null) => void }) {
+  const isOverridden = value !== null;
+  return (
+    <div>
+      <label className="mb-1 flex items-center justify-between text-xs font-medium text-[var(--text-secondary)]">
+        <span>{label}</span>
+        <button
+          type="button"
+          onClick={() => onChange(isOverridden ? null : auto)}
+          className="text-[10px] font-semibold text-[var(--series-1)] hover:underline"
+        >
+          {isOverridden ? "Use auto" : "Override"}
+        </button>
+      </label>
+      {isOverridden ? (
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+          className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
+        />
+      ) : (
+        <div className="w-full rounded-lg border border-dashed border-[var(--border-hairline)] bg-[var(--gridline)]/20 px-3 py-2 text-sm text-[var(--text-muted)]">
+          {formatCurrencyCompact(auto)} (auto)
+        </div>
       )}
     </div>
   );

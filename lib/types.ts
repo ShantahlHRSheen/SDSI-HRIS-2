@@ -279,9 +279,10 @@ export type AttendanceRecordSource = "import" | "manual";
 // One row per employee per payroll period — the real, editable attendance
 // summary that drives Payroll Processing. Populated either by uploading the
 // company's per-period attendance-tracker export (its "Summary" tab) or by
-// direct HR/Payroll entry. Overtime pay and leave pay are NOT derived from
-// here — they come from the already-approved Overtime/Leave requests
-// elsewhere in the system, so there is only one source of truth for each.
+// direct HR/Payroll entry. Vacation/sick leave pay is computed straight from
+// this record's vlDays/slDays. Overtime pay is the one figure NOT derived
+// from here — it comes from the already-approved Overtime requests elsewhere
+// in the system, so there is only one source of truth for it.
 export interface AttendancePeriodRecord {
   id: string;
   periodId: string;
@@ -293,6 +294,37 @@ export interface AttendancePeriodRecord {
   lateAdjMinutes: number;
   notes: string;
   source: AttendanceRecordSource;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+// Per-employee, per-period manual inputs/overrides layered on top of the
+// automatic payroll computation — allowance amounts, loans/deductions the
+// system has no other source for, adjustments, and optional overrides for
+// the five statutory figures that are normally auto-computed from the
+// "Basis of Mandatories" (SSS, SSS WISP, PhilHealth, Pag-IBIG, withholding
+// tax). A null override means "use the auto-computed value."
+export interface PayrollLineOverride {
+  id: string;
+  periodId: string;
+  employeeId: string;
+  travelAllowance: number;
+  laundryAllowance: number;
+  medicalCashAllowance: number;
+  supervisorAllowance: number;
+  cashAdvance: number;
+  lsmBizLoan: number;
+  lsmCoopLoan: number;
+  shortages: number;
+  sssLoan: number;
+  hdmfLoan: number;
+  adjustmentAdd: number;
+  adjustmentDeduct: number;
+  sssContributionOverride: number | null;
+  sssWispOverride: number | null;
+  philHealthContributionOverride: number | null;
+  hdmfContributionOverride: number | null;
+  withholdingTaxOverride: number | null;
   updatedBy: string;
   updatedAt: string;
 }

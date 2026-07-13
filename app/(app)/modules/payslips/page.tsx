@@ -7,19 +7,19 @@ import { PageHeader } from "@/components/PageHeader";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { PayslipDocument } from "@/components/payroll/PayslipDocument";
-import { computePayrollForPeriod, type PayrollLine } from "@/lib/payroll";
+import { computePayrollForPeriod, payrollLineToSummary, summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
 import { branchName, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 
 export default function PayslipsPage() {
-  const { currentUser, currentEmployee, employees, branches, departments, payrollPeriods, attendancePeriodRecords, leaveRequests, overtimeRequests, generatedPayslips, addGeneratedPayslip } = useHris();
+  const { currentUser, currentEmployee, employees, branches, departments, payrollPeriods, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, generatedPayslips, addGeneratedPayslip } = useHris();
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; line: PayrollLine } | null>(null);
 
   const lines = useMemo(
-    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests) : []),
-    [period, employees, attendancePeriodRecords, leaveRequests, overtimeRequests],
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides) : []),
+    [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides],
   );
   const lineByEmployee = new Map(lines.map((l) => [l.employeeId, l]));
 
@@ -73,28 +73,7 @@ function PreviewModal({ preview, onClose }: { preview: { employee: Employee; per
   );
 }
 
-function summaryToLine(summary: Record<string, number>): PayrollLine {
-  return {
-    employeeId: "",
-    basicPay: summary.basicPay ?? 0,
-    allowances: summary.allowances ?? 0,
-    overtimePay: summary.overtimePay ?? 0,
-    holidayPay: summary.holidayPay ?? 0,
-    leavePay: summary.leavePay ?? 0,
-    lateDeduction: summary.lateDeduction ?? 0,
-    grossPay: summary.grossPay ?? 0,
-    employeeSSS: summary.employeeSSS ?? 0,
-    employeeHDMF: summary.employeeHDMF ?? 0,
-    employeePhilHealth: summary.employeePhilHealth ?? 0,
-    withholdingTax: summary.withholdingTax ?? 0,
-    totalDeductions: summary.totalDeductions ?? 0,
-    netPay: summary.netPay ?? 0,
-    employerSSS: 0,
-    employerHDMF: 0,
-    employerPhilHealth: 0,
-    employerExpense: 0,
-  };
-}
+const summaryToLine = summaryToPayrollLine;
 
 function SelfServiceView({
   employee,
@@ -212,21 +191,7 @@ function AdminView({
     addGeneratedPayslip({
       periodId: period.id,
       employeeId: emp.id,
-      summary: {
-        basicPay: line.basicPay,
-        allowances: line.allowances,
-        overtimePay: line.overtimePay,
-        holidayPay: line.holidayPay,
-        leavePay: line.leavePay,
-        lateDeduction: line.lateDeduction,
-        grossPay: line.grossPay,
-        employeeSSS: line.employeeSSS,
-        employeeHDMF: line.employeeHDMF,
-        employeePhilHealth: line.employeePhilHealth,
-        withholdingTax: line.withholdingTax,
-        totalDeductions: line.totalDeductions,
-        netPay: line.netPay,
-      },
+      summary: payrollLineToSummary(line),
     });
     setPreview({ employee: emp, period, line });
   }

@@ -1,5 +1,4 @@
 import type { Employee } from "./types";
-import { BRANCHES } from "./mock-data";
 import { employeeHdmfNumber, employeePhilHealthNumber, employeeSssNumber, employeeTIN, fullName } from "./helpers";
 import {
   filterFacts,
@@ -10,13 +9,17 @@ import {
   type MonthlyEmployeeFact,
 } from "./monthly-analytics";
 
-// Illustrative employer registration details — placeholders. Real TIN/RDO
-// code must come from the company's actual BIR Certificate of Registration
-// (BIR Form 2303) before these forms are used for anything but a demo.
+// Employer registration details. Name, address, phone, and email are the
+// company's real details; TIN and RDO code are illustrative placeholders —
+// real values must come from the company's actual BIR Certificate of
+// Registration (BIR Form 2303) before these forms are used for anything but
+// a demo.
 export const COMPANY_INFO = {
   name: "Shantahl Direct Sales Inc.",
   tin: "000-123-456-000",
-  address: BRANCHES.find((b) => b.id === "br-cbt")?.address ?? "Cabanatuan City, Philippines",
+  address: "109 Apo St., Mabini Homesite, Cabanatuan City, Nueva Ecija",
+  phone: "044-960-0126",
+  email: "shantahlhr@gmail.com",
   rdoCode: "043 — Pasig City",
 };
 

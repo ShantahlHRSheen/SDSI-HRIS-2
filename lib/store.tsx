@@ -38,6 +38,7 @@ import type {
   LeaveRequest,
   LeaveType,
   OvertimeRequest,
+  PayrollLineOverride,
   PayrollPeriod,
   PerformanceEvaluation,
   Position,
@@ -68,6 +69,7 @@ interface PersistedState {
   generatedPayslips: GeneratedPayslip[];
   generatedVouchers: GeneratedVoucher[];
   attendancePeriodRecords: AttendancePeriodRecord[];
+  payrollLineOverrides: PayrollLineOverride[];
 }
 
 function defaultState(): PersistedState {
@@ -92,6 +94,7 @@ function defaultState(): PersistedState {
     generatedPayslips: [],
     generatedVouchers: [],
     attendancePeriodRecords: ATTENDANCE_PERIOD_RECORDS,
+    payrollLineOverrides: [],
   };
 }
 
@@ -127,12 +130,15 @@ interface HrisContextShape {
   generatedPayslips: GeneratedPayslip[];
   generatedVouchers: GeneratedVoucher[];
   attendancePeriodRecords: AttendancePeriodRecord[];
+  payrollLineOverrides: PayrollLineOverride[];
 
   updateEmployee: (id: string, patch: Partial<Omit<Employee, "id" | "employeeNumber">>) => void;
   addEmployee: (input: Omit<Employee, "id" | "employeeNumber">) => void;
 
   upsertAttendancePeriodRecord: (input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">) => void;
   importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => void;
+
+  upsertPayrollLineOverride: (input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">) => void;
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
@@ -315,6 +321,25 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, attendancePeriodRecords: [...imported, ...rest] };
       });
       logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
+    },
+    [logAudit, demoUsers],
+  );
+
+  const upsertPayrollLineOverride: HrisContextShape["upsertPayrollLineOverride"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const existing = prev.payrollLineOverrides.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
+        const entry: PayrollLineOverride = {
+          ...input,
+          id: existing?.id ?? nextId("plo"),
+          updatedBy: actor?.name ?? "System",
+          updatedAt: TODAY,
+        };
+        const rest = prev.payrollLineOverrides.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId));
+        return { ...prev, payrollLineOverrides: [entry, ...rest] };
+      });
+      logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
     },
     [logAudit, demoUsers],
   );
@@ -572,10 +597,12 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     generatedPayslips: state.generatedPayslips,
     generatedVouchers: state.generatedVouchers,
     attendancePeriodRecords: state.attendancePeriodRecords,
+    payrollLineOverrides: state.payrollLineOverrides,
     updateEmployee,
     addEmployee,
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
+    upsertPayrollLineOverride,
     addEvaluation,
     setEvaluationStatus,
     addDisciplinaryRecord,

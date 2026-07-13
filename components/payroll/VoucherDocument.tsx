@@ -8,6 +8,8 @@ function DocHeader({ title, subtitle }: { title: string; subtitle?: string }) {
     <div className="mb-5 border-b-2 border-[#0b0b0b] pb-3">
       <div className="text-sm font-bold uppercase">{COMPANY_INFO.name}</div>
       <div className="text-xs text-[#52514e]">{COMPANY_INFO.address}</div>
+      <div className="text-xs text-[#52514e]">{COMPANY_INFO.phone}</div>
+      <div className="text-xs text-[#52514e]">{COMPANY_INFO.email}</div>
       <h1 className="mt-3 text-lg font-bold">{title}</h1>
       {subtitle && <div className="text-xs text-[#52514e]">{subtitle}</div>}
     </div>
