@@ -11,7 +11,6 @@ import type {
   PayrollPeriod,
   PerformanceEvaluation,
   Position,
-  Role,
   WorkSchedule,
 } from "./types";
 
@@ -25,19 +24,13 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function addMonths(dateStr: string, months: number): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d.toISOString().slice(0, 10);
-}
-
 export function daysBetween(from: string, to: string): number {
   const a = new Date(from + "T00:00:00Z").getTime();
   const b = new Date(to + "T00:00:00Z").getTime();
   return Math.round((b - a) / 86400000);
 }
 
-// deterministic pseudo-random for cosmetic jitter (salary, scores) only
+// deterministic pseudo-random for cosmetic jitter (evaluation scores) only
 function mulberry32(seed: number) {
   let a = seed;
   return function () {
@@ -51,55 +44,78 @@ function mulberry32(seed: number) {
 const rng = mulberry32(20260713);
 
 export const BRANCHES: Branch[] = [
-  { id: "br-mnl", name: "Manila (Head Office)", code: "MNL", address: "Shantahl Bldg, Ortigas Ave, Pasig City" },
-  { id: "br-qc", name: "Quezon City", code: "QC", address: "Commonwealth Ave, Quezon City" },
+  { id: "br-cbt", name: "Cabanatuan", code: "CBT", address: "Maharlika Highway, Cabanatuan City" },
+  { id: "br-mnl", name: "Manila", code: "MNL", address: "Shantahl Bldg, Ortigas Ave, Pasig City" },
   { id: "br-ceb", name: "Cebu", code: "CEB", address: "IT Park, Cebu City" },
+  { id: "br-mdu", name: "Mandaue", code: "MDU", address: "A.S. Fortuna St, Mandaue City" },
   { id: "br-dvo", name: "Davao", code: "DVO", address: "J.P. Laurel Ave, Davao City" },
-  { id: "br-ilo", name: "Iloilo", code: "ILO", address: "Diversion Rd, Iloilo City" },
-  { id: "br-bcd", name: "Bacolod", code: "BCD", address: "Lacson St, Bacolod City" },
+  { id: "br-cav", name: "Cavite", code: "CAV", address: "Aguinaldo Highway, Cavite City" },
   { id: "br-cdo", name: "Cagayan de Oro", code: "CDO", address: "Corrales Ave, Cagayan de Oro" },
-  { id: "br-bag", name: "Baguio", code: "BAG", address: "Session Rd, Baguio City" },
-  { id: "br-btg", name: "Batangas", code: "BTG", address: "P. Burgos St, Batangas City" },
-  { id: "br-ges", name: "General Santos", code: "GES", address: "Pioneer Ave, General Santos City" },
+  { id: "br-pgs", name: "Pangasinan", code: "PGS", address: "McArthur Highway, Dagupan City, Pangasinan" },
+  { id: "br-lcn", name: "Lucena", code: "LCN", address: "Merchan St, Lucena City" },
+  { id: "br-bcd", name: "Bacolod", code: "BCD", address: "Lacson St, Bacolod City" },
 ];
 
 export const DEPARTMENTS: Department[] = [
-  { id: "dp-exec", name: "Executive" },
+  { id: "dp-bod", name: "BOD" },
+  { id: "dp-acctg", name: "Accounting" },
+  { id: "dp-fin", name: "Finance" },
   { id: "dp-hr", name: "Human Resources" },
-  { id: "dp-fin", name: "Finance & Accounting" },
-  { id: "dp-sales", name: "Sales" },
-  { id: "dp-mktg", name: "Marketing" },
-  { id: "dp-ops", name: "Operations" },
-  { id: "dp-wh", name: "Warehouse & Logistics" },
-  { id: "dp-cs", name: "Customer Service" },
-  { id: "dp-it", name: "Information Technology" },
-  { id: "dp-admin", name: "Administrative" },
+  { id: "dp-darofy-mktg", name: "Darofy - Marketing" },
+  { id: "dp-darofy-sales", name: "Darofy - Sales" },
+  { id: "dp-mlm-netdev", name: "MLM - Network Development" },
+  { id: "dp-mlm-mktg", name: "MLM - Marketing" },
+  { id: "dp-mlm-sales", name: "MLM - Sales" },
+  { id: "dp-cosmetics", name: "Cosmetics" },
+  { id: "dp-darofy-marketing-corp", name: "Darofy Marketing" },
+  { id: "dp-indie-mktg", name: "Independent Marketing" },
+  { id: "dp-operation", name: "Operations" },
 ];
 
 export const POSITIONS: Position[] = [
-  { id: "ps-president", title: "President", departmentId: "dp-exec" },
-  { id: "ps-vp-ops", title: "Vice Chairperson", departmentId: "dp-exec" },
-  { id: "ps-hr-admin", title: "HR Manager", departmentId: "dp-hr" },
-  { id: "ps-hr-officer", title: "HR Officer", departmentId: "dp-hr" },
-  { id: "ps-hr-assistant", title: "HR Assistant", departmentId: "dp-hr" },
-  { id: "ps-payroll-officer", title: "Payroll Officer", departmentId: "dp-fin" },
-  { id: "ps-sr-acctg", title: "Sr. Accounting Assistant", departmentId: "dp-fin" },
-  { id: "ps-treasurer", title: "Corporate Treasurer", departmentId: "dp-fin" },
-  { id: "ps-cfo", title: "Chief Finance Officer", departmentId: "dp-fin" },
-  { id: "ps-acctg-staff", title: "Accounting Staff", departmentId: "dp-fin" },
-  { id: "ps-mktg-officer", title: "Marketing Officer", departmentId: "dp-mktg" },
-  { id: "ps-mktg-assistant", title: "Marketing Assistant", departmentId: "dp-mktg" },
-  { id: "ps-sysadmin", title: "System Administrator", departmentId: "dp-it" },
-  { id: "ps-it-support", title: "IT Support Staff", departmentId: "dp-it" },
-  { id: "ps-sales-mgr", title: "Branch Sales Manager", departmentId: "dp-sales" },
-  { id: "ps-sales-assoc", title: "Sales Associate", departmentId: "dp-sales" },
-  { id: "ps-sales-consultant", title: "Sales Consultant", departmentId: "dp-sales" },
-  { id: "ps-cashier", title: "Cashier", departmentId: "dp-sales" },
-  { id: "ps-ops-mgr", title: "Branch Operations Manager", departmentId: "dp-ops" },
-  { id: "ps-ops-staff", title: "Operations Staff", departmentId: "dp-ops" },
-  { id: "ps-wh-sup", title: "Warehouse Supervisor", departmentId: "dp-wh" },
-  { id: "ps-csr", title: "Customer Service Representative", departmentId: "dp-cs" },
-  { id: "ps-admin-staff", title: "Admin Staff", departmentId: "dp-admin" },
+  { id: "ps-chairman-of-the-board-1", title: "Chairman of the Board", departmentId: "dp-bod" },
+  { id: "ps-president-for-cosmetics-2", title: "President for Cosmetics", departmentId: "dp-bod" },
+  { id: "ps-president-for-darofy-3", title: "President for Darofy", departmentId: "dp-bod" },
+  { id: "ps-vice-chairperson-4", title: "Vice Chairperson", departmentId: "dp-bod" },
+  { id: "ps-chief-finance-officer-5", title: "Chief Finance Officer", departmentId: "dp-acctg" },
+  { id: "ps-accounting-clerk-6", title: "Accounting Clerk", departmentId: "dp-acctg" },
+  { id: "ps-sr-accounting-assistant-7", title: "Sr. Accounting Assistant", departmentId: "dp-acctg" },
+  { id: "ps-jr-accounting-assistant-8", title: "Jr. Accounting Assistant", departmentId: "dp-acctg" },
+  { id: "ps-bookkeeper-9", title: "Bookkeeper", departmentId: "dp-fin" },
+  { id: "ps-corporate-treasurer-10", title: "Corporate Treasurer", departmentId: "dp-fin" },
+  { id: "ps-hr-manager-11", title: "HR Manager", departmentId: "dp-hr" },
+  { id: "ps-content-creator-12", title: "Content Creator", departmentId: "dp-darofy-mktg" },
+  { id: "ps-marketing-head-13", title: "Marketing Head", departmentId: "dp-darofy-mktg" },
+  { id: "ps-multimedia-artist-14", title: "Multimedia Artist", departmentId: "dp-darofy-mktg" },
+  { id: "ps-sales-manager-15", title: "Sales Manager", departmentId: "dp-darofy-sales" },
+  { id: "ps-sales-admin-16", title: "Sales Admin", departmentId: "dp-darofy-sales" },
+  { id: "ps-network-development-head-luzon-17", title: "Network Development Head - Luzon", departmentId: "dp-mlm-netdev" },
+  { id: "ps-network-development-head-visayas-18", title: "Network Development Head - Visayas", departmentId: "dp-mlm-netdev" },
+  { id: "ps-network-development-head-mindanao-19", title: "Network Development Head - Mindanao", departmentId: "dp-mlm-netdev" },
+  { id: "ps-multimedia-artist-20", title: "Multimedia Artist", departmentId: "dp-mlm-mktg" },
+  { id: "ps-social-media-manager-21", title: "Social Media Manager", departmentId: "dp-mlm-mktg" },
+  { id: "ps-video-editor-22", title: "Video Editor", departmentId: "dp-mlm-mktg" },
+  { id: "ps-ads-specialist-23", title: "Ads Specialist", departmentId: "dp-mlm-sales" },
+  { id: "ps-sales-admin-24", title: "Sales Admin", departmentId: "dp-mlm-sales" },
+  { id: "ps-platform-specialist-25", title: "Platform Specialist", departmentId: "dp-cosmetics" },
+  { id: "ps-multimedia-artist-head-26", title: "Multimedia Artist Head", departmentId: "dp-cosmetics" },
+  { id: "ps-video-editor-27", title: "Video Editor", departmentId: "dp-cosmetics" },
+  { id: "ps-multimedia-artist-head-mlm-28", title: "Multimedia Artist Head (MLM)", departmentId: "dp-darofy-marketing-corp" },
+  { id: "ps-multimedia-artist-head-29", title: "Multimedia Artist Head", departmentId: "dp-mlm-mktg" },
+  { id: "ps-marketing-assistant-30", title: "Marketing Assistant", departmentId: "dp-indie-mktg" },
+  { id: "ps-product-specialist-31", title: "Product Specialist", departmentId: "dp-indie-mktg" },
+  { id: "ps-cashier-32", title: "Cashier", departmentId: "dp-operation" },
+  { id: "ps-csr-33", title: "CSR", departmentId: "dp-operation" },
+  { id: "ps-warehouseman-34", title: "Warehouseman", departmentId: "dp-operation" },
+  { id: "ps-operations-manager-35", title: "Operations Manager", departmentId: "dp-operation" },
+  { id: "ps-driver-messenger-36", title: "Driver / Messenger", departmentId: "dp-operation" },
+  { id: "ps-logistics-staff-37", title: "Logistics Staff", departmentId: "dp-operation" },
+  { id: "ps-operations-supervisor-38", title: "Operations Supervisor", departmentId: "dp-operation" },
+  { id: "ps-utility-39", title: "Utility", departmentId: "dp-operation" },
+  { id: "ps-branch-supervisor-40", title: "Branch Supervisor", departmentId: "dp-operation" },
+  { id: "ps-branch-manager-41", title: "Branch Manager", departmentId: "dp-operation" },
+  { id: "ps-driver-warehouseman-42", title: "Driver / Warehouseman", departmentId: "dp-operation" },
+  { id: "ps-stockman-43", title: "Stockman", departmentId: "dp-operation" },
 ];
 
 export const WORK_SCHEDULES: WorkSchedule[] = [
@@ -146,323 +162,923 @@ export const PAYROLL_PERIODS: PayrollPeriod[] = [
   { id: "pp-6", start: "2026-07-16", end: "2026-07-31", status: "open" },
 ];
 
-const FIRST_NAMES = [
-  "Maria", "Juan", "Jose", "Ana", "Carlos", "Elena", "Miguel", "Isabel", "Ramon", "Patricia",
-  "Roberto", "Rosario", "Antonio", "Teresa", "Francisco", "Corazon", "Eduardo", "Luz", "Ricardo", "Carmen",
-  "Alfredo", "Gloria", "Fernando", "Victoria", "Manuel", "Cecilia", "Rodrigo", "Angelica", "Danilo", "Marites",
-  "Renato", "Josefina", "Arnel", "Divina", "Bayani", "Leonora", "Reynaldo", "Perla", "Armando", "Rowena",
-  "Nestor", "Fe", "Rodel", "Grace", "Wilfredo", "Emilia", "Dennis", "Rosemarie", "Randy", "Jocelyn",
-];
-const LAST_NAMES = [
-  "Santos", "Reyes", "Cruz", "Bautista", "Garcia", "Torres", "Flores", "Ramos", "Mendoza", "Castillo",
-  "Villanueva", "Aquino", "Del Rosario", "Gonzales", "Rivera", "Domingo", "Pascual", "Fernandez", "De Guzman", "Aguilar",
-  "Salazar", "Navarro", "Marasigan", "Uy", "Tan", "Lim", "Yap", "Ocampo", "Manalo", "Sarmiento",
-];
-
+// Real employee roster imported from the company's Excel 201-file export
+// (BRANCH / DEPARTMENT / DIVISION / Position / Salary / Allowance columns).
+// Fields not present in that export (birthdate, contact info, government-ID
+// seeds, etc.) are deterministically generated placeholders — see the
+// per-employee "illustrative" convention used throughout this demo.
 let empSeq = 0;
 function nextEmployeeNumber(): string {
   empSeq += 1;
   return `SDSI-${String(empSeq).padStart(4, "0")}`;
 }
 
-interface BuildEmployeeArgs {
-  id: string;
-  firstName: string;
-  lastName: string;
-  branchId: string;
-  departmentId: string;
-  positionId: string;
-  supervisorId: string | null;
-  employmentStatus: Employee["employmentStatus"];
-  dateHired: string;
-  dateRegularized?: string | null;
-  contractStart?: string | null;
-  contractEnd?: string | null;
-  probationEndsAt?: string | null;
-  payrollType: "daily" | "monthly";
-  dailyRate?: number | null;
-  monthlySalary?: number | null;
-  status?: Employee["status"];
-  statusChangedAt?: string | null;
-  roles: Role[];
-  birthMonth: number;
-  birthDay: number;
-  birthYear: number;
-}
-
-function buildEmployee(a: BuildEmployeeArgs): Employee {
-  const mm = String(a.birthMonth).padStart(2, "0");
-  const dd = String(a.birthDay).padStart(2, "0");
-  return {
-    id: a.id,
-    employeeNumber: nextEmployeeNumber(),
-    firstName: a.firstName,
-    lastName: a.lastName,
-    nickname: a.firstName.slice(0, 4),
-    gender: rng() > 0.5 ? "Male" : "Female",
-    birthdate: `${a.birthYear}-${mm}-${dd}`,
-    civilStatus: (["Single", "Married", "Single", "Widowed"] as const)[Math.floor(rng() * 4)],
-    nationality: "Filipino",
-    address: `${100 + Math.floor(rng() * 800)} Mabini St., ${a.branchId.replace("br-", "").toUpperCase()}`,
-    contactNumber: `09${String(100000000 + Math.floor(rng() * 800000000)).slice(0, 9)}`,
-    email: `${a.firstName.toLowerCase()}.${a.lastName.toLowerCase().replace(/\s+/g, "")}@shantahl.com.ph`,
-    emergencyContactName: `${LAST_NAMES[Math.floor(rng() * LAST_NAMES.length)]}, Emergency Contact`,
-    emergencyContactPhone: `09${String(100000000 + Math.floor(rng() * 800000000)).slice(0, 9)}`,
-    branchId: a.branchId,
-    departmentId: a.departmentId,
-    positionId: a.positionId,
-    supervisorId: a.supervisorId,
-    employmentStatus: a.employmentStatus,
-    dateHired: a.dateHired,
-    dateRegularized: a.dateRegularized ?? null,
-    contractStart: a.contractStart ?? null,
-    contractEnd: a.contractEnd ?? null,
-    probationEndsAt: a.probationEndsAt ?? null,
-    payrollType: a.payrollType,
-    dailyRate: a.dailyRate ?? null,
-    monthlySalary: a.monthlySalary ?? null,
-    status: a.status ?? "active",
-    statusChangedAt: a.statusChangedAt ?? null,
-    roles: a.roles,
-  };
-}
-
-export const EMPLOYEES: Employee[] = [];
-
-// --- Corporate / Head Office staff -----------------------------------------
-const president = buildEmployee({
-  id: "emp-001", firstName: "Fernando", lastName: "Reyes", branchId: "br-mnl", departmentId: "dp-exec",
-  positionId: "ps-president", supervisorId: null, employmentStatus: "regular", dateHired: "2008-02-01",
-  dateRegularized: "2008-08-01", payrollType: "monthly", monthlySalary: 250000, roles: ["upper_management"],
-  birthMonth: 3, birthDay: 12, birthYear: 1968,
-});
-const vpOps = buildEmployee({
-  id: "emp-002", firstName: "Sheilah A.", lastName: "Magdadaro", branchId: "br-mnl", departmentId: "dp-exec",
-  positionId: "ps-vp-ops", supervisorId: president.id, employmentStatus: "regular", dateHired: "2011-05-16",
-  dateRegularized: "2011-11-16", payrollType: "monthly", monthlySalary: 180000, roles: ["upper_management"],
-  birthMonth: 7, birthDay: 20, birthYear: 1975,
-});
-const hrAdmin = buildEmployee({
-  id: "emp-003", firstName: "Sheena", lastName: "Evangelista", branchId: "br-mnl", departmentId: "dp-hr",
-  positionId: "ps-hr-admin", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2014-01-20",
-  dateRegularized: "2014-07-20", payrollType: "monthly", monthlySalary: 75000, roles: ["hr_admin"],
-  birthMonth: 7, birthDay: 28, birthYear: 1982,
-});
-const hrOfficer = buildEmployee({
-  id: "emp-004", firstName: "Rosario", lastName: "Domingo", branchId: "br-mnl", departmentId: "dp-hr",
-  positionId: "ps-hr-officer", supervisorId: hrAdmin.id, employmentStatus: "regular", dateHired: "2019-03-04",
-  dateRegularized: "2019-09-04", payrollType: "monthly", monthlySalary: 38000, roles: ["employee"],
-  birthMonth: 2, birthDay: 9, birthYear: 1990,
-});
-const hrAssistant = buildEmployee({
-  id: "emp-005", firstName: "Divina", lastName: "Pascual", branchId: "br-mnl", departmentId: "dp-hr",
-  positionId: "ps-hr-assistant", supervisorId: hrAdmin.id, employmentStatus: "probationary", dateHired: "2026-03-02",
-  probationEndsAt: addMonths("2026-03-02", 6), payrollType: "monthly", monthlySalary: 26000, roles: ["employee"],
-  birthMonth: 9, birthDay: 15, birthYear: 1996,
-});
-const payrollOfficer = buildEmployee({
-  id: "emp-006", firstName: "Juan", lastName: "Dela Cruz", branchId: "br-mnl", departmentId: "dp-fin",
-  positionId: "ps-payroll-officer", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2015-06-10",
-  dateRegularized: "2015-12-10", payrollType: "monthly", monthlySalary: 55000, roles: ["payroll_officer"],
-  birthMonth: 11, birthDay: 3, birthYear: 1986,
-});
-const srAcctg = buildEmployee({
-  id: "emp-007", firstName: "Wendie", lastName: "Halog", branchId: "br-mnl", departmentId: "dp-fin",
-  positionId: "ps-sr-acctg", supervisorId: payrollOfficer.id, employmentStatus: "regular", dateHired: "2016-08-22",
-  dateRegularized: "2017-02-22", payrollType: "monthly", monthlySalary: 42000, roles: ["sr_accounting_assistant"],
-  birthMonth: 5, birthDay: 30, birthYear: 1988,
-});
-const treasurer = buildEmployee({
-  id: "emp-008", firstName: "Joan Mariette", lastName: "Santarina", branchId: "br-mnl", departmentId: "dp-fin",
-  positionId: "ps-treasurer", supervisorId: president.id, employmentStatus: "regular", dateHired: "2010-04-05",
-  dateRegularized: "2010-10-05", payrollType: "monthly", monthlySalary: 120000, roles: ["treasurer"],
-  birthMonth: 12, birthDay: 18, birthYear: 1972,
-});
-const cfo = buildEmployee({
-  id: "emp-009", firstName: "Maricris", lastName: "Barlinan", branchId: "br-mnl", departmentId: "dp-fin",
-  positionId: "ps-cfo", supervisorId: president.id, employmentStatus: "regular", dateHired: "2009-09-14",
-  dateRegularized: "2010-03-14", payrollType: "monthly", monthlySalary: 200000, roles: ["cfo"],
-  birthMonth: 7, birthDay: 5, birthYear: 1970,
-});
-const acctgStaff = buildEmployee({
-  id: "emp-010", firstName: "Cecilia", lastName: "Ocampo", branchId: "br-mnl", departmentId: "dp-fin",
-  positionId: "ps-acctg-staff", supervisorId: srAcctg.id, employmentStatus: "regular", dateHired: "2020-01-13",
-  dateRegularized: "2020-07-13", payrollType: "monthly", monthlySalary: 28000, roles: ["employee"],
-  birthMonth: 4, birthDay: 22, birthYear: 1993,
-});
-const mktgOfficer = buildEmployee({
-  id: "emp-011", firstName: "Danilo", lastName: "Aquino", branchId: "br-mnl", departmentId: "dp-mktg",
-  positionId: "ps-mktg-officer", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2017-10-02",
-  dateRegularized: "2018-04-02", payrollType: "monthly", monthlySalary: 40000, roles: ["employee"],
-  birthMonth: 1, birthDay: 27, birthYear: 1991,
-});
-const mktgAssistant = buildEmployee({
-  id: "emp-012", firstName: "Marites", lastName: "Villanueva", branchId: "br-mnl", departmentId: "dp-mktg",
-  positionId: "ps-mktg-assistant", supervisorId: mktgOfficer.id, employmentStatus: "project_based",
-  dateHired: "2026-02-16", contractStart: "2026-02-16", contractEnd: "2026-08-15",
-  payrollType: "monthly", monthlySalary: 24000, roles: ["employee"],
-  birthMonth: 8, birthDay: 8, birthYear: 1997,
-});
-const sysAdmin = buildEmployee({
-  id: "emp-013", firstName: "Patricia", lastName: "Uy", branchId: "br-mnl", departmentId: "dp-it",
-  positionId: "ps-sysadmin", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2013-11-18",
-  dateRegularized: "2014-05-18", payrollType: "monthly", monthlySalary: 65000, roles: ["sys_admin"],
-  birthMonth: 6, birthDay: 25, birthYear: 1984,
-});
-const itSupport = buildEmployee({
-  id: "emp-014", firstName: "Renato", lastName: "Navarro", branchId: "br-mnl", departmentId: "dp-it",
-  positionId: "ps-it-support", supervisorId: sysAdmin.id, employmentStatus: "regular", dateHired: "2021-05-03",
-  dateRegularized: "2021-11-03", payrollType: "monthly", monthlySalary: 26000, roles: ["employee"],
-  birthMonth: 7, birthDay: 2, birthYear: 1995,
-});
-
-EMPLOYEES.push(
-  president, vpOps, hrAdmin, hrOfficer, hrAssistant, payrollOfficer, srAcctg,
-  treasurer, cfo, acctgStaff, mktgOfficer, mktgAssistant, sysAdmin, itSupport,
-);
-
-// --- Branch staff ------------------------------------------------------
-interface BranchSlotTemplate {
-  slot: string;
-  position: string;
-  departmentId: string;
-  reportsTo: "vp" | "salesManager" | "opsManager";
-  employmentStatus: Employee["employmentStatus"];
-  roles: Role[];
-  payrollType: "daily" | "monthly";
-}
-
-const BRANCH_TEMPLATE: BranchSlotTemplate[] = [
-  { slot: "salesManager", position: "ps-sales-mgr", departmentId: "dp-sales", reportsTo: "vp", employmentStatus: "regular", roles: ["dept_head", "employee"], payrollType: "monthly" },
-  { slot: "opsManager", position: "ps-ops-mgr", departmentId: "dp-ops", reportsTo: "vp", employmentStatus: "regular", roles: ["dept_head", "employee"], payrollType: "monthly" },
-  { slot: "sales1", position: "ps-sales-assoc", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "regular", roles: ["employee"], payrollType: "daily" },
-  { slot: "sales2", position: "ps-sales-assoc", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "probationary", roles: ["employee"], payrollType: "daily" },
-  { slot: "consultant", position: "ps-sales-consultant", departmentId: "dp-sales", reportsTo: "salesManager", employmentStatus: "freelance", roles: ["employee"], payrollType: "daily" },
-  { slot: "opsStaff", position: "ps-ops-staff", departmentId: "dp-ops", reportsTo: "opsManager", employmentStatus: "regular", roles: ["employee"], payrollType: "daily" },
-  { slot: "warehouseSup", position: "ps-wh-sup", departmentId: "dp-wh", reportsTo: "opsManager", employmentStatus: "regular", roles: ["dept_head", "employee"], payrollType: "monthly" },
-  { slot: "csr", position: "ps-csr", departmentId: "dp-cs", reportsTo: "opsManager", employmentStatus: "project_based", roles: ["employee"], payrollType: "daily" },
-  { slot: "adminStaff", position: "ps-admin-staff", departmentId: "dp-admin", reportsTo: "opsManager", employmentStatus: "regular", roles: ["employee"], payrollType: "daily" },
+export const EMPLOYEES: Employee[] = [
+  {
+    id: "emp-001", employeeNumber: nextEmployeeNumber(),
+    firstName: "Lowel", lastName: "Magdadaro", nickname: "Lowe",
+    gender: "Female", birthdate: "1975-01-03", civilStatus: "Single", nationality: "Filipino",
+    address: "819 Mabini St., CBT", contactNumber: "09814377841", email: "lowel.magdadaro@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09544883796",
+    branchId: "br-cbt", departmentId: "dp-bod", positionId: "ps-chairman-of-the-board-1", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2025-07-13", dateRegularized: "2026-01-13",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 75000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["upper_management"],
+  },
+  {
+    id: "emp-002", employeeNumber: nextEmployeeNumber(),
+    firstName: "Junrey", lastName: "Japitan", nickname: "Junr",
+    gender: "Female", birthdate: "1976-04-08", civilStatus: "Widowed", nationality: "Filipino",
+    address: "159 Mabini St., CBT", contactNumber: "09760377693", email: "junrey.japitan@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09681966606",
+    branchId: "br-cbt", departmentId: "dp-bod", positionId: "ps-president-for-cosmetics-2", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2024-07-12", dateRegularized: "2025-01-12",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 50000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["upper_management"],
+  },
+  {
+    id: "emp-003", employeeNumber: nextEmployeeNumber(),
+    firstName: "Magdadaro", lastName: "Mark Anthony", nickname: "Magd",
+    gender: "Female", birthdate: "1977-07-13", civilStatus: "Single", nationality: "Filipino",
+    address: "721 Mabini St., CBT", contactNumber: "09155203271", email: "magdadaro.markanthony@shantahl.com.ph",
+    emergencyContactName: "Castillo, Emergency Contact", emergencyContactPhone: "09748039203",
+    branchId: "br-cbt", departmentId: "dp-bod", positionId: "ps-president-for-darofy-3", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2023-07-12", dateRegularized: "2024-01-12",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 50000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["upper_management"],
+  },
+  {
+    id: "emp-004", employeeNumber: nextEmployeeNumber(),
+    firstName: "Sheilah", lastName: "Magdadaro", nickname: "Shei",
+    gender: "Male", birthdate: "1978-10-18", civilStatus: "Widowed", nationality: "Filipino",
+    address: "389 Mabini St., CBT", contactNumber: "09883582018", email: "sheilah.magdadaro@shantahl.com.ph",
+    emergencyContactName: "Castillo, Emergency Contact", emergencyContactPhone: "09843379746",
+    branchId: "br-cbt", departmentId: "dp-bod", positionId: "ps-vice-chairperson-4", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2022-07-11", dateRegularized: "2023-01-11",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 35000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["upper_management"],
+  },
+  {
+    id: "emp-005", employeeNumber: nextEmployeeNumber(),
+    firstName: "Maricris", lastName: "Barlinan", nickname: "Mari",
+    gender: "Female", birthdate: "1979-01-23", civilStatus: "Single", nationality: "Filipino",
+    address: "790 Mabini St., CBT", contactNumber: "09694456749", email: "maricris.barlinan@shantahl.com.ph",
+    emergencyContactName: "Cruz, Emergency Contact", emergencyContactPhone: "09893882675",
+    branchId: "br-cbt", departmentId: "dp-acctg", positionId: "ps-chief-finance-officer-5", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2021-07-10", dateRegularized: "2022-01-10",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 20000,
+    dailyAllowance: null, monthlyAllowance: 5000,
+    status: "active", statusChangedAt: null, roles: ["cfo"],
+  },
+  {
+    id: "emp-006", employeeNumber: nextEmployeeNumber(),
+    firstName: "Abigail", lastName: "Caluya", nickname: "Abig",
+    gender: "Female", birthdate: "1980-04-03", civilStatus: "Single", nationality: "Filipino",
+    address: "495 Mabini St., CBT", contactNumber: "09515648848", email: "abigail.caluya@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09649037673",
+    branchId: "br-cbt", departmentId: "dp-acctg", positionId: "ps-accounting-clerk-6", supervisorId: "emp-005",
+    employmentStatus: "regular", dateHired: "2020-07-09", dateRegularized: "2021-01-09",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-007", employeeNumber: nextEmployeeNumber(),
+    firstName: "Wendie", lastName: "Halog", nickname: "Wend",
+    gender: "Female", birthdate: "1981-07-08", civilStatus: "Single", nationality: "Filipino",
+    address: "720 Mabini St., CBT", contactNumber: "09775726408", email: "wendie.halog@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09325738528",
+    branchId: "br-cbt", departmentId: "dp-acctg", positionId: "ps-sr-accounting-assistant-7", supervisorId: "emp-005",
+    employmentStatus: "regular", dateHired: "2019-07-09", dateRegularized: "2020-01-09",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 691, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["sr_accounting_assistant", "payroll_officer"],
+  },
+  {
+    id: "emp-008", employeeNumber: nextEmployeeNumber(),
+    firstName: "Charmaine", lastName: "Palacio", nickname: "Char",
+    gender: "Male", birthdate: "1982-10-13", civilStatus: "Widowed", nationality: "Filipino",
+    address: "623 Mabini St., CBT", contactNumber: "09596558039", email: "charmaine.palacio@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09398102204",
+    branchId: "br-cbt", departmentId: "dp-acctg", positionId: "ps-jr-accounting-assistant-8", supervisorId: "emp-005",
+    employmentStatus: "regular", dateHired: "2018-07-08", dateRegularized: "2019-01-08",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 671, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-009", employeeNumber: nextEmployeeNumber(),
+    firstName: "Kathleen", lastName: "Surigao", nickname: "Kath",
+    gender: "Female", birthdate: "1983-01-18", civilStatus: "Widowed", nationality: "Filipino",
+    address: "883 Mabini St., CBT", contactNumber: "09799299053", email: "kathleen.surigao@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09299216228",
+    branchId: "br-cbt", departmentId: "dp-acctg", positionId: "ps-accounting-clerk-6", supervisorId: "emp-005",
+    employmentStatus: "regular", dateHired: "2017-07-07", dateRegularized: "2018-01-07",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-010", employeeNumber: nextEmployeeNumber(),
+    firstName: "Erika Grace", lastName: "Bulaclac", nickname: "Erik",
+    gender: "Male", birthdate: "1984-04-23", civilStatus: "Single", nationality: "Filipino",
+    address: "662 Mabini St., CBT", contactNumber: "09223669959", email: "erikagrace.bulaclac@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09198070206",
+    branchId: "br-cbt", departmentId: "dp-fin", positionId: "ps-bookkeeper-9", supervisorId: "emp-011",
+    employmentStatus: "regular", dateHired: "2016-07-06", dateRegularized: "2017-01-06",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-011", employeeNumber: nextEmployeeNumber(),
+    firstName: "Joan Mariette", lastName: "Santarina", nickname: "Joan",
+    gender: "Male", birthdate: "1985-07-16", civilStatus: "Single", nationality: "Filipino",
+    address: "842 Mabini St., CBT", contactNumber: "09280130817", email: "joanmariette.santarina@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09503468972",
+    branchId: "br-cbt", departmentId: "dp-fin", positionId: "ps-corporate-treasurer-10", supervisorId: "emp-004",
+    employmentStatus: "regular", dateHired: "2025-07-03", dateRegularized: "2026-01-03",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 723, monthlySalary: null,
+    dailyAllowance: 28, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["treasurer"],
+  },
+  {
+    id: "emp-012", employeeNumber: nextEmployeeNumber(),
+    firstName: "Sheena", lastName: "Evangelista", nickname: "Shee",
+    gender: "Female", birthdate: "1986-10-08", civilStatus: "Single", nationality: "Filipino",
+    address: "146 Mabini St., CBT", contactNumber: "09202523426", email: "sheena.evangelista@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09809690825",
+    branchId: "br-cbt", departmentId: "dp-hr", positionId: "ps-hr-manager-11", supervisorId: "emp-004",
+    employmentStatus: "regular", dateHired: "2024-07-02", dateRegularized: "2025-01-02",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 723, monthlySalary: null,
+    dailyAllowance: 28, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["hr_admin"],
+  },
+  {
+    id: "emp-013", employeeNumber: nextEmployeeNumber(),
+    firstName: "Angela", lastName: "Acosta", nickname: "Ange",
+    gender: "Female", birthdate: "1987-01-13", civilStatus: "Widowed", nationality: "Filipino",
+    address: "625 Mabini St., CBT", contactNumber: "09834478972", email: "angela.acosta@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09251593727",
+    branchId: "br-cbt", departmentId: "dp-darofy-mktg", positionId: "ps-content-creator-12", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2023-07-02", dateRegularized: "2024-01-02",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-014", employeeNumber: nextEmployeeNumber(),
+    firstName: "Erwin", lastName: "Carreon", nickname: "Erwi",
+    gender: "Male", birthdate: "1988-04-18", civilStatus: "Single", nationality: "Filipino",
+    address: "366 Mabini St., CBT", contactNumber: "09374213352", email: "erwin.carreon@shantahl.com.ph",
+    emergencyContactName: "Cruz, Emergency Contact", emergencyContactPhone: "09640012596",
+    branchId: "br-cbt", departmentId: "dp-darofy-mktg", positionId: "ps-content-creator-12", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2022-07-01", dateRegularized: "2023-01-01",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-015", employeeNumber: nextEmployeeNumber(),
+    firstName: "Sarah Mae", lastName: "Iglesia", nickname: "Sara",
+    gender: "Female", birthdate: "1989-07-23", civilStatus: "Single", nationality: "Filipino",
+    address: "200 Mabini St., CBT", contactNumber: "09535272254", email: "sarahmae.iglesia@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09623635778",
+    branchId: "br-cbt", departmentId: "dp-darofy-mktg", positionId: "ps-marketing-head-13", supervisorId: "emp-003",
+    employmentStatus: "regular", dateHired: "2021-06-30", dateRegularized: "2021-12-30",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 691, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-016", employeeNumber: nextEmployeeNumber(),
+    firstName: "Frank", lastName: "Delos Santos", nickname: "Fran",
+    gender: "Female", birthdate: "1990-10-03", civilStatus: "Married", nationality: "Filipino",
+    address: "375 Mabini St., CBT", contactNumber: "09623078009", email: "frank.delossantos@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09397007915",
+    branchId: "br-cbt", departmentId: "dp-darofy-mktg", positionId: "ps-multimedia-artist-14", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2020-06-29", dateRegularized: "2020-12-29",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-017", employeeNumber: nextEmployeeNumber(),
+    firstName: "Mae", lastName: "Japitan", nickname: "Mae",
+    gender: "Male", birthdate: "1991-01-08", civilStatus: "Single", nationality: "Filipino",
+    address: "371 Mabini St., CBT", contactNumber: "09769192700", email: "mae.japitan@shantahl.com.ph",
+    emergencyContactName: "Bautista, Emergency Contact", emergencyContactPhone: "09179040997",
+    branchId: "br-cbt", departmentId: "dp-darofy-sales", positionId: "ps-sales-manager-15", supervisorId: "emp-003",
+    employmentStatus: "regular", dateHired: "2019-06-29", dateRegularized: "2019-12-29",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 691, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["dept_head", "employee"],
+  },
+  {
+    id: "emp-018", employeeNumber: nextEmployeeNumber(),
+    firstName: "Christian Mharbee", lastName: "Mongcal", nickname: "Chri",
+    gender: "Female", birthdate: "1992-04-13", civilStatus: "Single", nationality: "Filipino",
+    address: "157 Mabini St., CBT", contactNumber: "09346999412", email: "christianmharbee.mongcal@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09603287414",
+    branchId: "br-cbt", departmentId: "dp-darofy-sales", positionId: "ps-sales-admin-16", supervisorId: "emp-017",
+    employmentStatus: "regular", dateHired: "2018-06-28", dateRegularized: "2018-12-28",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-019", employeeNumber: nextEmployeeNumber(),
+    firstName: "Fernan", lastName: "Barlinan", nickname: "Fern",
+    gender: "Male", birthdate: "1993-07-18", civilStatus: "Single", nationality: "Filipino",
+    address: "626 Mabini St., CBT", contactNumber: "09108323567", email: "fernan.barlinan@shantahl.com.ph",
+    emergencyContactName: "Castillo, Emergency Contact", emergencyContactPhone: "09754806675",
+    branchId: "br-cbt", departmentId: "dp-darofy-sales", positionId: "ps-sales-admin-16", supervisorId: "emp-017",
+    employmentStatus: "regular", dateHired: "2017-06-27", dateRegularized: "2017-12-27",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-020", employeeNumber: nextEmployeeNumber(),
+    firstName: "Chester", lastName: "Rosales", nickname: "Ches",
+    gender: "Female", birthdate: "1994-10-23", civilStatus: "Married", nationality: "Filipino",
+    address: "208 Mabini St., MNL", contactNumber: "09718018064", email: "chester.rosales@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09374864293",
+    branchId: "br-mnl", departmentId: "dp-mlm-netdev", positionId: "ps-network-development-head-luzon-17", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2016-06-26", dateRegularized: "2016-12-26",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 19432,
+    dailyAllowance: null, monthlyAllowance: 5568,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-021", employeeNumber: nextEmployeeNumber(),
+    firstName: "Randel", lastName: "Segovia", nickname: "Rand",
+    gender: "Male", birthdate: "1995-01-03", civilStatus: "Widowed", nationality: "Filipino",
+    address: "685 Mabini St., MDU", contactNumber: "09155228070", email: "randel.segovia@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09835109785",
+    branchId: "br-mdu", departmentId: "dp-mlm-netdev", positionId: "ps-network-development-head-visayas-18", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2025-06-23", dateRegularized: "2025-12-23",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 19432,
+    dailyAllowance: null, monthlyAllowance: 5568,
+    status: "resigned", statusChangedAt: "2026-07-07", roles: ["employee"],
+  },
+  {
+    id: "emp-022", employeeNumber: nextEmployeeNumber(),
+    firstName: "Domecillo", lastName: "Romelito", nickname: "Dome",
+    gender: "Female", birthdate: "1996-04-08", civilStatus: "Single", nationality: "Filipino",
+    address: "386 Mabini St., MNL", contactNumber: "09657433461", email: "domecillo.romelito@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09837355007",
+    branchId: "br-mnl", departmentId: "dp-mlm-netdev", positionId: "ps-network-development-head-mindanao-19", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2024-06-22", dateRegularized: "2024-12-22",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 19432,
+    dailyAllowance: null, monthlyAllowance: 5568,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-023", employeeNumber: nextEmployeeNumber(),
+    firstName: "John Michael", lastName: "De Maliwat", nickname: "John",
+    gender: "Male", birthdate: "1997-07-13", civilStatus: "Single", nationality: "Filipino",
+    address: "410 Mabini St., CBT", contactNumber: "09716857942", email: "johnmichael.demaliwat@shantahl.com.ph",
+    emergencyContactName: "Bautista, Emergency Contact", emergencyContactPhone: "09310118476",
+    branchId: "br-cbt", departmentId: "dp-mlm-mktg", positionId: "ps-multimedia-artist-20", supervisorId: "emp-037",
+    employmentStatus: "regular", dateHired: "2023-06-22", dateRegularized: "2023-12-22",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-024", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jaz", lastName: "Eusebio", nickname: "Jaz",
+    gender: "Male", birthdate: "1998-10-18", civilStatus: "Widowed", nationality: "Filipino",
+    address: "893 Mabini St., CBT", contactNumber: "09564468182", email: "jaz.eusebio@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09361267731",
+    branchId: "br-cbt", departmentId: "dp-mlm-mktg", positionId: "ps-social-media-manager-21", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2022-06-21", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 18000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-025", employeeNumber: nextEmployeeNumber(),
+    firstName: "Renz", lastName: "Nunez", nickname: "Renz",
+    gender: "Male", birthdate: "1999-01-23", civilStatus: "Single", nationality: "Filipino",
+    address: "832 Mabini St., MNL", contactNumber: "09312321708", email: "renz.nunez@shantahl.com.ph",
+    emergencyContactName: "Bautista, Emergency Contact", emergencyContactPhone: "09810023459",
+    branchId: "br-mnl", departmentId: "dp-mlm-mktg", positionId: "ps-social-media-manager-21", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2021-06-20", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 881.79, monthlySalary: null,
+    dailyAllowance: 0, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-026", employeeNumber: nextEmployeeNumber(),
+    firstName: "Danniel", lastName: "Borja", nickname: "Dann",
+    gender: "Female", birthdate: "1975-04-03", civilStatus: "Widowed", nationality: "Filipino",
+    address: "798 Mabini St., MNL", contactNumber: "09655959362", email: "danniel.borja@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09434923531",
+    branchId: "br-mnl", departmentId: "dp-mlm-mktg", positionId: "ps-video-editor-22", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2020-06-19", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 881.79, monthlySalary: null,
+    dailyAllowance: 0, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-027", employeeNumber: nextEmployeeNumber(),
+    firstName: "Michelle", lastName: "Ignacio", nickname: "Mich",
+    gender: "Male", birthdate: "1976-07-08", civilStatus: "Widowed", nationality: "Filipino",
+    address: "832 Mabini St., CBT", contactNumber: "09202863933", email: "michelle.ignacio@shantahl.com.ph",
+    emergencyContactName: "Mendoza, Emergency Contact", emergencyContactPhone: "09116476333",
+    branchId: "br-cbt", departmentId: "dp-mlm-sales", positionId: "ps-ads-specialist-23", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2019-06-19", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 18000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-028", employeeNumber: nextEmployeeNumber(),
+    firstName: "Eric", lastName: "Ads Specialist", nickname: "Eric",
+    gender: "Female", birthdate: "1977-10-13", civilStatus: "Single", nationality: "Filipino",
+    address: "351 Mabini St., CEB", contactNumber: "09287144025", email: "eric.adsspecialist@shantahl.com.ph",
+    emergencyContactName: "Flores, Emergency Contact", emergencyContactPhone: "09173989182",
+    branchId: "br-ceb", departmentId: "dp-mlm-sales", positionId: "ps-ads-specialist-23", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2018-06-18", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 10000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-029", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jennifer", lastName: "Gonzales", nickname: "Jenn",
+    gender: "Female", birthdate: "1978-01-18", civilStatus: "Single", nationality: "Filipino",
+    address: "817 Mabini St., CBT", contactNumber: "09522888602", email: "jennifer.gonzales@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09592651901",
+    branchId: "br-cbt", departmentId: "dp-mlm-sales", positionId: "ps-sales-admin-24", supervisorId: "emp-012",
+    employmentStatus: "regular", dateHired: "2017-06-17", dateRegularized: "2017-12-17",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-030", employeeNumber: nextEmployeeNumber(),
+    firstName: "Charm", lastName: "Rivera", nickname: "Char",
+    gender: "Female", birthdate: "1979-04-23", civilStatus: "Single", nationality: "Filipino",
+    address: "570 Mabini St., CBT", contactNumber: "09346510656", email: "charm.rivera@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09587864915",
+    branchId: "br-cbt", departmentId: "dp-mlm-sales", positionId: "ps-sales-admin-24", supervisorId: "emp-012",
+    employmentStatus: "regular", dateHired: "2016-06-16", dateRegularized: "2016-12-16",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-031", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jai", lastName: "Jai", nickname: "Jai",
+    gender: "Male", birthdate: "1980-07-19", civilStatus: "Single", nationality: "Filipino",
+    address: "106 Mabini St., CEB", contactNumber: "09178517533", email: "jai.jai@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09249762484",
+    branchId: "br-ceb", departmentId: "dp-mlm-sales", positionId: "ps-sales-admin-24", supervisorId: "emp-012",
+    employmentStatus: "regular", dateHired: "2025-07-13", dateRegularized: "2026-01-13",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 540, monthlySalary: null,
+    dailyAllowance: 0, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-032", employeeNumber: nextEmployeeNumber(),
+    firstName: "Suzanne", lastName: "Sarona", nickname: "Suza",
+    gender: "Male", birthdate: "1981-10-08", civilStatus: "Single", nationality: "Filipino",
+    address: "217 Mabini St., CEB", contactNumber: "09421037133", email: "suzanne.sarona@shantahl.com.ph",
+    emergencyContactName: "Reyes, Emergency Contact", emergencyContactPhone: "09119699175",
+    branchId: "br-ceb", departmentId: "dp-mlm-sales", positionId: "ps-sales-admin-24", supervisorId: "emp-012",
+    employmentStatus: "regular", dateHired: "2024-07-12", dateRegularized: "2025-01-12",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 540, monthlySalary: null,
+    dailyAllowance: 0, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-033", employeeNumber: nextEmployeeNumber(),
+    firstName: "Marissa", lastName: "Camposo", nickname: "Mari",
+    gender: "Female", birthdate: "1982-01-13", civilStatus: "Single", nationality: "Filipino",
+    address: "279 Mabini St., CEB", contactNumber: "09686325573", email: "marissa.camposo@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09518323723",
+    branchId: "br-ceb", departmentId: "dp-mlm-sales", positionId: "ps-sales-admin-24", supervisorId: "emp-012",
+    employmentStatus: "regular", dateHired: "2023-07-12", dateRegularized: "2024-01-12",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 540, monthlySalary: null,
+    dailyAllowance: 0, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-034", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jerome", lastName: "Canas", nickname: "Jero",
+    gender: "Female", birthdate: "1983-04-18", civilStatus: "Married", nationality: "Filipino",
+    address: "790 Mabini St., CBT", contactNumber: "09405109318", email: "jerome.canas@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09347769338",
+    branchId: "br-cbt", departmentId: "dp-cosmetics", positionId: "ps-platform-specialist-25", supervisorId: "emp-002",
+    employmentStatus: "regular", dateHired: "2022-07-11", dateRegularized: "2023-01-11",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-035", employeeNumber: nextEmployeeNumber(),
+    firstName: "Loribel", lastName: "Garcia", nickname: "Lori",
+    gender: "Male", birthdate: "1984-07-23", civilStatus: "Widowed", nationality: "Filipino",
+    address: "221 Mabini St., CBT", contactNumber: "09764742588", email: "loribel.garcia@shantahl.com.ph",
+    emergencyContactName: "Mendoza, Emergency Contact", emergencyContactPhone: "09836137296",
+    branchId: "br-cbt", departmentId: "dp-cosmetics", positionId: "ps-multimedia-artist-head-26", supervisorId: "emp-002",
+    employmentStatus: "regular", dateHired: "2021-07-10", dateRegularized: "2022-01-10",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 606, monthlySalary: null,
+    dailyAllowance: null, monthlyAllowance: 4194,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-036", employeeNumber: nextEmployeeNumber(),
+    firstName: "Arnie", lastName: "Pangilinan", nickname: "Arni",
+    gender: "Male", birthdate: "1985-10-03", civilStatus: "Widowed", nationality: "Filipino",
+    address: "736 Mabini St., CBT", contactNumber: "09311053927", email: "arnie.pangilinan@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09599946623",
+    branchId: "br-cbt", departmentId: "dp-cosmetics", positionId: "ps-video-editor-27", supervisorId: "emp-002",
+    employmentStatus: "regular", dateHired: "2020-07-09", dateRegularized: "2021-01-09",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: null, monthlyAllowance: 2611,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-037", employeeNumber: nextEmployeeNumber(),
+    firstName: "Ronald", lastName: "Lugtu", nickname: "Rona",
+    gender: "Female", birthdate: "1986-01-08", civilStatus: "Single", nationality: "Filipino",
+    address: "170 Mabini St., CBT", contactNumber: "09155792455", email: "ronald.lugtu@shantahl.com.ph",
+    emergencyContactName: "Castillo, Emergency Contact", emergencyContactPhone: "09337416176",
+    branchId: "br-cbt", departmentId: "dp-darofy-marketing-corp", positionId: "ps-multimedia-artist-head-mlm-28", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2019-07-09", dateRegularized: "2020-01-09",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 690.1, monthlySalary: null,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-038", employeeNumber: nextEmployeeNumber(),
+    firstName: "John Paul Michael", lastName: "Papa", nickname: "John",
+    gender: "Male", birthdate: "1987-04-13", civilStatus: "Married", nationality: "Filipino",
+    address: "687 Mabini St., CBT", contactNumber: "09373676433", email: "johnpaulmichael.papa@shantahl.com.ph",
+    emergencyContactName: "Mendoza, Emergency Contact", emergencyContactPhone: "09610095354",
+    branchId: "br-cbt", departmentId: "dp-mlm-mktg", positionId: "ps-multimedia-artist-head-29", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2018-07-08", dateRegularized: "2019-01-08",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 20000,
+    dailyAllowance: null, monthlyAllowance: 5000,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-039", employeeNumber: nextEmployeeNumber(),
+    firstName: "Ara Juniella", lastName: "Aling", nickname: "Ara ",
+    gender: "Female", birthdate: "1988-07-18", civilStatus: "Married", nationality: "Filipino",
+    address: "368 Mabini St., MNL", contactNumber: "09258878968", email: "arajuniella.aling@shantahl.com.ph",
+    emergencyContactName: "Bautista, Emergency Contact", emergencyContactPhone: "09566898997",
+    branchId: "br-mnl", departmentId: "dp-indie-mktg", positionId: "ps-marketing-assistant-30", supervisorId: "emp-012",
+    employmentStatus: "regular", dateHired: "2017-07-07", dateRegularized: "2018-01-07",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 695, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-040", employeeNumber: nextEmployeeNumber(),
+    firstName: "Dra.", lastName: "Cecil Catapang", nickname: "Dra.",
+    gender: "Female", birthdate: "1989-10-23", civilStatus: "Widowed", nationality: "Filipino",
+    address: "155 Mabini St., MNL", contactNumber: "09645182813", email: "dra..cecilcatapang@shantahl.com.ph",
+    emergencyContactName: "Flores, Emergency Contact", emergencyContactPhone: "09892212970",
+    branchId: "br-mnl", departmentId: "dp-indie-mktg", positionId: "ps-product-specialist-31", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2016-07-06", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 30000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-041", employeeNumber: nextEmployeeNumber(),
+    firstName: "Shegive", lastName: "Lee", nickname: "Sheg",
+    gender: "Female", birthdate: "1990-01-03", civilStatus: "Single", nationality: "Filipino",
+    address: "256 Mabini St., MNL", contactNumber: "09613933666", email: "shegive.lee@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09677316062",
+    branchId: "br-mnl", departmentId: "dp-indie-mktg", positionId: "ps-product-specialist-31", supervisorId: null,
+    employmentStatus: "freelance", dateHired: "2025-07-03", dateRegularized: null,
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 25000,
+    dailyAllowance: null, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-042", employeeNumber: nextEmployeeNumber(),
+    firstName: "Reynalyn", lastName: "Alfonso", nickname: "Reyn",
+    gender: "Female", birthdate: "1991-04-08", civilStatus: "Widowed", nationality: "Filipino",
+    address: "714 Mabini St., CBT", contactNumber: "09332243271", email: "reynalyn.alfonso@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09655059314",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2024-07-02", dateRegularized: "2025-01-02",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-043", employeeNumber: nextEmployeeNumber(),
+    firstName: "Cherry Ann", lastName: "Asuncion", nickname: "Cher",
+    gender: "Male", birthdate: "1992-07-13", civilStatus: "Single", nationality: "Filipino",
+    address: "770 Mabini St., CBT", contactNumber: "09479548553", email: "cherryann.asuncion@shantahl.com.ph",
+    emergencyContactName: "Flores, Emergency Contact", emergencyContactPhone: "09408301147",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-csr-33", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2023-07-02", dateRegularized: "2024-01-02",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-044", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jomari", lastName: "De Dios", nickname: "Joma",
+    gender: "Female", birthdate: "1993-10-18", civilStatus: "Married", nationality: "Filipino",
+    address: "453 Mabini St., CBT", contactNumber: "09619536130", email: "jomari.dedios@shantahl.com.ph",
+    emergencyContactName: "Reyes, Emergency Contact", emergencyContactPhone: "09442048398",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-warehouseman-34", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2022-07-01", dateRegularized: "2023-01-01",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-045", employeeNumber: nextEmployeeNumber(),
+    firstName: "Marlyn", lastName: "Leonardo", nickname: "Marl",
+    gender: "Female", birthdate: "1994-01-23", civilStatus: "Single", nationality: "Filipino",
+    address: "326 Mabini St., CBT", contactNumber: "09640841457", email: "marlyn.leonardo@shantahl.com.ph",
+    emergencyContactName: "Flores, Emergency Contact", emergencyContactPhone: "09658435024",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-operations-manager-35", supervisorId: null,
+    employmentStatus: "regular", dateHired: "2021-06-30", dateRegularized: "2021-12-30",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "monthly", dailyRate: null, monthlySalary: 20000,
+    dailyAllowance: null, monthlyAllowance: 5000,
+    status: "active", statusChangedAt: null, roles: ["dept_head", "employee"],
+  },
+  {
+    id: "emp-046", employeeNumber: nextEmployeeNumber(),
+    firstName: "Ronnel", lastName: "Longalong", nickname: "Ronn",
+    gender: "Female", birthdate: "1995-04-03", civilStatus: "Widowed", nationality: "Filipino",
+    address: "856 Mabini St., CBT", contactNumber: "09698730557", email: "ronnel.longalong@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09349894925",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-driver-messenger-36", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2020-06-29", dateRegularized: "2020-12-29",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "on_leave", statusChangedAt: "2026-07-11", roles: ["employee"],
+  },
+  {
+    id: "emp-047", employeeNumber: nextEmployeeNumber(),
+    firstName: "Twinkle", lastName: "Marayag", nickname: "Twin",
+    gender: "Female", birthdate: "1996-07-08", civilStatus: "Single", nationality: "Filipino",
+    address: "810 Mabini St., CBT", contactNumber: "09327109754", email: "twinkle.marayag@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09630285605",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-logistics-staff-37", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2019-06-29", dateRegularized: "2019-12-29",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-048", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jaimie", lastName: "Nucom", nickname: "Jaim",
+    gender: "Male", birthdate: "1997-10-13", civilStatus: "Single", nationality: "Filipino",
+    address: "895 Mabini St., CBT", contactNumber: "09337570350", email: "jaimie.nucom@shantahl.com.ph",
+    emergencyContactName: "Cruz, Emergency Contact", emergencyContactPhone: "09365641031",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-operations-supervisor-38", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2018-06-28", dateRegularized: "2018-12-28",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 691, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-049", employeeNumber: nextEmployeeNumber(),
+    firstName: "Felix Ardee", lastName: "Santarina", nickname: "Feli",
+    gender: "Female", birthdate: "1998-01-18", civilStatus: "Married", nationality: "Filipino",
+    address: "680 Mabini St., CBT", contactNumber: "09643830844", email: "felixardee.santarina@shantahl.com.ph",
+    emergencyContactName: "Cruz, Emergency Contact", emergencyContactPhone: "09395592550",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-logistics-staff-37", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2017-06-27", dateRegularized: "2017-12-27",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-050", employeeNumber: nextEmployeeNumber(),
+    firstName: "Daiki", lastName: "Yamakawa", nickname: "Daik",
+    gender: "Male", birthdate: "1999-04-23", civilStatus: "Single", nationality: "Filipino",
+    address: "487 Mabini St., CBT", contactNumber: "09871326587", email: "daiki.yamakawa@shantahl.com.ph",
+    emergencyContactName: "Cruz, Emergency Contact", emergencyContactPhone: "09204643870",
+    branchId: "br-cbt", departmentId: "dp-operation", positionId: "ps-utility-39", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2016-06-26", dateRegularized: "2016-12-26",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 590, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-051", employeeNumber: nextEmployeeNumber(),
+    firstName: "Aboguin", lastName: "Ma. Abegail Fatima", nickname: "Abog",
+    gender: "Male", birthdate: "1975-07-31", civilStatus: "Single", nationality: "Filipino",
+    address: "716 Mabini St., MNL", contactNumber: "09707497574", email: "aboguin.ma.abegailfatima@shantahl.com.ph",
+    emergencyContactName: "Flores, Emergency Contact", emergencyContactPhone: "09851757640",
+    branchId: "br-mnl", departmentId: "dp-operation", positionId: "ps-branch-supervisor-40", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2025-06-23", dateRegularized: "2025-12-23",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 715, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-052", employeeNumber: nextEmployeeNumber(),
+    firstName: "Abegail", lastName: "Bordaje", nickname: "Abeg",
+    gender: "Female", birthdate: "1976-10-08", civilStatus: "Widowed", nationality: "Filipino",
+    address: "888 Mabini St., MNL", contactNumber: "09806010398", email: "abegail.bordaje@shantahl.com.ph",
+    emergencyContactName: "Castillo, Emergency Contact", emergencyContactPhone: "09620431406",
+    branchId: "br-mnl", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2024-06-22", dateRegularized: "2024-12-22",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 695, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-053", employeeNumber: nextEmployeeNumber(),
+    firstName: "Dayanara", lastName: "Flores", nickname: "Daya",
+    gender: "Male", birthdate: "1977-01-13", civilStatus: "Single", nationality: "Filipino",
+    address: "846 Mabini St., MNL", contactNumber: "09737681564", email: "dayanara.flores@shantahl.com.ph",
+    emergencyContactName: "Flores, Emergency Contact", emergencyContactPhone: "09710273978",
+    branchId: "br-mnl", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2023-06-22", dateRegularized: "2023-12-22",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 695, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-054", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jemuel", lastName: "Castillo", nickname: "Jemu",
+    gender: "Male", birthdate: "1978-04-18", civilStatus: "Widowed", nationality: "Filipino",
+    address: "899 Mabini St., MNL", contactNumber: "09842755432", email: "jemuel.castillo@shantahl.com.ph",
+    emergencyContactName: "Mendoza, Emergency Contact", emergencyContactPhone: "09487314626",
+    branchId: "br-mnl", departmentId: "dp-operation", positionId: "ps-warehouseman-34", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2022-06-21", dateRegularized: "2022-12-21",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 695, monthlySalary: null,
+    dailyAllowance: 47, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-055", employeeNumber: nextEmployeeNumber(),
+    firstName: "Girlie Gail", lastName: "Gallardo", nickname: "Girl",
+    gender: "Female", birthdate: "1979-07-23", civilStatus: "Married", nationality: "Filipino",
+    address: "440 Mabini St., MNL", contactNumber: "09355178039", email: "girliegail.gallardo@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09365236199",
+    branchId: "br-mnl", departmentId: "dp-operation", positionId: "ps-branch-manager-41", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2021-06-20", dateRegularized: "2021-12-20",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 754, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["dept_head", "employee"],
+  },
+  {
+    id: "emp-056", employeeNumber: nextEmployeeNumber(),
+    firstName: "Clover", lastName: "Riomalos", nickname: "Clov",
+    gender: "Male", birthdate: "1980-10-03", civilStatus: "Widowed", nationality: "Filipino",
+    address: "491 Mabini St., MNL", contactNumber: "09820084918", email: "clover.riomalos@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09684302189",
+    branchId: "br-mnl", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2020-06-19", dateRegularized: "2020-12-19",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 695, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-057", employeeNumber: nextEmployeeNumber(),
+    firstName: "Bersabal", lastName: "Jober", nickname: "Bers",
+    gender: "Male", birthdate: "1981-01-08", civilStatus: "Married", nationality: "Filipino",
+    address: "334 Mabini St., CEB", contactNumber: "09271003000", email: "bersabal.jober@shantahl.com.ph",
+    emergencyContactName: "Mendoza, Emergency Contact", emergencyContactPhone: "09841398099",
+    branchId: "br-ceb", departmentId: "dp-operation", positionId: "ps-driver-warehouseman-42", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2019-06-19", dateRegularized: "2019-12-19",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 540, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-058", employeeNumber: nextEmployeeNumber(),
+    firstName: "Karlou James", lastName: "Japitan", nickname: "Karl",
+    gender: "Male", birthdate: "1982-04-13", civilStatus: "Single", nationality: "Filipino",
+    address: "511 Mabini St., MDU", contactNumber: "09310371303", email: "karloujames.japitan@shantahl.com.ph",
+    emergencyContactName: "Garcia, Emergency Contact", emergencyContactPhone: "09688462772",
+    branchId: "br-mdu", departmentId: "dp-operation", positionId: "ps-branch-supervisor-40", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2018-06-18", dateRegularized: "2018-12-18",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 646, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-059", employeeNumber: nextEmployeeNumber(),
+    firstName: "Ricky", lastName: "Malasa", nickname: "Rick",
+    gender: "Female", birthdate: "1983-07-18", civilStatus: "Single", nationality: "Filipino",
+    address: "784 Mabini St., MDU", contactNumber: "09764522872", email: "ricky.malasa@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09548025632",
+    branchId: "br-mdu", departmentId: "dp-operation", positionId: "ps-stockman-43", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2017-06-17", dateRegularized: "2017-12-17",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 540, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-060", employeeNumber: nextEmployeeNumber(),
+    firstName: "Mary Jane", lastName: "Pedrano", nickname: "Mary",
+    gender: "Female", birthdate: "1984-10-23", civilStatus: "Married", nationality: "Filipino",
+    address: "536 Mabini St., MDU", contactNumber: "09761596281", email: "maryjane.pedrano@shantahl.com.ph",
+    emergencyContactName: "Torres, Emergency Contact", emergencyContactPhone: "09387210965",
+    branchId: "br-mdu", departmentId: "dp-operation", positionId: "ps-branch-manager-41", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2016-06-16", dateRegularized: "2016-12-16",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 670, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["dept_head", "employee"],
+  },
+  {
+    id: "emp-061", employeeNumber: nextEmployeeNumber(),
+    firstName: "Leonilyn", lastName: "Talisic", nickname: "Leon",
+    gender: "Female", birthdate: "1985-01-03", civilStatus: "Single", nationality: "Filipino",
+    address: "269 Mabini St., MDU", contactNumber: "09722825985", email: "leonilyn.talisic@shantahl.com.ph",
+    emergencyContactName: "Santos, Emergency Contact", emergencyContactPhone: "09752102555",
+    branchId: "br-mdu", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2025-07-13", dateRegularized: "2026-01-13",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 629, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "resigned", statusChangedAt: "2026-06-25", roles: ["employee"],
+  },
+  {
+    id: "emp-062", employeeNumber: nextEmployeeNumber(),
+    firstName: "Gretchen", lastName: "De Sosa", nickname: "Gret",
+    gender: "Male", birthdate: "1986-04-08", civilStatus: "Widowed", nationality: "Filipino",
+    address: "806 Mabini St., CAV", contactNumber: "09878052626", email: "gretchen.desosa@shantahl.com.ph",
+    emergencyContactName: "Bautista, Emergency Contact", emergencyContactPhone: "09878196373",
+    branchId: "br-cav", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2024-07-12", dateRegularized: "2025-01-12",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 600, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-063", employeeNumber: nextEmployeeNumber(),
+    firstName: "Rhea", lastName: "Francisco", nickname: "Rhea",
+    gender: "Female", birthdate: "1987-07-13", civilStatus: "Single", nationality: "Filipino",
+    address: "659 Mabini St., CAV", contactNumber: "09615246744", email: "rhea.francisco@shantahl.com.ph",
+    emergencyContactName: "Reyes, Emergency Contact", emergencyContactPhone: "09490490010",
+    branchId: "br-cav", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2023-07-12", dateRegularized: "2024-01-12",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 600, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-064", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jemima", lastName: "Amestoso", nickname: "Jemi",
+    gender: "Male", birthdate: "1988-10-18", civilStatus: "Single", nationality: "Filipino",
+    address: "733 Mabini St., CDO", contactNumber: "09836011136", email: "jemima.amestoso@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09889433095",
+    branchId: "br-cdo", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2022-07-11", dateRegularized: "2023-01-11",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 500, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-065", employeeNumber: nextEmployeeNumber(),
+    firstName: "Daniel", lastName: "Bato", nickname: "Dani",
+    gender: "Female", birthdate: "1989-01-23", civilStatus: "Widowed", nationality: "Filipino",
+    address: "267 Mabini St., PGS", contactNumber: "09581223383", email: "daniel.bato@shantahl.com.ph",
+    emergencyContactName: "Bautista, Emergency Contact", emergencyContactPhone: "09133993434",
+    branchId: "br-pgs", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2021-07-10", dateRegularized: "2022-01-10",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 505, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-066", employeeNumber: nextEmployeeNumber(),
+    firstName: "Charles", lastName: "Villaflor", nickname: "Char",
+    gender: "Male", birthdate: "1990-04-03", civilStatus: "Single", nationality: "Filipino",
+    address: "746 Mabini St., DVO", contactNumber: "09765300255", email: "charles.villaflor@shantahl.com.ph",
+    emergencyContactName: "Cruz, Emergency Contact", emergencyContactPhone: "09757668712",
+    branchId: "br-dvo", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2020-07-09", dateRegularized: "2021-01-09",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 510, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-067", employeeNumber: nextEmployeeNumber(),
+    firstName: "Jebeth", lastName: "Guinto", nickname: "Jebe",
+    gender: "Male", birthdate: "1991-07-08", civilStatus: "Widowed", nationality: "Filipino",
+    address: "335 Mabini St., LCN", contactNumber: "09678580673", email: "jebeth.guinto@shantahl.com.ph",
+    emergencyContactName: "Castillo, Emergency Contact", emergencyContactPhone: "09110380464",
+    branchId: "br-lcn", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2019-07-09", dateRegularized: "2020-01-09",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 600, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
+  {
+    id: "emp-068", employeeNumber: nextEmployeeNumber(),
+    firstName: "Catherine", lastName: "Mogato", nickname: "Cath",
+    gender: "Male", birthdate: "1992-10-13", civilStatus: "Single", nationality: "Filipino",
+    address: "609 Mabini St., BCD", contactNumber: "09763921498", email: "catherine.mogato@shantahl.com.ph",
+    emergencyContactName: "Ramos, Emergency Contact", emergencyContactPhone: "09317860781",
+    branchId: "br-bcd", departmentId: "dp-operation", positionId: "ps-cashier-32", supervisorId: "emp-045",
+    employmentStatus: "regular", dateHired: "2018-07-08", dateRegularized: "2019-01-08",
+    contractStart: null, contractEnd: null, probationEndsAt: null,
+    payrollType: "daily", dailyRate: 480, monthlySalary: null,
+    dailyAllowance: 22, monthlyAllowance: null,
+    status: "active", statusChangedAt: null, roles: ["employee"],
+  },
 ];
 
-export const DEPT_HEAD_IDS: Record<string, { salesManager: string; opsManager: string }> = {};
-export const RANK_AND_FILE_SAMPLE_ID_BY_BRANCH: Record<string, string> = {};
-
-BRANCHES.forEach((branch, branchIdx) => {
-  const slotIds: Record<string, string> = {};
-  BRANCH_TEMPLATE.forEach((tpl, slotIdx) => {
-    const nameIdx = (branchIdx * BRANCH_TEMPLATE.length + slotIdx) % FIRST_NAMES.length;
-    const lastIdx = (branchIdx * 7 + slotIdx * 3) % LAST_NAMES.length;
-    const id = `emp-${branch.code.toLowerCase()}-${tpl.slot}`;
-    let supervisorId: string | null;
-    if (tpl.reportsTo === "vp") supervisorId = vpOps.id;
-    else supervisorId = slotIds[tpl.reportsTo];
-
-    const hireYearsAgo = 1 + ((branchIdx + slotIdx) % 8);
-    let dateHired = addDays(TODAY, -365 * hireYearsAgo - slotIdx * 11);
-    let dateRegularized: string | null = addMonths(dateHired, 6);
-    let contractStart: string | null = null;
-    let contractEnd: string | null = null;
-    let probationEndsAt: string | null = null;
-    let statusChangedAt: string | null = null;
-    let status: Employee["status"] = "active";
-
-    if (tpl.employmentStatus === "probationary") {
-      // spread probation end dates around TODAY: some overdue, some due this
-      // week, some next month, most further out — for contract-monitoring demo
-      const spread = [-10, 3, 15, 40, 75][(branchIdx + slotIdx) % 5];
-      dateHired = addDays(addDays(TODAY, spread), -180);
-      dateRegularized = null;
-      probationEndsAt = addDays(TODAY, spread);
-    } else if (tpl.employmentStatus === "freelance" || tpl.employmentStatus === "project_based") {
-      const spread = [-5, 8, 20, 45, 70, 90][(branchIdx * 3 + slotIdx) % 6];
-      contractStart = addDays(dateHired, 0);
-      contractEnd = addDays(TODAY, spread);
-      dateRegularized = null;
-    }
-
-    // sprinkle a few resignations / on-leave for dashboard widgets
-    if (branchIdx === 1 && tpl.slot === "csr") {
-      status = "resigned";
-      statusChangedAt = addDays(TODAY, -6);
-    }
-    if (branchIdx === 4 && tpl.slot === "sales1") {
-      status = "on_leave";
-      statusChangedAt = addDays(TODAY, -2);
-    }
-    if (branchIdx === 7 && tpl.slot === "opsStaff") {
-      status = "resigned";
-      statusChangedAt = addDays(TODAY, -18);
-    }
-
-    const isMonthly = tpl.payrollType === "monthly";
-    const monthlySalary = isMonthly ? 30000 + ((branchIdx + slotIdx) % 6) * 6000 : null;
-    const dailyRate = !isMonthly ? 520 + ((branchIdx + slotIdx) % 5) * 35 : null;
-
-    const emp = buildEmployee({
-      id,
-      firstName: FIRST_NAMES[nameIdx],
-      lastName: LAST_NAMES[lastIdx],
-      branchId: branch.id,
-      departmentId: tpl.departmentId,
-      positionId: tpl.position,
-      supervisorId,
-      employmentStatus: tpl.employmentStatus,
-      dateHired,
-      dateRegularized,
-      contractStart,
-      contractEnd,
-      probationEndsAt,
-      payrollType: tpl.payrollType,
-      dailyRate,
-      monthlySalary,
-      status,
-      statusChangedAt,
-      roles: tpl.roles,
-      birthMonth: ((branchIdx * 3 + slotIdx) % 12) + 1,
-      birthDay: 3 + ((slotIdx * 5 + branchIdx) % 25),
-      birthYear: 1980 + ((branchIdx + slotIdx) % 20),
-    });
-
-    slotIds[tpl.slot] = id;
-    EMPLOYEES.push(emp);
-
-    if (tpl.slot === "sales1") RANK_AND_FILE_SAMPLE_ID_BY_BRANCH[branch.id] = id;
-  });
-  DEPT_HEAD_IDS[branch.id] = { salesManager: slotIds.salesManager, opsManager: slotIds.opsManager };
-});
-
-// force a couple of July birthdays for the "upcoming birthdays" widget, deterministically
-EMPLOYEES.find((e) => e.id === "emp-ceb-sales1")!.birthdate = "1992-07-16";
-EMPLOYEES.find((e) => e.id === "emp-dvo-opsStaff")!.birthdate = "1989-07-19";
-EMPLOYEES.find((e) => e.id === "emp-bag-adminStaff")!.birthdate = "1994-07-31";
-
-// named for the demo-user roster below, distinct from the auto-generated staff pool
-const deptManagerEmployee = EMPLOYEES.find((e) => e.id === "emp-ceb-salesManager")!;
-deptManagerEmployee.firstName = "Marlyn";
-deptManagerEmployee.lastName = "Leonardo";
-
-// Cabanatuan is a newly-opened branch — kept out of BRANCH_TEMPLATE's auto-staffing
-// loop above so it doesn't get a full generated roster, and added here with a
-// single named employee instead.
-BRANCHES.push({ id: "br-cbt", name: "Cabanatuan", code: "CBT", address: "Maharlika Highway, Cabanatuan City" });
-const reynalyn = buildEmployee({
-  id: "emp-cbt-cashier", firstName: "Reynalyn", lastName: "Alfonso", branchId: "br-cbt", departmentId: "dp-sales",
-  positionId: "ps-cashier", supervisorId: vpOps.id, employmentStatus: "regular", dateHired: "2025-09-15",
-  dateRegularized: "2026-03-15", payrollType: "daily", dailyRate: 560, roles: ["employee"],
-  birthMonth: 10, birthDay: 4, birthYear: 1998,
-});
-EMPLOYEES.push(reynalyn);
+// --- Named references into the real roster, used to wire demo logins and
+// seed audit/discipline records below. ---------------------------------------
+const hrManager = EMPLOYEES.find((e) => e.id === "emp-012")!; // Sheena Evangelista, HR Manager
+const srAcctgPayroll = EMPLOYEES.find((e) => e.id === "emp-007")!; // Wendie Halog, Sr. Accounting Assistant & Payroll Officer
+const treasurer = EMPLOYEES.find((e) => e.id === "emp-011")!; // Joan Mariette Santarina, Corporate Treasurer
+const cfo = EMPLOYEES.find((e) => e.id === "emp-005")!; // Maricris Barlinan, CFO
+const opsManagerCbt = EMPLOYEES.find((e) => e.id === "emp-045")!; // Marlyn Leonardo, Operations Manager (Cabanatuan)
+const cashierReynalyn = EMPLOYEES.find((e) => e.id === "emp-042")!; // Reynalyn Alfonso, Cashier (Cabanatuan)
+const viceChair = EMPLOYEES.find((e) => e.id === "emp-004")!; // Sheilah A. Magdadaro, Vice Chairperson
 
 // --- Demo login users -----------------------------------------------------
 export const DEMO_USERS: DemoUser[] = [
-  { id: "u-hr", employeeId: hrAdmin.id, name: "Sheena Evangelista", title: "HR Manager", roles: ["hr_admin"], initials: "SE" },
-  { id: "u-payroll", employeeId: payrollOfficer.id, name: "Juan Dela Cruz", title: "Payroll Officer", roles: ["payroll_officer"], initials: "JD" },
-  { id: "u-acctg", employeeId: srAcctg.id, name: "Wendie Halog", title: "Sr. Accounting Assistant", roles: ["sr_accounting_assistant"], initials: "WH" },
+  { id: "u-hr", employeeId: hrManager.id, name: "Sheena Evangelista", title: "HR Manager", roles: ["hr_admin"], initials: "SE" },
+  { id: "u-acctg", employeeId: srAcctgPayroll.id, name: "Wendie Halog", title: "Sr. Accounting Assistant & Payroll Officer", roles: ["sr_accounting_assistant", "payroll_officer"], initials: "WH" },
   { id: "u-treasurer", employeeId: treasurer.id, name: "Joan Mariette Santarina", title: "Corporate Treasurer", roles: ["treasurer"], initials: "JS" },
   { id: "u-cfo", employeeId: cfo.id, name: "Maricris Barlinan", title: "Chief Finance Officer", roles: ["cfo"], initials: "MB" },
-  { id: "u-depthead", employeeId: "emp-ceb-salesManager", name: "Marlyn Leonardo", title: "Branch Sales Manager (Cebu)", roles: ["dept_head", "employee"], initials: "ML" },
-  { id: "u-employee", employeeId: "emp-cbt-cashier", name: "Reynalyn Alfonso", title: "Cashier (Cabanatuan Branch)", roles: ["employee"], initials: "RA" },
-  { id: "u-upper", employeeId: vpOps.id, name: "Sheilah A. Magdadaro", title: "Vice Chairperson", roles: ["upper_management"], initials: "SM" },
+  { id: "u-depthead", employeeId: opsManagerCbt.id, name: "Marlyn Leonardo", title: "Operations Manager (Cabanatuan Branch)", roles: ["dept_head", "employee"], initials: "ML" },
+  { id: "u-employee", employeeId: cashierReynalyn.id, name: "Reynalyn Alfonso", title: "Cashier (Cabanatuan Branch)", roles: ["employee"], initials: "RA" },
+  { id: "u-upper", employeeId: viceChair.id, name: "Sheilah A. Magdadaro", title: "Vice Chairperson", roles: ["upper_management"], initials: "SM" },
 ];
 
 // --- Performance evaluations ------------------------------------------------
@@ -505,7 +1121,7 @@ export const CURRENT_EVAL_PERIOD = "Semi-Annual 2026 (Jan–Jun)";
 const evalPeriod = CURRENT_EVAL_PERIOD;
 let evalSeq = 0;
 EMPLOYEES.filter((e) => e.roles.includes("employee") && e.supervisorId).forEach((e, i) => {
-  if (i % 4 !== 0) return; // sample subset
+  if (i % 3 !== 0) return; // sample subset
   evalSeq += 1;
   const status: PerformanceEvaluation["status"] = evalSeq % 3 === 0 ? "draft" : evalSeq % 3 === 1 ? "acknowledged" : "submitted";
   PERFORMANCE_EVALUATIONS.push(
@@ -535,7 +1151,7 @@ discEmployees.forEach((e, i) => {
     employeeId: e.id,
     type,
     description: DISC_DESCRIPTIONS[type],
-    issuedBy: hrAdmin.id,
+    issuedBy: hrManager.id,
     date: addDays(TODAY, -(i * 9 + 5)),
     status: i % 3 === 0 ? "resolved" : "open",
     attachmentName: i % 2 === 0 ? `${type}-${e.employeeNumber}.pdf` : null,
@@ -544,14 +1160,14 @@ discEmployees.forEach((e, i) => {
 
 // --- Audit logs --------------------------------------------------------------
 export const AUDIT_LOGS: AuditLog[] = [
-  { id: "al-1", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "Employee 201 File", action: "update", description: "Updated contact details", previousValue: "0917xxxxxxx", newValue: "0918xxxxxxx", createdAt: addDays(TODAY, -20) },
-  { id: "al-2", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payroll", action: "lock", description: "Locked payroll period 2026-07-01 to 2026-07-15", previousValue: "open", newValue: "locked", createdAt: addDays(TODAY, -2) },
-  { id: "al-3", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "Leave Management", action: "approve", description: "Approved Vacation Leave request", previousValue: "pending", newValue: "approved", createdAt: addDays(TODAY, -6) },
-  { id: "al-4", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "System Administration", action: "create", description: "Added new work schedule: Flexi", previousValue: null, newValue: "Flexi 09:00-18:00", createdAt: addDays(TODAY, -30) },
-  { id: "al-5", userId: hrAdmin.id, userName: "Sheena Evangelista", module: "Discipline", action: "create", description: "Issued written warning", previousValue: null, newValue: "written_warning", createdAt: addDays(TODAY, -14) },
-  { id: "al-6", userId: "emp-ceb-salesManager", userName: "Marlyn Leonardo", module: "Overtime", action: "approve", description: "Approved 3 OT hours", previousValue: "pending", newValue: "approved (3 hrs)", createdAt: addDays(TODAY, -4) },
-  { id: "al-7", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payslips", action: "generate", description: "Generated payslips for 105 employees", previousValue: null, newValue: "105 payslips", createdAt: addDays(TODAY, -16) },
-  { id: "al-8", userId: payrollOfficer.id, userName: "Juan Dela Cruz", module: "Payroll Reports", action: "generate", description: "Generated monthly employer payroll expense report for June 2026", previousValue: null, newValue: "report generated", createdAt: addDays(TODAY, -1) },
+  { id: "al-1", userId: hrManager.id, userName: "Sheena Evangelista", module: "Employee 201 File", action: "update", description: "Updated contact details", previousValue: "0917xxxxxxx", newValue: "0918xxxxxxx", createdAt: addDays(TODAY, -20) },
+  { id: "al-2", userId: srAcctgPayroll.id, userName: "Wendie Halog", module: "Payroll", action: "lock", description: "Locked payroll period 2026-07-01 to 2026-07-15", previousValue: "open", newValue: "locked", createdAt: addDays(TODAY, -2) },
+  { id: "al-3", userId: hrManager.id, userName: "Sheena Evangelista", module: "Leave Management", action: "approve", description: "Approved Vacation Leave request", previousValue: "pending", newValue: "approved", createdAt: addDays(TODAY, -6) },
+  { id: "al-4", userId: hrManager.id, userName: "Sheena Evangelista", module: "System Administration", action: "create", description: "Added new work schedule: Flexi", previousValue: null, newValue: "Flexi 09:00-18:00", createdAt: addDays(TODAY, -30) },
+  { id: "al-5", userId: hrManager.id, userName: "Sheena Evangelista", module: "Discipline", action: "create", description: "Issued written warning", previousValue: null, newValue: "written_warning", createdAt: addDays(TODAY, -14) },
+  { id: "al-6", userId: opsManagerCbt.id, userName: "Marlyn Leonardo", module: "Overtime", action: "approve", description: "Approved 3 OT hours", previousValue: "pending", newValue: "approved (3 hrs)", createdAt: addDays(TODAY, -4) },
+  { id: "al-7", userId: srAcctgPayroll.id, userName: "Wendie Halog", module: "Payslips", action: "generate", description: "Generated payslips for 68 employees", previousValue: null, newValue: "68 payslips", createdAt: addDays(TODAY, -16) },
+  { id: "al-8", userId: srAcctgPayroll.id, userName: "Wendie Halog", module: "Payroll Reports", action: "generate", description: "Generated monthly employer payroll expense report for June 2026", previousValue: null, newValue: "report generated", createdAt: addDays(TODAY, -1) },
 ];
 
 // --- Announcements -----------------------------------------------------------

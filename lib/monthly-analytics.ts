@@ -127,7 +127,12 @@ function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
   const dailyEquivalent = basicSalary / workingDays;
   const hourlyRate = dailyEquivalent / 8;
 
-  const allowances = 500 + (hash(seed + "al") % 1500);
+  const allowances =
+    employee.monthlyAllowance != null
+      ? employee.monthlyAllowance
+      : employee.dailyAllowance != null
+        ? Math.round(employee.dailyAllowance * workingDays)
+        : 500 + (hash(seed + "al") % 1500);
   const overtimePay = Math.round(otHours * hourlyRate * 1.25);
   const holidayWorked = hash(seed + "h") % 6 === 0; // roughly one month in six
   const holidayPay = holidayWorked ? Math.round(dailyEquivalent) : 0;

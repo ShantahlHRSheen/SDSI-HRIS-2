@@ -16,7 +16,7 @@ import {
 export const COMPANY_INFO = {
   name: "Shantahl Direct Sales Inc.",
   tin: "000-123-456-000",
-  address: BRANCHES.find((b) => b.id === "br-mnl")?.address ?? "Manila, Philippines",
+  address: BRANCHES.find((b) => b.id === "br-cbt")?.address ?? "Cabanatuan City, Philippines",
   rdoCode: "043 — Pasig City",
 };
 

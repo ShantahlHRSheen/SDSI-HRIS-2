@@ -80,6 +80,16 @@ export default function EmployeeProfilePage() {
           <Row label="Probation ends" value={formatDate(employee.probationEndsAt)} />
           <Row label="Payroll type" value={employee.payrollType === "monthly" ? "Monthly" : "Daily"} />
           <Row label="Rate" value={employee.payrollType === "monthly" ? formatCurrency(employee.monthlySalary) + " / month" : formatCurrency(employee.dailyRate) + " / day"} />
+          <Row
+            label="Allowance"
+            value={
+              employee.monthlyAllowance
+                ? formatCurrency(employee.monthlyAllowance) + " / month"
+                : employee.dailyAllowance
+                  ? formatCurrency(employee.dailyAllowance) + " / day"
+                  : "—"
+            }
+          />
         </Section>
 
         <Section title="Government IDs" note="Masked placeholder values for demo purposes only.">

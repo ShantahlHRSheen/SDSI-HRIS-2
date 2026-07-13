@@ -119,6 +119,8 @@ export interface Employee {
   payrollType: "daily" | "monthly";
   dailyRate: number | null;
   monthlySalary: number | null;
+  dailyAllowance: number | null;
+  monthlyAllowance: number | null;
 
   status: EmployeeLifecycleStatus;
   statusChangedAt: string | null;
