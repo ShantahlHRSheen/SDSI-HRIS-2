@@ -16,7 +16,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--series-1)] text-white">
+          <div className="glow-accent flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--series-1)] text-[var(--on-accent)]">
             <Building2 size={18} />
           </div>
           <div className="leading-tight">
@@ -45,10 +45,10 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                       key={item.href + item.label}
                       href={item.href}
                       onClick={onClose}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
+                      className={`flex items-center justify-between rounded-lg border-l-2 px-3 py-2 text-sm transition-colors ${
                         active
-                          ? "bg-[var(--series-1)]/10 font-medium text-[var(--series-1)]"
-                          : "text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50"
+                          ? "border-[var(--series-1)] bg-[var(--series-1)]/10 font-medium text-[var(--series-1)]"
+                          : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50"
                       }`}
                     >
                       <span>{item.label}</span>

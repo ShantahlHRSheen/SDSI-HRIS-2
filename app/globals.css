@@ -1,67 +1,65 @@
 @import "tailwindcss";
 
+/*
+  Deliberate single visual identity: black-and-green, always on — not adaptive
+  to OS light/dark preference. Tokens stay the same shape as before so every
+  component (which reads only var(--...) tokens) picks this up automatically.
+*/
 :root {
-  --surface-1: #fcfcfb;
-  --page-plane: #f9f9f7;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border-hairline: rgba(11, 11, 11, 0.1);
+  --surface-1: #0e1512;
+  --page-plane: #060908;
+  --text-primary: #ffffff;
+  --text-secondary: #b7c7bf;
+  --text-muted: #71847a;
+  --gridline: #16211b;
+  --baseline: #26372e;
+  --border-hairline: rgba(120, 255, 195, 0.14);
 
-  --series-1: #2a78d6;
-  --series-2: #1baf7a;
-  --series-3: #eda100;
-  --series-4: #008300;
-  --series-5: #4a3aa7;
-  --series-6: #e34948;
-  --series-7: #e87ba4;
-  --series-8: #eb6834;
+  --accent: #2fe6a6;
+  --accent-strong: #58f0bc;
+  --accent-soft: rgba(47, 230, 166, 0.12);
+  --accent-glow: rgba(47, 230, 166, 0.35);
+  --on-accent: #052018;
 
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  --series-1: #2fe6a6;
+  --series-2: #22d3ee;
+  --series-3: #ffd166;
+  --series-4: #60a5fa;
+  --series-5: #a78bfa;
+  --series-6: #f87171;
+  --series-7: #ff6fa8;
+  --series-8: #fb923c;
 
-  --seq-100: #cde2fb;
-  --seq-250: #86b6ef;
-  --seq-400: #3987e5;
-  --seq-450: #2a78d6;
-  --seq-550: #1c5cab;
-  --seq-700: #0d366b;
-}
+  --status-good: #22c55e;
+  --status-warning: #fbbf24;
+  --status-serious: #fb7185;
+  --status-critical: #ef4444;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface-1: #1a1a19;
-    --page-plane: #0d0d0d;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --gridline: #2c2c2a;
-    --baseline: #383835;
-    --border-hairline: rgba(255, 255, 255, 0.1);
-
-    --series-1: #3987e5;
-    --series-2: #199e70;
-    --series-3: #c98500;
-    --series-4: #008300;
-    --series-5: #9085e9;
-    --series-6: #e66767;
-    --series-7: #d55181;
-    --series-8: #d95926;
-  }
+  --seq-100: #113026;
+  --seq-250: #164a37;
+  --seq-400: #1c7a55;
+  --seq-450: #22c56e;
+  --seq-550: #58e0a0;
+  --seq-700: #baf3d5;
 }
 
 body {
   background: var(--page-plane);
+  background-image:
+    radial-gradient(ellipse 900px 480px at 12% -8%, rgba(47, 230, 166, 0.10), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(34, 211, 238, 0.06), transparent 55%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
 }
 
 ::-webkit-scrollbar {
@@ -71,4 +69,10 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--baseline);
   border-radius: 4px;
+}
+
+/* Subtle glow reserved for primary actions and the active nav state — keeps
+   the futuristic accent from being applied everywhere at once. */
+.glow-accent {
+  box-shadow: 0 0 0 1px var(--accent-glow), 0 0 18px -2px var(--accent-glow);
 }

@@ -80,7 +80,7 @@ export default function UsersAdminPage() {
           ))}
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setEditing(null)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-            <button onClick={save} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white">Save roles</button>
+            <button onClick={save} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Save roles</button>
           </div>
         </div>
       </Modal>

@@ -40,7 +40,7 @@ export default function EmployeeProfilePage() {
       <button onClick={() => router.back()} className="mb-4 flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back to directory</button>
 
       <div className="mb-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--series-5)] text-xl font-semibold text-white">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xl font-semibold text-[var(--on-accent)]">
           {employee.firstName[0]}{employee.lastName[0]}
         </div>
         <div className="min-w-0 flex-1">

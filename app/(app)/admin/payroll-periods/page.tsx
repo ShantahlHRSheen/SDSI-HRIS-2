@@ -33,7 +33,7 @@ export default function PayrollPeriodsAdminPage() {
           <div className="text-sm font-medium text-[var(--text-primary)]">Payroll Periods</div>
           <div className="text-xs text-[var(--text-muted)]">Open periods accept attendance/leave/OT data; locking freezes computation; closing finalizes the period after payslip release.</div>
         </div>
-        <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-white">
+        <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
           <Plus size={14} /> Add period
         </button>
       </div>
@@ -84,7 +84,7 @@ export default function PayrollPeriodsAdminPage() {
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-            <button onClick={submit} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white">Add period</button>
+            <button onClick={submit} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Add period</button>
           </div>
         </div>
       </Modal>

@@ -57,7 +57,7 @@ export default function DisciplinePage() {
         subtitle="Incident reports, warnings, suspensions, and Notice to Explain / Notice of Decision records."
         actions={
           canCreate && (
-            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-white">
+            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
               <Plus size={16} /> New record
             </button>
           )
@@ -65,9 +65,9 @@ export default function DisciplinePage() {
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <button onClick={() => setTypeFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${typeFilter === "all" ? "bg-[var(--series-1)] text-white" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>All</button>
+        <button onClick={() => setTypeFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${typeFilter === "all" ? "bg-[var(--series-1)] text-[var(--on-accent)]" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>All</button>
         {(Object.keys(DISCIPLINARY_LABELS) as DisciplinaryType[]).map((t) => (
-          <button key={t} onClick={() => setTypeFilter(t)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${typeFilter === t ? "bg-[var(--series-1)] text-white" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>
+          <button key={t} onClick={() => setTypeFilter(t)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${typeFilter === t ? "bg-[var(--series-1)] text-[var(--on-accent)]" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>
             {DISCIPLINARY_LABELS[t]}
           </button>
         ))}
@@ -150,7 +150,7 @@ export default function DisciplinePage() {
           </label>
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setShowCreate(false)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-            <button onClick={submit} disabled={!form.employeeId || !form.description} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40">Issue record</button>
+            <button onClick={submit} disabled={!form.employeeId || !form.description} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">Issue record</button>
           </div>
         </div>
       </Modal>

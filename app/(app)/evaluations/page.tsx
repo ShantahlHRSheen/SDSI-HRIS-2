@@ -73,7 +73,7 @@ export default function EvaluationsPage() {
         subtitle={`Current period: ${CURRENT_EVAL_PERIOD}`}
         actions={
           canCreate && (
-            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-white">
+            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
               <Plus size={16} /> New evaluation
             </button>
           )
@@ -85,7 +85,7 @@ export default function EvaluationsPage() {
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${statusFilter === s ? "bg-[var(--series-1)] text-white" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${statusFilter === s ? "bg-[var(--series-1)] text-[var(--on-accent)]" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}
           >
             {s}
           </button>
@@ -180,7 +180,7 @@ export default function EvaluationsPage() {
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => submit("draft")} disabled={!form.employeeId} className="rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm text-[var(--text-secondary)] disabled:opacity-40">Save as draft</button>
-            <button onClick={() => submit("submitted")} disabled={!form.employeeId} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40">Submit evaluation</button>
+            <button onClick={() => submit("submitted")} disabled={!form.employeeId} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">Submit evaluation</button>
           </div>
         </div>
       </Modal>
@@ -215,7 +215,7 @@ export default function EvaluationsPage() {
                 {detailEval.status === "draft" && (
                   <button onClick={() => setEvaluationStatus(detailEval.id, "submitted")} className="rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm">Submit</button>
                 )}
-                <button onClick={() => setEvaluationStatus(detailEval.id, "acknowledged")} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white">Mark acknowledged</button>
+                <button onClick={() => setEvaluationStatus(detailEval.id, "acknowledged")} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Mark acknowledged</button>
               </div>
             )}
           </div>

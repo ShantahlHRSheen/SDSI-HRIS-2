@@ -23,7 +23,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col items-center bg-[var(--page-plane)] px-4 py-10 sm:py-16">
       <div className="mb-8 flex flex-col items-center text-center">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--series-1)] text-white">
+        <div className="glow-accent mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--series-1)] text-[var(--on-accent)]">
           <Building2 size={26} />
         </div>
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Shantahl Direct Sales Inc.</h1>
@@ -41,7 +41,7 @@ export default function LoginPage() {
             onClick={() => signInAs(u.id)}
             className="flex items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 text-left transition-shadow hover:shadow-md"
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--series-5)] text-sm font-semibold text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--on-accent)]">
               {u.initials}
             </div>
             <div className="min-w-0 flex-1">

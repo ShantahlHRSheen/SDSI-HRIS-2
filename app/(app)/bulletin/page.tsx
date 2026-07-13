@@ -54,7 +54,7 @@ export default function BulletinBoardPage() {
         subtitle="Announcements, holidays, events, memos, and policy updates — the first thing employees see on login."
         actions={
           canPost && (
-            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-white">
+            <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
               <Plus size={16} /> Post announcement
             </button>
           )
@@ -64,9 +64,9 @@ export default function BulletinBoardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="mb-4 flex flex-wrap gap-2">
-            <button onClick={() => setCategoryFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${categoryFilter === "all" ? "bg-[var(--series-1)] text-white" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>All</button>
+            <button onClick={() => setCategoryFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${categoryFilter === "all" ? "bg-[var(--series-1)] text-[var(--on-accent)]" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>All</button>
             {(Object.keys(CATEGORY_LABELS) as AnnouncementCategory[]).map((c) => (
-              <button key={c} onClick={() => setCategoryFilter(c)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${categoryFilter === c ? "bg-[var(--series-1)] text-white" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>
+              <button key={c} onClick={() => setCategoryFilter(c)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${categoryFilter === c ? "bg-[var(--series-1)] text-[var(--on-accent)]" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}>
                 {CATEGORY_LABELS[c]}
               </button>
             ))}
@@ -125,7 +125,7 @@ export default function BulletinBoardPage() {
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setShowCreate(false)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-            <button onClick={submit} disabled={!form.title || !form.body} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40">Post</button>
+            <button onClick={submit} disabled={!form.title || !form.body} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">Post</button>
           </div>
         </div>
       </Modal>

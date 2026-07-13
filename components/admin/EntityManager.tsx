@@ -84,7 +84,7 @@ export function EntityManager<T extends { id: string }>({
           {subtitle && <div className="text-xs text-[var(--text-muted)]">{subtitle}</div>}
         </div>
         {canEdit && (
-          <button onClick={openAdd} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-white">
+          <button onClick={openAdd} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
             <Plus size={14} /> Add
           </button>
         )}
@@ -171,7 +171,7 @@ export function EntityManager<T extends { id: string }>({
           ))}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-            <button onClick={submit} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-white">{editing ? "Save changes" : "Add"}</button>
+            <button onClick={submit} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">{editing ? "Save changes" : "Add"}</button>
           </div>
         </div>
       </Modal>

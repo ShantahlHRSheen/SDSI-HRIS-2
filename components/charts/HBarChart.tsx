@@ -29,7 +29,7 @@ export function HBarChart({
               {d.label}
             </div>
             <div
-              className="relative h-4 flex-1 rounded-sm bg-[var(--gridline)]/40"
+              className="relative h-4 flex-1 rounded-sm bg-[var(--baseline)]/45"
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover((h) => (h === i ? null : h))}
             >
