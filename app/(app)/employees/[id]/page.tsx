@@ -101,7 +101,7 @@ export default function EmployeeProfilePage() {
           <Row label="Date regularized" value={formatDate(employee.dateRegularized)} />
           <Row label="Contract period" value={employee.contractStart ? `${formatDate(employee.contractStart)} – ${formatDate(employee.contractEnd)}` : "—"} />
           <Row label="Probation ends" value={formatDate(employee.probationEndsAt)} />
-          <Row label="Payroll type" value={employee.payrollType === "monthly" ? "Monthly" : "Daily"} />
+          <Row label="Payroll type" value={employee.payrollType === "monthly" ? "Fixed-rate" : "Daily-rate"} />
           <Row label="Rate" value={employee.payrollType === "monthly" ? formatCurrency(employee.monthlySalary) + " / month" : formatCurrency(employee.dailyRate) + " / day"} />
           <Row
             label="Allowance"

@@ -8,8 +8,12 @@ import {
 import type { Employee, Role } from "./types";
 import { ROLE_LABELS } from "./types";
 
+// Standard HRIS display format: "Surname - Name - Middle Initial." — e.g.
+// "Dela Cruz - Juan - A." A blank middle name simply omits that segment.
 export function fullName(e: Employee): string {
-  return `${e.firstName} ${e.lastName}`;
+  const mi = e.middleName?.trim();
+  const middlePart = mi ? ` - ${mi.charAt(0).toUpperCase()}.` : "";
+  return `${e.lastName} - ${e.firstName}${middlePart}`;
 }
 
 export function branchName(branchId: string): string {

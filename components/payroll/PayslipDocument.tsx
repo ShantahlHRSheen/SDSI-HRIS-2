@@ -64,12 +64,11 @@ export function PayslipDocument({ employee, period, line }: { employee: Employee
       </FormSection>
 
       <FormFootnote>
-        {line.isSecondCutoff
-          ? "SSS, SSS WISP, PhilHealth, and Pag-IBIG contributions for the month are deducted in full this cutoff, per company convention."
-          : "This is the 1st cutoff of the month — SSS, SSS WISP, PhilHealth, and Pag-IBIG contributions are deducted on the 2nd cutoff instead."}
-        {" "}Generated automatically from finalized payroll records in the HRIS, using the official SSS / PhilHealth /
-        Pag-IBIG contribution schedules and the BIR semi-monthly withholding tax table applied to each employee&apos;s
-        Basis of Mandatories. This is a demo payslip and not an official payroll document.
+        SSS, SSS WISP, PhilHealth, and Pag-IBIG contributions are exactly half of the employee&apos;s full monthly
+        share, deducted on every cutoff. Generated automatically from finalized payroll records in the HRIS, using
+        the official SSS / PhilHealth / Pag-IBIG contribution schedules and the BIR semi-monthly withholding tax
+        table applied to each employee&apos;s Basis of Mandatories. This is a demo payslip and not an official
+        payroll document.
       </FormFootnote>
     </FormShell>
   );

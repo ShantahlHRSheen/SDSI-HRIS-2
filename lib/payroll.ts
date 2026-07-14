@@ -10,19 +10,23 @@ import { computeHdmf, computePhilHealth, computeSemiMonthlyWithholdingTax, compu
 //   lib/attendance-import.ts and the Attendance module).
 // - Overtime pay comes from the already-approved Overtime requests whose
 //   date falls inside the period — not from a second, parallel estimate —
-//   so there is exactly one source of truth for it.
+//   so there is exactly one source of truth for it, unless overridden.
 // - SSS / SSS WISP / PhilHealth / Pag-IBIG (HDMF) contributions are computed
 //   from lib/statutory.ts against each employee's "Basis of Mandatories" —
 //   their standing monthly compensation, independent of a single period's
-//   actual earnings — and (per the source template) are deducted in full
-//   only on the second cutoff of each month. Withholding tax is computed
-//   every period from the semi-monthly BIR table.
-// - Every leaf figure here (allowances, loans, cash advance, adjustments,
-//   and the five statutory contributions) can be overridden per employee
-//   per period via a PayrollLineOverride; the aggregate/derived fields
-//   (gross, totals, net pay) are always recomputed from those inputs and are
-//   never independently overridable, so the arithmetic always stays
-//   internally consistent.
+//   actual earnings — with exactly half of the full monthly employee (and
+//   employer) contribution deducted on EACH semi-monthly cutoff. Withholding
+//   tax is computed every period from the semi-monthly BIR table, which is
+//   itself already calibrated to a half-month's compensation.
+// - A daily-rate employee's basic pay is their attendance for the period
+//   (rate per day × days worked). A fixed-rate employee's basic pay is a
+//   flat half of their monthly salary, regardless of days worked.
+// - Every figure here — earnings, allowances, loans, adjustments, and the
+//   five statutory contributions — can be overridden per employee per
+//   period via a PayrollLineOverride; the aggregate/derived fields (gross,
+//   totals, net pay) are always recomputed from those (possibly-overridden)
+//   inputs and are never independently overridable, so the arithmetic
+//   always stays internally consistent.
 // ---------------------------------------------------------------------------
 
 const OT_MULTIPLIER = 1.25;
@@ -36,6 +40,7 @@ const MONTHS_PER_YEAR = 12;
 
 export interface PayrollLine {
   employeeId: string;
+  payrollType: Employee["payrollType"];
 
   // --- Inputs (from attendance + employee record) ---------------------
   basisOfMandatories: number;
@@ -45,20 +50,28 @@ export interface PayrollLine {
   slDays: number;
   lateMinutes: number;
   otHours: number;
+  otHoursAuto: number;
   ratePerDay: number;
 
   // --- Earnings --------------------------------------------------------
   basicPay: number;
+  basicPayAuto: number;
   latesUndertime: number;
+  latesUndertimeAuto: number;
   basicSalaryLessLate: number;
   holidayPay: number;
+  holidayPayAuto: number;
   vlPay: number;
+  vlPayAuto: number;
   slPay: number;
+  slPayAuto: number;
   otPay: number;
+  otPayAuto: number;
   basicSalaryTotal: number;
 
   travelAllowance: number;
   dailyAllowance: number;
+  dailyAllowanceAuto: number;
   laundryAllowance: number;
   medicalCashAllowance: number;
   supervisorAllowance: number;
@@ -74,8 +87,7 @@ export interface PayrollLine {
   withholdingTax: number;
   totalDeductionsOtherThanMandatories: number;
 
-  // --- Statutory mandatories (employee share) ---------------------------
-  isSecondCutoff: boolean;
+  // --- Statutory mandatories (employee share, half per cutoff) ----------
   sssContribution: number;
   sssContributionAuto: number;
   sssWisp: number;
@@ -93,7 +105,7 @@ export interface PayrollLine {
   adjustmentDeduct: number;
   netPay: number;
 
-  // --- Employer share / cost ----------------------------------------------
+  // --- Employer share / cost (half per cutoff) ---------------------------
   employerSSS: number;
   employerSSSWisp: number;
   employerHDMF: number;
@@ -121,13 +133,6 @@ function approvedOtHours(employeeId: string, period: PayrollPeriod, overtimeRequ
     .reduce((s, r) => s + r.hours, 0);
 }
 
-// Per the source template, SSS / SSS WISP / PhilHealth / Pag-IBIG are
-// deducted in full only on the second semi-monthly cutoff of each month
-// (start day > 15) — nothing is withheld on the first cutoff.
-function isSecondCutoff(period: PayrollPeriod): boolean {
-  return Number(period.start.slice(8, 10)) > 15;
-}
-
 const emptyOverride: Omit<PayrollLineOverride, "id" | "periodId" | "employeeId" | "updatedBy" | "updatedAt"> = {
   travelAllowance: 0,
   laundryAllowance: 0,
@@ -146,6 +151,14 @@ const emptyOverride: Omit<PayrollLineOverride, "id" | "periodId" | "employeeId" 
   philHealthContributionOverride: null,
   hdmfContributionOverride: null,
   withholdingTaxOverride: null,
+  dailyAllowanceOverride: null,
+  basicPayOverride: null,
+  latesUndertimeOverride: null,
+  holidayPayOverride: null,
+  vlPayOverride: null,
+  slPayOverride: null,
+  otHoursOverride: null,
+  otPayOverride: null,
 };
 
 export function computePayrollForPeriod(
@@ -158,7 +171,6 @@ export function computePayrollForPeriod(
   const byEmployeeId = new Map(employees.map((e) => [e.id, e]));
   const recordsForPeriod = attendanceRecords.filter((r) => r.periodId === period.id);
   const overrideByEmployeeId = new Map(overrides.filter((o) => o.periodId === period.id).map((o) => [o.employeeId, o]));
-  const secondCutoff = isSecondCutoff(period);
 
   const lines: PayrollLine[] = [];
   for (const rec of recordsForPeriod) {
@@ -169,29 +181,44 @@ export function computePayrollForPeriod(
     const rate = ratePerDay(employee);
     const basis = basisOfMandatories(employee, rate);
 
-    const basicPay = Math.round(rate * rec.daysWorked);
-    const latesUndertime = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.lateAdjMinutes);
+    const basicPayAuto = employee.payrollType === "daily" ? Math.round(rate * rec.daysWorked) : Math.round((employee.monthlySalary ?? 0) / 2);
+    const basicPay = ov.basicPayOverride ?? basicPayAuto;
+
+    const latesUndertimeAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.lateAdjMinutes);
+    const latesUndertime = ov.latesUndertimeOverride ?? latesUndertimeAuto;
     const basicSalaryLessLate = basicPay - latesUndertime;
-    const holidayPay = Math.round(rate * rec.holidayDays);
-    const vlPay = Math.round(rate * rec.vlDays);
-    const slPay = Math.round(rate * rec.slDays);
-    const otHours = approvedOtHours(employee.id, period, overtimeRequests);
-    const otPay = Math.round((rate / WORK_HOURS_PER_DAY) * OT_MULTIPLIER * otHours);
+
+    const holidayPayAuto = Math.round(rate * rec.holidayDays);
+    const holidayPay = ov.holidayPayOverride ?? holidayPayAuto;
+    const vlPayAuto = Math.round(rate * rec.vlDays);
+    const vlPay = ov.vlPayOverride ?? vlPayAuto;
+    const slPayAuto = Math.round(rate * rec.slDays);
+    const slPay = ov.slPayOverride ?? slPayAuto;
+
+    const otHoursAuto = approvedOtHours(employee.id, period, overtimeRequests);
+    const otHours = ov.otHoursOverride ?? otHoursAuto;
+    const otPayAuto = Math.round((rate / WORK_HOURS_PER_DAY) * OT_MULTIPLIER * otHours);
+    const otPay = ov.otPayOverride ?? otPayAuto;
+
     const basicSalaryTotal = basicSalaryLessLate + holidayPay + vlPay + slPay + otPay;
 
-    const dailyAllowance = Math.round((employee.dailyAllowance ?? 0) * rec.daysWorked);
+    const dailyAllowanceAuto = Math.round((employee.dailyAllowance ?? 0) * rec.daysWorked);
+    const dailyAllowance = ov.dailyAllowanceOverride ?? dailyAllowanceAuto;
     const netAllowances = dailyAllowance + ov.travelAllowance + ov.laundryAllowance + ov.medicalCashAllowance + ov.supervisorAllowance;
 
     const grossSalary = basicSalaryTotal + netAllowances;
 
+    // SSS / SSS WISP / PhilHealth / Pag-IBIG are keyed to the employee's
+    // full monthly Basis of Mandatories, but exactly half of the monthly
+    // employee (and employer) share is deducted on every cutoff.
     const sss = computeSss(basis);
     const philHealth = computePhilHealth(basis);
     const hdmf = computeHdmf(basis);
 
-    const sssContributionAuto = secondCutoff ? sss.regular.employee : 0;
-    const sssWispAuto = secondCutoff ? sss.wisp.employee : 0;
-    const philHealthContributionAuto = secondCutoff ? philHealth.employee : 0;
-    const hdmfContributionAuto = secondCutoff ? hdmf.employee : 0;
+    const sssContributionAuto = Math.round((sss.regular.employee / 2) * 100) / 100;
+    const sssWispAuto = Math.round((sss.wisp.employee / 2) * 100) / 100;
+    const philHealthContributionAuto = Math.round((philHealth.employee / 2) * 100) / 100;
+    const hdmfContributionAuto = Math.round((hdmf.employee / 2) * 100) / 100;
 
     const sssContribution = ov.sssContributionOverride ?? sssContributionAuto;
     const sssWisp = ov.sssWispOverride ?? sssWispAuto;
@@ -208,14 +235,15 @@ export function computePayrollForPeriod(
 
     const netPay = grossSalary + ov.adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - ov.adjustmentDeduct;
 
-    const employerSSS = secondCutoff ? sss.regular.employer : 0;
-    const employerSSSWisp = secondCutoff ? sss.wisp.employer : 0;
-    const employerHDMF = secondCutoff ? hdmf.employer : 0;
-    const employerPhilHealth = secondCutoff ? philHealth.employer : 0;
+    const employerSSS = Math.round((sss.regular.employer / 2) * 100) / 100;
+    const employerSSSWisp = Math.round((sss.wisp.employer / 2) * 100) / 100;
+    const employerHDMF = Math.round((hdmf.employer / 2) * 100) / 100;
+    const employerPhilHealth = Math.round((philHealth.employer / 2) * 100) / 100;
     const employerExpense = grossSalary + employerSSS + employerSSSWisp + employerHDMF + employerPhilHealth;
 
     lines.push({
       employeeId: employee.id,
+      payrollType: employee.payrollType,
       basisOfMandatories: basis,
       daysWorking: rec.daysWorked,
       holidayDays: rec.holidayDays,
@@ -223,17 +251,25 @@ export function computePayrollForPeriod(
       slDays: rec.slDays,
       lateMinutes: rec.lateAdjMinutes,
       otHours,
+      otHoursAuto,
       ratePerDay: rate,
       basicPay,
+      basicPayAuto,
       latesUndertime,
+      latesUndertimeAuto,
       basicSalaryLessLate,
       holidayPay,
+      holidayPayAuto,
       vlPay,
+      vlPayAuto,
       slPay,
+      slPayAuto,
       otPay,
+      otPayAuto,
       basicSalaryTotal,
       travelAllowance: ov.travelAllowance,
       dailyAllowance,
+      dailyAllowanceAuto,
       laundryAllowance: ov.laundryAllowance,
       medicalCashAllowance: ov.medicalCashAllowance,
       supervisorAllowance: ov.supervisorAllowance,
@@ -245,7 +281,6 @@ export function computePayrollForPeriod(
       shortages: ov.shortages,
       withholdingTax,
       totalDeductionsOtherThanMandatories,
-      isSecondCutoff: secondCutoff,
       sssContribution,
       sssContributionAuto,
       sssWisp,
@@ -271,19 +306,20 @@ export function computePayrollForPeriod(
 }
 
 // Serializes a computed PayrollLine into the plain numeric summary shape
-// stored on a GeneratedPayslip/GeneratedVoucher record (booleans are encoded
-// as 0/1 so the whole line survives a round trip through Record<string, number>).
+// stored on a GeneratedPayslip/GeneratedVoucher record. payrollType (a
+// string) is dropped from the round trip — it isn't needed to redisplay a
+// historical payslip, since every other field is already a resolved number.
 export function payrollLineToSummary(line: PayrollLine): Record<string, number> {
   const rest: Partial<PayrollLine> = { ...line };
   delete rest.employeeId;
-  const isSecondCutoff = rest.isSecondCutoff;
-  delete rest.isSecondCutoff;
-  return { ...(rest as Record<string, number>), isSecondCutoff: isSecondCutoff ? 1 : 0 };
+  delete rest.payrollType;
+  return rest as Record<string, number>;
 }
 
 export function summaryToPayrollLine(summary: Record<string, number>, employeeId = ""): PayrollLine {
   return {
     employeeId,
+    payrollType: "daily",
     basisOfMandatories: summary.basisOfMandatories ?? 0,
     daysWorking: summary.daysWorking ?? 0,
     holidayDays: summary.holidayDays ?? 0,
@@ -291,17 +327,25 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     slDays: summary.slDays ?? 0,
     lateMinutes: summary.lateMinutes ?? 0,
     otHours: summary.otHours ?? 0,
+    otHoursAuto: summary.otHoursAuto ?? 0,
     ratePerDay: summary.ratePerDay ?? 0,
     basicPay: summary.basicPay ?? 0,
+    basicPayAuto: summary.basicPayAuto ?? 0,
     latesUndertime: summary.latesUndertime ?? 0,
+    latesUndertimeAuto: summary.latesUndertimeAuto ?? 0,
     basicSalaryLessLate: summary.basicSalaryLessLate ?? 0,
     holidayPay: summary.holidayPay ?? 0,
+    holidayPayAuto: summary.holidayPayAuto ?? 0,
     vlPay: summary.vlPay ?? 0,
+    vlPayAuto: summary.vlPayAuto ?? 0,
     slPay: summary.slPay ?? 0,
+    slPayAuto: summary.slPayAuto ?? 0,
     otPay: summary.otPay ?? 0,
+    otPayAuto: summary.otPayAuto ?? 0,
     basicSalaryTotal: summary.basicSalaryTotal ?? 0,
     travelAllowance: summary.travelAllowance ?? 0,
     dailyAllowance: summary.dailyAllowance ?? 0,
+    dailyAllowanceAuto: summary.dailyAllowanceAuto ?? 0,
     laundryAllowance: summary.laundryAllowance ?? 0,
     medicalCashAllowance: summary.medicalCashAllowance ?? 0,
     supervisorAllowance: summary.supervisorAllowance ?? 0,
@@ -313,7 +357,6 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     shortages: summary.shortages ?? 0,
     withholdingTax: summary.withholdingTax ?? 0,
     totalDeductionsOtherThanMandatories: summary.totalDeductionsOtherThanMandatories ?? 0,
-    isSecondCutoff: (summary.isSecondCutoff ?? 0) === 1,
     sssContribution: summary.sssContribution ?? 0,
     sssContributionAuto: summary.sssContributionAuto ?? 0,
     sssWisp: summary.sssWisp ?? 0,

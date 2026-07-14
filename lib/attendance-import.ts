@@ -1,6 +1,5 @@
 import ExcelJS from "exceljs";
 import type { Employee } from "./types";
-import { fullName } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Parses the company's per-payroll-period attendance-tracker export (its
@@ -165,8 +164,16 @@ export interface AttendanceImportPreview {
 // as a warning rather than silently trusted or silently dropped.
 const LATE_OUTLIER_AVG_MIN_PER_DAY = 60;
 
+// Deliberately built from firstName/lastName directly rather than the
+// display-formatted fullName() helper (which renders "Surname - Name - M.I."
+// for the UI) — this matches the "First Last" order used in the company's
+// uploaded attendance-tracker export.
+function importMatchName(e: Employee): string {
+  return `${e.firstName} ${e.lastName}`;
+}
+
 export function buildAttendanceImportPreview(parsed: ParsedAttendanceWorkbook, employees: Employee[]): AttendanceImportPreview {
-  const byNorm = new Map(employees.map((e) => [normalizeName(fullName(e)), e]));
+  const byNorm = new Map(employees.map((e) => [normalizeName(importMatchName(e)), e]));
   const matched: AttendanceImportMatch[] = [];
   const unmatched: ParsedAttendanceRow[] = [];
 

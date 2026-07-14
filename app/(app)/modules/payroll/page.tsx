@@ -44,8 +44,14 @@ export default function PayrollProcessingPage() {
     [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides],
   );
   const summary = summarizePayrollLines(lines);
-  const byId = new Map(employees.map((e) => [e.id, e]));
+  const byId = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
   const lineByEmployee = new Map(lines.map((l) => [l.employeeId, l]));
+
+  // Payroll Processing is always presented sorted alphabetically by surname.
+  const sortedLines = useMemo(
+    () => [...lines].sort((a, b) => (byId.get(a.employeeId)?.lastName ?? "").localeCompare(byId.get(b.employeeId)?.lastName ?? "")),
+    [lines, byId],
+  );
 
   const alreadyGenerated = period ? new Set(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => p.employeeId)) : new Set();
 
@@ -67,6 +73,7 @@ export default function PayrollProcessingPage() {
       [
         "Employee",
         "Branch",
+        "Payroll Type",
         "Rate/Day",
         "Days Working",
         "Basic Pay",
@@ -86,11 +93,12 @@ export default function PayrollProcessingPage() {
         "Other Deductions",
         "Net Pay",
       ],
-      lines.map((l) => {
+      sortedLines.map((l) => {
         const emp = byId.get(l.employeeId);
         return [
           emp ? fullName(emp) : l.employeeId,
           emp ? branchName(emp.branchId) : "",
+          l.payrollType === "daily" ? "Daily-rate" : "Fixed-rate",
           l.ratePerDay,
           l.daysWorking,
           l.basicPay,
@@ -119,7 +127,7 @@ export default function PayrollProcessingPage() {
     <div>
       <PageHeader
         title="Payroll Processing"
-        subtitle="Computed automatically from attendance and approved overtime records for the selected payroll period — allowances, loans, and statutory contributions remain editable per employee."
+        subtitle="Computed automatically from attendance and approved overtime records for the selected payroll period — every figure remains editable per employee, including attendance, rate, and statutory contributions."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={exportCsv} className="rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Export CSV</button>
@@ -153,11 +161,6 @@ export default function PayrollProcessingPage() {
           ))}
         </select>
         {period && <Badge tone={STATUS_TONE[period.status]}>{period.status}</Badge>}
-        {period && (
-          <span className="text-xs text-[var(--text-muted)]">
-            {lines[0]?.isSecondCutoff ? "2nd cutoff — mandatories deducted in full" : "1st cutoff — mandatories not deducted"}
-          </span>
-        )}
       </div>
 
       {!period ? (
@@ -172,8 +175,8 @@ export default function PayrollProcessingPage() {
           </div>
 
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll register — {formatDate(period.start)} – {formatDate(period.end)}</div>
-            {lines.length === 0 ? (
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll register — {formatDate(period.start)} – {formatDate(period.end)} (sorted A–Z by surname)</div>
+            {sortedLines.length === 0 ? (
               <EmptyState
                 icon={Wallet}
                 title="No attendance data for this period yet"
@@ -181,10 +184,11 @@ export default function PayrollProcessingPage() {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1400px] text-sm">
+                <table className="w-full min-w-[1500px] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="px-3 py-2 font-medium">Employee</th>
+                      <th className="px-3 py-2 font-medium">Type</th>
                       <th className="px-3 py-2 font-medium">Rate/Day</th>
                       <th className="px-3 py-2 font-medium">Basic</th>
                       <th className="px-3 py-2 font-medium">Late</th>
@@ -206,11 +210,12 @@ export default function PayrollProcessingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map((l) => {
+                    {sortedLines.map((l) => {
                       const emp = byId.get(l.employeeId);
                       return (
                         <tr key={l.employeeId} className="border-b border-[var(--gridline)] last:border-0">
                           <td className="px-3 py-2 text-[var(--text-primary)]">{emp ? fullName(emp) : l.employeeId}</td>
+                          <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{l.payrollType === "daily" ? "Daily-rate" : "Fixed-rate"}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.ratePerDay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.basicPay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.latesUndertime ? `-${formatCurrencyCompact(l.latesUndertime)}` : "—"}</td>
@@ -256,9 +261,8 @@ export default function PayrollProcessingPage() {
           line={lineByEmployee.get(editing.id) ?? null}
           overrides={payrollLineOverrides}
           onClose={() => setEditing(null)}
-          onSave={(input) => {
+          onSaveOverride={(input) => {
             upsertPayrollLineOverride(input);
-            setEditing(null);
           }}
         />
       )}
@@ -297,7 +301,29 @@ function defaultOverrideForm(periodId: string, employeeId: string, overrides: Pa
     philHealthContributionOverride: null,
     hdmfContributionOverride: null,
     withholdingTaxOverride: null,
+    dailyAllowanceOverride: null,
+    basicPayOverride: null,
+    latesUndertimeOverride: null,
+    holidayPayOverride: null,
+    vlPayOverride: null,
+    slPayOverride: null,
+    otHoursOverride: null,
+    otPayOverride: null,
   };
+}
+
+interface AttendanceFormData {
+  daysWorked: number;
+  holidayDays: number;
+  vlDays: number;
+  slDays: number;
+  lateAdjMinutes: number;
+}
+
+interface RateFormData {
+  payrollType: Employee["payrollType"];
+  dailyRate: number | null;
+  monthlySalary: number | null;
 }
 
 function PayrollLineEditModal({
@@ -306,39 +332,140 @@ function PayrollLineEditModal({
   line,
   overrides,
   onClose,
-  onSave,
+  onSaveOverride,
 }: {
   employee: Employee;
   period: { id: string };
   line: PayrollLine | null;
   overrides: PayrollLineOverride[];
   onClose: () => void;
-  onSave: (input: OverrideFormData) => void;
+  onSaveOverride: (input: OverrideFormData) => void;
 }) {
+  const { attendancePeriodRecords, upsertAttendancePeriodRecord, updateEmployee } = useHris();
+  const attendanceRecord = attendancePeriodRecords.find((r) => r.periodId === period.id && r.employeeId === employee.id);
+
   const [form, setForm] = useState<OverrideFormData>(() => defaultOverrideForm(period.id, employee.id, overrides));
+  const [attendance, setAttendance] = useState<AttendanceFormData>(() => ({
+    daysWorked: attendanceRecord?.daysWorked ?? 0,
+    holidayDays: attendanceRecord?.holidayDays ?? 0,
+    vlDays: attendanceRecord?.vlDays ?? 0,
+    slDays: attendanceRecord?.slDays ?? 0,
+    lateAdjMinutes: attendanceRecord?.lateAdjMinutes ?? 0,
+  }));
+  const [rate, setRate] = useState<RateFormData>(() => ({
+    payrollType: employee.payrollType,
+    dailyRate: employee.dailyRate,
+    monthlySalary: employee.monthlySalary,
+  }));
 
   function setNum<K extends keyof OverrideFormData>(key: K, value: number) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function setOverride<K extends "sssContributionOverride" | "sssWispOverride" | "philHealthContributionOverride" | "hdmfContributionOverride" | "withholdingTaxOverride">(
-    key: K,
-    value: number | null,
-  ) {
+  function setOverride<K extends
+    | "sssContributionOverride"
+    | "sssWispOverride"
+    | "philHealthContributionOverride"
+    | "hdmfContributionOverride"
+    | "withholdingTaxOverride"
+    | "dailyAllowanceOverride"
+    | "basicPayOverride"
+    | "latesUndertimeOverride"
+    | "holidayPayOverride"
+    | "vlPayOverride"
+    | "slPayOverride"
+    | "otHoursOverride"
+    | "otPayOverride">(key: K, value: number | null) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setAttendanceField<K extends keyof AttendanceFormData>(key: K, value: number) {
+    setAttendance((a) => ({ ...a, [key]: value }));
+  }
+
+  function save() {
+    upsertAttendancePeriodRecord({
+      periodId: period.id,
+      employeeId: employee.id,
+      daysWorked: attendance.daysWorked,
+      holidayDays: attendance.holidayDays,
+      vlDays: attendance.vlDays,
+      slDays: attendance.slDays,
+      lateAdjMinutes: attendance.lateAdjMinutes,
+      notes: attendanceRecord?.notes ?? "",
+    });
+    updateEmployee(employee.id, {
+      payrollType: rate.payrollType,
+      dailyRate: rate.dailyRate,
+      monthlySalary: rate.monthlySalary,
+    });
+    onSaveOverride(form);
+    onClose();
   }
 
   return (
     <Modal open onClose={onClose} title={`Adjust payroll — ${fullName(employee)}`} wide>
       <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
-        <FieldSection title="Allowances">
+        <FieldSection title="Payroll type & rate">
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField
+              label="Payroll type"
+              value={rate.payrollType}
+              onChange={(v) => setRate((r) => ({ ...r, payrollType: v as Employee["payrollType"] }))}
+              options={[
+                { value: "daily", label: "Daily-rate" },
+                { value: "monthly", label: "Fixed-rate" },
+              ]}
+            />
+            {rate.payrollType === "daily" ? (
+              <NumberField label="Rate per day" value={rate.dailyRate ?? 0} onChange={(v) => setRate((r) => ({ ...r, dailyRate: v }))} />
+            ) : (
+              <NumberField label="Fixed monthly salary" value={rate.monthlySalary ?? 0} onChange={(v) => setRate((r) => ({ ...r, monthlySalary: v }))} />
+            )}
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {rate.payrollType === "daily"
+              ? "Basic pay = rate per day × days worked."
+              : "Basic pay is fixed at half the monthly salary, regardless of days worked."}
+          </p>
+        </FieldSection>
+
+        <FieldSection title="Attendance for this period">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <NumberField label="Days working" value={attendance.daysWorked} onChange={(v) => setAttendanceField("daysWorked", v)} />
+            <NumberField label="Holiday days" value={attendance.holidayDays} onChange={(v) => setAttendanceField("holidayDays", v)} />
+            <NumberField label="VL days" value={attendance.vlDays} onChange={(v) => setAttendanceField("vlDays", v)} />
+            <NumberField label="SL days" value={attendance.slDays} onChange={(v) => setAttendanceField("slDays", v)} />
+            <NumberField label="Late/undertime (mins)" value={attendance.lateAdjMinutes} onChange={(v) => setAttendanceField("lateAdjMinutes", v)} />
+            <OverrideField
+              label="OT hours"
+              auto={line?.otHoursAuto ?? 0}
+              value={form.otHoursOverride}
+              onChange={(v) => setOverride("otHoursOverride", v)}
+            />
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Saving here updates this employee&apos;s attendance record for the period directly. OT hours default to approved Overtime requests unless overridden.</p>
+        </FieldSection>
+
+        <FieldSection title="Earnings (auto-computed from the above — override if needed)">
+          <div className="grid grid-cols-2 gap-3">
+            <OverrideField label="Basic pay" auto={line?.basicPayAuto ?? 0} value={form.basicPayOverride} onChange={(v) => setOverride("basicPayOverride", v)} />
+            <OverrideField label="Lates/undertime" auto={line?.latesUndertimeAuto ?? 0} value={form.latesUndertimeOverride} onChange={(v) => setOverride("latesUndertimeOverride", v)} />
+            <OverrideField label="Holiday pay" auto={line?.holidayPayAuto ?? 0} value={form.holidayPayOverride} onChange={(v) => setOverride("holidayPayOverride", v)} />
+            <OverrideField label="VL pay" auto={line?.vlPayAuto ?? 0} value={form.vlPayOverride} onChange={(v) => setOverride("vlPayOverride", v)} />
+            <OverrideField label="SL pay" auto={line?.slPayAuto ?? 0} value={form.slPayOverride} onChange={(v) => setOverride("slPayOverride", v)} />
+            <OverrideField label="OT pay" auto={line?.otPayAuto ?? 0} value={form.otPayOverride} onChange={(v) => setOverride("otPayOverride", v)} />
+            <OverrideField label="Daily allowance" auto={line?.dailyAllowanceAuto ?? 0} value={form.dailyAllowanceOverride} onChange={(v) => setOverride("dailyAllowanceOverride", v)} />
+          </div>
+        </FieldSection>
+
+        <FieldSection title="Other allowances">
           <div className="grid grid-cols-2 gap-3">
             <NumberField label="Travel allowance" value={form.travelAllowance} onChange={(v) => setNum("travelAllowance", v)} />
             <NumberField label="Laundry allowance" value={form.laundryAllowance} onChange={(v) => setNum("laundryAllowance", v)} />
             <NumberField label="Medical cash allowance" value={form.medicalCashAllowance} onChange={(v) => setNum("medicalCashAllowance", v)} />
             <NumberField label="Supervisor allowance" value={form.supervisorAllowance} onChange={(v) => setNum("supervisorAllowance", v)} />
           </div>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Daily allowance (₱{employee.dailyAllowance ?? 0}/day × days worked) comes from the employee record and is not set here.</p>
         </FieldSection>
 
         <FieldSection title="Loans / cash advance / shortages">
@@ -352,7 +479,7 @@ function PayrollLineEditModal({
           </div>
         </FieldSection>
 
-        <FieldSection title="Statutory contributions (auto-computed from Basis of Mandatories — override if needed)">
+        <FieldSection title="Statutory contributions (half of the monthly amount, every cutoff — override if needed)">
           <div className="grid grid-cols-2 gap-3">
             <OverrideField
               label="SSS contribution"
@@ -385,9 +512,6 @@ function PayrollLineEditModal({
               onChange={(v) => setOverride("withholdingTaxOverride", v)}
             />
           </div>
-          {!line?.isSecondCutoff && (
-            <p className="mt-1 text-xs text-[var(--text-muted)]">This is the 1st cutoff of the month — SSS/WISP/PhilHealth/Pag-IBIG auto-compute to ₱0 and are deducted only on the 2nd cutoff, unless overridden here.</p>
-          )}
         </FieldSection>
 
         <FieldSection title="Adjustments">
@@ -399,7 +523,7 @@ function PayrollLineEditModal({
 
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-          <button onClick={() => onSave(form)} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Save changes</button>
+          <button onClick={save} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Save changes</button>
         </div>
       </div>
     </Modal>
@@ -425,6 +549,19 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
         onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
         className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
       />
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
     </div>
   );
 }

@@ -93,6 +93,7 @@ export interface Employee {
   employeeNumber: string;
   firstName: string;
   lastName: string;
+  middleName?: string;
   nickname: string;
   gender: "Male" | "Female";
   birthdate: string;
@@ -325,6 +326,16 @@ export interface PayrollLineOverride {
   philHealthContributionOverride: number | null;
   hdmfContributionOverride: number | null;
   withholdingTaxOverride: number | null;
+  // Every other computed earnings figure can also be directly overridden —
+  // null means "keep using the auto-computed value."
+  dailyAllowanceOverride: number | null;
+  basicPayOverride: number | null;
+  latesUndertimeOverride: number | null;
+  holidayPayOverride: number | null;
+  vlPayOverride: number | null;
+  slPayOverride: number | null;
+  otHoursOverride: number | null;
+  otPayOverride: number | null;
   updatedBy: string;
   updatedAt: string;
 }

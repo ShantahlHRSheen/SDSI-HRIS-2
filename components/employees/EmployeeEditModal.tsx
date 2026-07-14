@@ -21,6 +21,7 @@ function defaultForm(employee: Employee | null, branchId: string, departmentId: 
   return {
     firstName: "",
     lastName: "",
+    middleName: "",
     nickname: "",
     gender: "Male",
     birthdate: "2000-01-01",
@@ -85,6 +86,7 @@ export function EmployeeEditModal({
           <div className="grid grid-cols-2 gap-3">
             <TextField label="First name" value={form.firstName} onChange={(v) => set("firstName", v)} />
             <TextField label="Last name" value={form.lastName} onChange={(v) => set("lastName", v)} />
+            <TextField label="Middle name" value={form.middleName ?? ""} onChange={(v) => set("middleName", v)} />
             <TextField label="Nickname" value={form.nickname} onChange={(v) => set("nickname", v)} />
             <SelectField label="Gender" value={form.gender} onChange={(v) => set("gender", v as Employee["gender"])} options={["Male", "Female"]} />
             <DateField label="Birthdate" value={form.birthdate} onChange={(v) => set("birthdate", v)} />
@@ -130,7 +132,15 @@ export function EmployeeEditModal({
 
         <FieldSection title="Payroll">
           <div className="grid grid-cols-2 gap-3">
-            <SelectField label="Payroll type" value={form.payrollType} onChange={(v) => set("payrollType", v as Employee["payrollType"])} options={["daily", "monthly"]} />
+            <SelectField
+              label="Payroll type"
+              value={form.payrollType}
+              onChange={(v) => set("payrollType", v as Employee["payrollType"])}
+              options={[
+                { value: "daily", label: "Daily-rate" },
+                { value: "monthly", label: "Fixed-rate" },
+              ]}
+            />
             {form.payrollType === "daily" ? (
               <NumberField label="Daily rate" value={form.dailyRate} onChange={(v) => set("dailyRate", v)} />
             ) : (
