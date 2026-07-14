@@ -275,6 +275,18 @@ export interface GeneratedVoucher {
   generatedAt: string;
 }
 
+// Per-recipient, per-period manual override for the allowance voucher
+// amount — defaults to the auto-computed payroll figure unless HR/Payroll
+// sets one here.
+export interface VoucherAmountOverride {
+  id: string;
+  periodId: string;
+  employeeId: string;
+  amount: number;
+  updatedBy: string;
+  updatedAt: string;
+}
+
 export type AttendanceRecordSource = "import" | "manual";
 
 // One row per employee per payroll period — the real, editable attendance

@@ -43,6 +43,7 @@ import type {
   PerformanceEvaluation,
   Position,
   RequestStatus,
+  VoucherAmountOverride,
   WorkSchedule,
 } from "./types";
 
@@ -70,6 +71,7 @@ interface PersistedState {
   generatedVouchers: GeneratedVoucher[];
   attendancePeriodRecords: AttendancePeriodRecord[];
   payrollLineOverrides: PayrollLineOverride[];
+  voucherAmountOverrides: VoucherAmountOverride[];
 }
 
 function defaultState(): PersistedState {
@@ -95,6 +97,7 @@ function defaultState(): PersistedState {
     generatedVouchers: [],
     attendancePeriodRecords: ATTENDANCE_PERIOD_RECORDS,
     payrollLineOverrides: [],
+    voucherAmountOverrides: [],
   };
 }
 
@@ -131,6 +134,7 @@ interface HrisContextShape {
   generatedVouchers: GeneratedVoucher[];
   attendancePeriodRecords: AttendancePeriodRecord[];
   payrollLineOverrides: PayrollLineOverride[];
+  voucherAmountOverrides: VoucherAmountOverride[];
 
   updateEmployee: (id: string, patch: Partial<Omit<Employee, "id" | "employeeNumber">>) => void;
   addEmployee: (input: Omit<Employee, "id" | "employeeNumber">) => void;
@@ -139,6 +143,7 @@ interface HrisContextShape {
   importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => void;
 
   upsertPayrollLineOverride: (input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">) => void;
+  upsertVoucherAmountOverride: (input: Omit<VoucherAmountOverride, "id" | "updatedBy" | "updatedAt">) => void;
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
@@ -340,6 +345,25 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, payrollLineOverrides: [entry, ...rest] };
       });
       logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
+    },
+    [logAudit, demoUsers],
+  );
+
+  const upsertVoucherAmountOverride: HrisContextShape["upsertVoucherAmountOverride"] = useCallback(
+    (input) => {
+      setState((prev) => {
+        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const existing = prev.voucherAmountOverrides.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
+        const entry: VoucherAmountOverride = {
+          ...input,
+          id: existing?.id ?? nextId("vao"),
+          updatedBy: actor?.name ?? "System",
+          updatedAt: TODAY,
+        };
+        const rest = prev.voucherAmountOverrides.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId));
+        return { ...prev, voucherAmountOverrides: [entry, ...rest] };
+      });
+      logAudit("Allowance Vouchers", "update", `Adjusted voucher amount for period ${input.periodId}`);
     },
     [logAudit, demoUsers],
   );
@@ -598,11 +622,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     generatedVouchers: state.generatedVouchers,
     attendancePeriodRecords: state.attendancePeriodRecords,
     payrollLineOverrides: state.payrollLineOverrides,
+    voucherAmountOverrides: state.voucherAmountOverrides,
     updateEmployee,
     addEmployee,
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
     upsertPayrollLineOverride,
+    upsertVoucherAmountOverride,
     addEvaluation,
     setEvaluationStatus,
     addDisciplinaryRecord,

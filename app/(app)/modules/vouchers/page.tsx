@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { FileCheck2, Printer, Receipt } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
+import { StatTile } from "@/components/StatTile";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { VoucherDocument } from "@/components/payroll/VoucherDocument";
@@ -12,7 +13,19 @@ import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/h
 import type { Employee, GeneratedVoucher, PayrollPeriod } from "@/lib/types";
 
 export default function AllowanceVouchersPage() {
-  const { employees, payrollPeriods, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, generatedVouchers, addGeneratedVoucher } = useHris();
+  const {
+    employees,
+    payrollPeriods,
+    attendancePeriodRecords,
+    overtimeRequests,
+    payrollLineOverrides,
+    voucherAmountOverrides,
+    upsertVoucherAmountOverride,
+    generatedVouchers,
+    addGeneratedVoucher,
+    currentUser,
+  } = useHris();
+  const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; amount: number } | null>(null);
@@ -21,12 +34,25 @@ export default function AllowanceVouchersPage() {
     () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides) : []),
     [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides],
   );
-  const amountByEmployee = new Map(lines.map((l) => [l.employeeId, l.basicSalaryTotal + l.netAllowances]));
+  const autoAmountByEmployee = new Map(lines.map((l) => [l.employeeId, l.basicSalaryTotal + l.netAllowances]));
+  const overrideByEmployee = new Map(
+    voucherAmountOverrides.filter((o) => o.periodId === period?.id).map((o) => [o.employeeId, o.amount]),
+  );
+  const amountByEmployee = new Map(
+    employees.map((e) => [e.id, overrideByEmployee.get(e.id) ?? autoAmountByEmployee.get(e.id) ?? 0]),
+  );
 
   const recipients = employees.filter((e) => (e.employmentStatus === "freelance" || e.employmentStatus === "project_based") && (e.status === "active" || e.status === "on_leave"));
 
-  const generatedForPeriod = new Set(generatedVouchers.filter((v) => v.periodId === period?.id).map((v) => v.employeeId));
+  const vouchersForPeriod = period ? generatedVouchers.filter((v) => v.periodId === period.id) : [];
+  const generatedForPeriod = new Set(vouchersForPeriod.map((v) => v.employeeId));
+  const totalGeneratedThisPeriod = vouchersForPeriod.reduce((s, v) => s + v.amount, 0);
   const history = generatedVouchers.slice().sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : -1));
+
+  function setAmount(emp: Employee, amount: number) {
+    if (!period) return;
+    upsertVoucherAmountOverride({ periodId: period.id, employeeId: emp.id, amount });
+  }
 
   function generate(emp: Employee) {
     if (!period) return;
@@ -51,7 +77,7 @@ export default function AllowanceVouchersPage() {
     <div>
       <PageHeader
         title="Allowance Vouchers"
-        subtitle="Generate allowance vouchers for freelance and project-based personnel, computed from finalized payroll records."
+        subtitle="Generate allowance vouchers for freelance and project-based personnel — amounts default from finalized payroll records and remain editable per recipient."
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -59,6 +85,14 @@ export default function AllowanceVouchersPage() {
           {payrollPeriods.map((p) => <option key={p.id} value={p.id}>{formatDate(p.start)} – {formatDate(p.end)}</option>)}
         </select>
       </div>
+
+      {period && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatTile label="Recipients" value={recipients.length.toString()} />
+          <StatTile label="Generated this period" value={vouchersForPeriod.length.toString()} />
+          <StatTile label="Total generated this period" value={formatCurrencyCompact(totalGeneratedThisPeriod)} />
+        </div>
+      )}
 
       {recipients.length === 0 ? (
         <EmptyState icon={Receipt} title="No eligible recipients" description="Freelance and project-based personnel will appear here." />
@@ -81,7 +115,18 @@ export default function AllowanceVouchersPage() {
                   <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{fullName(emp)}</td>
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{branchName(emp.branchId)}</td>
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{emp.employmentStatus.replace("_", " ")}</td>
-                  <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(amountByEmployee.get(emp.id) ?? 0)}</td>
+                  <td className="tabular px-3 py-2 text-[var(--text-secondary)]">
+                    {canManage ? (
+                      <input
+                        type="number"
+                        value={amountByEmployee.get(emp.id) ?? 0}
+                        onChange={(e) => setAmount(emp, e.target.value === "" ? 0 : Number(e.target.value))}
+                        className="w-28 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2 py-1 text-sm"
+                      />
+                    ) : (
+                      formatCurrencyCompact(amountByEmployee.get(emp.id) ?? 0)
+                    )}
+                  </td>
                   <td className="px-3 py-2">{generatedForPeriod.has(emp.id) ? <span className="text-xs text-[var(--status-good)]">Generated</span> : <span className="text-xs text-[var(--text-muted)]">Not generated</span>}</td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1.5">

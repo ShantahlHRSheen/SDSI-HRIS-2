@@ -22,7 +22,6 @@ export function VoucherDocument({ employee, period, amount }: { employee: Employ
       <DocHeader title="Allowance Voucher" subtitle={`Pay period: ${formatDate(period.start)} – ${formatDate(period.end)}`} />
 
       <FormSection title="Recipient Information">
-        <FormRow label="Employee ID" value={employee.employeeNumber} mono />
         <FormRow label="Name" value={fullName(employee)} />
         <FormRow label="Position" value={positionTitle(employee.positionId)} />
         <FormRow label="Branch / Department" value={`${branchName(employee.branchId)} / ${departmentName(employee.departmentId)}`} />
