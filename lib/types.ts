@@ -319,6 +319,9 @@ export interface PayrollLineOverride {
   shortages: number;
   sssLoan: number;
   hdmfLoan: number;
+  // Voluntary Modified Pag-IBIG 2 (MP2) savings — separate from the
+  // mandatory Pag-IBIG contribution, entered manually per employee.
+  hdmfMp2Savings: number;
   adjustmentAdd: number;
   adjustmentDeduct: number;
   sssContributionOverride: number | null;

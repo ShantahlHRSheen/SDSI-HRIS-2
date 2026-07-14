@@ -84,6 +84,7 @@ export interface PayrollLine {
   lsmBizLoan: number;
   lsmCoopLoan: number;
   shortages: number;
+  hdmfMp2Savings: number;
   withholdingTax: number;
   totalDeductionsOtherThanMandatories: number;
 
@@ -144,6 +145,7 @@ const emptyOverride: Omit<PayrollLineOverride, "id" | "periodId" | "employeeId" 
   shortages: 0,
   sssLoan: 0,
   hdmfLoan: 0,
+  hdmfMp2Savings: 0,
   adjustmentAdd: 0,
   adjustmentDeduct: 0,
   sssContributionOverride: null,
@@ -230,7 +232,7 @@ export function computePayrollForPeriod(
     const withholdingTax = ov.withholdingTaxOverride ?? computeSemiMonthlyWithholdingTax(taxableCompensation);
 
     const totalDeductionsOtherThanMandatories =
-      ov.cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + ov.shortages + withholdingTax + ov.sssLoan + ov.hdmfLoan;
+      ov.cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + ov.shortages + withholdingTax + ov.sssLoan + ov.hdmfLoan + ov.hdmfMp2Savings;
     const totalMandatories = sssContribution + sssWisp + hdmfContribution + philHealthContribution;
 
     const netPay = grossSalary + ov.adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - ov.adjustmentDeduct;
@@ -279,6 +281,7 @@ export function computePayrollForPeriod(
       lsmBizLoan: ov.lsmBizLoan,
       lsmCoopLoan: ov.lsmCoopLoan,
       shortages: ov.shortages,
+      hdmfMp2Savings: ov.hdmfMp2Savings,
       withholdingTax,
       totalDeductionsOtherThanMandatories,
       sssContribution,
@@ -355,6 +358,7 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     lsmBizLoan: summary.lsmBizLoan ?? 0,
     lsmCoopLoan: summary.lsmCoopLoan ?? 0,
     shortages: summary.shortages ?? 0,
+    hdmfMp2Savings: summary.hdmfMp2Savings ?? 0,
     withholdingTax: summary.withholdingTax ?? 0,
     totalDeductionsOtherThanMandatories: summary.totalDeductionsOtherThanMandatories ?? 0,
     sssContribution: summary.sssContribution ?? 0,

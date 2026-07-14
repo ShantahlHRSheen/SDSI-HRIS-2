@@ -54,6 +54,7 @@ export function PayslipDocument({ employee, period, line }: { employee: Employee
         <FormAmountRow label="PhilHealth Contribution" value={line.philHealthContribution} />
         <FormAmountRow label="Pag-IBIG (HDMF) Contribution" value={line.hdmfContribution} />
         {line.hdmfLoan > 0 && <FormAmountRow label="Pag-IBIG (HDMF) Loan" value={line.hdmfLoan} />}
+        {line.hdmfMp2Savings > 0 && <FormAmountRow label="Pag-IBIG (HDMF) MP2 Savings" value={line.hdmfMp2Savings} />}
         <FormAmountRow label="Withholding Tax" value={line.withholdingTax} />
         {line.adjustmentDeduct > 0 && <FormAmountRow label="Adjustment (Deduct)" value={line.adjustmentDeduct} />}
         <FormAmountRow label="Total Deductions" value={line.totalDeductionsOtherThanMandatories + line.totalMandatories + line.adjustmentDeduct} bold />

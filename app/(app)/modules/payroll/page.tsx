@@ -53,6 +53,61 @@ export default function PayrollProcessingPage() {
     [lines, byId],
   );
 
+  const totals = useMemo(
+    () =>
+      sortedLines.reduce(
+        (t, l) => ({
+          ratePerDay: t.ratePerDay + l.ratePerDay,
+          basicPay: t.basicPay + l.basicPay,
+          latesUndertime: t.latesUndertime + l.latesUndertime,
+          holidayPay: t.holidayPay + l.holidayPay,
+          vlPay: t.vlPay + l.vlPay,
+          slPay: t.slPay + l.slPay,
+          otPay: t.otPay + l.otPay,
+          netAllowances: t.netAllowances + l.netAllowances,
+          grossSalary: t.grossSalary + l.grossSalary,
+          sssContribution: t.sssContribution + l.sssContribution,
+          sssWisp: t.sssWisp + l.sssWisp,
+          philHealthContribution: t.philHealthContribution + l.philHealthContribution,
+          hdmfContribution: t.hdmfContribution + l.hdmfContribution,
+          withholdingTax: t.withholdingTax + l.withholdingTax,
+          cashAdvance: t.cashAdvance + l.cashAdvance,
+          lsmBizLoan: t.lsmBizLoan + l.lsmBizLoan,
+          lsmCoopLoan: t.lsmCoopLoan + l.lsmCoopLoan,
+          shortages: t.shortages + l.shortages,
+          sssLoan: t.sssLoan + l.sssLoan,
+          hdmfLoan: t.hdmfLoan + l.hdmfLoan,
+          hdmfMp2Savings: t.hdmfMp2Savings + l.hdmfMp2Savings,
+          netPay: t.netPay + l.netPay,
+        }),
+        {
+          ratePerDay: 0,
+          basicPay: 0,
+          latesUndertime: 0,
+          holidayPay: 0,
+          vlPay: 0,
+          slPay: 0,
+          otPay: 0,
+          netAllowances: 0,
+          grossSalary: 0,
+          sssContribution: 0,
+          sssWisp: 0,
+          philHealthContribution: 0,
+          hdmfContribution: 0,
+          withholdingTax: 0,
+          cashAdvance: 0,
+          lsmBizLoan: 0,
+          lsmCoopLoan: 0,
+          shortages: 0,
+          sssLoan: 0,
+          hdmfLoan: 0,
+          hdmfMp2Savings: 0,
+          netPay: 0,
+        },
+      ),
+    [sortedLines],
+  );
+
   const alreadyGenerated = period ? new Set(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => p.employeeId)) : new Set();
 
   function generatePayslips() {
@@ -89,8 +144,13 @@ export default function PayrollProcessingPage() {
         "PhilHealth Contribution",
         "Pag-IBIG Contribution",
         "Withholding Tax",
-        "Total Mandatories",
-        "Other Deductions",
+        "Cash Advance",
+        "LSM Biz Loan",
+        "LSM Coop Loan",
+        "Shortage Deduction",
+        "SSS Loan",
+        "Pag-IBIG Loan",
+        "Pag-IBIG MP2 Savings",
         "Net Pay",
       ],
       sortedLines.map((l) => {
@@ -114,8 +174,13 @@ export default function PayrollProcessingPage() {
           l.philHealthContribution,
           l.hdmfContribution,
           l.withholdingTax,
-          l.totalMandatories,
-          l.totalDeductionsOtherThanMandatories,
+          l.cashAdvance,
+          l.lsmBizLoan,
+          l.lsmCoopLoan,
+          l.shortages,
+          l.sssLoan,
+          l.hdmfLoan,
+          l.hdmfMp2Savings,
           l.netPay,
         ];
       }),
@@ -184,7 +249,7 @@ export default function PayrollProcessingPage() {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1500px] text-sm">
+                <table className="w-full min-w-[2200px] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="px-3 py-2 font-medium">Employee</th>
@@ -203,7 +268,13 @@ export default function PayrollProcessingPage() {
                       <th className="px-3 py-2 font-medium">PhilHealth</th>
                       <th className="px-3 py-2 font-medium">HDMF</th>
                       <th className="px-3 py-2 font-medium">WHT</th>
-                      <th className="px-3 py-2 font-medium">Other Ded.</th>
+                      <th className="px-3 py-2 font-medium">Cash Adv.</th>
+                      <th className="px-3 py-2 font-medium">LSM Biz</th>
+                      <th className="px-3 py-2 font-medium">LSM Coop</th>
+                      <th className="px-3 py-2 font-medium">Shortage</th>
+                      <th className="px-3 py-2 font-medium">SSS Loan</th>
+                      <th className="px-3 py-2 font-medium">Pag-IBIG Loan</th>
+                      <th className="px-3 py-2 font-medium">Pag-IBIG MP2</th>
                       <th className="px-3 py-2 font-medium">Net pay</th>
                       <th className="px-3 py-2 font-medium">Payslip</th>
                       <th className="px-3 py-2 font-medium"></th>
@@ -230,7 +301,13 @@ export default function PayrollProcessingPage() {
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.philHealthContribution)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfContribution)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.withholdingTax)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.totalDeductionsOtherThanMandatories)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.cashAdvance)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.lsmBizLoan)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.lsmCoopLoan)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.shortages)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssLoan)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfLoan)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfMp2Savings)}</td>
                           <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.netPay)}</td>
                           <td className="px-3 py-2">{alreadyGenerated.has(l.employeeId) ? <Badge tone="good">Released</Badge> : <Badge tone="muted">Not released</Badge>}</td>
                           <td className="px-3 py-2">
@@ -244,6 +321,36 @@ export default function PayrollProcessingPage() {
                       );
                     })}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]">
+                      <td className="px-3 py-2">Total</td>
+                      <td className="px-3 py-2"></td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.ratePerDay)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.basicPay)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.latesUndertime)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.holidayPay)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.vlPay)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.slPay)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.otPay)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netAllowances)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.grossSalary)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssContribution)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssWisp)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.philHealthContribution)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfContribution)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.withholdingTax)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.cashAdvance)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmBizLoan)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmCoopLoan)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.shortages)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssLoan)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfLoan)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfMp2Savings)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netPay)}</td>
+                      <td className="px-3 py-2"></td>
+                      <td className="px-3 py-2"></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
@@ -294,6 +401,7 @@ function defaultOverrideForm(periodId: string, employeeId: string, overrides: Pa
     shortages: 0,
     sssLoan: 0,
     hdmfLoan: 0,
+    hdmfMp2Savings: 0,
     adjustmentAdd: 0,
     adjustmentDeduct: 0,
     sssContributionOverride: null,
@@ -476,6 +584,7 @@ function PayrollLineEditModal({
             <NumberField label="Shortage deduction" value={form.shortages} onChange={(v) => setNum("shortages", v)} />
             <NumberField label="SSS loan" value={form.sssLoan} onChange={(v) => setNum("sssLoan", v)} />
             <NumberField label="Pag-IBIG (HDMF) loan" value={form.hdmfLoan} onChange={(v) => setNum("hdmfLoan", v)} />
+            <NumberField label="Pag-IBIG (HDMF) MP2 savings" value={form.hdmfMp2Savings} onChange={(v) => setNum("hdmfMp2Savings", v)} />
           </div>
         </FieldSection>
 
