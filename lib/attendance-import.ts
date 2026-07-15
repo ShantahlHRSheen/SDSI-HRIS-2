@@ -67,6 +67,13 @@ function cellNumber(row: ExcelJS.Row, col: number): number {
   return toNumber(cellScalar(row, col));
 }
 
+// For columns that may not exist in a given tracker export — `col` is
+// undefined when the header lookup found no match, and returns 0 rather
+// than calling into ExcelJS with an invalid column index.
+function cellNumberOptional(row: ExcelJS.Row, col: number | undefined): number {
+  return col === undefined ? 0 : cellNumber(row, col);
+}
+
 export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<ParsedAttendanceWorkbook> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
@@ -101,6 +108,7 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
 
   const rows: ParsedAttendanceRow[] = [];
   const headerRow = headerRowNum;
+  const undertimeCol = headerMap["undertime adj mins"] ?? headerMap["undertime raw mins"];
   // The template's Emp ID / Employee Name columns are lookup formulas bounded
   // to a fixed range far larger than the real roster (e.g. up to row 505), so
   // rows past the real data are expected to read as blank. Some Google
@@ -126,10 +134,12 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
       slDays: cellNumber(row, headerMap["sl days"]),
       vlDays: cellNumber(row, headerMap["vl days"]),
       lateAdjMinutes: cellNumber(row, headerMap["late adj mins"]),
-      // "Undertime Raw Mins" is read like "notes" — optional, defaulting to 0
-      // rather than failing the whole import — so older tracker exports that
-      // predate this column still import cleanly.
-      undertimeMinutes: headerMap["undertime raw mins"] ? cellNumber(row, headerMap["undertime raw mins"]) : 0,
+      // The source template's actual header is "Undertime Adj Mins" (mirroring
+      // "Late Adj Mins"); "undertime raw mins" is also accepted in case a
+      // differently-named tracker export is used. Read like "notes" —
+      // optional, defaulting to 0 rather than failing the whole import — so
+      // older tracker exports that predate this column still import cleanly.
+      undertimeMinutes: cellNumberOptional(row, undertimeCol),
       notes: headerMap["notes"] ? cellText(row, headerMap["notes"]) : "",
     });
   });
