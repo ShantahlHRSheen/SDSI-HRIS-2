@@ -1,0 +1,567 @@
+-- =============================================================================
+-- Shantahl HRIS — Supabase schema (groundwork)
+--
+-- Mirrors the data model currently defined in lib/types.ts (localStorage demo)
+-- so a future migration can move the app off client-only storage without a
+-- redesign. Nothing in the running app reads or writes this schema yet — see
+-- lib/supabase/client.ts and lib/supabase/queries.ts for the (currently
+-- unused) client-side wiring.
+--
+-- Run this once, in order, against a fresh Supabase project: paste into the
+-- SQL Editor (Database > SQL Editor) and Run, or `psql <connection-string> -f
+-- supabase/schema.sql`.
+--
+-- Auth model: every employee who should be able to log in gets a Supabase
+-- Auth user (email + password, created via Auth > Users or the Admin API),
+-- then employees.user_id is set to that auth user's id. Employees without a
+-- user_id simply have no login — matches today's "7 of 68 have a demo
+-- login" state, and lets you onboard the rest incrementally.
+-- =============================================================================
+
+create extension if not exists pgcrypto;
+
+-- ---------------------------------------------------------------------------
+-- Enums
+-- ---------------------------------------------------------------------------
+
+create type app_role as enum (
+  'hr_admin',
+  'payroll_officer',
+  'sr_accounting_assistant',
+  'treasurer',
+  'cfo',
+  'dept_head',
+  'employee',
+  'upper_management',
+  'sys_admin'
+);
+
+create type holiday_type as enum ('regular', 'special_non_working');
+create type payroll_period_status as enum ('open', 'locked', 'closed');
+create type employment_status as enum (
+  'regular', 'probationary', 'project_based', 'freelance', 'consultant', 'intern'
+);
+create type employee_lifecycle_status as enum ('active', 'on_leave', 'resigned', 'terminated');
+create type payroll_type as enum ('daily', 'monthly');
+create type evaluation_status as enum ('draft', 'submitted', 'acknowledged');
+create type disciplinary_type as enum (
+  'incident_report', 'verbal_warning', 'written_warning', 'suspension', 'nte', 'nod'
+);
+create type disciplinary_status as enum ('open', 'resolved');
+create type announcement_category as enum (
+  'announcement', 'holiday', 'event', 'memo', 'policy'
+);
+create type bir_form_type as enum ('1601c', '2316');
+create type request_status as enum ('pending', 'approved', 'rejected', 'cancelled');
+create type attendance_record_source as enum ('import', 'manual');
+
+-- ---------------------------------------------------------------------------
+-- Reference / lookup tables
+-- ---------------------------------------------------------------------------
+
+create table branches (
+  id text primary key default gen_random_uuid()::text,
+  name text not null,
+  code text not null unique,
+  address text not null
+);
+
+create table departments (
+  id text primary key default gen_random_uuid()::text,
+  name text not null
+);
+
+create table positions (
+  id text primary key default gen_random_uuid()::text,
+  title text not null,
+  department_id text not null references departments (id)
+);
+
+create table work_schedules (
+  id text primary key default gen_random_uuid()::text,
+  name text not null,
+  time_in text not null,
+  time_out text not null,
+  days text not null,
+  grace_minutes integer not null default 0
+);
+
+create table holidays (
+  id text primary key default gen_random_uuid()::text,
+  name text not null,
+  date date not null,
+  type holiday_type not null,
+  verified boolean not null default false
+);
+
+create table leave_types (
+  id text primary key default gen_random_uuid()::text,
+  name text not null,
+  default_credits numeric not null default 0,
+  requires_cert boolean not null default false
+);
+
+create table payroll_periods (
+  id text primary key default gen_random_uuid()::text,
+  period_start date not null,
+  period_end date not null,
+  status payroll_period_status not null default 'open',
+  check (period_end >= period_start)
+);
+
+-- ---------------------------------------------------------------------------
+-- Employees — the 201 file + the login link
+-- ---------------------------------------------------------------------------
+
+create table employees (
+  id text primary key default gen_random_uuid()::text,
+  employee_number text not null unique,
+  first_name text not null,
+  last_name text not null,
+  middle_name text,
+  nickname text not null,
+  gender text not null check (gender in ('Male', 'Female')),
+  birthdate date not null,
+  civil_status text not null check (civil_status in ('Single', 'Married', 'Widowed', 'Separated')),
+  nationality text not null,
+  address text not null,
+  contact_number text not null,
+  email text not null unique,
+  emergency_contact_name text not null,
+  emergency_contact_phone text not null,
+
+  branch_id text not null references branches (id),
+  department_id text not null references departments (id),
+  position_id text not null references positions (id),
+  supervisor_id text references employees (id),
+
+  employment_status employment_status not null,
+  date_hired date not null,
+  date_regularized date,
+  contract_start date,
+  contract_end date,
+  probation_ends_at date,
+
+  payroll_type payroll_type not null,
+  daily_rate numeric,
+  monthly_salary numeric,
+  daily_allowance numeric,
+  monthly_allowance numeric,
+
+  status employee_lifecycle_status not null default 'active',
+  status_changed_at date,
+  roles app_role[] not null default '{}',
+
+  -- Nullable: not every employee has been onboarded with a login yet.
+  user_id uuid unique references auth.users (id) on delete set null
+);
+
+create index employees_supervisor_id_idx on employees (supervisor_id);
+create index employees_user_id_idx on employees (user_id);
+
+-- ---------------------------------------------------------------------------
+-- Performance, discipline, audit, announcements
+-- ---------------------------------------------------------------------------
+
+create table performance_evaluations (
+  id text primary key default gen_random_uuid()::text,
+  employee_id text not null references employees (id),
+  evaluator_id text not null references employees (id),
+  period text not null,
+  criteria jsonb not null default '[]', -- [{ label, weight, score }]
+  overall_score numeric not null,
+  comments text not null default '',
+  status evaluation_status not null default 'draft',
+  created_at timestamptz not null default now()
+);
+
+create table disciplinary_records (
+  id text primary key default gen_random_uuid()::text,
+  employee_id text not null references employees (id),
+  type disciplinary_type not null,
+  description text not null,
+  issued_by text not null references employees (id),
+  date date not null,
+  status disciplinary_status not null default 'open',
+  attachment_name text
+);
+
+create table audit_logs (
+  id text primary key default gen_random_uuid()::text,
+  actor_employee_id text references employees (id),
+  actor_name text not null, -- denormalized at time of action, for immutability
+  module text not null,
+  action text not null,
+  description text not null,
+  previous_value text,
+  new_value text,
+  created_at timestamptz not null default now()
+);
+
+create table announcements (
+  id text primary key default gen_random_uuid()::text,
+  title text not null,
+  body text not null,
+  category announcement_category not null,
+  posted_by text not null, -- display name, matches current app convention
+  posted_at timestamptz not null default now(),
+  expires_at timestamptz
+);
+
+-- ---------------------------------------------------------------------------
+-- Approvable requests (leave / overtime / attendance correction)
+-- ---------------------------------------------------------------------------
+
+create table leave_requests (
+  id text primary key default gen_random_uuid()::text,
+  employee_id text not null references employees (id),
+  leave_type_id text not null references leave_types (id),
+  start_date date not null,
+  end_date date not null,
+  days numeric not null,
+  reason text not null default '',
+  status request_status not null default 'pending',
+  filed_at timestamptz not null default now(),
+  decided_by text references employees (id),
+  decided_at timestamptz,
+  decision_note text
+);
+
+create table overtime_requests (
+  id text primary key default gen_random_uuid()::text,
+  employee_id text not null references employees (id),
+  date date not null,
+  hours numeric not null,
+  reason text not null default '',
+  status request_status not null default 'pending',
+  filed_at timestamptz not null default now(),
+  decided_by text references employees (id),
+  decided_at timestamptz,
+  decision_note text
+);
+
+create table attendance_correction_requests (
+  id text primary key default gen_random_uuid()::text,
+  employee_id text not null references employees (id),
+  date date not null,
+  requested_time_in text,
+  requested_time_out text,
+  reason text not null default '',
+  status request_status not null default 'pending',
+  filed_at timestamptz not null default now(),
+  decided_by text references employees (id),
+  decided_at timestamptz,
+  decision_note text
+);
+
+-- ---------------------------------------------------------------------------
+-- Attendance + payroll
+-- ---------------------------------------------------------------------------
+
+create table attendance_period_records (
+  id text primary key default gen_random_uuid()::text,
+  period_id text not null references payroll_periods (id),
+  employee_id text not null references employees (id),
+  days_worked numeric not null default 0,
+  holiday_days numeric not null default 0,
+  sl_days numeric not null default 0,
+  vl_days numeric not null default 0,
+  late_adj_minutes numeric not null default 0,
+  undertime_minutes numeric not null default 0,
+  notes text not null default '',
+  source attendance_record_source not null default 'manual',
+  updated_by text not null, -- display name
+  updated_at timestamptz not null default now(),
+  unique (period_id, employee_id)
+);
+
+create table payroll_line_overrides (
+  id text primary key default gen_random_uuid()::text,
+  period_id text not null references payroll_periods (id),
+  employee_id text not null references employees (id),
+  travel_allowance numeric not null default 0,
+  laundry_allowance numeric not null default 0,
+  medical_cash_allowance numeric not null default 0,
+  supervisor_allowance numeric not null default 0,
+  cash_advance numeric not null default 0,
+  lsm_biz_loan numeric not null default 0,
+  lsm_coop_loan numeric not null default 0,
+  shortages numeric not null default 0,
+  sss_loan numeric not null default 0,
+  hdmf_loan numeric not null default 0,
+  hdmf_mp2_savings numeric not null default 0,
+  adjustment_add numeric not null default 0,
+  adjustment_deduct numeric not null default 0,
+  sss_contribution_override numeric,
+  sss_wisp_override numeric,
+  philhealth_contribution_override numeric,
+  hdmf_contribution_override numeric,
+  withholding_tax_override numeric,
+  daily_allowance_override numeric,
+  basic_pay_override numeric,
+  lates_undertime_override numeric,
+  undertime_deduction_override numeric,
+  holiday_pay_override numeric,
+  vl_pay_override numeric,
+  sl_pay_override numeric,
+  ot_hours_override numeric,
+  ot_pay_override numeric,
+  updated_by text not null,
+  updated_at timestamptz not null default now(),
+  unique (period_id, employee_id)
+);
+
+create table voucher_amount_overrides (
+  id text primary key default gen_random_uuid()::text,
+  period_id text not null references payroll_periods (id),
+  employee_id text not null references employees (id),
+  amount numeric not null,
+  updated_by text not null,
+  updated_at timestamptz not null default now(),
+  unique (period_id, employee_id)
+);
+
+create table generated_payslips (
+  id text primary key default gen_random_uuid()::text,
+  period_id text not null references payroll_periods (id),
+  employee_id text not null references employees (id),
+  generated_by text not null,
+  generated_at timestamptz not null default now(),
+  summary jsonb not null default '{}'
+);
+
+create table generated_vouchers (
+  id text primary key default gen_random_uuid()::text,
+  period_id text not null references payroll_periods (id),
+  employee_id text not null references employees (id),
+  amount numeric not null,
+  generated_by text not null,
+  generated_at timestamptz not null default now()
+);
+
+create table generated_bir_forms (
+  id text primary key default gen_random_uuid()::text,
+  form_type bir_form_type not null,
+  period text not null, -- monthKey ("2026-07") for 1601-C, tax year ("2026") for 2316
+  employee_id text references employees (id), -- null for 1601-C (company-wide)
+  generated_by text not null,
+  generated_at timestamptz not null default now(),
+  summary jsonb not null default '{}'
+);
+
+create index attendance_period_records_employee_idx on attendance_period_records (employee_id);
+create index payroll_line_overrides_employee_idx on payroll_line_overrides (employee_id);
+create index leave_requests_employee_idx on leave_requests (employee_id);
+create index overtime_requests_employee_idx on overtime_requests (employee_id);
+create index attendance_correction_requests_employee_idx on attendance_correction_requests (employee_id);
+create index performance_evaluations_employee_idx on performance_evaluations (employee_id);
+create index disciplinary_records_employee_idx on disciplinary_records (employee_id);
+create index generated_payslips_employee_idx on generated_payslips (employee_id);
+
+-- =============================================================================
+-- Role-check helpers
+--
+-- app_current_employee_id() resolves the signed-in employee row from
+-- auth.uid(). app_has_any_role(...) checks that employee's roles array.
+-- "Elevated" = every role that should see company-wide HR/payroll data,
+-- as opposed to only the signed-in employee's own records.
+-- =============================================================================
+
+create or replace function app_current_employee_id()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id from employees where user_id = auth.uid();
+$$;
+
+create or replace function app_has_any_role(target_roles app_role[])
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select roles && target_roles from employees where user_id = auth.uid()),
+    false
+  );
+$$;
+
+create or replace function app_is_elevated()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select app_has_any_role(array[
+    'hr_admin', 'payroll_officer', 'sr_accounting_assistant',
+    'treasurer', 'cfo', 'dept_head', 'upper_management', 'sys_admin'
+  ]::app_role[]);
+$$;
+
+create or replace function app_is_hr_or_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select app_has_any_role(array['hr_admin', 'sys_admin']::app_role[]);
+$$;
+
+create or replace function app_is_payroll()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select app_has_any_role(array[
+    'hr_admin', 'payroll_officer', 'sr_accounting_assistant',
+    'treasurer', 'cfo', 'sys_admin'
+  ]::app_role[]);
+$$;
+
+-- =============================================================================
+-- Row Level Security
+--
+-- Pattern: reference tables are readable by any signed-in user, writable only
+-- by hr_admin/sys_admin. Personal-data tables are readable/writable by the
+-- owning employee for their own row, and fully readable/writable by elevated
+-- roles. Sensitive company-wide tables (audit log, payroll overrides) are
+-- elevated-only. dept_head is treated as elevated for v1 (sees everything,
+-- not just their department) — scoping dept_head to direct reports only is a
+-- worthwhile follow-up once this is wired into the app.
+-- =============================================================================
+
+alter table branches enable row level security;
+alter table departments enable row level security;
+alter table positions enable row level security;
+alter table work_schedules enable row level security;
+alter table holidays enable row level security;
+alter table leave_types enable row level security;
+alter table payroll_periods enable row level security;
+alter table employees enable row level security;
+alter table performance_evaluations enable row level security;
+alter table disciplinary_records enable row level security;
+alter table audit_logs enable row level security;
+alter table announcements enable row level security;
+alter table leave_requests enable row level security;
+alter table overtime_requests enable row level security;
+alter table attendance_correction_requests enable row level security;
+alter table attendance_period_records enable row level security;
+alter table payroll_line_overrides enable row level security;
+alter table voucher_amount_overrides enable row level security;
+alter table generated_payslips enable row level security;
+alter table generated_vouchers enable row level security;
+alter table generated_bir_forms enable row level security;
+
+-- Reference tables: read for any signed-in user, write for HR/sys admin.
+create policy "reference read" on branches for select using (auth.role() = 'authenticated');
+create policy "reference write" on branches for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+create policy "reference read" on departments for select using (auth.role() = 'authenticated');
+create policy "reference write" on departments for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+create policy "reference read" on positions for select using (auth.role() = 'authenticated');
+create policy "reference write" on positions for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+create policy "reference read" on work_schedules for select using (auth.role() = 'authenticated');
+create policy "reference write" on work_schedules for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+create policy "reference read" on holidays for select using (auth.role() = 'authenticated');
+create policy "reference write" on holidays for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+create policy "reference read" on leave_types for select using (auth.role() = 'authenticated');
+create policy "reference write" on leave_types for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+create policy "reference read" on announcements for select using (auth.role() = 'authenticated');
+create policy "reference write" on announcements for all using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+-- Payroll periods: elevated roles manage them, everyone signed-in can read
+-- (employees need to see period labels on their own payslips/vouchers).
+create policy "payroll periods read" on payroll_periods for select using (auth.role() = 'authenticated');
+create policy "payroll periods write" on payroll_periods for all using (app_is_payroll()) with check (app_is_payroll());
+
+-- Employees: self row, direct reports (for dept_head-style visibility later),
+-- and elevated roles can read everyone; only HR/sys admin can write.
+create policy "employees read self or elevated" on employees for select
+  using (id = app_current_employee_id() or app_is_elevated());
+create policy "employees write hr" on employees for all
+  using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+-- Performance evaluations: the employee being evaluated, the evaluator, and
+-- elevated roles.
+create policy "evaluations read" on performance_evaluations for select
+  using (employee_id = app_current_employee_id() or evaluator_id = app_current_employee_id() or app_is_elevated());
+create policy "evaluations write elevated" on performance_evaluations for all
+  using (app_is_elevated()) with check (app_is_elevated());
+
+-- Disciplinary records: the employee named in the record, plus elevated
+-- roles — not visible to coworkers.
+create policy "discipline read" on disciplinary_records for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "discipline write elevated" on disciplinary_records for all
+  using (app_is_elevated()) with check (app_is_elevated());
+
+-- Audit log: elevated-only, and written by the app (service role) rather
+-- than end users.
+create policy "audit read elevated" on audit_logs for select using (app_is_elevated());
+create policy "audit write elevated" on audit_logs for insert with check (app_is_elevated());
+
+-- Approvable requests: the filer, plus elevated roles who approve them.
+create policy "leave requests read" on leave_requests for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "leave requests insert self" on leave_requests for insert
+  with check (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "leave requests update elevated or own pending" on leave_requests for update
+  using (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'))
+  with check (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'));
+
+create policy "overtime requests read" on overtime_requests for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "overtime requests insert self" on overtime_requests for insert
+  with check (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "overtime requests update elevated or own pending" on overtime_requests for update
+  using (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'))
+  with check (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'));
+
+create policy "correction requests read" on attendance_correction_requests for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "correction requests insert self" on attendance_correction_requests for insert
+  with check (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "correction requests update elevated or own pending" on attendance_correction_requests for update
+  using (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'))
+  with check (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'));
+
+-- Attendance + payroll figures: the employee can read their own; only
+-- payroll-tier roles write.
+create policy "attendance read" on attendance_period_records for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "attendance write payroll" on attendance_period_records for all
+  using (app_is_payroll()) with check (app_is_payroll());
+
+create policy "payroll overrides elevated only" on payroll_line_overrides for all
+  using (app_is_payroll()) with check (app_is_payroll());
+
+create policy "voucher overrides elevated only" on voucher_amount_overrides for all
+  using (app_is_payroll()) with check (app_is_payroll());
+
+create policy "payslips read" on generated_payslips for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "payslips write payroll" on generated_payslips for all
+  using (app_is_payroll()) with check (app_is_payroll());
+
+create policy "vouchers read" on generated_vouchers for select
+  using (employee_id = app_current_employee_id() or app_is_elevated());
+create policy "vouchers write payroll" on generated_vouchers for all
+  using (app_is_payroll()) with check (app_is_payroll());
+
+create policy "bir forms read" on generated_bir_forms for select
+  using (employee_id = app_current_employee_id() or employee_id is null or app_is_elevated());
+create policy "bir forms write payroll" on generated_bir_forms for all
+  using (app_is_payroll()) with check (app_is_payroll());
