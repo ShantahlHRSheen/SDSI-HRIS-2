@@ -49,6 +49,7 @@ export interface PayrollLine {
   vlDays: number;
   slDays: number;
   lateMinutes: number;
+  undertimeMinutes: number;
   otHours: number;
   otHoursAuto: number;
   ratePerDay: number;
@@ -58,6 +59,8 @@ export interface PayrollLine {
   basicPayAuto: number;
   latesUndertime: number;
   latesUndertimeAuto: number;
+  undertimeDeduction: number;
+  undertimeDeductionAuto: number;
   basicSalaryLessLate: number;
   holidayPay: number;
   holidayPayAuto: number;
@@ -156,6 +159,7 @@ const emptyOverride: Omit<PayrollLineOverride, "id" | "periodId" | "employeeId" 
   dailyAllowanceOverride: null,
   basicPayOverride: null,
   latesUndertimeOverride: null,
+  undertimeDeductionOverride: null,
   holidayPayOverride: null,
   vlPayOverride: null,
   slPayOverride: null,
@@ -188,7 +192,12 @@ export function computePayrollForPeriod(
 
     const latesUndertimeAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.lateAdjMinutes);
     const latesUndertime = ov.latesUndertimeOverride ?? latesUndertimeAuto;
-    const basicSalaryLessLate = basicPay - latesUndertime;
+    // Undertime deduction — same per-minute rate formula as the late
+    // deduction, applied to the "Undertime Raw Mins" column imported
+    // separately from "Late Adj Mins".
+    const undertimeDeductionAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.undertimeMinutes);
+    const undertimeDeduction = ov.undertimeDeductionOverride ?? undertimeDeductionAuto;
+    const basicSalaryLessLate = basicPay - latesUndertime - undertimeDeduction;
 
     const holidayPayAuto = Math.round(rate * rec.holidayDays);
     const holidayPay = ov.holidayPayOverride ?? holidayPayAuto;
@@ -252,6 +261,7 @@ export function computePayrollForPeriod(
       vlDays: rec.vlDays,
       slDays: rec.slDays,
       lateMinutes: rec.lateAdjMinutes,
+      undertimeMinutes: rec.undertimeMinutes,
       otHours,
       otHoursAuto,
       ratePerDay: rate,
@@ -259,6 +269,8 @@ export function computePayrollForPeriod(
       basicPayAuto,
       latesUndertime,
       latesUndertimeAuto,
+      undertimeDeduction,
+      undertimeDeductionAuto,
       basicSalaryLessLate,
       holidayPay,
       holidayPayAuto,
@@ -329,6 +341,7 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     vlDays: summary.vlDays ?? 0,
     slDays: summary.slDays ?? 0,
     lateMinutes: summary.lateMinutes ?? 0,
+    undertimeMinutes: summary.undertimeMinutes ?? 0,
     otHours: summary.otHours ?? 0,
     otHoursAuto: summary.otHoursAuto ?? 0,
     ratePerDay: summary.ratePerDay ?? 0,
@@ -336,6 +349,8 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     basicPayAuto: summary.basicPayAuto ?? 0,
     latesUndertime: summary.latesUndertime ?? 0,
     latesUndertimeAuto: summary.latesUndertimeAuto ?? 0,
+    undertimeDeduction: summary.undertimeDeduction ?? 0,
+    undertimeDeductionAuto: summary.undertimeDeductionAuto ?? 0,
     basicSalaryLessLate: summary.basicSalaryLessLate ?? 0,
     holidayPay: summary.holidayPay ?? 0,
     holidayPayAuto: summary.holidayPayAuto ?? 0,

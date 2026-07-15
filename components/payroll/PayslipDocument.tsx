@@ -33,7 +33,8 @@ export function PayslipDocument({ employee, period, line }: { employee: Employee
 
       <FormSection title="Earnings">
         <FormAmountRow label="Basic Pay" value={line.basicPay} />
-        {line.latesUndertime > 0 && <FormAmountRow label="Lates / Undertime" value={-line.latesUndertime} />}
+        {line.latesUndertime > 0 && <FormAmountRow label="Late Deduction" value={-line.latesUndertime} />}
+        {line.undertimeDeduction > 0 && <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction} />}
         <FormAmountRow label="Net Allowances" value={line.netAllowances} />
         <FormAmountRow label="Overtime Pay" value={line.otPay} />
         <FormAmountRow label="Holiday Pay" value={line.holidayPay} />

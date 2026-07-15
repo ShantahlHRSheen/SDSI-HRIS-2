@@ -20,6 +20,7 @@ export interface ParsedAttendanceRow {
   slDays: number;
   vlDays: number;
   lateAdjMinutes: number;
+  undertimeMinutes: number;
   notes: string;
 }
 
@@ -125,6 +126,10 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
       slDays: cellNumber(row, headerMap["sl days"]),
       vlDays: cellNumber(row, headerMap["vl days"]),
       lateAdjMinutes: cellNumber(row, headerMap["late adj mins"]),
+      // "Undertime Raw Mins" is read like "notes" — optional, defaulting to 0
+      // rather than failing the whole import — so older tracker exports that
+      // predate this column still import cleanly.
+      undertimeMinutes: headerMap["undertime raw mins"] ? cellNumber(row, headerMap["undertime raw mins"]) : 0,
       notes: headerMap["notes"] ? cellText(row, headerMap["notes"]) : "",
     });
   });

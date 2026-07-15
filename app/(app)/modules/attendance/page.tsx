@@ -70,6 +70,7 @@ export default function AttendancePage() {
         slDays: m.parsed.slDays,
         vlDays: m.parsed.vlDays,
         lateAdjMinutes: m.parsed.lateAdjMinutes,
+        undertimeMinutes: m.parsed.undertimeMinutes,
         notes: m.parsed.notes,
       })),
     );
@@ -92,12 +93,13 @@ export default function AttendancePage() {
         {!myRecord ? (
           <EmptyState icon={CalendarClock} title="No attendance recorded yet" description="HR/Payroll hasn't entered attendance for this period yet." />
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
             <StatTile label="Days worked" value={myRecord.daysWorked.toString()} />
             <StatTile label="Holiday days" value={myRecord.holidayDays.toString()} />
             <StatTile label="SL days" value={myRecord.slDays.toString()} />
             <StatTile label="VL days" value={myRecord.vlDays.toString()} />
             <StatTile label="Late (min)" value={myRecord.lateAdjMinutes.toString()} />
+            <StatTile label="Undertime (min)" value={myRecord.undertimeMinutes.toString()} />
           </div>
         )}
       </div>
@@ -161,6 +163,7 @@ export default function AttendancePage() {
                   <th className="px-3 py-2 font-medium">SL</th>
                   <th className="px-3 py-2 font-medium">VL</th>
                   <th className="px-3 py-2 font-medium">Late (min)</th>
+                  <th className="px-3 py-2 font-medium">Undertime (min)</th>
                   <th className="px-3 py-2 font-medium">Source</th>
                   <th className="px-3 py-2 font-medium">Actions</th>
                 </tr>
@@ -188,6 +191,7 @@ export default function AttendancePage() {
                           <span className={outlier ? "text-[var(--status-warning)]" : ""}>{rec.lateAdjMinutes}</span>
                           {outlier && <AlertTriangle size={12} className="ml-1 inline text-[var(--status-warning)]" />}
                         </td>
+                        <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.undertimeMinutes}</td>
                         <td className="px-3 py-2"><Badge tone={rec.source === "import" ? "info" : "muted"}>{rec.source}</Badge></td>
                         <td className="px-3 py-2">
                           {emp && (
@@ -253,6 +257,7 @@ function EditAttendanceModal({
     slDays: target.record?.slDays ?? 0,
     vlDays: target.record?.vlDays ?? 0,
     lateAdjMinutes: target.record?.lateAdjMinutes ?? 0,
+    undertimeMinutes: target.record?.undertimeMinutes ?? 0,
     notes: target.record?.notes ?? "",
   });
 
@@ -284,7 +289,8 @@ function EditAttendanceModal({
           <NumberField label="Holiday days" value={form.holidayDays} onChange={(v) => setForm((f) => ({ ...f, holidayDays: v }))} />
           <NumberField label="SL days" value={form.slDays} onChange={(v) => setForm((f) => ({ ...f, slDays: v }))} />
           <NumberField label="VL days" value={form.vlDays} onChange={(v) => setForm((f) => ({ ...f, vlDays: v }))} />
-          <NumberField label="Late/undertime (min)" value={form.lateAdjMinutes} onChange={(v) => setForm((f) => ({ ...f, lateAdjMinutes: v }))} />
+          <NumberField label="Late (min)" value={form.lateAdjMinutes} onChange={(v) => setForm((f) => ({ ...f, lateAdjMinutes: v }))} />
+          <NumberField label="Undertime raw (min)" value={form.undertimeMinutes} onChange={(v) => setForm((f) => ({ ...f, undertimeMinutes: v }))} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Notes</label>

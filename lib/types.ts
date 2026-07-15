@@ -305,6 +305,7 @@ export interface AttendancePeriodRecord {
   slDays: number;
   vlDays: number;
   lateAdjMinutes: number;
+  undertimeMinutes: number;
   notes: string;
   source: AttendanceRecordSource;
   updatedBy: string;
@@ -346,6 +347,7 @@ export interface PayrollLineOverride {
   dailyAllowanceOverride: number | null;
   basicPayOverride: number | null;
   latesUndertimeOverride: number | null;
+  undertimeDeductionOverride: number | null;
   holidayPayOverride: number | null;
   vlPayOverride: number | null;
   slPayOverride: number | null;

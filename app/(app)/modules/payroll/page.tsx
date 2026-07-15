@@ -60,6 +60,7 @@ export default function PayrollProcessingPage() {
           ratePerDay: t.ratePerDay + l.ratePerDay,
           basicPay: t.basicPay + l.basicPay,
           latesUndertime: t.latesUndertime + l.latesUndertime,
+          undertimeDeduction: t.undertimeDeduction + l.undertimeDeduction,
           holidayPay: t.holidayPay + l.holidayPay,
           vlPay: t.vlPay + l.vlPay,
           slPay: t.slPay + l.slPay,
@@ -84,6 +85,7 @@ export default function PayrollProcessingPage() {
           ratePerDay: 0,
           basicPay: 0,
           latesUndertime: 0,
+          undertimeDeduction: 0,
           holidayPay: 0,
           vlPay: 0,
           slPay: 0,
@@ -132,7 +134,8 @@ export default function PayrollProcessingPage() {
         "Rate/Day",
         "Days Working",
         "Basic Pay",
-        "Lates/Undertime",
+        "Late Deduction",
+        "Undertime Deduction",
         "Holiday Pay",
         "VL Pay",
         "SL Pay",
@@ -163,6 +166,7 @@ export default function PayrollProcessingPage() {
           l.daysWorking,
           l.basicPay,
           l.latesUndertime,
+          l.undertimeDeduction,
           l.holidayPay,
           l.vlPay,
           l.slPay,
@@ -257,6 +261,7 @@ export default function PayrollProcessingPage() {
                       <th className="px-3 py-2 font-medium">Rate/Day</th>
                       <th className="px-3 py-2 font-medium">Basic</th>
                       <th className="px-3 py-2 font-medium">Late</th>
+                      <th className="px-3 py-2 font-medium">Undertime</th>
                       <th className="px-3 py-2 font-medium">Holiday</th>
                       <th className="px-3 py-2 font-medium">VL</th>
                       <th className="px-3 py-2 font-medium">SL</th>
@@ -290,6 +295,7 @@ export default function PayrollProcessingPage() {
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.ratePerDay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.basicPay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.latesUndertime ? `-${formatCurrencyCompact(l.latesUndertime)}` : "—"}</td>
+                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.undertimeDeduction ? `-${formatCurrencyCompact(l.undertimeDeduction)}` : "—"}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.holidayPay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.vlPay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.slPay)}</td>
@@ -328,6 +334,7 @@ export default function PayrollProcessingPage() {
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.ratePerDay)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.basicPay)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.latesUndertime)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.undertimeDeduction)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.holidayPay)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.vlPay)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.slPay)}</td>
@@ -412,6 +419,7 @@ function defaultOverrideForm(periodId: string, employeeId: string, overrides: Pa
     dailyAllowanceOverride: null,
     basicPayOverride: null,
     latesUndertimeOverride: null,
+    undertimeDeductionOverride: null,
     holidayPayOverride: null,
     vlPayOverride: null,
     slPayOverride: null,
@@ -426,6 +434,7 @@ interface AttendanceFormData {
   vlDays: number;
   slDays: number;
   lateAdjMinutes: number;
+  undertimeMinutes: number;
 }
 
 interface RateFormData {
@@ -459,6 +468,7 @@ function PayrollLineEditModal({
     vlDays: attendanceRecord?.vlDays ?? 0,
     slDays: attendanceRecord?.slDays ?? 0,
     lateAdjMinutes: attendanceRecord?.lateAdjMinutes ?? 0,
+    undertimeMinutes: attendanceRecord?.undertimeMinutes ?? 0,
   }));
   const [rate, setRate] = useState<RateFormData>(() => ({
     payrollType: employee.payrollType,
@@ -479,6 +489,7 @@ function PayrollLineEditModal({
     | "dailyAllowanceOverride"
     | "basicPayOverride"
     | "latesUndertimeOverride"
+    | "undertimeDeductionOverride"
     | "holidayPayOverride"
     | "vlPayOverride"
     | "slPayOverride"
@@ -500,6 +511,7 @@ function PayrollLineEditModal({
       vlDays: attendance.vlDays,
       slDays: attendance.slDays,
       lateAdjMinutes: attendance.lateAdjMinutes,
+      undertimeMinutes: attendance.undertimeMinutes,
       notes: attendanceRecord?.notes ?? "",
     });
     updateEmployee(employee.id, {
@@ -544,7 +556,8 @@ function PayrollLineEditModal({
             <NumberField label="Holiday days" value={attendance.holidayDays} onChange={(v) => setAttendanceField("holidayDays", v)} />
             <NumberField label="VL days" value={attendance.vlDays} onChange={(v) => setAttendanceField("vlDays", v)} />
             <NumberField label="SL days" value={attendance.slDays} onChange={(v) => setAttendanceField("slDays", v)} />
-            <NumberField label="Late/undertime (mins)" value={attendance.lateAdjMinutes} onChange={(v) => setAttendanceField("lateAdjMinutes", v)} />
+            <NumberField label="Late (mins)" value={attendance.lateAdjMinutes} onChange={(v) => setAttendanceField("lateAdjMinutes", v)} />
+            <NumberField label="Undertime raw (mins)" value={attendance.undertimeMinutes} onChange={(v) => setAttendanceField("undertimeMinutes", v)} />
             <OverrideField
               label="OT hours"
               auto={line?.otHoursAuto ?? 0}
@@ -558,7 +571,8 @@ function PayrollLineEditModal({
         <FieldSection title="Earnings (auto-computed from the above — override if needed)">
           <div className="grid grid-cols-2 gap-3">
             <OverrideField label="Basic pay" auto={line?.basicPayAuto ?? 0} value={form.basicPayOverride} onChange={(v) => setOverride("basicPayOverride", v)} />
-            <OverrideField label="Lates/undertime" auto={line?.latesUndertimeAuto ?? 0} value={form.latesUndertimeOverride} onChange={(v) => setOverride("latesUndertimeOverride", v)} />
+            <OverrideField label="Late deduction" auto={line?.latesUndertimeAuto ?? 0} value={form.latesUndertimeOverride} onChange={(v) => setOverride("latesUndertimeOverride", v)} />
+            <OverrideField label="Undertime deduction" auto={line?.undertimeDeductionAuto ?? 0} value={form.undertimeDeductionOverride} onChange={(v) => setOverride("undertimeDeductionOverride", v)} />
             <OverrideField label="Holiday pay" auto={line?.holidayPayAuto ?? 0} value={form.holidayPayOverride} onChange={(v) => setOverride("holidayPayOverride", v)} />
             <OverrideField label="VL pay" auto={line?.vlPayAuto ?? 0} value={form.vlPayOverride} onChange={(v) => setOverride("vlPayOverride", v)} />
             <OverrideField label="SL pay" auto={line?.slPayAuto ?? 0} value={form.slPayOverride} onChange={(v) => setOverride("slPayOverride", v)} />
