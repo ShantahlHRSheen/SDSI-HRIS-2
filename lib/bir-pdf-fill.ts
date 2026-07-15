@@ -148,12 +148,15 @@ export async function fillForm1601CPdf(data: Form1601CData, items: Form1601CLine
   const page = pdfDoc.getPages()[0];
 
   const [year, month] = data.monthKey.split("-");
-  draw(page, font, `${month}/${year}`, 132, 825, { size: 8 });
-  draw(page, font, "X", 198, 814.9, { size: 7 }); // Any Taxes Withheld? Yes
+  const monthDigits = `${month}${year}`;
+  for (let i = 0; i < monthDigits.length; i++) {
+    draw(page, font, monthDigits[i], 46.2 + i * 14.4 + 7.2, 814.9, { align: "center", size: 7 });
+  }
   draw(page, font, "X", 246, 814.9, { size: 7 }); // Amended Return? No
+  draw(page, font, "X", 317, 814.9, { size: 7 }); // Any Taxes Withheld? Yes
   draw(page, font, "1", 415, 825, { size: 8 });
 
-  draw(page, font, COMPANY_INFO.tin, 235, 778, { size: 7 });
+  draw(page, font, COMPANY_INFO.tin, 235, 780, { size: 7 });
   draw(page, font, rdoCodeOnly(COMPANY_INFO.rdoCode), 526, 778, { size: 7 });
   draw(page, font, COMPANY_INFO.name, 32, 754, { size: 7 });
   draw(page, font, COMPANY_INFO.address, 32, 723, { size: 7 });
