@@ -1,16 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileCheck2, Layers, Printer } from "lucide-react";
+import { Download, FileCheck2, Layers, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { Form2316Document } from "@/components/bir/Form2316";
 import { buildForm2316, getAvailableTaxYears, type Form2316Data } from "@/lib/bir";
+import { downloadPdfBytes, fillForm2316Pdf } from "@/lib/bir-pdf-fill";
 import { getMonthlyFacts } from "@/lib/monthly-analytics";
 import { branchName, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
+
+async function downloadOfficial2316(data: Form2316Data) {
+  const bytes = await fillForm2316Pdf(data);
+  downloadPdfBytes(bytes, `2316-${data.employee.employeeNumber}-${data.taxYear}.pdf`);
+}
 
 export default function Form2316Page() {
   const { currentUser, currentEmployee, employees, branches, departments, generatedBirForms, addGeneratedBirForm } = useHris();
@@ -49,6 +55,9 @@ function PreviewModal({ preview, onClose }: { preview: Form2316Data | null; onCl
       {preview && (
         <div>
           <div className="mb-3 flex justify-end gap-2 print:hidden">
+            <button onClick={() => downloadOfficial2316(preview)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
+              <Download size={14} /> Download Official BIR Form
+            </button>
             <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
               <Printer size={14} /> Print / Download PDF
             </button>

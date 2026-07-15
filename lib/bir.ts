@@ -50,6 +50,47 @@ export function buildForm1601C(facts: MonthlyEmployeeFact[], employees: Employee
   };
 }
 
+// Granular figures for the real 1601-C form's Part II line items (14-36),
+// derived from the same monthly tax summary as Form1601CData's aggregates.
+// MWE-specific lines (15, 16) are always 0 since this system doesn't track
+// minimum-wage-earner status separately; adjustment/penalty lines (26,
+// 28-35) are always 0 since no prior-period remittance schedule is tracked.
+export interface Form1601CLineItems {
+  totalCompensation: number; // 14
+  statutoryMwe: number; // 15
+  mweHolidayOtNsdHazard: number; // 16
+  thirteenthMonthAndOtherBenefits: number; // 17
+  deMinimisBenefits: number; // 18
+  mandatoryContributions: number; // 19
+  otherNonTaxable: number; // 20
+  totalNonTaxable: number; // 21
+  totalTaxableCompensation: number; // 22
+  netTaxableCompensation: number; // 24
+  totalTaxesWithheld: number; // 25
+  taxesWithheldForRemittance: number; // 27
+  totalAmountStillDue: number; // 36
+}
+
+export function buildForm1601CLineItems(facts: MonthlyEmployeeFact[], employees: Employee[], monthKey: string): Form1601CLineItems {
+  const monthFacts = filterFacts(facts, employees, { monthKey });
+  const tax = summarizeTax(monthFacts);
+  return {
+    totalCompensation: tax.grossCompensation,
+    statutoryMwe: 0,
+    mweHolidayOtNsdHazard: 0,
+    thirteenthMonthAndOtherBenefits: tax.thirteenthMonthAccrual + tax.otherBenefits,
+    deMinimisBenefits: tax.deMinimisBenefits,
+    mandatoryContributions: tax.employeeSSS + tax.employeeHDMF + tax.employeePhilHealth,
+    otherNonTaxable: 0,
+    totalNonTaxable: tax.nonTaxableCompensation,
+    totalTaxableCompensation: tax.taxableCompensation,
+    netTaxableCompensation: tax.taxableCompensation,
+    totalTaxesWithheld: tax.withholdingTax,
+    taxesWithheldForRemittance: tax.withholdingTax,
+    totalAmountStillDue: tax.withholdingTax,
+  };
+}
+
 export interface Form2316Data {
   employee: Employee;
   taxYear: number;

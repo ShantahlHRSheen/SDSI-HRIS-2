@@ -1,16 +1,24 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileCheck2, Printer } from "lucide-react";
+import { Download, FileCheck2, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { Form1601CDocument } from "@/components/bir/Form1601C";
-import { buildForm1601C, COMPANY_INFO, type Form1601CData } from "@/lib/bir";
+import { buildForm1601C, buildForm1601CLineItems, COMPANY_INFO, type Form1601CData } from "@/lib/bir";
+import { downloadPdfBytes, fillForm1601CPdf } from "@/lib/bir-pdf-fill";
 import { getMonthlyFacts, getMonthsList, CURRENT_MONTH_KEY } from "@/lib/monthly-analytics";
 import { formatCurrencyCompact, formatDate } from "@/lib/helpers";
+import type { Employee } from "@/lib/types";
+
+async function downloadOfficial1601C(data: Form1601CData, facts: ReturnType<typeof getMonthlyFacts>, employees: Employee[]) {
+  const items = buildForm1601CLineItems(facts, employees, data.monthKey);
+  const bytes = await fillForm1601CPdf(data, items);
+  downloadPdfBytes(bytes, `1601C-${data.monthKey}.pdf`);
+}
 
 export default function Form1601CPage() {
   const { employees, generatedBirForms, addGeneratedBirForm, currentUser } = useHris();
@@ -139,6 +147,9 @@ export default function Form1601CPage() {
         {preview && (
           <div>
             <div className="mb-3 flex justify-end gap-2 print:hidden">
+              <button onClick={() => downloadOfficial1601C(preview, facts, employees)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
+                <Download size={14} /> Download Official BIR Form
+              </button>
               <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
                 <Printer size={14} /> Print / Download PDF
               </button>
