@@ -5,15 +5,8 @@ import { getSupabaseClient } from "./client";
 // anywhere in the app yet — safe to extend/delete as the real migration
 // takes shape.
 
-export async function signInWithPassword(email: string, password: string) {
-  const supabase = getSupabaseClient();
-  return supabase.auth.signInWithPassword({ email, password });
-}
-
-export async function signOut() {
-  const supabase = getSupabaseClient();
-  return supabase.auth.signOut();
-}
+// Real sign-in/sign-out live in ./auth.ts, which guards against Supabase not
+// being configured yet — use those instead of calling supabase.auth directly.
 
 // Resolves the employees row for whoever is currently signed in, via the
 // employees.user_id -> auth.users.id link. RLS already scopes this to "your

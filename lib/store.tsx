@@ -1,6 +1,9 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { fullName } from "./helpers";
+import { getInitialSession, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   ANNOUNCEMENTS,
   ATTENDANCE_PERIOD_RECORDS,
@@ -112,6 +115,7 @@ interface HrisContextShape {
   currentUser: DemoUser | null;
   currentEmployee: Employee | null;
   login: (userId: string) => void;
+  loginWithSupabase: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => void;
 
   employees: Employee[];
@@ -204,6 +208,26 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PersistedState>(defaultState);
   const [demoUsers, setDemoUsers] = useState<DemoUser[]>(DEMO_USERS);
   const [ready, setReady] = useState(false);
+  const [supabaseSession, setSupabaseSession] = useState<Session | null>(null);
+
+  // Real per-employee login, layered on top of the demo click-to-select
+  // login below rather than replacing it — not every employee has a
+  // Supabase Auth account yet. A signed-in Supabase session is matched to
+  // an employee by email; everything else (payroll, attendance, etc.)
+  // still reads/writes localStorage exactly as before.
+  useEffect(() => {
+    let active = true;
+    getInitialSession().then((session) => {
+      if (active) setSupabaseSession(session);
+    });
+    const unwatch = watchAuthState((session) => {
+      if (active) setSupabaseSession(session);
+    });
+    return () => {
+      active = false;
+      unwatch();
+    };
+  }, []);
 
   useEffect(() => {
     // One-time hydration from localStorage on mount. This intentionally runs
@@ -232,10 +256,34 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state, demoUsers, ready]);
 
+  const supabaseEmployee = useMemo(() => {
+    const email = supabaseSession?.user.email;
+    if (!email) return null;
+    return state.employees.find((e) => e.email.toLowerCase() === email.toLowerCase()) ?? null;
+  }, [supabaseSession, state.employees]);
+
+  const currentUser = useMemo<DemoUser | null>(() => {
+    if (supabaseEmployee) {
+      return {
+        id: `sb-${supabaseEmployee.id}`,
+        employeeId: supabaseEmployee.id,
+        name: fullName(supabaseEmployee),
+        title: state.positions.find((p) => p.id === supabaseEmployee.positionId)?.title ?? "—",
+        roles: supabaseEmployee.roles,
+        initials: `${supabaseEmployee.firstName.charAt(0)}${supabaseEmployee.lastName.charAt(0)}`.toUpperCase(),
+      };
+    }
+    return demoUsers.find((u) => u.id === state.currentUserId) ?? null;
+  }, [supabaseEmployee, demoUsers, state.currentUserId, state.positions]);
+  const currentEmployee = useMemo(
+    () => (currentUser ? state.employees.find((e) => e.id === currentUser.employeeId) ?? null : null),
+    [currentUser, state.employees],
+  );
+
   const logAudit = useCallback(
     (module: string, action: string, description: string, previousValue: string | null = null, newValue: string | null = null) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const entry: AuditLog = {
           id: nextId("al"),
           userId: actor?.employeeId ?? "system",
@@ -250,22 +298,35 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, auditLogs: [entry, ...prev.auditLogs] };
       });
     },
-    [demoUsers],
+    [currentUser],
   );
 
   const login = useCallback((userId: string) => {
     setState((prev) => ({ ...prev, currentUserId: userId }));
   }, []);
 
+  const loginWithSupabase = useCallback(
+    async (email: string, password: string): Promise<{ error: string | null }> => {
+      const { session, error } = await supabaseSignInWithPassword(email, password);
+      if (error) return { error };
+      if (!session) return { error: "Sign-in did not return a session." };
+
+      const matched = state.employees.find((e) => e.email.toLowerCase() === email.toLowerCase());
+      if (!matched) {
+        await signOutSupabase();
+        return { error: `Signed in, but no employee record matches ${email}. Contact HR.` };
+      }
+      setSupabaseSession(session);
+      return { error: null };
+    },
+    [state.employees],
+  );
+
   const logout = useCallback(() => {
     setState((prev) => ({ ...prev, currentUserId: null }));
+    setSupabaseSession(null);
+    void signOutSupabase();
   }, []);
-
-  const currentUser = useMemo(() => demoUsers.find((u) => u.id === state.currentUserId) ?? null, [demoUsers, state.currentUserId]);
-  const currentEmployee = useMemo(
-    () => (currentUser ? state.employees.find((e) => e.id === currentUser.employeeId) ?? null : null),
-    [currentUser, state.employees],
-  );
 
   const updateEmployee: HrisContextShape["updateEmployee"] = useCallback(
     (id, patch) => {
@@ -293,7 +354,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const upsertAttendancePeriodRecord: HrisContextShape["upsertAttendancePeriodRecord"] = useCallback(
     (input) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const existing = prev.attendancePeriodRecords.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
         const entry: AttendancePeriodRecord = {
           ...input,
@@ -307,13 +368,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Attendance", "update", `Manually updated attendance for period ${input.periodId}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const importAttendancePeriodRecords: HrisContextShape["importAttendancePeriodRecords"] = useCallback(
     (periodId, rows) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const imported: AttendancePeriodRecord[] = rows.map((row) => ({
           ...row,
           id: nextId("att"),
@@ -327,13 +388,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const upsertPayrollLineOverride: HrisContextShape["upsertPayrollLineOverride"] = useCallback(
     (input) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const existing = prev.payrollLineOverrides.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
         const entry: PayrollLineOverride = {
           ...input,
@@ -346,13 +407,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const upsertVoucherAmountOverride: HrisContextShape["upsertVoucherAmountOverride"] = useCallback(
     (input) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const existing = prev.voucherAmountOverrides.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
         const entry: VoucherAmountOverride = {
           ...input,
@@ -365,7 +426,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Allowance Vouchers", "update", `Adjusted voucher amount for period ${input.periodId}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const addEvaluation: HrisContextShape["addEvaluation"] = useCallback(
@@ -482,7 +543,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const addGeneratedBirForm: HrisContextShape["addGeneratedBirForm"] = useCallback(
     (input) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const entry: GeneratedBirForm = {
           ...input,
           id: nextId("bir"),
@@ -494,7 +555,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       const label = input.formType === "1601c" ? "BIR Form 1601-C" : "BIR Form 2316";
       logAudit("BIR", "generate", `Generated ${label} for ${input.period}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const fileLeaveRequest: HrisContextShape["fileLeaveRequest"] = useCallback(
@@ -509,7 +570,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const decideLeaveRequest: HrisContextShape["decideLeaveRequest"] = useCallback(
     (id, decision, note) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         return {
           ...prev,
           leaveRequests: prev.leaveRequests.map((r) =>
@@ -519,7 +580,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Leave Management", "decide", `Leave request ${decision}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const fileOvertimeRequest: HrisContextShape["fileOvertimeRequest"] = useCallback(
@@ -534,7 +595,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const decideOvertimeRequest: HrisContextShape["decideOvertimeRequest"] = useCallback(
     (id, decision, note) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         return {
           ...prev,
           overtimeRequests: prev.overtimeRequests.map((r) =>
@@ -544,7 +605,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Overtime", "decide", `Overtime request ${decision}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const fileCorrectionRequest: HrisContextShape["fileCorrectionRequest"] = useCallback(
@@ -559,7 +620,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const decideCorrectionRequest: HrisContextShape["decideCorrectionRequest"] = useCallback(
     (id, decision, note) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         return {
           ...prev,
           correctionRequests: prev.correctionRequests.map((r) =>
@@ -569,31 +630,31 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Attendance Corrections", "decide", `Correction request ${decision}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const addGeneratedPayslip: HrisContextShape["addGeneratedPayslip"] = useCallback(
     (input) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const entry: GeneratedPayslip = { ...input, id: nextId("ps"), generatedAt: TODAY, generatedBy: actor?.name ?? "System" };
         return { ...prev, generatedPayslips: [entry, ...prev.generatedPayslips] };
       });
       logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const addGeneratedVoucher: HrisContextShape["addGeneratedVoucher"] = useCallback(
     (input) => {
       setState((prev) => {
-        const actor = demoUsers.find((u) => u.id === prev.currentUserId);
+        const actor = currentUser;
         const entry: GeneratedVoucher = { ...input, id: nextId("vo"), generatedAt: TODAY, generatedBy: actor?.name ?? "System" };
         return { ...prev, generatedVouchers: [entry, ...prev.generatedVouchers] };
       });
       logAudit("Allowance Vouchers", "generate", `Generated voucher for period ${input.periodId}`);
     },
-    [logAudit, demoUsers],
+    [logAudit, currentUser],
   );
 
   const value: HrisContextShape = {
@@ -601,6 +662,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     currentUser,
     currentEmployee,
     login,
+    loginWithSupabase,
     logout,
     employees: state.employees,
     evaluations: state.evaluations,
