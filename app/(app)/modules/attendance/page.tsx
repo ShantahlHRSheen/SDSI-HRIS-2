@@ -249,7 +249,13 @@ function EditAttendanceModal({
   onClose: () => void;
   onSave: (input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">) => void;
 }) {
+  // Every employee is selectable here, not just active/on_leave ones — HR
+  // needs to be able to record historical attendance (e.g. backfilling a
+  // past payroll period) for employees who have since resigned or been
+  // terminated. Active/on_leave employees are listed first for convenience.
   const active = employees.filter((e) => e.status === "active" || e.status === "on_leave");
+  const inactive = employees.filter((e) => e.status !== "active" && e.status !== "on_leave");
+  const selectable = [...active, ...inactive];
   const [employeeId, setEmployeeId] = useState(target.employee?.id ?? active[0]?.id ?? "");
   const [form, setForm] = useState({
     daysWorked: target.record?.daysWorked ?? 0,
@@ -279,8 +285,8 @@ function EditAttendanceModal({
             disabled={!!target.record}
             className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm disabled:opacity-60"
           >
-            {active.map((e) => (
-              <option key={e.id} value={e.id}>{fullName(e)}</option>
+            {selectable.map((e) => (
+              <option key={e.id} value={e.id}>{fullName(e)}{e.status !== "active" && e.status !== "on_leave" ? ` (${e.status.replace("_", " ")})` : ""}</option>
             ))}
           </select>
         </div>
