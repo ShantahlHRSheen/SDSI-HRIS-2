@@ -35,6 +35,32 @@ function draw(page: PDFPage, font: PDFFont, text: string, x: number, y: number, 
   page.drawText(text, { x: drawX, y, size, font: f, color: TEXT_COLOR });
 }
 
+// 1601-C's Part II amount column is a true comb/digit-box grid (unlike
+// 2316's, which are plain single-line boxes) — 11 whole-number cells then a
+// printed decimal marker then 2 centavo cells, geometry measured directly
+// from the template's own vector line-drawing operators.
+const COMB_1601C = {
+  wholeCellCount: 11,
+  wholeCellStart: 391,
+  wholeCellPitch: 14.4,
+  centsCellStart: 564.2,
+  centsCellPitch: 15.1,
+};
+
+function drawCombAmount1601C(page: PDFPage, font: PDFFont, amount: number, y: number, size = 7.5) {
+  const [wholeStr, centsStr] = money(amount).split(".");
+  const digits = wholeStr.replace(/,/g, "").slice(-COMB_1601C.wholeCellCount);
+  const startCell = COMB_1601C.wholeCellCount - digits.length;
+  for (let i = 0; i < digits.length; i++) {
+    const cellLeft = COMB_1601C.wholeCellStart + (startCell + i) * COMB_1601C.wholeCellPitch;
+    draw(page, font, digits[i], cellLeft + COMB_1601C.wholeCellPitch / 2, y, { align: "center", size });
+  }
+  for (let i = 0; i < centsStr.length; i++) {
+    const cellLeft = COMB_1601C.centsCellStart + i * COMB_1601C.centsCellPitch;
+    draw(page, font, centsStr[i], cellLeft + COMB_1601C.centsCellPitch / 2, y, { align: "center", size });
+  }
+}
+
 function employeeNameLastFirstMi(employee: Form2316Data["employee"]): string {
   const mi = employee.middleName?.trim();
   return `${employee.lastName}, ${employee.firstName}${mi ? ` ${mi.charAt(0).toUpperCase()}.` : ""}`;
@@ -87,7 +113,7 @@ export async function fillForm2316Pdf(data: Form2316Data): Promise<Uint8Array> {
     [628.3, Math.max(data.nonTaxableCompensation - data.thirteenthMonthPay - data.deMinimisBenefits - (data.employeeSSS + data.employeeHDMF + data.employeePhilHealth), 0)], // 37
     [612.9, data.nonTaxableCompensation], // 38
   ];
-  nonTaxableRows.forEach(([y, amount]) => draw(page, font, money(amount), 600, y, { align: "right", size: 7 }));
+  nonTaxableRows.forEach(([y, amount]) => draw(page, font, money(amount), 585, y, { align: "right", size: 7 }));
 
   // --- Part IV-B — Taxable Compensation Income Regular (39-52) -----------
   const otherTaxableRegular = Math.max(data.taxableCompensation - data.basicSalary - data.overtimePay, 0);
@@ -97,7 +123,7 @@ export async function fillForm2316Pdf(data: Form2316Data): Promise<Uint8Array> {
     [326.2, data.overtimePay], // 50 Overtime Pay
     [262.6, data.taxableCompensation], // 52 Total Taxable Compensation Income
   ];
-  taxableRows.forEach(([y, amount]) => draw(page, font, money(amount), 600, y, { align: "right", size: 7 }));
+  taxableRows.forEach(([y, amount]) => draw(page, font, money(amount), 585, y, { align: "right", size: 7 }));
 
   // --- Part IV-A — Summary (19-28) ----------------------------------------
   const summaryRows: [number, number][] = [
@@ -111,7 +137,7 @@ export async function fillForm2316Pdf(data: Form2316Data): Promise<Uint8Array> {
     [262.3, data.totalTaxWithheld], // 26
     [219.1, data.totalTaxWithheld], // 28 Total Taxes Withheld
   ];
-  summaryRows.forEach(([y, amount]) => draw(page, font, money(amount), 253, y, { align: "right", size: 7 }));
+  summaryRows.forEach(([y, amount]) => draw(page, font, money(amount), 306, y, { align: "right", size: 7 }));
 
   return pdfDoc.save();
 }
@@ -160,7 +186,7 @@ export async function fillForm1601CPdf(data: Form1601CData, items: Form1601CLine
     [282.6, 0], // 35
     [266.7, items.totalAmountStillDue], // 36
   ];
-  rows.forEach(([y, amount]) => draw(page, font, money(amount), 545, y, { align: "right", size: 6.5 }));
+  rows.forEach(([y, amount]) => drawCombAmount1601C(page, font, amount, y - 1.5));
 
   return pdfDoc.save();
 }
