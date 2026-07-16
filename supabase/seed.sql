@@ -145,7 +145,7 @@ insert into employees (
   'br-cbt', 'dp-bod', 'ps-chairman-of-the-board-1',
   'regular', '2025-07-13', '2026-01-13', null, null, null,
   'monthly', null, 75000, null, null,
-  'active', null, array['upper_management']
+  'active', null, array['upper_management']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -160,7 +160,7 @@ insert into employees (
   'br-cbt', 'dp-bod', 'ps-president-for-cosmetics-2',
   'regular', '2024-07-12', '2025-01-12', null, null, null,
   'monthly', null, 50000, null, null,
-  'active', null, array['upper_management']
+  'active', null, array['upper_management']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -175,7 +175,7 @@ insert into employees (
   'br-cbt', 'dp-bod', 'ps-president-for-darofy-3',
   'regular', '2023-07-12', '2024-01-12', null, null, null,
   'monthly', null, 50000, null, null,
-  'active', null, array['upper_management']
+  'active', null, array['upper_management']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -190,7 +190,7 @@ insert into employees (
   'br-cbt', 'dp-bod', 'ps-vice-chairperson-4',
   'regular', '2022-07-11', '2023-01-11', null, null, null,
   'monthly', null, 35000, null, null,
-  'active', null, array['upper_management']
+  'active', null, array['upper_management']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -205,7 +205,7 @@ insert into employees (
   'br-cbt', 'dp-acctg', 'ps-chief-finance-officer-5',
   'regular', '2021-07-10', '2022-01-10', null, null, null,
   'monthly', null, 20000, null, 5000,
-  'active', null, array['cfo']
+  'active', null, array['cfo']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -220,7 +220,7 @@ insert into employees (
   'br-cbt', 'dp-acctg', 'ps-accounting-clerk-6',
   'regular', '2020-07-09', '2021-01-09', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -235,7 +235,7 @@ insert into employees (
   'br-cbt', 'dp-acctg', 'ps-sr-accounting-assistant-7',
   'regular', '2019-07-09', '2020-01-09', null, null, null,
   'daily', 691, null, 22, null,
-  'active', null, array['sr_accounting_assistant', 'payroll_officer']
+  'active', null, array['sr_accounting_assistant', 'payroll_officer']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -250,7 +250,7 @@ insert into employees (
   'br-cbt', 'dp-acctg', 'ps-jr-accounting-assistant-8',
   'regular', '2018-07-08', '2019-01-08', null, null, null,
   'daily', 671, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -265,7 +265,7 @@ insert into employees (
   'br-cbt', 'dp-acctg', 'ps-accounting-clerk-6',
   'regular', '2017-07-07', '2018-01-07', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -280,7 +280,7 @@ insert into employees (
   'br-cbt', 'dp-fin', 'ps-bookkeeper-9',
   'regular', '2016-07-06', '2017-01-06', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -295,7 +295,7 @@ insert into employees (
   'br-cbt', 'dp-fin', 'ps-corporate-treasurer-10',
   'regular', '2025-07-03', '2026-01-03', null, null, null,
   'daily', 723, null, 28, null,
-  'active', null, array['treasurer']
+  'active', null, array['treasurer']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -310,7 +310,7 @@ insert into employees (
   'br-cbt', 'dp-hr', 'ps-hr-manager-11',
   'regular', '2024-07-02', '2025-01-02', null, null, null,
   'daily', 723, null, 28, null,
-  'active', null, array['hr_admin']
+  'active', null, array['hr_admin']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -325,7 +325,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-mktg', 'ps-content-creator-12',
   'regular', '2023-07-02', '2024-01-02', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -340,7 +340,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-mktg', 'ps-content-creator-12',
   'regular', '2022-07-01', '2023-01-01', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -355,7 +355,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-mktg', 'ps-marketing-head-13',
   'regular', '2021-06-30', '2021-12-30', null, null, null,
   'daily', 691, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -370,7 +370,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-mktg', 'ps-multimedia-artist-14',
   'regular', '2020-06-29', '2020-12-29', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -385,7 +385,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-sales', 'ps-sales-manager-15',
   'regular', '2019-06-29', '2019-12-29', null, null, null,
   'daily', 691, null, 22, null,
-  'active', null, array['dept_head', 'employee']
+  'active', null, array['dept_head', 'employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -400,7 +400,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-sales', 'ps-sales-admin-16',
   'regular', '2018-06-28', '2018-12-28', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -415,7 +415,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-sales', 'ps-sales-admin-16',
   'regular', '2017-06-27', '2017-12-27', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -430,7 +430,7 @@ insert into employees (
   'br-mnl', 'dp-mlm-netdev', 'ps-network-development-head-luzon-17',
   'regular', '2016-06-26', '2016-12-26', null, null, null,
   'monthly', null, 19432, null, 5568,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -445,7 +445,7 @@ insert into employees (
   'br-mdu', 'dp-mlm-netdev', 'ps-network-development-head-visayas-18',
   'regular', '2025-06-23', '2025-12-23', null, null, null,
   'monthly', null, 19432, null, 5568,
-  'resigned', '2026-07-07', array['employee']
+  'resigned', '2026-07-07', array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -460,7 +460,7 @@ insert into employees (
   'br-mnl', 'dp-mlm-netdev', 'ps-network-development-head-mindanao-19',
   'regular', '2024-06-22', '2024-12-22', null, null, null,
   'monthly', null, 19432, null, 5568,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -475,7 +475,7 @@ insert into employees (
   'br-cbt', 'dp-mlm-mktg', 'ps-multimedia-artist-20',
   'regular', '2023-06-22', '2023-12-22', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -490,7 +490,7 @@ insert into employees (
   'br-cbt', 'dp-mlm-mktg', 'ps-social-media-manager-21',
   'freelance', '2022-06-21', null, null, null, null,
   'monthly', null, 18000, null, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -505,7 +505,7 @@ insert into employees (
   'br-mnl', 'dp-mlm-mktg', 'ps-social-media-manager-21',
   'freelance', '2021-06-20', null, null, null, null,
   'daily', 881.79, null, 0, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -520,7 +520,7 @@ insert into employees (
   'br-mnl', 'dp-mlm-mktg', 'ps-video-editor-22',
   'freelance', '2020-06-19', null, null, null, null,
   'daily', 881.79, null, 0, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -535,7 +535,7 @@ insert into employees (
   'br-cbt', 'dp-mlm-sales', 'ps-ads-specialist-23',
   'freelance', '2019-06-19', null, null, null, null,
   'monthly', null, 18000, null, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -550,7 +550,7 @@ insert into employees (
   'br-ceb', 'dp-mlm-sales', 'ps-ads-specialist-23',
   'freelance', '2018-06-18', null, null, null, null,
   'monthly', null, 10000, null, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -565,7 +565,7 @@ insert into employees (
   'br-cbt', 'dp-mlm-sales', 'ps-sales-admin-24',
   'regular', '2017-06-17', '2017-12-17', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -580,7 +580,7 @@ insert into employees (
   'br-cbt', 'dp-mlm-sales', 'ps-sales-admin-24',
   'regular', '2016-06-16', '2016-12-16', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -595,7 +595,7 @@ insert into employees (
   'br-ceb', 'dp-mlm-sales', 'ps-sales-admin-24',
   'regular', '2025-07-13', '2026-01-13', null, null, null,
   'daily', 540, null, 0, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -610,7 +610,7 @@ insert into employees (
   'br-ceb', 'dp-mlm-sales', 'ps-sales-admin-24',
   'regular', '2024-07-12', '2025-01-12', null, null, null,
   'daily', 540, null, 0, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -625,7 +625,7 @@ insert into employees (
   'br-ceb', 'dp-mlm-sales', 'ps-sales-admin-24',
   'regular', '2023-07-12', '2024-01-12', null, null, null,
   'daily', 540, null, 0, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -640,7 +640,7 @@ insert into employees (
   'br-cbt', 'dp-cosmetics', 'ps-platform-specialist-25',
   'regular', '2022-07-11', '2023-01-11', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -655,7 +655,7 @@ insert into employees (
   'br-cbt', 'dp-cosmetics', 'ps-multimedia-artist-head-26',
   'regular', '2021-07-10', '2022-01-10', null, null, null,
   'daily', 606, null, null, 4194,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -670,7 +670,7 @@ insert into employees (
   'br-cbt', 'dp-cosmetics', 'ps-video-editor-27',
   'regular', '2020-07-09', '2021-01-09', null, null, null,
   'daily', 590, null, null, 2611,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -685,7 +685,7 @@ insert into employees (
   'br-cbt', 'dp-darofy-marketing-corp', 'ps-multimedia-artist-head-mlm-28',
   'regular', '2019-07-09', '2020-01-09', null, null, null,
   'daily', 690.1, null, null, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -700,7 +700,7 @@ insert into employees (
   'br-cbt', 'dp-mlm-mktg', 'ps-multimedia-artist-head-29',
   'regular', '2018-07-08', '2019-01-08', null, null, null,
   'monthly', null, 20000, null, 5000,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -715,7 +715,7 @@ insert into employees (
   'br-mnl', 'dp-indie-mktg', 'ps-marketing-assistant-30',
   'regular', '2017-07-07', '2018-01-07', null, null, null,
   'daily', 695, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -730,7 +730,7 @@ insert into employees (
   'br-mnl', 'dp-indie-mktg', 'ps-product-specialist-31',
   'freelance', '2016-07-06', null, null, null, null,
   'monthly', null, 30000, null, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -745,7 +745,7 @@ insert into employees (
   'br-mnl', 'dp-indie-mktg', 'ps-product-specialist-31',
   'freelance', '2025-07-03', null, null, null, null,
   'monthly', null, 25000, null, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -760,7 +760,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-cashier-32',
   'regular', '2024-07-02', '2025-01-02', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -775,7 +775,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-csr-33',
   'regular', '2023-07-02', '2024-01-02', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -790,7 +790,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-warehouseman-34',
   'regular', '2022-07-01', '2023-01-01', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -805,7 +805,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-operations-manager-35',
   'regular', '2021-06-30', '2021-12-30', null, null, null,
   'monthly', null, 20000, null, 5000,
-  'active', null, array['dept_head', 'employee']
+  'active', null, array['dept_head', 'employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -820,7 +820,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-driver-messenger-36',
   'regular', '2020-06-29', '2020-12-29', null, null, null,
   'daily', 590, null, 22, null,
-  'on_leave', '2026-07-11', array['employee']
+  'on_leave', '2026-07-11', array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -835,7 +835,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-logistics-staff-37',
   'regular', '2019-06-29', '2019-12-29', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -850,7 +850,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-operations-supervisor-38',
   'regular', '2018-06-28', '2018-12-28', null, null, null,
   'daily', 691, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -865,7 +865,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-logistics-staff-37',
   'regular', '2017-06-27', '2017-12-27', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -880,7 +880,7 @@ insert into employees (
   'br-cbt', 'dp-operation', 'ps-utility-39',
   'regular', '2016-06-26', '2016-12-26', null, null, null,
   'daily', 590, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -895,7 +895,7 @@ insert into employees (
   'br-mnl', 'dp-operation', 'ps-branch-supervisor-40',
   'regular', '2025-06-23', '2025-12-23', null, null, null,
   'daily', 715, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -910,7 +910,7 @@ insert into employees (
   'br-mnl', 'dp-operation', 'ps-cashier-32',
   'regular', '2024-06-22', '2024-12-22', null, null, null,
   'daily', 695, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -925,7 +925,7 @@ insert into employees (
   'br-mnl', 'dp-operation', 'ps-cashier-32',
   'regular', '2023-06-22', '2023-12-22', null, null, null,
   'daily', 695, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -940,7 +940,7 @@ insert into employees (
   'br-mnl', 'dp-operation', 'ps-warehouseman-34',
   'regular', '2022-06-21', '2022-12-21', null, null, null,
   'daily', 695, null, 47, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -955,7 +955,7 @@ insert into employees (
   'br-mnl', 'dp-operation', 'ps-branch-manager-41',
   'regular', '2021-06-20', '2021-12-20', null, null, null,
   'daily', 754, null, 22, null,
-  'active', null, array['dept_head', 'employee']
+  'active', null, array['dept_head', 'employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -970,7 +970,7 @@ insert into employees (
   'br-mnl', 'dp-operation', 'ps-cashier-32',
   'regular', '2020-06-19', '2020-12-19', null, null, null,
   'daily', 695, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -985,7 +985,7 @@ insert into employees (
   'br-ceb', 'dp-operation', 'ps-driver-warehouseman-42',
   'regular', '2019-06-19', '2019-12-19', null, null, null,
   'daily', 540, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1000,7 +1000,7 @@ insert into employees (
   'br-mdu', 'dp-operation', 'ps-branch-supervisor-40',
   'regular', '2018-06-18', '2018-12-18', null, null, null,
   'daily', 646, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1015,7 +1015,7 @@ insert into employees (
   'br-mdu', 'dp-operation', 'ps-stockman-43',
   'regular', '2017-06-17', '2017-12-17', null, null, null,
   'daily', 540, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1030,7 +1030,7 @@ insert into employees (
   'br-mdu', 'dp-operation', 'ps-branch-manager-41',
   'regular', '2016-06-16', '2016-12-16', null, null, null,
   'daily', 670, null, 22, null,
-  'active', null, array['dept_head', 'employee']
+  'active', null, array['dept_head', 'employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1045,7 +1045,7 @@ insert into employees (
   'br-mdu', 'dp-operation', 'ps-cashier-32',
   'regular', '2025-07-13', '2026-01-13', null, null, null,
   'daily', 629, null, 22, null,
-  'resigned', '2026-06-25', array['employee']
+  'resigned', '2026-06-25', array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1060,7 +1060,7 @@ insert into employees (
   'br-cav', 'dp-operation', 'ps-cashier-32',
   'regular', '2024-07-12', '2025-01-12', null, null, null,
   'daily', 600, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1075,7 +1075,7 @@ insert into employees (
   'br-cav', 'dp-operation', 'ps-cashier-32',
   'regular', '2023-07-12', '2024-01-12', null, null, null,
   'daily', 600, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1090,7 +1090,7 @@ insert into employees (
   'br-cdo', 'dp-operation', 'ps-cashier-32',
   'regular', '2022-07-11', '2023-01-11', null, null, null,
   'daily', 500, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1105,7 +1105,7 @@ insert into employees (
   'br-pgs', 'dp-operation', 'ps-cashier-32',
   'regular', '2021-07-10', '2022-01-10', null, null, null,
   'daily', 505, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1120,7 +1120,7 @@ insert into employees (
   'br-dvo', 'dp-operation', 'ps-cashier-32',
   'regular', '2020-07-09', '2021-01-09', null, null, null,
   'daily', 510, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1135,7 +1135,7 @@ insert into employees (
   'br-lcn', 'dp-operation', 'ps-cashier-32',
   'regular', '2019-07-09', '2020-01-09', null, null, null,
   'daily', 600, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 insert into employees (
   id, employee_number, first_name, last_name, middle_name, nickname, gender, birthdate,
@@ -1150,7 +1150,7 @@ insert into employees (
   'br-bcd', 'dp-operation', 'ps-cashier-32',
   'regular', '2018-07-08', '2019-01-08', null, null, null,
   'daily', 480, null, 22, null,
-  'active', null, array['employee']
+  'active', null, array['employee']::app_role[]
 );
 
 -- Second pass: supervisor_id / job_performance_evaluator_id (self-referencing FKs)
