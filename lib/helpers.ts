@@ -71,7 +71,10 @@ export function formatCurrencyCompact(n: number | null): string {
 
 export function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
-  const d = new Date(dateStr + "T00:00:00Z");
+  // Bare "YYYY-MM-DD" dates need a time appended to parse as UTC midnight;
+  // full ISO timestamps (e.g. Supabase timestamptz columns) already have one.
+  const iso = dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00Z`;
+  const d = new Date(iso);
   return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
 }
 

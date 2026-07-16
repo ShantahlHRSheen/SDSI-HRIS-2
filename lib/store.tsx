@@ -5,31 +5,48 @@ import type { Session } from "@supabase/supabase-js";
 import { fullName } from "./helpers";
 import { getInitialSession, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
+  decideCorrectionRequestRow,
+  decideLeaveRequestRow,
+  decideOvertimeRequestRow,
   deleteBranchRow,
   deleteDepartmentRow,
   deleteHolidayRow,
   deleteLeaveTypeRow,
   deletePositionRow,
   deleteWorkScheduleRow,
+  fetchAnnouncements,
   fetchBranches,
+  fetchCorrectionRequests,
   fetchDepartments,
+  fetchDisciplinaryRecords,
   fetchEmployees,
+  fetchEvaluations,
   fetchHolidays,
+  fetchLeaveRequests,
   fetchLeaveTypes,
+  fetchOvertimeRequests,
   fetchPayrollPeriods,
   fetchPositions,
   fetchWorkSchedules,
+  insertAnnouncement,
   insertBranch,
+  insertCorrectionRequest,
   insertDepartment,
+  insertDisciplinaryRecord,
   insertEmployee,
+  insertEvaluation,
   insertHoliday,
+  insertLeaveRequest,
   insertLeaveType,
+  insertOvertimeRequest,
   insertPayrollPeriod,
   insertPosition,
   insertWorkSchedule,
   updateBranchRow,
   updateDepartmentRow,
+  updateDisciplinaryStatusRow,
   updateEmployeeRow,
+  updateEvaluationRow,
   updateHolidayRow,
   updateLeaveTypeRow,
   updatePayrollPeriodRow,
@@ -264,19 +281,35 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Phase 1 of the Supabase migration: once someone is signed in with a real
+  // Phase 1+2 of the Supabase migration: once someone is signed in with a real
   // Supabase Auth account (not the demo click-to-select login below), pull
-  // the reference/org data and employee 201 files from Supabase and overwrite
-  // those slices — that's now the source of truth for anyone with a real
-  // account. Demo-login users are unaffected: RLS requires an authenticated
-  // Supabase session to read these tables at all, so without one, the app
-  // keeps behaving exactly as it does today (mock data + localStorage).
+  // these tables from Supabase and overwrite those slices — that's now the
+  // source of truth for anyone with a real account. Demo-login users are
+  // unaffected: RLS requires an authenticated Supabase session to read these
+  // tables at all, so without one, the app keeps behaving exactly as it does
+  // today (mock data + localStorage). Still local-only: attendance records,
+  // payroll overrides, and generated payslips/vouchers/BIR forms (Phase 3).
   useEffect(() => {
     if (!supabaseSession) return;
     let active = true;
     (async () => {
       try {
-        const [branches, departments, positions, workSchedules, holidays, leaveTypes, payrollPeriods, employees] = await Promise.all([
+        const [
+          branches,
+          departments,
+          positions,
+          workSchedules,
+          holidays,
+          leaveTypes,
+          payrollPeriods,
+          employees,
+          evaluations,
+          disciplinaryRecords,
+          announcements,
+          leaveRequests,
+          overtimeRequests,
+          correctionRequests,
+        ] = await Promise.all([
           fetchBranches(),
           fetchDepartments(),
           fetchPositions(),
@@ -285,9 +318,31 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           fetchLeaveTypes(),
           fetchPayrollPeriods(),
           fetchEmployees(),
+          fetchEvaluations(),
+          fetchDisciplinaryRecords(),
+          fetchAnnouncements(),
+          fetchLeaveRequests(),
+          fetchOvertimeRequests(),
+          fetchCorrectionRequests(),
         ]);
         if (!active) return;
-        setState((prev) => ({ ...prev, branches, departments, positions, workSchedules, holidays, leaveTypes, payrollPeriods, employees }));
+        setState((prev) => ({
+          ...prev,
+          branches,
+          departments,
+          positions,
+          workSchedules,
+          holidays,
+          leaveTypes,
+          payrollPeriods,
+          employees,
+          evaluations,
+          disciplinaryRecords,
+          announcements,
+          leaveRequests,
+          overtimeRequests,
+          correctionRequests,
+        }));
       } catch (err) {
         console.error("Failed to load org/employee data from Supabase — keeping local data.", err);
       }
@@ -521,12 +576,23 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addEvaluation: HrisContextShape["addEvaluation"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertEvaluation(input);
+          setState((prev) => ({ ...prev, evaluations: [entry, ...prev.evaluations] }));
+          logAudit("Performance Evaluation", "create", `Created evaluation for period ${input.period}`);
+          return;
+        } catch (err) {
+          console.error("Failed to add evaluation in Supabase", err);
+          return;
+        }
+      }
       const entry: PerformanceEvaluation = { ...input, id: nextId("ev"), createdAt: TODAY };
       setState((prev) => ({ ...prev, evaluations: [entry, ...prev.evaluations] }));
       logAudit("Performance Evaluation", "create", `Created evaluation for period ${input.period}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   // Saves just one category's ratings/remarks onto an existing evaluation —
@@ -535,7 +601,27 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   // section-evaluator field matches `category`, leaving the other section
   // (and its evaluator stamp) untouched.
   const updateEvaluationSection: HrisContextShape["updateEvaluationSection"] = useCallback(
-    (id, category, sectionCriteria, evaluatorEmployeeId, comments) => {
+    async (id, category, sectionCriteria, evaluatorEmployeeId, comments) => {
+      if (supabaseSession) {
+        try {
+          const existing = state.evaluations.find((e) => e.id === id);
+          if (!existing) return;
+          const criteria: EvaluationCriterion[] = [...existing.criteria.filter((c) => c.category !== category), ...sectionCriteria];
+          const entry = await updateEvaluationRow(id, {
+            criteria,
+            overallScore: computeOverallScore(criteria),
+            behaviorEvaluatorId: category === "Behavior" ? evaluatorEmployeeId : existing.behaviorEvaluatorId,
+            jobPerformanceEvaluatorId: category === "Job Performance" ? evaluatorEmployeeId : existing.jobPerformanceEvaluatorId,
+            comments: comments !== undefined ? comments : existing.comments,
+          });
+          setState((prev) => ({ ...prev, evaluations: prev.evaluations.map((e) => (e.id === id ? entry : e)) }));
+          logAudit("Performance Evaluation", "update", `Saved ${category} section for evaluation ${id}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save evaluation section in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         evaluations: prev.evaluations.map((e) => {
@@ -553,47 +639,85 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       }));
       logAudit("Performance Evaluation", "update", `Saved ${category} section for evaluation ${id}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession, state.evaluations],
   );
 
   const setEvaluationStatus: HrisContextShape["setEvaluationStatus"] = useCallback(
-    (id, status) => {
+    async (id, status) => {
+      if (supabaseSession) {
+        try {
+          await updateEvaluationRow(id, { status });
+        } catch (err) {
+          console.error("Failed to update evaluation status in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         evaluations: prev.evaluations.map((e) => (e.id === id ? { ...e, status } : e)),
       }));
       logAudit("Performance Evaluation", "update", `Evaluation status changed`, null, status);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const addDisciplinaryRecord: HrisContextShape["addDisciplinaryRecord"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertDisciplinaryRecord(input);
+          setState((prev) => ({ ...prev, disciplinaryRecords: [entry, ...prev.disciplinaryRecords] }));
+          logAudit("Discipline", "create", `Issued ${input.type.replace("_", " ")}`);
+          return;
+        } catch (err) {
+          console.error("Failed to add disciplinary record in Supabase", err);
+          return;
+        }
+      }
       const entry: DisciplinaryRecord = { ...input, id: nextId("disc") };
       setState((prev) => ({ ...prev, disciplinaryRecords: [entry, ...prev.disciplinaryRecords] }));
       logAudit("Discipline", "create", `Issued ${input.type.replace("_", " ")}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const setDisciplinaryStatus: HrisContextShape["setDisciplinaryStatus"] = useCallback(
-    (id, status) => {
+    async (id, status) => {
+      if (supabaseSession) {
+        try {
+          await updateDisciplinaryStatusRow(id, status);
+        } catch (err) {
+          console.error("Failed to update disciplinary status in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         disciplinaryRecords: prev.disciplinaryRecords.map((d) => (d.id === id ? { ...d, status } : d)),
       }));
       logAudit("Discipline", "update", `Record marked ${status}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const addAnnouncement: HrisContextShape["addAnnouncement"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertAnnouncement(input);
+          setState((prev) => ({ ...prev, announcements: [entry, ...prev.announcements] }));
+          logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}`);
+          return;
+        } catch (err) {
+          console.error("Failed to add announcement in Supabase", err);
+          return;
+        }
+      }
       const entry: Announcement = { ...input, id: nextId("an"), postedAt: TODAY };
       setState((prev) => ({ ...prev, announcements: [entry, ...prev.announcements] }));
       logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   // `cloud`, when given, lets these generic CRUD helpers write through to
@@ -761,78 +885,138 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const fileLeaveRequest: HrisContextShape["fileLeaveRequest"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertLeaveRequest(input);
+          setState((prev) => ({ ...prev, leaveRequests: [entry, ...prev.leaveRequests] }));
+          logAudit("Leave Management", "file", `Filed leave request (${input.days} day(s))`);
+          return;
+        } catch (err) {
+          console.error("Failed to file leave request in Supabase", err);
+          return;
+        }
+      }
       const entry: LeaveRequest = { ...input, id: nextId("lv"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
       setState((prev) => ({ ...prev, leaveRequests: [entry, ...prev.leaveRequests] }));
       logAudit("Leave Management", "file", `Filed leave request (${input.days} day(s))`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const decideLeaveRequest: HrisContextShape["decideLeaveRequest"] = useCallback(
-    (id, decision, note) => {
-      setState((prev) => {
-        const actor = currentUser;
-        return {
-          ...prev,
-          leaveRequests: prev.leaveRequests.map((r) =>
-            r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
-          ),
-        };
-      });
+    async (id, decision, note) => {
+      const actor = currentUser;
+      if (supabaseSession && actor?.employeeId) {
+        try {
+          const entry = await decideLeaveRequestRow(id, decision, actor.employeeId, note ?? null);
+          setState((prev) => ({ ...prev, leaveRequests: prev.leaveRequests.map((r) => (r.id === id ? entry : r)) }));
+          logAudit("Leave Management", "decide", `Leave request ${decision}`);
+          return;
+        } catch (err) {
+          console.error("Failed to decide leave request in Supabase", err);
+          return;
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        leaveRequests: prev.leaveRequests.map((r) =>
+          r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
+        ),
+      }));
       logAudit("Leave Management", "decide", `Leave request ${decision}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const fileOvertimeRequest: HrisContextShape["fileOvertimeRequest"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertOvertimeRequest(input);
+          setState((prev) => ({ ...prev, overtimeRequests: [entry, ...prev.overtimeRequests] }));
+          logAudit("Overtime", "file", `Filed overtime request (${input.hours}h on ${input.date})`);
+          return;
+        } catch (err) {
+          console.error("Failed to file overtime request in Supabase", err);
+          return;
+        }
+      }
       const entry: OvertimeRequest = { ...input, id: nextId("ot"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
       setState((prev) => ({ ...prev, overtimeRequests: [entry, ...prev.overtimeRequests] }));
       logAudit("Overtime", "file", `Filed overtime request (${input.hours}h on ${input.date})`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const decideOvertimeRequest: HrisContextShape["decideOvertimeRequest"] = useCallback(
-    (id, decision, note) => {
-      setState((prev) => {
-        const actor = currentUser;
-        return {
-          ...prev,
-          overtimeRequests: prev.overtimeRequests.map((r) =>
-            r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
-          ),
-        };
-      });
+    async (id, decision, note) => {
+      const actor = currentUser;
+      if (supabaseSession && actor?.employeeId) {
+        try {
+          const entry = await decideOvertimeRequestRow(id, decision, actor.employeeId, note ?? null);
+          setState((prev) => ({ ...prev, overtimeRequests: prev.overtimeRequests.map((r) => (r.id === id ? entry : r)) }));
+          logAudit("Overtime", "decide", `Overtime request ${decision}`);
+          return;
+        } catch (err) {
+          console.error("Failed to decide overtime request in Supabase", err);
+          return;
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        overtimeRequests: prev.overtimeRequests.map((r) =>
+          r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
+        ),
+      }));
       logAudit("Overtime", "decide", `Overtime request ${decision}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const fileCorrectionRequest: HrisContextShape["fileCorrectionRequest"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertCorrectionRequest(input);
+          setState((prev) => ({ ...prev, correctionRequests: [entry, ...prev.correctionRequests] }));
+          logAudit("Attendance Corrections", "file", `Filed attendance correction for ${input.date}`);
+          return;
+        } catch (err) {
+          console.error("Failed to file correction request in Supabase", err);
+          return;
+        }
+      }
       const entry: AttendanceCorrectionRequest = { ...input, id: nextId("ac"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
       setState((prev) => ({ ...prev, correctionRequests: [entry, ...prev.correctionRequests] }));
       logAudit("Attendance Corrections", "file", `Filed attendance correction for ${input.date}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const decideCorrectionRequest: HrisContextShape["decideCorrectionRequest"] = useCallback(
-    (id, decision, note) => {
-      setState((prev) => {
-        const actor = currentUser;
-        return {
-          ...prev,
-          correctionRequests: prev.correctionRequests.map((r) =>
-            r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
-          ),
-        };
-      });
+    async (id, decision, note) => {
+      const actor = currentUser;
+      if (supabaseSession && actor?.employeeId) {
+        try {
+          const entry = await decideCorrectionRequestRow(id, decision, actor.employeeId, note ?? null);
+          setState((prev) => ({ ...prev, correctionRequests: prev.correctionRequests.map((r) => (r.id === id ? entry : r)) }));
+          logAudit("Attendance Corrections", "decide", `Correction request ${decision}`);
+          return;
+        } catch (err) {
+          console.error("Failed to decide correction request in Supabase", err);
+          return;
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        correctionRequests: prev.correctionRequests.map((r) =>
+          r.id === id ? { ...r, status: decision, decidedBy: actor?.employeeId ?? null, decidedAt: TODAY, decisionNote: note ?? null } : r,
+        ),
+      }));
       logAudit("Attendance Corrections", "decide", `Correction request ${decision}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const addGeneratedPayslip: HrisContextShape["addGeneratedPayslip"] = useCallback(
