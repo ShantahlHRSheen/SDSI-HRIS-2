@@ -134,6 +134,10 @@ create table employees (
   department_id text not null references departments (id),
   position_id text not null references positions (id),
   supervisor_id text references employees (id),
+  -- Who evaluates this employee's Job Performance KPIs — assigned by HR,
+  -- independent of supervisor_id. Null falls back to supervisor_id (see
+  -- effectiveJobPerformanceEvaluatorId in lib/performance-eval.ts).
+  job_performance_evaluator_id text references employees (id),
 
   employment_status employment_status not null,
   date_hired date not null,
@@ -166,9 +170,13 @@ create index employees_user_id_idx on employees (user_id);
 create table performance_evaluations (
   id text primary key default gen_random_uuid()::text,
   employee_id text not null references employees (id),
-  evaluator_id text not null references employees (id),
+  -- Split ownership: HR fills/owns Behavior, the employee's designated Job
+  -- Performance evaluator fills/owns Job Performance, independently. Null
+  -- until that party actually saves their section.
+  behavior_evaluator_id text references employees (id),
+  job_performance_evaluator_id text references employees (id),
   period text not null,
-  criteria jsonb not null default '[]', -- [{ label, weight, score }]
+  criteria jsonb not null default '[]', -- [{ category, label, weight, score, remarks }]
   overall_score numeric not null,
   comments text not null default '',
   status evaluation_status not null default 'draft',
@@ -272,6 +280,19 @@ create table attendance_period_records (
   source attendance_record_source not null default 'manual',
   updated_by text not null, -- display name
   updated_at timestamptz not null default now(),
+
+  -- Daily-level tardiness/absenteeism detail — only populated when imported
+  -- from a tracker export with a "Daily Attendance" sheet. Optional so
+  -- manual entries and older imports remain valid without backfilling.
+  late_instances integer,
+  late_day_details jsonb,
+  undertime_instances integer,
+  undertime_day_details jsonb,
+  half_day_instances integer,
+  half_day_dates jsonb,
+  absence_instances integer,
+  absent_dates jsonb,
+
   unique (period_id, employee_id)
 );
 
@@ -494,10 +515,16 @@ create policy "employees read self or elevated" on employees for select
 create policy "employees write hr" on employees for all
   using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
 
--- Performance evaluations: the employee being evaluated, the evaluator, and
--- elevated roles.
+-- Performance evaluations: the employee being evaluated, either of their two
+-- section evaluators (HR for Behavior, the designated evaluator for Job
+-- Performance), and elevated roles.
 create policy "evaluations read" on performance_evaluations for select
-  using (employee_id = app_current_employee_id() or evaluator_id = app_current_employee_id() or app_is_elevated());
+  using (
+    employee_id = app_current_employee_id()
+    or behavior_evaluator_id = app_current_employee_id()
+    or job_performance_evaluator_id = app_current_employee_id()
+    or app_is_elevated()
+  );
 create policy "evaluations write elevated" on performance_evaluations for all
   using (app_is_elevated()) with check (app_is_elevated());
 

@@ -5,6 +5,38 @@ import type { Session } from "@supabase/supabase-js";
 import { fullName } from "./helpers";
 import { getInitialSession, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
+  deleteBranchRow,
+  deleteDepartmentRow,
+  deleteHolidayRow,
+  deleteLeaveTypeRow,
+  deletePositionRow,
+  deleteWorkScheduleRow,
+  fetchBranches,
+  fetchDepartments,
+  fetchEmployees,
+  fetchHolidays,
+  fetchLeaveTypes,
+  fetchPayrollPeriods,
+  fetchPositions,
+  fetchWorkSchedules,
+  insertBranch,
+  insertDepartment,
+  insertEmployee,
+  insertHoliday,
+  insertLeaveType,
+  insertPayrollPeriod,
+  insertPosition,
+  insertWorkSchedule,
+  updateBranchRow,
+  updateDepartmentRow,
+  updateEmployeeRow,
+  updateHolidayRow,
+  updateLeaveTypeRow,
+  updatePayrollPeriodRow,
+  updatePositionRow,
+  updateWorkScheduleRow,
+} from "./supabase/repo";
+import {
   ANNOUNCEMENTS,
   ATTENDANCE_PERIOD_RECORDS,
   AUDIT_LOGS,
@@ -232,6 +264,39 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Phase 1 of the Supabase migration: once someone is signed in with a real
+  // Supabase Auth account (not the demo click-to-select login below), pull
+  // the reference/org data and employee 201 files from Supabase and overwrite
+  // those slices — that's now the source of truth for anyone with a real
+  // account. Demo-login users are unaffected: RLS requires an authenticated
+  // Supabase session to read these tables at all, so without one, the app
+  // keeps behaving exactly as it does today (mock data + localStorage).
+  useEffect(() => {
+    if (!supabaseSession) return;
+    let active = true;
+    (async () => {
+      try {
+        const [branches, departments, positions, workSchedules, holidays, leaveTypes, payrollPeriods, employees] = await Promise.all([
+          fetchBranches(),
+          fetchDepartments(),
+          fetchPositions(),
+          fetchWorkSchedules(),
+          fetchHolidays(),
+          fetchLeaveTypes(),
+          fetchPayrollPeriods(),
+          fetchEmployees(),
+        ]);
+        if (!active) return;
+        setState((prev) => ({ ...prev, branches, departments, positions, workSchedules, holidays, leaveTypes, payrollPeriods, employees }));
+      } catch (err) {
+        console.error("Failed to load org/employee data from Supabase — keeping local data.", err);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [supabaseSession]);
+
   useEffect(() => {
     // One-time hydration from localStorage on mount. This intentionally runs
     // only after the server-rendered default state has painted, so the first
@@ -332,18 +397,41 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateEmployee: HrisContextShape["updateEmployee"] = useCallback(
-    (id, patch) => {
+    async (id, patch) => {
+      if (supabaseSession) {
+        try {
+          const entry = await updateEmployeeRow(id, patch);
+          setState((prev) => ({ ...prev, employees: prev.employees.map((e) => (e.id === id ? entry : e)) }));
+          logAudit("Employee 201 File", "update", `Updated employee record ${id}`);
+          return;
+        } catch (err) {
+          console.error("Failed to update employee in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         employees: prev.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
       }));
       logAudit("Employee 201 File", "update", `Updated employee record ${id}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const addEmployee: HrisContextShape["addEmployee"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const seq = state.employees.length + 1;
+          const entry = await insertEmployee(input, `SDSI-${String(seq).padStart(4, "0")}`);
+          setState((prev) => ({ ...prev, employees: [...prev.employees, entry] }));
+          logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
+          return;
+        } catch (err) {
+          console.error("Failed to add employee in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
         const seq = prev.employees.length + 1;
         const entry: Employee = { ...input, id: nextId("emp"), employeeNumber: `SDSI-${String(seq).padStart(4, "0")}` };
@@ -351,7 +439,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession, state.employees],
   );
 
   const upsertAttendancePeriodRecord: HrisContextShape["upsertAttendancePeriodRecord"] = useCallback(
@@ -508,24 +596,65 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit],
   );
 
+  // `cloud`, when given, lets these generic CRUD helpers write through to
+  // Supabase (Phase 1 tables) whenever there's a real Supabase session;
+  // demo-login users (no session) keep today's local-only behavior.
   function makeCrud<T extends { id: string }>(
     key: keyof PersistedState,
     moduleLabel: string,
     idPrefix: string,
+    cloud?: {
+      insert: (input: Omit<T, "id">) => Promise<T>;
+      update: (id: string, patch: Partial<Omit<T, "id">>) => Promise<T>;
+      remove: (id: string) => Promise<void>;
+    },
   ) {
-    const add = (input: Omit<T, "id">) => {
+    const add = async (input: Omit<T, "id">) => {
+      if (cloud && supabaseSession) {
+        try {
+          const entry = await cloud.insert(input);
+          setState((prev) => ({ ...prev, [key]: [...(prev[key] as unknown as T[]), entry] }));
+          logAudit(moduleLabel, "create", `Added new ${moduleLabel.toLowerCase()} record`);
+          return;
+        } catch (err) {
+          console.error(`Failed to add ${moduleLabel} record in Supabase`, err);
+          return;
+        }
+      }
       const entry = { ...input, id: nextId(idPrefix) } as unknown as T;
       setState((prev) => ({ ...prev, [key]: [...(prev[key] as unknown as T[]), entry] }));
       logAudit(moduleLabel, "create", `Added new ${moduleLabel.toLowerCase()} record`);
     };
-    const update = (id: string, patch: Partial<Omit<T, "id">>) => {
+    const update = async (id: string, patch: Partial<Omit<T, "id">>) => {
+      if (cloud && supabaseSession) {
+        try {
+          const entry = await cloud.update(id, patch);
+          setState((prev) => ({
+            ...prev,
+            [key]: (prev[key] as unknown as T[]).map((item) => (item.id === id ? entry : item)),
+          }));
+          logAudit(moduleLabel, "update", `Updated ${moduleLabel.toLowerCase()} record`);
+          return;
+        } catch (err) {
+          console.error(`Failed to update ${moduleLabel} record in Supabase`, err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         [key]: (prev[key] as unknown as T[]).map((item) => (item.id === id ? { ...item, ...patch } : item)),
       }));
       logAudit(moduleLabel, "update", `Updated ${moduleLabel.toLowerCase()} record`);
     };
-    const remove = (id: string) => {
+    const remove = async (id: string) => {
+      if (cloud && supabaseSession) {
+        try {
+          await cloud.remove(id);
+        } catch (err) {
+          console.error(`Failed to remove ${moduleLabel} record in Supabase`, err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         [key]: (prev[key] as unknown as T[]).filter((item) => item.id !== id),
@@ -535,31 +664,74 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     return { add, update, remove };
   }
 
-  const branchCrud = makeCrud<Branch>("branches", "Branch Config", "br");
-  const deptCrud = makeCrud<Department>("departments", "Department Config", "dp");
-  const positionCrud = makeCrud<Position>("positions", "Position Config", "ps");
-  const scheduleCrud = makeCrud<WorkSchedule>("workSchedules", "Work Schedule Config", "ws");
-  const holidayCrud = makeCrud<Holiday>("holidays", "Holiday Config", "hd");
-  const leaveTypeCrud = makeCrud<LeaveType>("leaveTypes", "Leave Type Config", "lt");
+  const branchCrud = makeCrud<Branch>("branches", "Branch Config", "br", {
+    insert: insertBranch,
+    update: updateBranchRow,
+    remove: deleteBranchRow,
+  });
+  const deptCrud = makeCrud<Department>("departments", "Department Config", "dp", {
+    insert: insertDepartment,
+    update: updateDepartmentRow,
+    remove: deleteDepartmentRow,
+  });
+  const positionCrud = makeCrud<Position>("positions", "Position Config", "ps", {
+    insert: insertPosition,
+    update: updatePositionRow,
+    remove: deletePositionRow,
+  });
+  const scheduleCrud = makeCrud<WorkSchedule>("workSchedules", "Work Schedule Config", "ws", {
+    insert: insertWorkSchedule,
+    update: updateWorkScheduleRow,
+    remove: deleteWorkScheduleRow,
+  });
+  const holidayCrud = makeCrud<Holiday>("holidays", "Holiday Config", "hd", {
+    insert: insertHoliday,
+    update: updateHolidayRow,
+    remove: deleteHolidayRow,
+  });
+  const leaveTypeCrud = makeCrud<LeaveType>("leaveTypes", "Leave Type Config", "lt", {
+    insert: insertLeaveType,
+    update: updateLeaveTypeRow,
+    remove: deleteLeaveTypeRow,
+  });
 
   const setPayrollPeriodStatus: HrisContextShape["setPayrollPeriodStatus"] = useCallback(
-    (id, status) => {
+    async (id, status) => {
+      if (supabaseSession) {
+        try {
+          await updatePayrollPeriodRow(id, { status });
+        } catch (err) {
+          console.error("Failed to update payroll period status in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => ({
         ...prev,
         payrollPeriods: prev.payrollPeriods.map((p) => (p.id === id ? { ...p, status } : p)),
       }));
       logAudit("Payroll", "update", `Payroll period status set to ${status}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const addPayrollPeriod: HrisContextShape["addPayrollPeriod"] = useCallback(
-    (input) => {
+    async (input) => {
+      if (supabaseSession) {
+        try {
+          const entry = await insertPayrollPeriod(input);
+          setState((prev) => ({ ...prev, payrollPeriods: [...prev.payrollPeriods, entry] }));
+          logAudit("Payroll", "create", `Created payroll period ${input.start} to ${input.end}`);
+          return;
+        } catch (err) {
+          console.error("Failed to add payroll period in Supabase", err);
+          return;
+        }
+      }
       const entry: PayrollPeriod = { ...input, id: nextId("pp") };
       setState((prev) => ({ ...prev, payrollPeriods: [...prev.payrollPeriods, entry] }));
       logAudit("Payroll", "create", `Created payroll period ${input.start} to ${input.end}`);
     },
-    [logAudit],
+    [logAudit, supabaseSession],
   );
 
   const updateUserRoles: HrisContextShape["updateUserRoles"] = useCallback(

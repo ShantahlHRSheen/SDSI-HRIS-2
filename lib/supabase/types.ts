@@ -6,6 +6,12 @@
 //
 // Insert/Update are intentionally loose (Partial<Row>) here — a generated
 // file will know exactly which columns have defaults and tighten this up.
+//
+// NOTE: Row shapes below are `type` aliases, not `interface`s, on purpose —
+// supabase-js's generic inference for `.insert()`/`.update()` silently
+// collapses to `never` when a table's Row type is declared as an `interface`
+// (a real quirk of how TS resolves `Partial<T>` through its deep conditional
+// types). Keep these as `type`.
 
 export type AppRole =
   | "hr_admin"
@@ -18,58 +24,58 @@ export type AppRole =
   | "upper_management"
   | "sys_admin";
 
-type Table<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row> };
+type Table<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
 
-export interface BranchRow {
+export type BranchRow = {
   id: string;
   name: string;
   code: string;
   address: string;
-}
+};
 
-export interface DepartmentRow {
+export type DepartmentRow = {
   id: string;
   name: string;
-}
+};
 
-export interface PositionRow {
+export type PositionRow = {
   id: string;
   title: string;
   department_id: string;
-}
+};
 
-export interface WorkScheduleRow {
+export type WorkScheduleRow = {
   id: string;
   name: string;
   time_in: string;
   time_out: string;
   days: string;
   grace_minutes: number;
-}
+};
 
-export interface HolidayRow {
+export type HolidayRow = {
   id: string;
   name: string;
   date: string;
   type: "regular" | "special_non_working";
   verified: boolean;
-}
+};
 
-export interface LeaveTypeRow {
+export type LeaveTypeRow = {
   id: string;
   name: string;
   default_credits: number;
   requires_cert: boolean;
-}
+};
 
-export interface PayrollPeriodRow {
+export type PayrollPeriodRow = {
   id: string;
   period_start: string;
   period_end: string;
   status: "open" | "locked" | "closed";
-}
+};
 
-export interface EmployeeRow {
+export type EmployeeRow = {
   id: string;
   employee_number: string;
   first_name: string;
@@ -89,6 +95,7 @@ export interface EmployeeRow {
   department_id: string;
   position_id: string;
   supervisor_id: string | null;
+  job_performance_evaluator_id: string | null;
   employment_status: "regular" | "probationary" | "project_based" | "freelance" | "consultant" | "intern";
   date_hired: string;
   date_regularized: string | null;
@@ -104,21 +111,22 @@ export interface EmployeeRow {
   status_changed_at: string | null;
   roles: AppRole[];
   user_id: string | null;
-}
+};
 
-export interface PerformanceEvaluationRow {
+export type PerformanceEvaluationRow = {
   id: string;
   employee_id: string;
-  evaluator_id: string;
+  behavior_evaluator_id: string | null;
+  job_performance_evaluator_id: string | null;
   period: string;
-  criteria: { label: string; weight: number; score: number }[];
+  criteria: { category: string; label: string; weight: number; score: number; remarks: string }[];
   overall_score: number;
   comments: string;
   status: "draft" | "submitted" | "acknowledged";
   created_at: string;
-}
+};
 
-export interface DisciplinaryRecordRow {
+export type DisciplinaryRecordRow = {
   id: string;
   employee_id: string;
   type: "incident_report" | "verbal_warning" | "written_warning" | "suspension" | "nte" | "nod";
@@ -127,9 +135,9 @@ export interface DisciplinaryRecordRow {
   date: string;
   status: "open" | "resolved";
   attachment_name: string | null;
-}
+};
 
-export interface AuditLogRow {
+export type AuditLogRow = {
   id: string;
   actor_employee_id: string | null;
   actor_name: string;
@@ -139,9 +147,9 @@ export interface AuditLogRow {
   previous_value: string | null;
   new_value: string | null;
   created_at: string;
-}
+};
 
-export interface AnnouncementRow {
+export type AnnouncementRow = {
   id: string;
   title: string;
   body: string;
@@ -149,9 +157,9 @@ export interface AnnouncementRow {
   posted_by: string;
   posted_at: string;
   expires_at: string | null;
-}
+};
 
-interface ApprovableRequestRow {
+type ApprovableRequestRow = {
   id: string;
   employee_id: string;
   reason: string;
@@ -160,27 +168,27 @@ interface ApprovableRequestRow {
   decided_by: string | null;
   decided_at: string | null;
   decision_note: string | null;
-}
+};
 
-export interface LeaveRequestRow extends ApprovableRequestRow {
+export type LeaveRequestRow = ApprovableRequestRow & {
   leave_type_id: string;
   start_date: string;
   end_date: string;
   days: number;
-}
+};
 
-export interface OvertimeRequestRow extends ApprovableRequestRow {
+export type OvertimeRequestRow = ApprovableRequestRow & {
   date: string;
   hours: number;
-}
+};
 
-export interface AttendanceCorrectionRequestRow extends ApprovableRequestRow {
+export type AttendanceCorrectionRequestRow = ApprovableRequestRow & {
   date: string;
   requested_time_in: string | null;
   requested_time_out: string | null;
-}
+};
 
-export interface AttendancePeriodRecordRow {
+export type AttendancePeriodRecordRow = {
   id: string;
   period_id: string;
   employee_id: string;
@@ -194,9 +202,17 @@ export interface AttendancePeriodRecordRow {
   source: "import" | "manual";
   updated_by: string;
   updated_at: string;
-}
+  late_instances: number | null;
+  late_day_details: { date: string; lateRawMinutes: number }[] | null;
+  undertime_instances: number | null;
+  undertime_day_details: { date: string; undertimeRawMinutes: number }[] | null;
+  half_day_instances: number | null;
+  half_day_dates: string[] | null;
+  absence_instances: number | null;
+  absent_dates: string[] | null;
+};
 
-export interface PayrollLineOverrideRow {
+export type PayrollLineOverrideRow = {
   id: string;
   period_id: string;
   employee_id: string;
@@ -229,36 +245,36 @@ export interface PayrollLineOverrideRow {
   ot_pay_override: number | null;
   updated_by: string;
   updated_at: string;
-}
+};
 
-export interface VoucherAmountOverrideRow {
+export type VoucherAmountOverrideRow = {
   id: string;
   period_id: string;
   employee_id: string;
   amount: number;
   updated_by: string;
   updated_at: string;
-}
+};
 
-export interface GeneratedPayslipRow {
+export type GeneratedPayslipRow = {
   id: string;
   period_id: string;
   employee_id: string;
   generated_by: string;
   generated_at: string;
   summary: Record<string, number>;
-}
+};
 
-export interface GeneratedVoucherRow {
+export type GeneratedVoucherRow = {
   id: string;
   period_id: string;
   employee_id: string;
   amount: number;
   generated_by: string;
   generated_at: string;
-}
+};
 
-export interface GeneratedBirFormRow {
+export type GeneratedBirFormRow = {
   id: string;
   form_type: "1601c" | "2316";
   period: string;
@@ -266,9 +282,12 @@ export interface GeneratedBirFormRow {
   generated_by: string;
   generated_at: string;
   summary: Record<string, number>;
-}
+};
 
 export interface Database {
+  __InternalSupabase: {
+    PostgrestVersion: "13";
+  };
   public: {
     Tables: {
       branches: Table<BranchRow>;
@@ -293,5 +312,7 @@ export interface Database {
       generated_vouchers: Table<GeneratedVoucherRow>;
       generated_bir_forms: Table<GeneratedBirFormRow>;
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
   };
 }
