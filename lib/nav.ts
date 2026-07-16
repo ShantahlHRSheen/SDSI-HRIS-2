@@ -44,6 +44,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Attendance Report", href: "/reports/attendance", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin"], built: true },
       { label: "Overtime Report", href: "/reports/overtime", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin"], built: true },
       { label: "Payroll Expense Report", href: "/reports/payroll-expense", roles: ["hr_admin", "payroll_officer", "upper_management", "sr_accounting_assistant", "treasurer", "cfo", "sys_admin"], built: true },
+      { label: "Tardiness Report", href: "/reports/tardiness", roles: ALL_ROLES, built: true },
+      { label: "Absenteeism Report", href: "/reports/absenteeism", roles: ALL_ROLES, built: true },
     ],
   },
   {

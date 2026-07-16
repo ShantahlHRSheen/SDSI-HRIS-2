@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { Employee } from "./types";
+import type { Employee, LateDayDetail, UndertimeDayDetail } from "./types";
 
 // ---------------------------------------------------------------------------
 // Parses the company's per-payroll-period attendance-tracker export (its
@@ -8,6 +8,14 @@ import type { Employee } from "./types";
 // header text (not position) since the source template has at least one
 // known broken column (its own "Position" column resolves to a schedule
 // time via a bad formula) — we simply never read columns we don't need.
+//
+// When the same workbook also has a "Daily Attendance" sheet (one row per
+// employee per day, with Late/Undertime Raw Mins and a daily Status), we
+// additionally derive per-employee instance counts — how many separate days
+// they were late/undertime/half-day/absent, not just the period's minute
+// totals — for the Tardiness/Absenteeism reports. That sheet is optional;
+// older tracker exports without it simply import with zero instances, same
+// as before this feature existed.
 // ---------------------------------------------------------------------------
 
 export interface ParsedAttendanceRow {
@@ -22,6 +30,14 @@ export interface ParsedAttendanceRow {
   lateAdjMinutes: number;
   undertimeMinutes: number;
   notes: string;
+  lateInstances: number;
+  lateDayDetails: LateDayDetail[];
+  undertimeInstances: number;
+  undertimeDayDetails: UndertimeDayDetail[];
+  halfDayInstances: number;
+  halfDayDates: string[];
+  absenceInstances: number;
+  absentDates: string[];
 }
 
 export interface ParsedAttendanceWorkbook {
@@ -74,6 +90,106 @@ function cellNumberOptional(row: ExcelJS.Row, col: number | undefined): number {
   return col === undefined ? 0 : cellNumber(row, col);
 }
 
+interface DailyAggregate {
+  lateInstances: number;
+  lateDayDetails: LateDayDetail[];
+  undertimeInstances: number;
+  undertimeDayDetails: UndertimeDayDetail[];
+  halfDayInstances: number;
+  halfDayDates: string[];
+  absenceInstances: number;
+  absentDates: string[];
+}
+
+function emptyDailyAggregate(): DailyAggregate {
+  return { lateInstances: 0, lateDayDetails: [], undertimeInstances: 0, undertimeDayDetails: [], halfDayInstances: 0, halfDayDates: [], absenceInstances: 0, absentDates: [] };
+}
+
+// Keyed by normalizeName(employee name) so it can be merged into
+// ParsedAttendanceRow the same way Summary-sheet rows are matched to the
+// system roster. Returns an empty map (not an error) when no "Daily
+// Attendance" sheet exists — that sheet is optional.
+function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | null, periodEnd: string | null): Map<string, DailyAggregate> {
+  const result = new Map<string, DailyAggregate>();
+  const sheetName = wb.worksheets.map((ws) => ws.name).find((n) => /daily\s*attendance/i.test(n));
+  if (!sheetName) return result;
+  const ws = wb.getWorksheet(sheetName)!;
+
+  let headerRowNum: number | null = null;
+  const headerMap: Record<string, number> = {};
+  ws.eachRow((row, rowNumber) => {
+    if (headerRowNum !== null) return;
+    const c1 = String(row.getCell(1).value ?? "").trim().toLowerCase();
+    if (c1 !== "date") return;
+    const candidateMap: Record<string, number> = {};
+    row.eachCell((cell, colNumber) => {
+      const label = String(cell.value ?? "").trim().toLowerCase();
+      if (label) candidateMap[label] = colNumber;
+    });
+    if (candidateMap["emp id"] && candidateMap["employee name"]) {
+      headerRowNum = rowNumber;
+      Object.assign(headerMap, candidateMap);
+    }
+  });
+  if (headerRowNum === null) return result;
+
+  const empIdCol = headerMap["emp id"];
+  const nameCol = headerMap["employee name"];
+  const statusCol = headerMap["status"];
+  const lateRawCol = headerMap["late raw mins"];
+  const undertimeRawCol = headerMap["undertime raw mins"];
+  if (!nameCol || !statusCol) return result;
+
+  const headerRow = headerRowNum;
+  ws.eachRow((row, rowNumber) => {
+    if (rowNumber <= headerRow) return;
+    // Real data rows always carry a numeric Emp ID; separator/"TOTAL"/stray
+    // name-artifact rows in this template's layout do not, so this is a
+    // reliable filter without needing to special-case those row types.
+    if (typeof row.getCell(empIdCol).value !== "number") return;
+
+    const dateStr = toDateStr(row.getCell(1).value);
+    if (!dateStr) return;
+    if (periodStart && dateStr < periodStart) return;
+    if (periodEnd && dateStr > periodEnd) return;
+
+    const rawName = cellText(row, nameCol);
+    if (!rawName) return;
+    const key = normalizeName(rawName);
+
+    const statusText = cellText(row, statusCol).toUpperCase();
+    const lateRaw = cellNumberOptional(row, lateRawCol);
+    const undertimeRaw = cellNumberOptional(row, undertimeRawCol);
+
+    const agg = result.get(key) ?? emptyDailyAggregate();
+
+    // The sheet's own Days-Worked formula treats a blank Status the same as
+    // an explicit "Absent" (distinct from SL/VL, which have their own status
+    // text) — this template just never types the word in, so blank is what
+    // an absence looks like on a day the employee was actually scheduled.
+    if (statusText === "") {
+      agg.absenceInstances += 1;
+      agg.absentDates.push(dateStr);
+    } else if (statusText === "HALF DAY") {
+      agg.halfDayInstances += 1;
+      agg.halfDayDates.push(dateStr);
+    }
+
+    if (lateRaw > 0) {
+      agg.lateInstances += 1;
+      agg.lateDayDetails.push({ date: dateStr, lateRawMinutes: lateRaw });
+    }
+    if (undertimeRaw > 0) {
+      agg.undertimeInstances += 1;
+      agg.undertimeDayDetails.push({ date: dateStr, undertimeRawMinutes: undertimeRaw });
+    }
+
+    result.set(key, agg);
+  });
+
+  return result;
+}
+
 export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<ParsedAttendanceWorkbook> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
@@ -106,6 +222,7 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
   const missing = REQUIRED_COLUMNS.filter((k) => !(k in headerMap));
   if (missing.length) throw new Error(`The summary sheet is missing expected column(s): ${missing.join(", ")}.`);
 
+  const dailyByName = parseDailyAttendanceSheet(wb, periodStart, periodEnd);
   const rows: ParsedAttendanceRow[] = [];
   const headerRow = headerRowNum;
   const undertimeCol = headerMap["undertime adj mins"] ?? headerMap["undertime raw mins"];
@@ -141,6 +258,7 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
       // older tracker exports that predate this column still import cleanly.
       undertimeMinutes: cellNumberOptional(row, undertimeCol),
       notes: headerMap["notes"] ? cellText(row, headerMap["notes"]) : "",
+      ...(dailyByName.get(normalizeName(rawName)) ?? emptyDailyAggregate()),
     });
   });
 

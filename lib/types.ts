@@ -296,6 +296,16 @@ export type AttendanceRecordSource = "import" | "manual";
 // this record's vlDays/slDays. Overtime pay is the one figure NOT derived
 // from here — it comes from the already-approved Overtime requests elsewhere
 // in the system, so there is only one source of truth for it.
+export interface LateDayDetail {
+  date: string;
+  lateRawMinutes: number;
+}
+
+export interface UndertimeDayDetail {
+  date: string;
+  undertimeRawMinutes: number;
+}
+
 export interface AttendancePeriodRecord {
   id: string;
   periodId: string;
@@ -310,6 +320,23 @@ export interface AttendancePeriodRecord {
   source: AttendanceRecordSource;
   updatedBy: string;
   updatedAt: string;
+
+  // Daily-level tardiness/absenteeism detail — only populated when imported
+  // from a tracker export with a "Daily Attendance" sheet (see
+  // lib/attendance-import.ts). Optional so records from older imports or
+  // manual entry (and every pre-existing seeded record) remain valid without
+  // backfilling data that was never captured at daily granularity. Instance
+  // counts are day-counts (e.g. "late on 6 separate days"), not minute totals
+  // — lateAdjMinutes/undertimeMinutes above are already the period's minute
+  // totals.
+  lateInstances?: number;
+  lateDayDetails?: LateDayDetail[];
+  undertimeInstances?: number;
+  undertimeDayDetails?: UndertimeDayDetail[];
+  halfDayInstances?: number;
+  halfDayDates?: string[];
+  absenceInstances?: number;
+  absentDates?: string[];
 }
 
 // Per-employee, per-period manual inputs/overrides layered on top of the

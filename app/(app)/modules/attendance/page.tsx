@@ -72,6 +72,14 @@ export default function AttendancePage() {
         lateAdjMinutes: m.parsed.lateAdjMinutes,
         undertimeMinutes: m.parsed.undertimeMinutes,
         notes: m.parsed.notes,
+        lateInstances: m.parsed.lateInstances,
+        lateDayDetails: m.parsed.lateDayDetails,
+        undertimeInstances: m.parsed.undertimeInstances,
+        undertimeDayDetails: m.parsed.undertimeDayDetails,
+        halfDayInstances: m.parsed.halfDayInstances,
+        halfDayDates: m.parsed.halfDayDates,
+        absenceInstances: m.parsed.absenceInstances,
+        absentDates: m.parsed.absentDates,
       })),
     );
     setImportPreview(null);

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Cake, Clock3, Info, UserMinus, UserPlus } from "lucide-react";
+import { AlarmClockOff, Cake, CalendarX2, Clock3, Info, UserMinus, UserPlus } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -29,6 +29,7 @@ import {
   summarizeOvertime,
   summarizePayroll,
 } from "@/lib/monthly-analytics";
+import { buildAbsenteeismRows, buildTardinessRows, flaggedAbsenteeism, flaggedTardiness, TARDINESS_THRESHOLD, ABSENTEEISM_THRESHOLD } from "@/lib/tardiness-absenteeism";
 import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
@@ -57,7 +58,7 @@ function variantFor(roles: string[]): "full" | "payroll" | "team" | "personal" {
 }
 
 export default function DashboardPage() {
-  const { currentUser, currentEmployee, employees, branches, announcements } = useHris();
+  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords } = useHris();
   const roles = currentUser?.roles ?? [];
   const variant = variantFor(roles);
 
@@ -70,6 +71,14 @@ export default function DashboardPage() {
 
   const branchFilter = variant === "team" && currentEmployee ? currentEmployee.branchId : undefined;
   const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+
+  // Real (not synthetic) attendance-derived flags, across every imported
+  // period on file — separate from the monthly-analytics widgets above,
+  // which run on the fact-table generator rather than actual import data.
+  const tardinessRows = useMemo(() => buildTardinessRows(attendancePeriodRecords, scoped), [attendancePeriodRecords, scoped]);
+  const absenteeismRows = useMemo(() => buildAbsenteeismRows(attendancePeriodRecords, scoped), [attendancePeriodRecords, scoped]);
+  const flaggedTardinessRows = flaggedTardiness(tardinessRows);
+  const flaggedAbsenteeismRows = flaggedAbsenteeism(absenteeismRows);
 
   if (variant === "personal") {
     return <PersonalDashboard employees={employees} announcements={announcements} />;
@@ -163,6 +172,39 @@ export default function DashboardPage() {
           <div className="mt-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
             <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">OT hours — last 6 months</div>
             <TrendChart data={overtimeTrend} color="var(--series-2)" valueFormatter={(v) => `${v} hrs`} />
+          </div>
+        </section>
+      )}
+
+      {/* --- Tardiness & Absenteeism (real imported attendance, not the fact-table generator) --- */}
+      {variant !== "payroll" && (
+        <section className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Tardiness &amp; Absenteeism</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label={`Flagged for tardiness (${TARDINESS_THRESHOLD}+)`} value={flaggedTardinessRows.length.toString()} deltaTone={flaggedTardinessRows.length > 0 ? "bad" : "neutral"} />
+            <StatTile label={`Flagged for absenteeism (${ABSENTEEISM_THRESHOLD}+)`} value={flaggedAbsenteeismRows.length.toString()} deltaTone={flaggedAbsenteeismRows.length > 0 ? "bad" : "neutral"} />
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ListCard
+              title="Tardiness Report"
+              icon={<AlarmClockOff size={16} />}
+              items={flaggedTardinessRows.slice(0, 6).map((row) => (
+                <PersonRow key={row.employee.id} employee={row.employee} right={<Badge tone="critical">{row.lateInstances} lates</Badge>} />
+              ))}
+              emptyText="No employees currently cross the tardiness threshold."
+              href="/reports/tardiness"
+            />
+            <ListCard
+              title="Absenteeism Report"
+              icon={<CalendarX2 size={16} />}
+              items={flaggedAbsenteeismRows.slice(0, 6).map((row) => (
+                <PersonRow key={row.employee.id} employee={row.employee} right={<Badge tone="critical">{row.totalInstances} instances</Badge>} />
+              ))}
+              emptyText="No employees currently cross the absenteeism threshold."
+              href="/reports/absenteeism"
+            />
           </div>
         </section>
       )}
@@ -308,6 +350,8 @@ function PersonalDashboard({ employees, announcements }: { employees: Employee[]
               { label: "Attendance Correction", href: "/modules/corrections" },
               { label: "View Payslips", href: "/modules/payslips" },
               { label: "My BIR 2316", href: "/bir/2316" },
+              { label: "My Tardiness Record", href: "/reports/tardiness" },
+              { label: "My Absenteeism Record", href: "/reports/absenteeism" },
               { label: "Org Chart", href: "/modules/org-chart" },
               { label: "Bulletin Board", href: "/bulletin" },
             ].map((a) => (
