@@ -128,10 +128,17 @@ export interface Employee {
   roles: Role[];
 }
 
+// KPI-based evaluation criterion — see lib/performance-eval.ts for the
+// template (14 KPIs across Behavior/Job Performance categories) and the
+// scoring formula. Rating is 0-3 against a written anchor per level (see
+// KPI_TEMPLATE's `anchors`); remarks are required by the form whenever
+// rating is 0 or 1.
 export interface EvaluationCriterion {
+  category: string;
   label: string;
   weight: number;
-  score: number; // 1-5
+  score: number; // 0-3
+  remarks: string;
 }
 
 export type EvaluationStatus = "draft" | "submitted" | "acknowledged";
@@ -142,7 +149,7 @@ export interface PerformanceEvaluation {
   evaluatorId: string;
   period: string;
   criteria: EvaluationCriterion[];
-  overallScore: number;
+  overallScore: number; // percentage, 0-100 — see computeOverallScore()
   comments: string;
   status: EvaluationStatus;
   createdAt: string;

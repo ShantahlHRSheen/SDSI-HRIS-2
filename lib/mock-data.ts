@@ -17,6 +17,7 @@ import type {
   Position,
   WorkSchedule,
 } from "./types";
+import { computeOverallScore, KPI_TEMPLATE } from "./performance-eval";
 
 // Fixed "today" so the demo's relative dates (birthdays, payroll periods, etc.)
 // stay meaningful without depending on wall-clock time.
@@ -1941,35 +1942,43 @@ export const ATTENDANCE_PERIOD_RECORDS: AttendancePeriodRecord[] = [
   { id: "att-seed-802", periodId: "pp-4", employeeId: "emp-068", daysWorked: 11, holidayDays: 0, slDays: 2, vlDays: 0, lateAdjMinutes: 0, undertimeMinutes: 0, notes: "", source: "import", updatedBy: "Sheena Evangelista", updatedAt: TODAY },
 ];
 
-// --- Performance evaluations ------------------------------------------------
-export const EVAL_CRITERIA_TEMPLATE = [
-  { label: "Job Knowledge", weight: 0.25 },
-  { label: "Quality of Work", weight: 0.25 },
-  { label: "Attendance & Punctuality", weight: 0.2 },
-  { label: "Teamwork", weight: 0.15 },
-  { label: "Initiative", weight: 0.15 },
-];
+// --- Performance evaluations -------------------------------------------------
+// KPI template (14 KPIs, Behavior 40% / Job Performance 60%, 0-3 rating
+// scale) lives in lib/performance-eval.ts — company-provided KPI/weight/
+// rating-scale spec, shared by this seed generator and the Evaluations page.
+const LOW_SCORE_REMARKS: Record<string, string> = {
+  0: "Repeated issue observed this period; discussed with employee and documented for follow-up.",
+  1: "Below expectation this period; coaching provided, to be monitored next cycle.",
+};
 
 function makeEvaluation(id: string, employeeId: string, evaluatorId: string, period: string, status: PerformanceEvaluation["status"], seedOffset: number): PerformanceEvaluation {
-  let weighted = 0;
-  const criteria = EVAL_CRITERIA_TEMPLATE.map((c, i) => {
-    const score = 3 + Math.round(rng() * 2 * 10) / 10 - ((i + seedOffset) % 2) * 0.4;
-    const clamped = Math.min(5, Math.max(2, Math.round(score * 10) / 10));
-    weighted += clamped * c.weight;
-    return { ...c, score: clamped };
+  const criteria = KPI_TEMPLATE.map((k, i) => {
+    // Mostly strong performers (2-3) with an occasional lower score, so the
+    // seed data exercises the "remarks required" rule without every record
+    // reading as a disciplinary case.
+    const roll = rng();
+    const score = roll > 0.85 ? ((i + seedOffset) % 2) : roll > 0.5 ? 2 : 3;
+    return {
+      category: k.category,
+      label: k.label,
+      weight: k.weight,
+      score,
+      remarks: score <= 1 ? LOW_SCORE_REMARKS[score] : "",
+    };
   });
+  const overallScore = computeOverallScore(criteria);
   return {
     id,
     employeeId,
     evaluatorId,
     period,
     criteria,
-    overallScore: Math.round(weighted * 10) / 10,
+    overallScore,
     comments:
-      weighted >= 4.2
+      overallScore >= 85
         ? "Consistently exceeds expectations; recommended for recognition."
-        : weighted >= 3.5
-          ? "Meets expectations with room to grow in initiative."
+        : overallScore >= 65
+          ? "Meets expectations with room to grow."
           : "Needs improvement; performance improvement plan to be discussed.",
     status,
     createdAt: addDays(TODAY, -seedOffset * 4 - 3),
