@@ -1951,7 +1951,15 @@ const LOW_SCORE_REMARKS: Record<string, string> = {
   1: "Below expectation this period; coaching provided, to be monitored next cycle.",
 };
 
-function makeEvaluation(id: string, employeeId: string, evaluatorId: string, period: string, status: PerformanceEvaluation["status"], seedOffset: number): PerformanceEvaluation {
+function makeEvaluation(
+  id: string,
+  employeeId: string,
+  hrEvaluatorId: string,
+  jobPerfEvaluatorId: string,
+  period: string,
+  status: PerformanceEvaluation["status"],
+  seedOffset: number,
+): PerformanceEvaluation {
   const criteria = KPI_TEMPLATE.map((k, i) => {
     // Mostly strong performers (2-3) with an occasional lower score, so the
     // seed data exercises the "remarks required" rule without every record
@@ -1967,10 +1975,16 @@ function makeEvaluation(id: string, employeeId: string, evaluatorId: string, per
     };
   });
   const overallScore = computeOverallScore(criteria);
+  // Drafts simulate a real in-progress state: HR has filled Behavior, the
+  // designated Job Performance evaluator hasn't gotten to their part yet.
+  // Submitted/acknowledged records represent both sections already done.
+  const behaviorDone = true;
+  const jobPerfDone = status !== "draft";
   return {
     id,
     employeeId,
-    evaluatorId,
+    behaviorEvaluatorId: behaviorDone ? hrEvaluatorId : null,
+    jobPerformanceEvaluatorId: jobPerfDone ? jobPerfEvaluatorId : null,
     period,
     criteria,
     overallScore,
@@ -1994,7 +2008,7 @@ EMPLOYEES.filter((e) => e.roles.includes("employee") && e.supervisorId).forEach(
   evalSeq += 1;
   const status: PerformanceEvaluation["status"] = evalSeq % 3 === 0 ? "draft" : evalSeq % 3 === 1 ? "acknowledged" : "submitted";
   PERFORMANCE_EVALUATIONS.push(
-    makeEvaluation(`ev-${evalSeq}`, e.id, e.supervisorId as string, evalPeriod, status, evalSeq),
+    makeEvaluation(`ev-${evalSeq}`, e.id, hrManager.id, e.supervisorId as string, evalPeriod, status, evalSeq),
   );
 });
 

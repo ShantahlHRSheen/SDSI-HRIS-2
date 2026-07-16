@@ -1,4 +1,4 @@
-import type { EvaluationCriterion } from "./types";
+import type { EvaluationCriterion, Employee } from "./types";
 
 // ---------------------------------------------------------------------------
 // KPI template and scoring formula for the Employee Performance Evaluation
@@ -194,4 +194,15 @@ export function ratingBand(overallScorePct: number): RatingBand {
 
 export function newCriteriaFromTemplate(): EvaluationCriterion[] {
   return KPI_TEMPLATE.map((k) => ({ category: k.category, label: k.label, weight: k.weight, score: 2, remarks: "" }));
+}
+
+export function criteriaForCategory(criteria: EvaluationCriterion[], category: KpiCategory): EvaluationCriterion[] {
+  return criteria.filter((c) => c.category === category);
+}
+
+// HR assigns this explicitly per employee; until they do, the employee's
+// org-chart supervisor is the sensible default Job Performance evaluator
+// (matches how Department/Branch Managers already supervise their teams).
+export function effectiveJobPerformanceEvaluatorId(employee: Employee): string | null {
+  return employee.jobPerformanceEvaluatorId ?? employee.supervisorId ?? null;
 }

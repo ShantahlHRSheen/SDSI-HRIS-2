@@ -109,6 +109,12 @@ export interface Employee {
   departmentId: string;
   positionId: string;
   supervisorId: string | null;
+  // Who evaluates this employee's Job Performance KPIs (Performance
+  // Evaluations) — assigned by HR, independent of the org-chart supervisor.
+  // Optional/undefined means "not explicitly assigned yet"; falls back to
+  // supervisorId (see effectiveJobPerformanceEvaluatorId in
+  // lib/performance-eval.ts) until HR assigns someone specific.
+  jobPerformanceEvaluatorId?: string | null;
 
   employmentStatus: EmploymentStatus;
   dateHired: string;
@@ -146,7 +152,13 @@ export type EvaluationStatus = "draft" | "submitted" | "acknowledged";
 export interface PerformanceEvaluation {
   id: string;
   employeeId: string;
-  evaluatorId: string;
+  // Split ownership: HR fills/owns the Behavior section, the employee's
+  // designated Job Performance evaluator (see Employee.jobPerformanceEvaluatorId)
+  // fills/owns the Job Performance section. Null until that party actually
+  // saves their section — the UI uses null/non-null here (not the criteria
+  // scores themselves) to tell "not yet evaluated" from "evaluated".
+  behaviorEvaluatorId: string | null;
+  jobPerformanceEvaluatorId: string | null;
   period: string;
   criteria: EvaluationCriterion[];
   overallScore: number; // percentage, 0-100 — see computeOverallScore()

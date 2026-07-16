@@ -24,6 +24,7 @@ import {
   TODAY,
   WORK_SCHEDULES,
 } from "./mock-data";
+import { computeOverallScore, type KpiCategory } from "./performance-eval";
 import type {
   Announcement,
   AttendanceCorrectionRequest,
@@ -34,6 +35,7 @@ import type {
   DemoUser,
   DisciplinaryRecord,
   Employee,
+  EvaluationCriterion,
   GeneratedBirForm,
   GeneratedPayslip,
   GeneratedVoucher,
@@ -150,6 +152,7 @@ interface HrisContextShape {
   upsertVoucherAmountOverride: (input: Omit<VoucherAmountOverride, "id" | "updatedBy" | "updatedAt">) => void;
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
+  updateEvaluationSection: (id: string, category: KpiCategory, criteria: EvaluationCriterion[], evaluatorEmployeeId: string, comments?: string) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
 
   addDisciplinaryRecord: (input: Omit<DisciplinaryRecord, "id">) => void;
@@ -438,6 +441,33 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit],
   );
 
+  // Saves just one category's ratings/remarks onto an existing evaluation —
+  // HR saves Behavior, the employee's designated Job Performance evaluator
+  // saves Job Performance, independently of each other. Stamps whichever
+  // section-evaluator field matches `category`, leaving the other section
+  // (and its evaluator stamp) untouched.
+  const updateEvaluationSection: HrisContextShape["updateEvaluationSection"] = useCallback(
+    (id, category, sectionCriteria, evaluatorEmployeeId, comments) => {
+      setState((prev) => ({
+        ...prev,
+        evaluations: prev.evaluations.map((e) => {
+          if (e.id !== id) return e;
+          const criteria: EvaluationCriterion[] = [...e.criteria.filter((c) => c.category !== category), ...sectionCriteria];
+          return {
+            ...e,
+            criteria,
+            overallScore: computeOverallScore(criteria),
+            behaviorEvaluatorId: category === "Behavior" ? evaluatorEmployeeId : e.behaviorEvaluatorId,
+            jobPerformanceEvaluatorId: category === "Job Performance" ? evaluatorEmployeeId : e.jobPerformanceEvaluatorId,
+            comments: comments !== undefined ? comments : e.comments,
+          };
+        }),
+      }));
+      logAudit("Performance Evaluation", "update", `Saved ${category} section for evaluation ${id}`);
+    },
+    [logAudit],
+  );
+
   const setEvaluationStatus: HrisContextShape["setEvaluationStatus"] = useCallback(
     (id, status) => {
       setState((prev) => ({
@@ -692,6 +722,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     upsertPayrollLineOverride,
     upsertVoucherAmountOverride,
     addEvaluation,
+    updateEvaluationSection,
     setEvaluationStatus,
     addDisciplinaryRecord,
     setDisciplinaryStatus,
