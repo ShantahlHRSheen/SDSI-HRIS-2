@@ -15,6 +15,11 @@
 alter table employees
   add column if not exists job_performance_evaluator_id text references employees (id);
 
+-- Must drop the old policy before dropping the column it references, or
+-- Postgres refuses with "cannot drop column ... because other objects depend
+-- on it" (error 2BP01).
+drop policy if exists "evaluations read" on performance_evaluations;
+
 alter table performance_evaluations
   add column if not exists behavior_evaluator_id text references employees (id);
 alter table performance_evaluations
@@ -22,7 +27,6 @@ alter table performance_evaluations
 alter table performance_evaluations
   drop column if exists evaluator_id;
 
-drop policy if exists "evaluations read" on performance_evaluations;
 create policy "evaluations read" on performance_evaluations for select
   using (
     employee_id = app_current_employee_id()
