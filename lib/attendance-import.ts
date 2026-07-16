@@ -105,14 +105,26 @@ function emptyDailyAggregate(): DailyAggregate {
   return { lateInstances: 0, lateDayDetails: [], undertimeInstances: 0, undertimeDayDetails: [], halfDayInstances: 0, halfDayDates: [], absenceInstances: 0, absentDates: [] };
 }
 
+interface DailyAttendanceParse {
+  byName: Map<string, DailyAggregate>;
+  // The actual earliest/latest dates seen among real data rows — more
+  // trustworthy than the Summary sheet's own "Period Start"/"Period End"
+  // label cells, which this template sometimes fills in a day early (see
+  // parseAttendanceWorkbook, which prefers these when available).
+  minDate: string | null;
+  maxDate: string | null;
+}
+
 // Keyed by normalizeName(employee name) so it can be merged into
 // ParsedAttendanceRow the same way Summary-sheet rows are matched to the
-// system roster. Returns an empty map (not an error) when no "Daily
+// system roster. Returns an empty result (not an error) when no "Daily
 // Attendance" sheet exists — that sheet is optional.
-function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | null, periodEnd: string | null): Map<string, DailyAggregate> {
-  const result = new Map<string, DailyAggregate>();
+function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | null, periodEnd: string | null): DailyAttendanceParse {
+  const byName = new Map<string, DailyAggregate>();
+  let minDate: string | null = null;
+  let maxDate: string | null = null;
   const sheetName = wb.worksheets.map((ws) => ws.name).find((n) => /daily\s*attendance/i.test(n));
-  if (!sheetName) return result;
+  if (!sheetName) return { byName, minDate, maxDate };
   const ws = wb.getWorksheet(sheetName)!;
 
   let headerRowNum: number | null = null;
@@ -131,14 +143,14 @@ function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | n
       Object.assign(headerMap, candidateMap);
     }
   });
-  if (headerRowNum === null) return result;
+  if (headerRowNum === null) return { byName, minDate, maxDate };
 
   const empIdCol = headerMap["emp id"];
   const nameCol = headerMap["employee name"];
   const statusCol = headerMap["status"];
   const lateRawCol = headerMap["late raw mins"];
   const undertimeRawCol = headerMap["undertime raw mins"];
-  if (!nameCol || !statusCol) return result;
+  if (!nameCol || !statusCol) return { byName, minDate, maxDate };
 
   const headerRow = headerRowNum;
   ws.eachRow((row, rowNumber) => {
@@ -150,8 +162,14 @@ function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | n
 
     const dateStr = toDateStr(row.getCell(1).value);
     if (!dateStr) return;
+    // periodStart/periodEnd here are the Summary sheet's own label cells,
+    // which this template can fill in a day early — used only as a loose
+    // sanity filter, not as the source of truth for the detected range
+    // (that's minDate/maxDate below, tracked from the real rows found).
     if (periodStart && dateStr < periodStart) return;
     if (periodEnd && dateStr > periodEnd) return;
+    if (!minDate || dateStr < minDate) minDate = dateStr;
+    if (!maxDate || dateStr > maxDate) maxDate = dateStr;
 
     const rawName = cellText(row, nameCol);
     if (!rawName) return;
@@ -161,7 +179,7 @@ function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | n
     const lateRaw = cellNumberOptional(row, lateRawCol);
     const undertimeRaw = cellNumberOptional(row, undertimeRawCol);
 
-    const agg = result.get(key) ?? emptyDailyAggregate();
+    const agg = byName.get(key) ?? emptyDailyAggregate();
 
     // The sheet's own Days-Worked formula treats a blank Status the same as
     // an explicit "Absent" (distinct from SL/VL, which have their own status
@@ -184,10 +202,10 @@ function parseDailyAttendanceSheet(wb: ExcelJS.Workbook, periodStart: string | n
       agg.undertimeDayDetails.push({ date: dateStr, undertimeRawMinutes: undertimeRaw });
     }
 
-    result.set(key, agg);
+    byName.set(key, agg);
   });
 
-  return result;
+  return { byName, minDate, maxDate };
 }
 
 export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<ParsedAttendanceWorkbook> {
@@ -222,7 +240,15 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
   const missing = REQUIRED_COLUMNS.filter((k) => !(k in headerMap));
   if (missing.length) throw new Error(`The summary sheet is missing expected column(s): ${missing.join(", ")}.`);
 
-  const dailyByName = parseDailyAttendanceSheet(wb, periodStart, periodEnd);
+  const daily = parseDailyAttendanceSheet(wb, periodStart, periodEnd);
+  const dailyByName = daily.byName;
+  // Prefer the Daily Attendance sheet's own earliest/latest row dates over
+  // the Summary sheet's "Period Start"/"Period End" label cells — this
+  // template can fill those in a day early (observed: a cell literally
+  // containing the day before the period actually starts), which otherwise
+  // makes the payroll-period auto-match in the UI pick the wrong period.
+  if (daily.minDate) periodStart = daily.minDate;
+  if (daily.maxDate) periodEnd = daily.maxDate;
   const rows: ParsedAttendanceRow[] = [];
   const headerRow = headerRowNum;
   const undertimeCol = headerMap["undertime adj mins"] ?? headerMap["undertime raw mins"];
