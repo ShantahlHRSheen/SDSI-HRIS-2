@@ -150,7 +150,7 @@ export default function DashboardPage() {
             <StatTile label="Attendance rate" value={`${currentAttendance.attendanceRate}%`} />
           </div>
           <div className="mt-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Attendance rate — last 6 months</div>
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Attendance rate — last 12 months</div>
             <TrendChart data={attendanceTrend} valueFormatter={(v) => `${v}%`} />
           </div>
         </section>
@@ -167,10 +167,10 @@ export default function DashboardPage() {
             <StatTile label="OT hours (this month)" value={currentOvertime.totalOtHours.toLocaleString()} />
             <StatTile label="OT pay (this month)" value={formatCurrencyCompact(currentOvertime.totalOtPay)} />
             <StatTile label="Avg hrs / employee" value={active.length ? (currentOvertime.totalOtHours / active.length).toFixed(1) : "0"} />
-            <StatTile label="Months tracked" value="6" hint="rolling window" />
+            <StatTile label="Months tracked" value="12" hint="rolling window" />
           </div>
           <div className="mt-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">OT hours — last 6 months</div>
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">OT hours — last 12 months</div>
             <TrendChart data={overtimeTrend} color="var(--series-2)" valueFormatter={(v) => `${v} hrs`} />
           </div>
         </section>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
         </div>
         <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 6 months</div>
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 12 months</div>
             <TrendChart data={payrollTrend} color="var(--series-1)" valueFormatter={(v) => formatCurrencyCompact(v)} />
           </div>
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">

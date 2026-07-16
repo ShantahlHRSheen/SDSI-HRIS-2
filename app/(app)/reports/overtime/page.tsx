@@ -61,7 +61,7 @@ export default function OvertimeReportPage() {
     <div>
       <PageHeader
         title="Monthly Overtime Report"
-        subtitle="OT hours and pay across the last 6 months, filterable by month, year, branch, department, and employee."
+        subtitle="OT hours and pay across the last 12 months, filterable by month, year, branch, department, and employee."
         actions={<ExportBar onExportCsv={exportCsv} />}
       />
 

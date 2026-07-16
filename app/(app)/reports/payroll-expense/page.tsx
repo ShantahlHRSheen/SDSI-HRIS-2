@@ -116,7 +116,7 @@ export default function PayrollExpenseReportPage() {
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-        <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 6 months</div>
+        <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 12 months</div>
         <TrendChart data={trend} valueFormatter={(v) => formatCurrencyCompact(v)} />
       </div>
 

@@ -14,7 +14,7 @@ import { branchName, departmentName, fullName } from "./helpers";
 // reloads.
 // ---------------------------------------------------------------------------
 
-const MONTHS_BACK = 6;
+const MONTHS_BACK = 12;
 
 export interface MonthMeta {
   key: string; // "2026-02"
@@ -111,9 +111,9 @@ export function computeMonthlyWithholdingTax(taxableCompensation: number): numbe
 function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
   const seed = `${employee.id}-${month.key}`;
   const workingDays = 22;
-  // A per-employee "attendance tendency" biases their whole 6-month history,
-  // so rates spread out across employees instead of all regressing to the
-  // same mean once summed over months.
+  // A per-employee "attendance tendency" biases their whole rolling-window
+  // history, so rates spread out across employees instead of all regressing
+  // to the same mean once summed over months.
   const tendency = hash(employee.id + "tendency") % 5; // 0 = reliable .. 4 = spotty
   const absentDays = Math.min(hash(seed + "a") % (2 + tendency), 6);
   const leaveDays = Math.min(hash(seed + "l") % (2 + tendency), 6);

@@ -69,7 +69,7 @@ export default function AttendanceReportPage() {
     <div>
       <PageHeader
         title="Monthly Attendance Report"
-        subtitle="Attendance summary across the last 6 months, filterable by month, year, branch, department, and employee."
+        subtitle="Attendance summary across the last 12 months, filterable by month, year, branch, department, and employee."
         actions={<ExportBar onExportCsv={exportCsv} />}
       />
 

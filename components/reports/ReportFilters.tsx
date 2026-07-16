@@ -44,7 +44,7 @@ export function ReportFilters({
         onChange={(e) => onChange({ ...value, monthKey: e.target.value })}
         className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
       >
-        <option value="">All months (6-mo window)</option>
+        <option value="">All months (12-mo window)</option>
         {months.map((m) => (
           <option key={m.key} value={m.key}>{m.label}</option>
         ))}
