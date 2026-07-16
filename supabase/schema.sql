@@ -384,8 +384,13 @@ create index generated_payslips_employee_idx on generated_payslips (employee_id)
 --
 -- app_current_employee_id() resolves the signed-in employee row from
 -- auth.uid(). app_has_any_role(...) checks that employee's roles array.
--- "Elevated" = every role that should see company-wide HR/payroll data,
--- as opposed to only the signed-in employee's own records.
+-- "Elevated" = every role that should see company-wide HR/payroll data
+-- regardless of department. dept_head is deliberately NOT elevated — it's
+-- scoped to its own department via app_is_dept_head() +
+-- app_current_department_id() instead, mirroring lib/helpers.ts's
+-- scopeEmployeesForViewer() exactly (same set of pages: employee directory,
+-- performance evaluations, disciplinary records, and the
+-- attendance/overtime/tardiness/absenteeism reports).
 -- =============================================================================
 
 create or replace function app_current_employee_id()
@@ -396,6 +401,16 @@ security definer
 set search_path = public
 as $$
   select id from employees where user_id = auth.uid();
+$$;
+
+create or replace function app_current_department_id()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select department_id from employees where user_id = auth.uid();
 $$;
 
 create or replace function app_has_any_role(target_roles app_role[])
@@ -420,8 +435,18 @@ set search_path = public
 as $$
   select app_has_any_role(array[
     'hr_admin', 'payroll_officer', 'sr_accounting_assistant',
-    'treasurer', 'cfo', 'dept_head', 'upper_management', 'sys_admin'
+    'treasurer', 'cfo', 'upper_management', 'sys_admin'
   ]::app_role[]);
+$$;
+
+create or replace function app_is_dept_head()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select app_has_any_role(array['dept_head']::app_role[]);
 $$;
 
 create or replace function app_is_hr_or_admin()
@@ -454,9 +479,11 @@ $$;
 -- by hr_admin/sys_admin. Personal-data tables are readable/writable by the
 -- owning employee for their own row, and fully readable/writable by elevated
 -- roles. Sensitive company-wide tables (audit log, payroll overrides) are
--- elevated-only. dept_head is treated as elevated for v1 (sees everything,
--- not just their department) — scoping dept_head to direct reports only is a
--- worthwhile follow-up once this is wired into the app.
+-- elevated-only. dept_head additionally sees same-department rows on the
+-- specific tables the app actually shows them (employees, evaluations,
+-- disciplinary records, attendance) — everywhere else dept_head is treated
+-- like a plain employee (their own rows only), matching what the frontend
+-- already does.
 -- =============================================================================
 
 alter table branches enable row level security;
@@ -508,39 +535,60 @@ create policy "reference write" on announcements for all using (app_is_hr_or_adm
 create policy "payroll periods read" on payroll_periods for select using (auth.role() = 'authenticated');
 create policy "payroll periods write" on payroll_periods for all using (app_is_payroll()) with check (app_is_payroll());
 
--- Employees: self row, direct reports (for dept_head-style visibility later),
--- and elevated roles can read everyone; only HR/sys admin can write.
+-- Employees: self row, elevated roles read everyone, dept_head reads their
+-- own department; only HR/sys admin can write.
 create policy "employees read self or elevated" on employees for select
-  using (id = app_current_employee_id() or app_is_elevated());
+  using (
+    id = app_current_employee_id()
+    or app_is_elevated()
+    or (app_is_dept_head() and department_id = app_current_department_id())
+  );
 create policy "employees write hr" on employees for all
   using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
 
 -- Performance evaluations: the employee being evaluated, either of their two
 -- section evaluators (HR for Behavior, the designated evaluator for Job
--- Performance), and elevated roles.
+-- Performance), elevated roles, and dept_head for their own department's
+-- employees (read-only overview — a dept_head can still only *write* the
+-- section they're actually assigned to evaluate, via the evaluator-id clause,
+-- same as anyone else).
 create policy "evaluations read" on performance_evaluations for select
   using (
     employee_id = app_current_employee_id()
     or behavior_evaluator_id = app_current_employee_id()
     or job_performance_evaluator_id = app_current_employee_id()
     or app_is_elevated()
+    or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id()))
   );
-create policy "evaluations write elevated" on performance_evaluations for all
-  using (app_is_elevated()) with check (app_is_elevated());
+create policy "evaluations write" on performance_evaluations for all
+  using (app_is_elevated() or behavior_evaluator_id = app_current_employee_id() or job_performance_evaluator_id = app_current_employee_id())
+  with check (app_is_elevated() or behavior_evaluator_id = app_current_employee_id() or job_performance_evaluator_id = app_current_employee_id());
 
--- Disciplinary records: the employee named in the record, plus elevated
--- roles — not visible to coworkers.
+-- Disciplinary records: the employee named in the record, elevated roles, and
+-- dept_head for their own department (dept_head can also issue these, per
+-- the app's "canCreate" check).
 create policy "discipline read" on disciplinary_records for select
-  using (employee_id = app_current_employee_id() or app_is_elevated());
-create policy "discipline write elevated" on disciplinary_records for all
-  using (app_is_elevated()) with check (app_is_elevated());
+  using (
+    employee_id = app_current_employee_id()
+    or app_is_elevated()
+    or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id()))
+  );
+create policy "discipline write" on disciplinary_records for all
+  using (app_is_elevated() or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id())))
+  with check (app_is_elevated() or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id())));
 
--- Audit log: elevated-only, and written by the app (service role) rather
--- than end users.
+-- Audit log: read is elevated-only (dept_head is not elevated, so doesn't
+-- see this, matching the page's stated "HR and System Administrators"
+-- audience). Insert is open to any signed-in user, since every action across
+-- every role gets logged — there's no service-role backend here to do it on
+-- their behalf.
 create policy "audit read elevated" on audit_logs for select using (app_is_elevated());
-create policy "audit write elevated" on audit_logs for insert with check (app_is_elevated());
+create policy "audit write authenticated" on audit_logs for insert with check (auth.role() = 'authenticated');
 
 -- Approvable requests: the filer, plus elevated roles who approve them.
+-- dept_head isn't elevated, so (like a plain employee) only sees/files their
+-- own requests here — the app never gives dept_head an approval queue for
+-- leave/overtime/corrections, only hr_admin/upper_management get that.
 create policy "leave requests read" on leave_requests for select
   using (employee_id = app_current_employee_id() or app_is_elevated());
 create policy "leave requests insert self" on leave_requests for insert
@@ -565,10 +613,15 @@ create policy "correction requests update elevated or own pending" on attendance
   using (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'))
   with check (app_is_elevated() or (employee_id = app_current_employee_id() and status = 'pending'));
 
--- Attendance + payroll figures: the employee can read their own; only
--- payroll-tier roles write.
+-- Attendance + payroll figures: the employee can read their own, dept_head
+-- can read their department's (for the attendance/overtime/tardiness/
+-- absenteeism reports); only payroll-tier roles write.
 create policy "attendance read" on attendance_period_records for select
-  using (employee_id = app_current_employee_id() or app_is_elevated());
+  using (
+    employee_id = app_current_employee_id()
+    or app_is_elevated()
+    or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id()))
+  );
 create policy "attendance write payroll" on attendance_period_records for all
   using (app_is_payroll()) with check (app_is_payroll());
 
@@ -588,7 +641,10 @@ create policy "vouchers read" on generated_vouchers for select
 create policy "vouchers write payroll" on generated_vouchers for all
   using (app_is_payroll()) with check (app_is_payroll());
 
+-- Company-wide 1601-C rows (employee_id is null) are payroll-tier only, not
+-- readable by every signed-in user — tightened from the original policy,
+-- which let anyone read them via a bare "employee_id is null" clause.
 create policy "bir forms read" on generated_bir_forms for select
-  using (employee_id = app_current_employee_id() or employee_id is null or app_is_elevated());
+  using (employee_id = app_current_employee_id() or app_is_elevated());
 create policy "bir forms write payroll" on generated_bir_forms for all
   using (app_is_payroll()) with check (app_is_payroll());

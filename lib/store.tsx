@@ -16,6 +16,7 @@ import {
   deleteWorkScheduleRow,
   fetchAnnouncements,
   fetchAttendancePeriodRecords,
+  fetchAuditLogs,
   fetchBranches,
   fetchCorrectionRequests,
   fetchDepartments,
@@ -36,6 +37,7 @@ import {
   fetchWorkSchedules,
   importAttendancePeriodRecordsRows,
   insertAnnouncement,
+  insertAuditLog,
   insertBranch,
   insertCorrectionRequest,
   insertDepartment,
@@ -294,13 +296,14 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Phase 1-3 of the Supabase migration: once someone is signed in with a real
+  // Phase 1-4 of the Supabase migration: once someone is signed in with a real
   // Supabase Auth account (not the demo click-to-select login below), pull
   // these tables from Supabase and overwrite those slices — that's now the
   // source of truth for anyone with a real account. Demo-login users are
   // unaffected: RLS requires an authenticated Supabase session to read these
   // tables at all, so without one, the app keeps behaving exactly as it does
-  // today (mock data + localStorage). Still local-only: audit logs (Phase 4).
+  // today (mock data + localStorage). auditLogs comes back empty for
+  // non-elevated real accounts (RLS), which is expected, not an error.
   useEffect(() => {
     if (!supabaseSession) return;
     let active = true;
@@ -327,6 +330,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           generatedPayslips,
           generatedVouchers,
           generatedBirForms,
+          auditLogs,
         ] = await Promise.all([
           fetchBranches(),
           fetchDepartments(),
@@ -348,6 +352,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           fetchGeneratedPayslips(),
           fetchGeneratedVouchers(),
           fetchGeneratedBirForms(),
+          fetchAuditLogs(),
         ]);
         if (!active) return;
         setState((prev) => ({
@@ -372,6 +377,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           generatedPayslips,
           generatedVouchers,
           generatedBirForms,
+          auditLogs,
         }));
       } catch (err) {
         console.error("Failed to load org/employee data from Supabase — keeping local data.", err);
@@ -435,8 +441,22 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
 
   const logAudit = useCallback(
     (module: string, action: string, description: string, previousValue: string | null = null, newValue: string | null = null) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        insertAuditLog({
+          userId: actor?.employeeId ?? "system",
+          userName: actor?.name ?? "System",
+          module,
+          action,
+          description,
+          previousValue,
+          newValue,
+        })
+          .then((entry) => setState((prev) => ({ ...prev, auditLogs: [entry, ...prev.auditLogs] })))
+          .catch((err) => console.error("Failed to write audit log to Supabase", err));
+        return;
+      }
       setState((prev) => {
-        const actor = currentUser;
         const entry: AuditLog = {
           id: nextId("al"),
           userId: actor?.employeeId ?? "system",
@@ -451,7 +471,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, auditLogs: [entry, ...prev.auditLogs] };
       });
     },
-    [currentUser],
+    [currentUser, supabaseSession],
   );
 
   const login = useCallback((userId: string) => {

@@ -3,6 +3,7 @@ import type {
   AnnouncementRow,
   AttendanceCorrectionRequestRow,
   AttendancePeriodRecordRow,
+  AuditLogRow,
   BranchRow,
   DepartmentRow,
   DisciplinaryRecordRow,
@@ -25,6 +26,7 @@ import type {
   Announcement,
   AttendanceCorrectionRequest,
   AttendancePeriodRecord,
+  AuditLog,
   Branch,
   Department,
   DisciplinaryRecord,
@@ -893,4 +895,43 @@ export async function insertGeneratedBirForm(input: Omit<GeneratedBirForm, "id" 
   const { data, error } = await getSupabaseClient().from("generated_bir_forms").insert(row).select().single();
   if (error) throw error;
   return toGeneratedBirForm(data);
+}
+
+// -----------------------------------------------------------------------------
+// Phase 4: audit log. Read is elevated-only (enforced by RLS); insert is open
+// to any signed-in user since every action across every role gets logged.
+// -----------------------------------------------------------------------------
+
+function toAuditLog(r: AuditLogRow): AuditLog {
+  return {
+    id: r.id,
+    userId: r.actor_employee_id ?? "system",
+    userName: r.actor_name,
+    module: r.module,
+    action: r.action,
+    description: r.description,
+    previousValue: r.previous_value,
+    newValue: r.new_value,
+    createdAt: r.created_at,
+  };
+}
+
+export async function fetchAuditLogs(): Promise<AuditLog[]> {
+  const { data, error } = await getSupabaseClient().from("audit_logs").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map(toAuditLog);
+}
+export async function insertAuditLog(input: Omit<AuditLog, "id" | "createdAt">): Promise<AuditLog> {
+  const row = {
+    actor_employee_id: input.userId === "system" ? null : input.userId,
+    actor_name: input.userName,
+    module: input.module,
+    action: input.action,
+    description: input.description,
+    previous_value: input.previousValue,
+    new_value: input.newValue,
+  };
+  const { data, error } = await getSupabaseClient().from("audit_logs").insert(row).select().single();
+  if (error) throw error;
+  return toAuditLog(data);
 }
