@@ -16,6 +16,7 @@ import {
   formatDate,
   fullName,
   positionTitle,
+  scopeEmployeesForViewer,
 } from "@/lib/helpers";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
@@ -23,8 +24,12 @@ import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { employees, evaluations, disciplinaryRecords, currentUser, updateEmployee } = useHris();
-  const employee = employees.find((e) => e.id === params.id);
+  const { employees, currentEmployee, evaluations, disciplinaryRecords, currentUser, updateEmployee } = useHris();
+  const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee);
+  // A dept_head navigating directly to another department's employee URL
+  // gets the same "not found" state as a genuinely missing id — deliberately
+  // not distinguishing the two, so this doesn't confirm who exists elsewhere.
+  const employee = visibleEmployees.find((e) => e.id === params.id);
   const [editing, setEditing] = useState(false);
   const canEdit = currentUser?.roles.includes("hr_admin");
 

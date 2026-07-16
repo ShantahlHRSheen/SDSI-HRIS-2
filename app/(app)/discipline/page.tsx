@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
-import { formatDate, fullName, positionTitle } from "@/lib/helpers";
+import { formatDate, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import type { DisciplinaryType } from "@/lib/types";
 
@@ -21,17 +21,24 @@ const TYPE_TONE: Record<DisciplinaryType, BadgeTone> = {
 };
 
 export default function DisciplinePage() {
-  const { disciplinaryRecords, employees, currentUser, currentEmployee, addDisciplinaryRecord, setDisciplinaryStatus } = useHris();
+  const { disciplinaryRecords, employees: allEmployees, currentUser, currentEmployee, addDisciplinaryRecord, setDisciplinaryStatus } = useHris();
   const [typeFilter, setTypeFilter] = useState<"all" | DisciplinaryType>("all");
   const [showCreate, setShowCreate] = useState(false);
 
   const canCreate = currentUser?.roles.some((r) => ["hr_admin", "dept_head"].includes(r));
 
+  const employees = useMemo(
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
+    [allEmployees, currentUser, currentEmployee],
+  );
+  const visibleEmployeeIds = useMemo(() => new Set(employees.map((e) => e.id)), [employees]);
+
   const rows = useMemo(() => {
     return disciplinaryRecords
+      .filter((r) => visibleEmployeeIds.has(r.employeeId))
       .filter((r) => (typeFilter === "all" ? true : r.type === typeFilter))
       .sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [disciplinaryRecords, typeFilter]);
+  }, [disciplinaryRecords, typeFilter, visibleEmployeeIds]);
 
   const [form, setForm] = useState({ employeeId: "", type: "incident_report" as DisciplinaryType, description: "", attach: false });
 

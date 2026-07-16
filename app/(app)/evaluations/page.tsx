@@ -8,7 +8,7 @@ import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { CURRENT_EVAL_PERIOD, EVAL_CRITERIA_TEMPLATE } from "@/lib/mock-data";
-import { formatDate, fullName, positionTitle } from "@/lib/helpers";
+import { formatDate, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import type { EvaluationCriterion, EvaluationStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<EvaluationStatus, BadgeTone> = {
@@ -25,11 +25,17 @@ export default function EvaluationsPage() {
 
   const canCreate = currentUser?.roles.some((r) => ["hr_admin", "dept_head"].includes(r));
 
+  const visibleEmployeeIds = useMemo(() => {
+    const scoped = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee);
+    return new Set(scoped.map((e) => e.id));
+  }, [employees, currentUser, currentEmployee]);
+
   const rows = useMemo(() => {
     return evaluations
+      .filter((e) => visibleEmployeeIds.has(e.employeeId))
       .filter((e) => (statusFilter === "all" ? true : e.status === statusFilter))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  }, [evaluations, statusFilter]);
+  }, [evaluations, statusFilter, visibleEmployeeIds]);
 
   const evaluableEmployees = useMemo(() => {
     if (currentUser?.roles.includes("hr_admin")) return employees.filter((e) => e.supervisorId);

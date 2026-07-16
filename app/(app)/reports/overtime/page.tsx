@@ -9,7 +9,7 @@ import { TrendChart } from "@/components/charts/TrendChart";
 import { ReportFilters, EMPTY_REPORT_FILTERS, type ReportFilterState } from "@/components/reports/ReportFilters";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { EmptyState } from "@/components/EmptyState";
-import { formatCurrencyCompact } from "@/lib/helpers";
+import { formatCurrencyCompact, scopeEmployeesForViewer } from "@/lib/helpers";
 import {
   filterFacts,
   getMonthlyFacts,
@@ -24,7 +24,11 @@ import {
 } from "@/lib/monthly-analytics";
 
 export default function OvertimeReportPage() {
-  const { employees, branches, departments } = useHris();
+  const { employees: allEmployees, branches, departments, currentUser, currentEmployee } = useHris();
+  const employees = useMemo(
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
+    [allEmployees, currentUser, currentEmployee],
+  );
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
 

@@ -32,6 +32,27 @@ export function hasAnyRole(userRoles: Role[], allowed: Role[]): boolean {
   return userRoles.some((r) => allowed.includes(r));
 }
 
+// Roles that see company-wide employee data regardless of department —
+// every other role that reaches these pages (dept_head being the one that
+// doesn't) sees everything, same as before this scoping existed.
+const COMPANY_WIDE_ROLES: Role[] = [
+  "hr_admin", "upper_management", "sys_admin", "payroll_officer",
+  "sr_accounting_assistant", "treasurer", "cfo",
+];
+
+// Department Heads only see their own department's employees and records —
+// used by the Employee Directory, Performance Evaluations, Discipline, and
+// the Attendance/Overtime/Tardiness/Absenteeism reports so a dept_head can't
+// browse another department's people or data. Any other role that can reach
+// these pages sees company-wide data, unchanged.
+export function scopeEmployeesForViewer(employees: Employee[], viewerRoles: Role[], viewerEmployee: Employee | null): Employee[] {
+  if (hasAnyRole(viewerRoles, COMPANY_WIDE_ROLES)) return employees;
+  if (viewerRoles.includes("dept_head") && viewerEmployee) {
+    return employees.filter((e) => e.departmentId === viewerEmployee.departmentId);
+  }
+  return employees;
+}
+
 export function roleBadgeLabel(role: Role): string {
   return ROLE_LABELS[role];
 }

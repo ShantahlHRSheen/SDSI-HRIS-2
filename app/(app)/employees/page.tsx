@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
-import { branchName, departmentName, fullName, positionTitle } from "@/lib/helpers";
+import { branchName, departmentName, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
 const STATUS_TONE: Record<Employee["status"], BadgeTone> = {
@@ -19,7 +19,11 @@ const STATUS_TONE: Record<Employee["status"], BadgeTone> = {
 };
 
 export default function EmployeeDirectoryPage() {
-  const { employees, branches, departments, currentUser, addEmployee } = useHris();
+  const { employees: allEmployees, currentEmployee, branches, departments, currentUser, addEmployee } = useHris();
+  const employees = useMemo(
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
+    [allEmployees, currentUser, currentEmployee],
+  );
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");

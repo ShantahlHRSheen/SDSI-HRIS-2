@@ -21,9 +21,14 @@ import {
   toCsv,
   downloadCsv,
 } from "@/lib/monthly-analytics";
+import { scopeEmployeesForViewer } from "@/lib/helpers";
 
 export default function AttendanceReportPage() {
-  const { employees, branches, departments } = useHris();
+  const { employees: allEmployees, branches, departments, currentUser, currentEmployee } = useHris();
+  const employees = useMemo(
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
+    [allEmployees, currentUser, currentEmployee],
+  );
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
 

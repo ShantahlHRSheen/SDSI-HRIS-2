@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { ExportBar } from "@/components/reports/ExportBar";
-import { branchName, departmentName, formatDate, fullName } from "@/lib/helpers";
+import { branchName, departmentName, formatDate, fullName, scopeEmployeesForViewer } from "@/lib/helpers";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { buildTardinessRows, flaggedTardiness, TARDINESS_THRESHOLD, type TardinessRow } from "@/lib/tardiness-absenteeism";
 import type { Employee } from "@/lib/types";
@@ -20,7 +20,8 @@ export default function TardinessReportPage() {
     return <SelfServiceView employee={currentEmployee} records={attendancePeriodRecords} />;
   }
 
-  return <AdminView employees={employees} branches={branches} departments={departments} payrollPeriods={payrollPeriods} records={attendancePeriodRecords} />;
+  const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee);
+  return <AdminView employees={visibleEmployees} branches={branches} departments={departments} payrollPeriods={payrollPeriods} records={attendancePeriodRecords} />;
 }
 
 function SelfServiceView({ employee, records }: { employee: Employee | null; records: ReturnType<typeof useHris>["attendancePeriodRecords"] }) {
