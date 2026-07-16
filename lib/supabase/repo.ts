@@ -2,34 +2,46 @@ import { getSupabaseClient } from "./client";
 import type {
   AnnouncementRow,
   AttendanceCorrectionRequestRow,
+  AttendancePeriodRecordRow,
   BranchRow,
   DepartmentRow,
   DisciplinaryRecordRow,
   EmployeeRow,
+  GeneratedBirFormRow,
+  GeneratedPayslipRow,
+  GeneratedVoucherRow,
   HolidayRow,
   LeaveRequestRow,
   LeaveTypeRow,
   OvertimeRequestRow,
+  PayrollLineOverrideRow,
   PayrollPeriodRow,
   PerformanceEvaluationRow,
   PositionRow,
+  VoucherAmountOverrideRow,
   WorkScheduleRow,
 } from "./types";
 import type {
   Announcement,
   AttendanceCorrectionRequest,
+  AttendancePeriodRecord,
   Branch,
   Department,
   DisciplinaryRecord,
   Employee,
+  GeneratedBirForm,
+  GeneratedPayslip,
+  GeneratedVoucher,
   Holiday,
   LeaveRequest,
   LeaveType,
   OvertimeRequest,
+  PayrollLineOverride,
   PayrollPeriod,
   PerformanceEvaluation,
   Position,
   RequestStatus,
+  VoucherAmountOverride,
   WorkSchedule,
 } from "../types";
 
@@ -611,4 +623,274 @@ export async function decideCorrectionRequestRow(
   const { data, error } = await getSupabaseClient().from("attendance_correction_requests").update(row).eq("id", id).select().single();
   if (error) throw error;
   return toCorrectionRequest(data);
+}
+
+// -----------------------------------------------------------------------------
+// Phase 3: attendance period records, payroll overrides, and generated
+// documents (payslips, vouchers, BIR forms) — the payroll engine's inputs
+// and outputs.
+// -----------------------------------------------------------------------------
+
+// ---- Attendance period records --------------------------------------------------
+
+function toAttendancePeriodRecord(r: AttendancePeriodRecordRow): AttendancePeriodRecord {
+  return {
+    id: r.id,
+    periodId: r.period_id,
+    employeeId: r.employee_id,
+    daysWorked: r.days_worked,
+    holidayDays: r.holiday_days,
+    slDays: r.sl_days,
+    vlDays: r.vl_days,
+    lateAdjMinutes: r.late_adj_minutes,
+    undertimeMinutes: r.undertime_minutes,
+    notes: r.notes,
+    source: r.source,
+    updatedBy: r.updated_by,
+    updatedAt: r.updated_at,
+    lateInstances: r.late_instances ?? undefined,
+    lateDayDetails: r.late_day_details ?? undefined,
+    undertimeInstances: r.undertime_instances ?? undefined,
+    undertimeDayDetails: r.undertime_day_details ?? undefined,
+    halfDayInstances: r.half_day_instances ?? undefined,
+    halfDayDates: r.half_day_dates ?? undefined,
+    absenceInstances: r.absence_instances ?? undefined,
+    absentDates: r.absent_dates ?? undefined,
+  };
+}
+function attendancePeriodRecordToRow(
+  input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">,
+  source: AttendancePeriodRecord["source"],
+  updatedBy: string,
+): Omit<AttendancePeriodRecordRow, "id"> {
+  return {
+    period_id: input.periodId,
+    employee_id: input.employeeId,
+    days_worked: input.daysWorked,
+    holiday_days: input.holidayDays,
+    sl_days: input.slDays,
+    vl_days: input.vlDays,
+    late_adj_minutes: input.lateAdjMinutes,
+    undertime_minutes: input.undertimeMinutes,
+    notes: input.notes,
+    source,
+    updated_by: updatedBy,
+    updated_at: new Date().toISOString(),
+    late_instances: input.lateInstances ?? null,
+    late_day_details: input.lateDayDetails ?? null,
+    undertime_instances: input.undertimeInstances ?? null,
+    undertime_day_details: input.undertimeDayDetails ?? null,
+    half_day_instances: input.halfDayInstances ?? null,
+    half_day_dates: input.halfDayDates ?? null,
+    absence_instances: input.absenceInstances ?? null,
+    absent_dates: input.absentDates ?? null,
+  };
+}
+
+export async function fetchAttendancePeriodRecords(): Promise<AttendancePeriodRecord[]> {
+  const { data, error } = await getSupabaseClient().from("attendance_period_records").select("*");
+  if (error) throw error;
+  return data.map(toAttendancePeriodRecord);
+}
+export async function upsertAttendancePeriodRecordRow(
+  input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">,
+  updatedBy: string,
+): Promise<AttendancePeriodRecord> {
+  const row = attendancePeriodRecordToRow(input, "manual", updatedBy);
+  const { data, error } = await getSupabaseClient()
+    .from("attendance_period_records")
+    .upsert(row, { onConflict: "period_id,employee_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return toAttendancePeriodRecord(data);
+}
+export async function importAttendancePeriodRecordsRows(
+  periodId: string,
+  rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[],
+  updatedBy: string,
+): Promise<AttendancePeriodRecord[]> {
+  const payload = rows.map((row) => attendancePeriodRecordToRow({ ...row, periodId }, "import", updatedBy));
+  const { data, error } = await getSupabaseClient()
+    .from("attendance_period_records")
+    .upsert(payload, { onConflict: "period_id,employee_id" })
+    .select();
+  if (error) throw error;
+  return data.map(toAttendancePeriodRecord);
+}
+
+// ---- Payroll line overrides --------------------------------------------------------
+
+function toPayrollLineOverride(r: PayrollLineOverrideRow): PayrollLineOverride {
+  return {
+    id: r.id,
+    periodId: r.period_id,
+    employeeId: r.employee_id,
+    travelAllowance: r.travel_allowance,
+    laundryAllowance: r.laundry_allowance,
+    medicalCashAllowance: r.medical_cash_allowance,
+    supervisorAllowance: r.supervisor_allowance,
+    cashAdvance: r.cash_advance,
+    lsmBizLoan: r.lsm_biz_loan,
+    lsmCoopLoan: r.lsm_coop_loan,
+    shortages: r.shortages,
+    sssLoan: r.sss_loan,
+    hdmfLoan: r.hdmf_loan,
+    hdmfMp2Savings: r.hdmf_mp2_savings,
+    adjustmentAdd: r.adjustment_add,
+    adjustmentDeduct: r.adjustment_deduct,
+    sssContributionOverride: r.sss_contribution_override,
+    sssWispOverride: r.sss_wisp_override,
+    philHealthContributionOverride: r.philhealth_contribution_override,
+    hdmfContributionOverride: r.hdmf_contribution_override,
+    withholdingTaxOverride: r.withholding_tax_override,
+    dailyAllowanceOverride: r.daily_allowance_override,
+    basicPayOverride: r.basic_pay_override,
+    latesUndertimeOverride: r.lates_undertime_override,
+    undertimeDeductionOverride: r.undertime_deduction_override,
+    holidayPayOverride: r.holiday_pay_override,
+    vlPayOverride: r.vl_pay_override,
+    slPayOverride: r.sl_pay_override,
+    otHoursOverride: r.ot_hours_override,
+    otPayOverride: r.ot_pay_override,
+    updatedBy: r.updated_by,
+    updatedAt: r.updated_at,
+  };
+}
+function payrollLineOverrideToRow(
+  input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">,
+  updatedBy: string,
+): Omit<PayrollLineOverrideRow, "id"> {
+  return {
+    period_id: input.periodId,
+    employee_id: input.employeeId,
+    travel_allowance: input.travelAllowance,
+    laundry_allowance: input.laundryAllowance,
+    medical_cash_allowance: input.medicalCashAllowance,
+    supervisor_allowance: input.supervisorAllowance,
+    cash_advance: input.cashAdvance,
+    lsm_biz_loan: input.lsmBizLoan,
+    lsm_coop_loan: input.lsmCoopLoan,
+    shortages: input.shortages,
+    sss_loan: input.sssLoan,
+    hdmf_loan: input.hdmfLoan,
+    hdmf_mp2_savings: input.hdmfMp2Savings,
+    adjustment_add: input.adjustmentAdd,
+    adjustment_deduct: input.adjustmentDeduct,
+    sss_contribution_override: input.sssContributionOverride,
+    sss_wisp_override: input.sssWispOverride,
+    philhealth_contribution_override: input.philHealthContributionOverride,
+    hdmf_contribution_override: input.hdmfContributionOverride,
+    withholding_tax_override: input.withholdingTaxOverride,
+    daily_allowance_override: input.dailyAllowanceOverride,
+    basic_pay_override: input.basicPayOverride,
+    lates_undertime_override: input.latesUndertimeOverride,
+    undertime_deduction_override: input.undertimeDeductionOverride,
+    holiday_pay_override: input.holidayPayOverride,
+    vl_pay_override: input.vlPayOverride,
+    sl_pay_override: input.slPayOverride,
+    ot_hours_override: input.otHoursOverride,
+    ot_pay_override: input.otPayOverride,
+    updated_by: updatedBy,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export async function fetchPayrollLineOverrides(): Promise<PayrollLineOverride[]> {
+  const { data, error } = await getSupabaseClient().from("payroll_line_overrides").select("*");
+  if (error) throw error;
+  return data.map(toPayrollLineOverride);
+}
+export async function upsertPayrollLineOverrideRow(
+  input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">,
+  updatedBy: string,
+): Promise<PayrollLineOverride> {
+  const row = payrollLineOverrideToRow(input, updatedBy);
+  const { data, error } = await getSupabaseClient()
+    .from("payroll_line_overrides")
+    .upsert(row, { onConflict: "period_id,employee_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return toPayrollLineOverride(data);
+}
+
+// ---- Voucher amount overrides --------------------------------------------------------
+
+function toVoucherAmountOverride(r: VoucherAmountOverrideRow): VoucherAmountOverride {
+  return { id: r.id, periodId: r.period_id, employeeId: r.employee_id, amount: r.amount, updatedBy: r.updated_by, updatedAt: r.updated_at };
+}
+
+export async function fetchVoucherAmountOverrides(): Promise<VoucherAmountOverride[]> {
+  const { data, error } = await getSupabaseClient().from("voucher_amount_overrides").select("*");
+  if (error) throw error;
+  return data.map(toVoucherAmountOverride);
+}
+export async function upsertVoucherAmountOverrideRow(
+  input: Omit<VoucherAmountOverride, "id" | "updatedBy" | "updatedAt">,
+  updatedBy: string,
+): Promise<VoucherAmountOverride> {
+  const row = { period_id: input.periodId, employee_id: input.employeeId, amount: input.amount, updated_by: updatedBy, updated_at: new Date().toISOString() };
+  const { data, error } = await getSupabaseClient()
+    .from("voucher_amount_overrides")
+    .upsert(row, { onConflict: "period_id,employee_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return toVoucherAmountOverride(data);
+}
+
+// ---- Generated payslips / vouchers / BIR forms ----------------------------------------
+
+function toGeneratedPayslip(r: GeneratedPayslipRow): GeneratedPayslip {
+  return { id: r.id, periodId: r.period_id, employeeId: r.employee_id, generatedBy: r.generated_by, generatedAt: r.generated_at, summary: r.summary };
+}
+export async function fetchGeneratedPayslips(): Promise<GeneratedPayslip[]> {
+  const { data, error } = await getSupabaseClient().from("generated_payslips").select("*");
+  if (error) throw error;
+  return data.map(toGeneratedPayslip);
+}
+export async function insertGeneratedPayslip(input: Omit<GeneratedPayslip, "id" | "generatedAt" | "generatedBy">, generatedBy: string): Promise<GeneratedPayslip> {
+  const row = { period_id: input.periodId, employee_id: input.employeeId, summary: input.summary, generated_by: generatedBy };
+  const { data, error } = await getSupabaseClient().from("generated_payslips").insert(row).select().single();
+  if (error) throw error;
+  return toGeneratedPayslip(data);
+}
+
+function toGeneratedVoucher(r: GeneratedVoucherRow): GeneratedVoucher {
+  return { id: r.id, periodId: r.period_id, employeeId: r.employee_id, amount: r.amount, generatedBy: r.generated_by, generatedAt: r.generated_at };
+}
+export async function fetchGeneratedVouchers(): Promise<GeneratedVoucher[]> {
+  const { data, error } = await getSupabaseClient().from("generated_vouchers").select("*");
+  if (error) throw error;
+  return data.map(toGeneratedVoucher);
+}
+export async function insertGeneratedVoucher(input: Omit<GeneratedVoucher, "id" | "generatedAt" | "generatedBy">, generatedBy: string): Promise<GeneratedVoucher> {
+  const row = { period_id: input.periodId, employee_id: input.employeeId, amount: input.amount, generated_by: generatedBy };
+  const { data, error } = await getSupabaseClient().from("generated_vouchers").insert(row).select().single();
+  if (error) throw error;
+  return toGeneratedVoucher(data);
+}
+
+function toGeneratedBirForm(r: GeneratedBirFormRow): GeneratedBirForm {
+  return {
+    id: r.id,
+    formType: r.form_type,
+    period: r.period,
+    employeeId: r.employee_id,
+    generatedBy: r.generated_by,
+    generatedAt: r.generated_at,
+    summary: r.summary,
+  };
+}
+export async function fetchGeneratedBirForms(): Promise<GeneratedBirForm[]> {
+  const { data, error } = await getSupabaseClient().from("generated_bir_forms").select("*");
+  if (error) throw error;
+  return data.map(toGeneratedBirForm);
+}
+export async function insertGeneratedBirForm(input: Omit<GeneratedBirForm, "id" | "generatedAt" | "generatedBy">, generatedBy: string): Promise<GeneratedBirForm> {
+  const row = { form_type: input.formType, period: input.period, employee_id: input.employeeId, summary: input.summary, generated_by: generatedBy };
+  const { data, error } = await getSupabaseClient().from("generated_bir_forms").insert(row).select().single();
+  if (error) throw error;
+  return toGeneratedBirForm(data);
 }

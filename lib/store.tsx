@@ -15,19 +15,26 @@ import {
   deletePositionRow,
   deleteWorkScheduleRow,
   fetchAnnouncements,
+  fetchAttendancePeriodRecords,
   fetchBranches,
   fetchCorrectionRequests,
   fetchDepartments,
   fetchDisciplinaryRecords,
   fetchEmployees,
   fetchEvaluations,
+  fetchGeneratedBirForms,
+  fetchGeneratedPayslips,
+  fetchGeneratedVouchers,
   fetchHolidays,
   fetchLeaveRequests,
   fetchLeaveTypes,
   fetchOvertimeRequests,
+  fetchPayrollLineOverrides,
   fetchPayrollPeriods,
   fetchPositions,
+  fetchVoucherAmountOverrides,
   fetchWorkSchedules,
+  importAttendancePeriodRecordsRows,
   insertAnnouncement,
   insertBranch,
   insertCorrectionRequest,
@@ -35,6 +42,9 @@ import {
   insertDisciplinaryRecord,
   insertEmployee,
   insertEvaluation,
+  insertGeneratedBirForm,
+  insertGeneratedPayslip,
+  insertGeneratedVoucher,
   insertHoliday,
   insertLeaveRequest,
   insertLeaveType,
@@ -52,6 +62,9 @@ import {
   updatePayrollPeriodRow,
   updatePositionRow,
   updateWorkScheduleRow,
+  upsertAttendancePeriodRecordRow,
+  upsertPayrollLineOverrideRow,
+  upsertVoucherAmountOverrideRow,
 } from "./supabase/repo";
 import {
   ANNOUNCEMENTS,
@@ -281,14 +294,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Phase 1+2 of the Supabase migration: once someone is signed in with a real
+  // Phase 1-3 of the Supabase migration: once someone is signed in with a real
   // Supabase Auth account (not the demo click-to-select login below), pull
   // these tables from Supabase and overwrite those slices — that's now the
   // source of truth for anyone with a real account. Demo-login users are
   // unaffected: RLS requires an authenticated Supabase session to read these
   // tables at all, so without one, the app keeps behaving exactly as it does
-  // today (mock data + localStorage). Still local-only: attendance records,
-  // payroll overrides, and generated payslips/vouchers/BIR forms (Phase 3).
+  // today (mock data + localStorage). Still local-only: audit logs (Phase 4).
   useEffect(() => {
     if (!supabaseSession) return;
     let active = true;
@@ -309,6 +321,12 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           leaveRequests,
           overtimeRequests,
           correctionRequests,
+          attendancePeriodRecords,
+          payrollLineOverrides,
+          voucherAmountOverrides,
+          generatedPayslips,
+          generatedVouchers,
+          generatedBirForms,
         ] = await Promise.all([
           fetchBranches(),
           fetchDepartments(),
@@ -324,6 +342,12 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           fetchLeaveRequests(),
           fetchOvertimeRequests(),
           fetchCorrectionRequests(),
+          fetchAttendancePeriodRecords(),
+          fetchPayrollLineOverrides(),
+          fetchVoucherAmountOverrides(),
+          fetchGeneratedPayslips(),
+          fetchGeneratedVouchers(),
+          fetchGeneratedBirForms(),
         ]);
         if (!active) return;
         setState((prev) => ({
@@ -342,6 +366,12 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           leaveRequests,
           overtimeRequests,
           correctionRequests,
+          attendancePeriodRecords,
+          payrollLineOverrides,
+          voucherAmountOverrides,
+          generatedPayslips,
+          generatedVouchers,
+          generatedBirForms,
         }));
       } catch (err) {
         console.error("Failed to load org/employee data from Supabase — keeping local data.", err);
@@ -498,9 +528,23 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const upsertAttendancePeriodRecord: HrisContextShape["upsertAttendancePeriodRecord"] = useCallback(
-    (input) => {
+    async (input) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        try {
+          const entry = await upsertAttendancePeriodRecordRow(input, actor?.name ?? "System");
+          setState((prev) => ({
+            ...prev,
+            attendancePeriodRecords: [entry, ...prev.attendancePeriodRecords.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId))],
+          }));
+          logAudit("Attendance", "update", `Manually updated attendance for period ${input.periodId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save attendance record in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const existing = prev.attendancePeriodRecords.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
         const entry: AttendancePeriodRecord = {
           ...input,
@@ -514,13 +558,24 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Attendance", "update", `Manually updated attendance for period ${input.periodId}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const importAttendancePeriodRecords: HrisContextShape["importAttendancePeriodRecords"] = useCallback(
-    (periodId, rows) => {
+    async (periodId, rows) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        try {
+          const imported = await importAttendancePeriodRecordsRows(periodId, rows, actor?.name ?? "System");
+          setState((prev) => ({ ...prev, attendancePeriodRecords: [...imported, ...prev.attendancePeriodRecords.filter((r) => r.periodId !== periodId)] }));
+          logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to import attendance records in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const imported: AttendancePeriodRecord[] = rows.map((row) => ({
           ...row,
           id: nextId("att"),
@@ -534,13 +589,27 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const upsertPayrollLineOverride: HrisContextShape["upsertPayrollLineOverride"] = useCallback(
-    (input) => {
+    async (input) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        try {
+          const entry = await upsertPayrollLineOverrideRow(input, actor?.name ?? "System");
+          setState((prev) => ({
+            ...prev,
+            payrollLineOverrides: [entry, ...prev.payrollLineOverrides.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId))],
+          }));
+          logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save payroll line override in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const existing = prev.payrollLineOverrides.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
         const entry: PayrollLineOverride = {
           ...input,
@@ -553,13 +622,27 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const upsertVoucherAmountOverride: HrisContextShape["upsertVoucherAmountOverride"] = useCallback(
-    (input) => {
+    async (input) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        try {
+          const entry = await upsertVoucherAmountOverrideRow(input, actor?.name ?? "System");
+          setState((prev) => ({
+            ...prev,
+            voucherAmountOverrides: [entry, ...prev.voucherAmountOverrides.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId))],
+          }));
+          logAudit("Allowance Vouchers", "update", `Adjusted voucher amount for period ${input.periodId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save voucher amount override in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const existing = prev.voucherAmountOverrides.find((r) => r.periodId === input.periodId && r.employeeId === input.employeeId);
         const entry: VoucherAmountOverride = {
           ...input,
@@ -572,7 +655,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Allowance Vouchers", "update", `Adjusted voucher amount for period ${input.periodId}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const addEvaluation: HrisContextShape["addEvaluation"] = useCallback(
@@ -867,9 +950,21 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addGeneratedBirForm: HrisContextShape["addGeneratedBirForm"] = useCallback(
-    (input) => {
+    async (input) => {
+      const actor = currentUser;
+      const label = input.formType === "1601c" ? "BIR Form 1601-C" : "BIR Form 2316";
+      if (supabaseSession) {
+        try {
+          const entry = await insertGeneratedBirForm(input, actor?.name ?? "System");
+          setState((prev) => ({ ...prev, generatedBirForms: [entry, ...prev.generatedBirForms] }));
+          logAudit("BIR", "generate", `Generated ${label} for ${input.period}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save generated BIR form in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const entry: GeneratedBirForm = {
           ...input,
           id: nextId("bir"),
@@ -878,10 +973,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         };
         return { ...prev, generatedBirForms: [entry, ...prev.generatedBirForms] };
       });
-      const label = input.formType === "1601c" ? "BIR Form 1601-C" : "BIR Form 2316";
       logAudit("BIR", "generate", `Generated ${label} for ${input.period}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const fileLeaveRequest: HrisContextShape["fileLeaveRequest"] = useCallback(
@@ -1020,27 +1114,49 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addGeneratedPayslip: HrisContextShape["addGeneratedPayslip"] = useCallback(
-    (input) => {
+    async (input) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        try {
+          const entry = await insertGeneratedPayslip(input, actor?.name ?? "System");
+          setState((prev) => ({ ...prev, generatedPayslips: [entry, ...prev.generatedPayslips] }));
+          logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save generated payslip in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const entry: GeneratedPayslip = { ...input, id: nextId("ps"), generatedAt: TODAY, generatedBy: actor?.name ?? "System" };
         return { ...prev, generatedPayslips: [entry, ...prev.generatedPayslips] };
       });
       logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const addGeneratedVoucher: HrisContextShape["addGeneratedVoucher"] = useCallback(
-    (input) => {
+    async (input) => {
+      const actor = currentUser;
+      if (supabaseSession) {
+        try {
+          const entry = await insertGeneratedVoucher(input, actor?.name ?? "System");
+          setState((prev) => ({ ...prev, generatedVouchers: [entry, ...prev.generatedVouchers] }));
+          logAudit("Allowance Vouchers", "generate", `Generated voucher for period ${input.periodId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save generated voucher in Supabase", err);
+          return;
+        }
+      }
       setState((prev) => {
-        const actor = currentUser;
         const entry: GeneratedVoucher = { ...input, id: nextId("vo"), generatedAt: TODAY, generatedBy: actor?.name ?? "System" };
         return { ...prev, generatedVouchers: [entry, ...prev.generatedVouchers] };
       });
       logAudit("Allowance Vouchers", "generate", `Generated voucher for period ${input.periodId}`);
     },
-    [logAudit, currentUser],
+    [logAudit, currentUser, supabaseSession],
   );
 
   const value: HrisContextShape = {
