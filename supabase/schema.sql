@@ -163,6 +163,31 @@ create table employees (
 create index employees_supervisor_id_idx on employees (supervisor_id);
 create index employees_user_id_idx on employees (user_id);
 
+-- Auto-link onboarding: whenever a new Supabase Auth user is created (via the
+-- dashboard, an invite, etc.), attach it to the employees row with the same
+-- email if that row doesn't already have a login. Without this, every new
+-- account would need someone to manually re-run the email-matching UPDATE
+-- from seed.sql — this makes incremental onboarding (see the employees.user_id
+-- comment above) actually incremental, with no follow-up step.
+create or replace function public.link_employee_on_auth_user_created()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.employees
+  set user_id = new.id
+  where lower(email) = lower(new.email) and user_id is null;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.link_employee_on_auth_user_created();
+
 -- ---------------------------------------------------------------------------
 -- Performance, discipline, audit, announcements
 -- ---------------------------------------------------------------------------
