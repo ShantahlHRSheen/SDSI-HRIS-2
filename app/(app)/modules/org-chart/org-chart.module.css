@@ -1,0 +1,255 @@
+.page {
+  --navy: #0f1a12;
+  --navy-2: #16241a;
+  --gold: #22c55e;
+  --gold-2: #4ade80;
+  --paper: #080a08;
+  --card: #12160f;
+  --line: #243024;
+  --ink: #eef2ec;
+  --sub: #8fa398;
+  --main: #22c55e; /* Shantahl Main */
+  --cosmetics: #34d399; /* Cosmetics */
+  --darofy: #65d18a; /* Darofy */
+  --shared: #0ea86b; /* Shared services */
+
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(34, 197, 94, 0.1), transparent 45%),
+    radial-gradient(circle at 85% 100%, rgba(34, 197, 94, 0.06), transparent 50%),
+    var(--paper);
+  font-family: "Helvetica Neue", Arial, "Segoe UI", sans-serif;
+  color: var(--ink);
+  padding: 40px 20px 80px;
+  border-radius: 12px;
+}
+.page * {
+  box-sizing: border-box;
+}
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 3px double var(--gold);
+}
+.eyebrow {
+  letter-spacing: 0.28em;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.header h1 {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  font-weight: 800;
+  text-shadow: 0 0 24px rgba(34, 197, 94, 0.35);
+}
+.header p {
+  margin: 8px 0 0;
+  color: var(--sub);
+  font-size: 13px;
+}
+
+/* top governance block */
+.gov {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.node {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 22px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  min-width: 260px;
+}
+.node.board {
+  background: linear-gradient(180deg, var(--navy-2), var(--navy));
+  color: var(--ink);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.15), 0 4px 18px rgba(0, 0, 0, 0.55);
+}
+.role {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.node.board .role {
+  color: var(--gold-2);
+}
+.name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.vline {
+  width: 2px;
+  height: 26px;
+  background: var(--line);
+}
+
+/* two-column chairman / vc layout */
+.halves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  align-items: start;
+  position: relative;
+  margin-top: 0;
+}
+.half {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.unitLabel {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sub);
+  margin: 22px 0 10px;
+}
+
+/* department card = collapsible outline tree */
+.dept {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 5px solid var(--dcolor, var(--navy));
+  border-radius: 10px;
+  margin-bottom: 22px;
+  padding: 16px 20px 18px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+}
+.deptHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.deptHead h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--dcolor, var(--navy));
+}
+.headName {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.headTitle {
+  font-size: 12px;
+  color: var(--sub);
+}
+
+/* tree list */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding-left: 18px;
+}
+.tree.root {
+  padding-left: 0;
+}
+.tree li {
+  position: relative;
+  padding: 5px 0 5px 20px;
+  margin-left: 2px;
+  border-left: 1.5px solid var(--line);
+}
+.tree li:last-child {
+  border-left: 1.5px solid transparent;
+}
+.tree li::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 18px;
+  border-left: 1.5px solid var(--line);
+  border-bottom: 1.5px solid var(--line);
+  border-bottom-left-radius: 6px;
+}
+.tree li:last-child::before {
+  border-left: 1.5px solid var(--line);
+}
+.tree.root > li {
+  border-left: none;
+  padding-left: 0;
+}
+.tree.root > li::before {
+  display: none;
+}
+
+.division {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dcolor, var(--navy));
+  display: inline-block;
+  margin-bottom: 4px;
+}
+.person {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.title {
+  font-size: 12.5px;
+  color: var(--sub);
+  font-weight: 400;
+}
+.placeholder {
+  font-style: italic;
+  font-size: 12.5px;
+  color: var(--sub);
+}
+.branchTag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--dcolor, var(--gold-2));
+  border-radius: 5px;
+  padding: 1px 7px;
+  margin-bottom: 3px;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 40px;
+  font-size: 11px;
+  color: var(--sub);
+}
+
+@media print {
+  .page {
+    padding: 0;
+  }
+  .dept {
+    break-inside: avoid;
+  }
+}
