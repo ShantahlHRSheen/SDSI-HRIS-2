@@ -8,11 +8,24 @@ import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { PayslipDocument } from "@/components/payroll/PayslipDocument";
 import { computePayrollForPeriod, payrollLineToSummary, summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
-import { branchName, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 
 export default function PayslipsPage() {
-  const { currentUser, currentEmployee, employees, branches, departments, payrollPeriods, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, generatedPayslips, addGeneratedPayslip } = useHris();
+  const {
+    currentUser,
+    currentEmployee,
+    employees,
+    employeeDepartmentAllocations,
+    branches,
+    departments,
+    payrollPeriods,
+    attendancePeriodRecords,
+    overtimeRequests,
+    payrollLineOverrides,
+    generatedPayslips,
+    addGeneratedPayslip,
+  } = useHris();
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; line: PayrollLine } | null>(null);
@@ -40,6 +53,7 @@ export default function PayslipsPage() {
   return (
     <AdminView
       employees={employees}
+      employeeDepartmentAllocations={employeeDepartmentAllocations}
       branches={branches}
       departments={departments}
       payrollPeriods={payrollPeriods}
@@ -143,6 +157,7 @@ function SelfServiceView({
 
 function AdminView({
   employees,
+  employeeDepartmentAllocations,
   branches,
   departments,
   payrollPeriods,
@@ -157,6 +172,7 @@ function AdminView({
   setPreview,
 }: {
   employees: Employee[];
+  employeeDepartmentAllocations: ReturnType<typeof useHris>["employeeDepartmentAllocations"];
   branches: ReturnType<typeof useHris>["branches"];
   departments: ReturnType<typeof useHris>["departments"];
   payrollPeriods: PayrollPeriod[];
@@ -178,7 +194,7 @@ function AdminView({
     .map((l) => employees.find((e) => e.id === l.employeeId))
     .filter((e): e is Employee => !!e)
     .filter((e) => (branchId ? e.branchId === branchId : true))
-    .filter((e) => (departmentId ? e.departmentId === departmentId : true))
+    .filter((e) => (departmentId ? departmentAllocationsForEmployee(e, employeeDepartmentAllocations).some((a) => a.departmentId === departmentId) : true))
     .filter((e) => fullName(e).toLowerCase().includes(search.toLowerCase()));
 
   const generatedForPeriod = new Set(generatedPayslips.filter((p) => p.periodId === period?.id).map((p) => p.employeeId));

@@ -21,15 +21,23 @@ const TYPE_TONE: Record<DisciplinaryType, BadgeTone> = {
 };
 
 export default function DisciplinePage() {
-  const { disciplinaryRecords, employees: allEmployees, currentUser, currentEmployee, addDisciplinaryRecord, setDisciplinaryStatus } = useHris();
+  const {
+    disciplinaryRecords,
+    employees: allEmployees,
+    employeeDepartmentAllocations,
+    currentUser,
+    currentEmployee,
+    addDisciplinaryRecord,
+    setDisciplinaryStatus,
+  } = useHris();
   const [typeFilter, setTypeFilter] = useState<"all" | DisciplinaryType>("all");
   const [showCreate, setShowCreate] = useState(false);
 
   const canCreate = currentUser?.roles.some((r) => ["hr_admin", "dept_head"].includes(r));
 
   const employees = useMemo(
-    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
-    [allEmployees, currentUser, currentEmployee],
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations),
+    [allEmployees, currentUser, currentEmployee, employeeDepartmentAllocations],
   );
   const visibleEmployeeIds = useMemo(() => new Set(employees.map((e) => e.id)), [employees]);
 

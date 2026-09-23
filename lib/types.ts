@@ -41,6 +41,16 @@ export interface Department {
   division: Division;
 }
 
+// Splits an employee's cost/headcount across more than one department. Only
+// present for employees who are actually split — see
+// departmentAllocationsForEmployee() in lib/helpers.ts, which is the single
+// place that reconciles this with an employee's primary departmentId.
+export interface EmployeeDepartmentAllocation {
+  employeeId: string;
+  departmentId: string;
+  percent: number; // 0-100; all rows for one employee should sum to 100
+}
+
 export interface Position {
   id: string;
   title: string;

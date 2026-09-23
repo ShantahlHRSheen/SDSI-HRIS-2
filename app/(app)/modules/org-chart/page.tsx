@@ -97,6 +97,9 @@ export default function OrgChartPage() {
                 <li>
                   <span className={styles.placeholder}>Sales Admins</span>
                 </li>
+                <li>
+                  <span className={styles.person}>Cecil Catapang</span> <span className={styles.title}>— Product Specialist (50% — shared with Darofy Department)</span>
+                </li>
               </ul>
             </li>
           </ul>
@@ -174,6 +177,9 @@ export default function OrgChartPage() {
                       <span className={styles.placeholder}>Sales Admins</span>
                     </li>
                   </ul>
+                </li>
+                <li>
+                  <span className={styles.person}>Cecil Catapang</span> <span className={styles.title}>— Product Specialist (50% — shared with MLM Department)</span>
                 </li>
               </ul>
             </li>

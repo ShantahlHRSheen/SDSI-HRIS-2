@@ -59,6 +59,7 @@ export default function EvaluationsPage() {
   const {
     evaluations,
     employees,
+    employeeDepartmentAllocations,
     currentEmployee,
     currentUser,
     addEvaluation,
@@ -78,7 +79,7 @@ export default function EvaluationsPage() {
   // a dept_head/manager additionally sees anyone they're the designated Job
   // Performance evaluator for, even outside their own department. ---------
   const visibleEmployeeIds = useMemo(() => {
-    const scoped = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee);
+    const scoped = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations);
     const ids = new Set(scoped.map((e) => e.id));
     if (currentEmployee) {
       employees.forEach((e) => {
@@ -86,7 +87,7 @@ export default function EvaluationsPage() {
       });
     }
     return ids;
-  }, [employees, currentUser, currentEmployee]);
+  }, [employees, currentUser, currentEmployee, employeeDepartmentAllocations]);
 
   const rows = useMemo(() => {
     return evaluations

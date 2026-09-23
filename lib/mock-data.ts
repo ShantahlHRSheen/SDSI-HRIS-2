@@ -8,6 +8,7 @@ import type {
   DemoUser,
   DisciplinaryRecord,
   Employee,
+  EmployeeDepartmentAllocation,
   Holiday,
   LeaveRequest,
   LeaveType,
@@ -88,11 +89,13 @@ export const POSITIONS: Position[] = [
   { id: "ps-bookkeeper-9", title: "Bookkeeper", departmentId: "dp-fin" },
   { id: "ps-corporate-treasurer-10", title: "Corporate Treasurer", departmentId: "dp-fin" },
   { id: "ps-hr-manager-11", title: "HR Manager", departmentId: "dp-hr" },
+  { id: "ps-business-unit-president-44", title: "Business Unit President", departmentId: "dp-darofy" },
   { id: "ps-content-creator-12", title: "Content Creator", departmentId: "dp-darofy" },
   { id: "ps-marketing-head-13", title: "Marketing Head", departmentId: "dp-darofy" },
   { id: "ps-multimedia-artist-14", title: "Multimedia Artist", departmentId: "dp-darofy" },
   { id: "ps-sales-manager-15", title: "Sales Manager", departmentId: "dp-darofy" },
   { id: "ps-sales-admin-16", title: "Sales Admin", departmentId: "dp-darofy" },
+  { id: "ps-business-unit-president-45", title: "Business Unit President", departmentId: "dp-mlm" },
   { id: "ps-network-development-head-luzon-17", title: "Network Development Head - Luzon", departmentId: "dp-mlm" },
   { id: "ps-network-development-head-visayas-18", title: "Network Development Head - Visayas", departmentId: "dp-mlm" },
   { id: "ps-network-development-head-mindanao-19", title: "Network Development Head - Mindanao", departmentId: "dp-mlm" },
@@ -101,6 +104,7 @@ export const POSITIONS: Position[] = [
   { id: "ps-video-editor-22", title: "Video Editor", departmentId: "dp-mlm" },
   { id: "ps-ads-specialist-23", title: "Ads Specialist", departmentId: "dp-mlm" },
   { id: "ps-sales-admin-24", title: "Sales Admin", departmentId: "dp-mlm" },
+  { id: "ps-business-unit-president-46", title: "Business Unit President", departmentId: "dp-cosmetics" },
   { id: "ps-platform-specialist-25", title: "Platform Specialist", departmentId: "dp-cosmetics" },
   { id: "ps-multimedia-artist-head-26", title: "Multimedia Artist Head", departmentId: "dp-cosmetics" },
   { id: "ps-video-editor-27", title: "Video Editor", departmentId: "dp-cosmetics" },
@@ -1074,6 +1078,16 @@ export const EMPLOYEES: Employee[] = [
     dailyAllowance: 22, monthlyAllowance: null,
     status: "active", statusChangedAt: null, roles: ["employee"],
   },
+];
+
+// Employees split across more than one department — most employees have no
+// entry here at all (see departmentAllocationsForEmployee in lib/helpers.ts).
+// Cecil Catapang (emp-040) is genuinely shared 50/50 between MLM and Darofy;
+// her monthlySalary (30000) is already the combined total of the two 15000
+// halves.
+export const EMPLOYEE_DEPARTMENT_ALLOCATIONS: EmployeeDepartmentAllocation[] = [
+  { employeeId: "emp-040", departmentId: "dp-mlm", percent: 50 },
+  { employeeId: "emp-040", departmentId: "dp-darofy", percent: 50 },
 ];
 
 // --- Named references into the real roster, used to wire demo logins and

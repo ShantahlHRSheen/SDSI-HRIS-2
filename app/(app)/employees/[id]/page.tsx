@@ -7,6 +7,7 @@ import { useHris } from "@/lib/store";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import {
   branchName,
+  departmentAllocationsForEmployee,
   departmentName,
   employeeHdmfNumber,
   employeePhilHealthNumber,
@@ -24,8 +25,8 @@ import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { employees, currentEmployee, evaluations, disciplinaryRecords, currentUser, updateEmployee } = useHris();
-  const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee);
+  const { employees, employeeDepartmentAllocations, currentEmployee, evaluations, disciplinaryRecords, currentUser, updateEmployee } = useHris();
+  const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations);
   // A dept_head navigating directly to another department's employee URL
   // gets the same "not found" state as a genuinely missing id — deliberately
   // not distinguishing the two, so this doesn't confirm who exists elsewhere.
@@ -66,7 +67,13 @@ export default function EmployeeProfilePage() {
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">{fullName(employee)} <span className="text-sm font-normal text-[var(--text-muted)]">&ldquo;{employee.nickname}&rdquo;</span></h1>
-          <div className="mt-0.5 text-sm text-[var(--text-secondary)]">{positionTitle(employee.positionId)} · {departmentName(employee.departmentId)} · {branchName(employee.branchId)}</div>
+          <div className="mt-0.5 text-sm text-[var(--text-secondary)]">
+            {positionTitle(employee.positionId)} ·{" "}
+            {departmentAllocationsForEmployee(employee, employeeDepartmentAllocations)
+              .map((a) => (a.percent < 100 ? `${departmentName(a.departmentId)} (${a.percent}%)` : departmentName(a.departmentId)))
+              .join(" · ")}{" "}
+            · {branchName(employee.branchId)}
+          </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge tone={STATUS_TONE[employee.status]}>{employee.status.replace("_", " ")}</Badge>
             <Badge tone="info">{employee.employmentStatus.replace("_", " ")}</Badge>

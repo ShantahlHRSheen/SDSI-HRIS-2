@@ -7,21 +7,31 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { ExportBar } from "@/components/reports/ExportBar";
-import { branchName, departmentName, formatDate, fullName, scopeEmployeesForViewer } from "@/lib/helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, formatDate, fullName, scopeEmployeesForViewer } from "@/lib/helpers";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { buildAbsenteeismRows, flaggedAbsenteeism, ABSENTEEISM_THRESHOLD, type AbsenteeismRow } from "@/lib/tardiness-absenteeism";
 import type { Employee } from "@/lib/types";
 
 export default function AbsenteeismReportPage() {
-  const { currentUser, currentEmployee, employees, branches, departments, payrollPeriods, attendancePeriodRecords } = useHris();
+  const { currentUser, currentEmployee, employees, employeeDepartmentAllocations, branches, departments, payrollPeriods, attendancePeriodRecords } =
+    useHris();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer", "dept_head", "upper_management", "sys_admin"].includes(r));
 
   if (!canManage) {
     return <SelfServiceView employee={currentEmployee} records={attendancePeriodRecords} />;
   }
 
-  const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee);
-  return <AdminView employees={visibleEmployees} branches={branches} departments={departments} payrollPeriods={payrollPeriods} records={attendancePeriodRecords} />;
+  const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations);
+  return (
+    <AdminView
+      employees={visibleEmployees}
+      employeeDepartmentAllocations={employeeDepartmentAllocations}
+      branches={branches}
+      departments={departments}
+      payrollPeriods={payrollPeriods}
+      records={attendancePeriodRecords}
+    />
+  );
 }
 
 function SelfServiceView({ employee, records }: { employee: Employee | null; records: ReturnType<typeof useHris>["attendancePeriodRecords"] }) {
@@ -69,12 +79,14 @@ function DayListCard({ title, dates }: { title: string; dates: string[] }) {
 
 function AdminView({
   employees,
+  employeeDepartmentAllocations,
   branches,
   departments,
   payrollPeriods,
   records,
 }: {
   employees: Employee[];
+  employeeDepartmentAllocations: ReturnType<typeof useHris>["employeeDepartmentAllocations"];
   branches: ReturnType<typeof useHris>["branches"];
   departments: ReturnType<typeof useHris>["departments"];
   payrollPeriods: ReturnType<typeof useHris>["payrollPeriods"];
@@ -100,7 +112,9 @@ function AdminView({
 
   const filtered = baseRows
     .filter((row) => (branchId ? row.employee.branchId === branchId : true))
-    .filter((row) => (departmentId ? row.employee.departmentId === departmentId : true))
+    .filter((row) =>
+      departmentId ? departmentAllocationsForEmployee(row.employee, employeeDepartmentAllocations).some((a) => a.departmentId === departmentId) : true,
+    )
     .filter((row) => fullName(row.employee).toLowerCase().includes(search.toLowerCase()));
 
   const flaggedCount = flaggedAbsenteeism(allRows).length;

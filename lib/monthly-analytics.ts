@@ -1,6 +1,6 @@
-import type { AttendancePeriodRecord, Employee, OvertimeRequest, PayrollLineOverride, PayrollPeriod } from "./types";
+import type { AttendancePeriodRecord, Employee, EmployeeDepartmentAllocation, OvertimeRequest, PayrollLineOverride, PayrollPeriod } from "./types";
 import { TODAY } from "./mock-data";
-import { branchName, departmentName, fullName } from "./helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, fullName } from "./helpers";
 import { computePayrollForPeriod, type PayrollLine } from "./payroll";
 
 // ---------------------------------------------------------------------------
@@ -346,14 +346,46 @@ export function groupByBranch(facts: MonthlyEmployeeFact[], employees: Employee[
     .filter((row) => row.payroll.employeeCount > 0);
 }
 
-export function groupByDepartment(facts: MonthlyEmployeeFact[], employees: Employee[], departments: { id: string }[]) {
+// Multiplies every numeric field of a fact by `weight` — used to attribute
+// a split employee's figures proportionally to each department they're
+// allocated to (a full-time-equivalent-style convention: all of their
+// numbers count fractionally toward each department, not just pay).
+function scaleFact(f: MonthlyEmployeeFact, weight: number): MonthlyEmployeeFact {
+  const scaled = { ...f };
+  for (const key of Object.keys(scaled) as (keyof MonthlyEmployeeFact)[]) {
+    const value = scaled[key];
+    if (typeof value === "number") (scaled[key] as number) = value * weight;
+  }
+  return scaled;
+}
+
+export function groupByDepartment(
+  facts: MonthlyEmployeeFact[],
+  employees: Employee[],
+  departments: { id: string }[],
+  allocations: EmployeeDepartmentAllocation[] = [],
+) {
   const byId = new Map(employees.map((e) => [e.id, e]));
   return departments
     .map((d) => {
-      const deptFacts = facts.filter((f) => byId.get(f.employeeId)?.departmentId === d.id);
-      const payroll = summarizePayroll(deptFacts);
-      const attendance = summarizeAttendance(deptFacts);
-      const overtime = summarizeOvertime(deptFacts);
+      const scaledFacts: MonthlyEmployeeFact[] = [];
+      const seenEmployeeIds = new Set<string>();
+      let headcountWeight = 0;
+      for (const f of facts) {
+        const emp = byId.get(f.employeeId);
+        if (!emp) continue;
+        const alloc = departmentAllocationsForEmployee(emp, allocations).find((a) => a.departmentId === d.id);
+        if (!alloc) continue;
+        const weight = alloc.percent / 100;
+        scaledFacts.push(scaleFact(f, weight));
+        if (!seenEmployeeIds.has(f.employeeId)) {
+          seenEmployeeIds.add(f.employeeId);
+          headcountWeight += weight;
+        }
+      }
+      const payroll = { ...summarizePayroll(scaledFacts), employeeCount: Math.round(headcountWeight * 100) / 100 };
+      const attendance = summarizeAttendance(scaledFacts);
+      const overtime = summarizeOvertime(scaledFacts);
       return { departmentId: d.id, label: departmentName(d.id), payroll, attendance, overtime };
     })
     .filter((row) => row.payroll.employeeCount > 0);

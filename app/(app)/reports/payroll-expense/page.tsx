@@ -26,7 +26,8 @@ import {
 } from "@/lib/monthly-analytics";
 
 export default function PayrollExpenseReportPage() {
-  const { employees, branches, departments, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
+  const { employees, employeeDepartmentAllocations, branches, departments, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } =
+    useHris();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
 
@@ -53,7 +54,7 @@ export default function PayrollExpenseReportPage() {
   const currentMonthKey = months[months.length - 1].key;
   const previousMonthKey = months[months.length - 2]?.key;
 
-  const byDepartment = groupByDepartment(filtered, employees, departments);
+  const byDepartment = groupByDepartment(filtered, employees, departments, employeeDepartmentAllocations);
 
   const branchesThisMonth = groupByBranch(filterFacts(facts, employees, { ...analyticsFilters, monthKey: currentMonthKey }), employees, branches);
   const branchesPrevMonth = groupByBranch(filterFacts(facts, employees, { ...analyticsFilters, monthKey: previousMonthKey }), employees, branches);

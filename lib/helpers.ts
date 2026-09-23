@@ -5,7 +5,7 @@ import {
   daysBetween,
   TODAY,
 } from "./mock-data";
-import type { Employee, Role } from "./types";
+import type { Employee, EmployeeDepartmentAllocation, Role } from "./types";
 import { ROLE_LABELS } from "./types";
 
 // Standard HRIS display format: "Surname - Name - Middle Initial." — e.g.
@@ -40,15 +40,39 @@ const COMPANY_WIDE_ROLES: Role[] = [
   "sr_accounting_assistant", "treasurer", "cfo",
 ];
 
+// The single place that reconciles an employee's plain departmentId with any
+// explicit split rows in employee_department_allocations. Most employees
+// have no allocation rows at all — they're fully (100%) attributed to their
+// departmentId, unchanged from before this concept existed. An employee who
+// does have rows (e.g. a role genuinely shared between two departments) is
+// represented by those rows instead, which should sum to 100%.
+export function departmentAllocationsForEmployee(
+  employee: Employee,
+  allocations: EmployeeDepartmentAllocation[],
+): { departmentId: string; percent: number }[] {
+  const rows = allocations.filter((a) => a.employeeId === employee.id);
+  if (rows.length > 0) return rows.map((a) => ({ departmentId: a.departmentId, percent: a.percent }));
+  return [{ departmentId: employee.departmentId, percent: 100 }];
+}
+
 // Department Heads only see their own department's employees and records —
 // used by the Employee Directory, Performance Evaluations, Discipline, and
 // the Attendance/Overtime/Tardiness/Absenteeism reports so a dept_head can't
 // browse another department's people or data. Any other role that can reach
-// these pages sees company-wide data, unchanged.
-export function scopeEmployeesForViewer(employees: Employee[], viewerRoles: Role[], viewerEmployee: Employee | null): Employee[] {
+// these pages sees company-wide data, unchanged. An employee split across
+// departments (see departmentAllocationsForEmployee) is visible to every
+// dept_head they're allocated to, not just one.
+export function scopeEmployeesForViewer(
+  employees: Employee[],
+  viewerRoles: Role[],
+  viewerEmployee: Employee | null,
+  allocations: EmployeeDepartmentAllocation[] = [],
+): Employee[] {
   if (hasAnyRole(viewerRoles, COMPANY_WIDE_ROLES)) return employees;
   if (viewerRoles.includes("dept_head") && viewerEmployee) {
-    return employees.filter((e) => e.departmentId === viewerEmployee.departmentId);
+    return employees.filter((e) =>
+      departmentAllocationsForEmployee(e, allocations).some((a) => a.departmentId === viewerEmployee.departmentId),
+    );
   }
   return employees;
 }

@@ -24,11 +24,21 @@ import {
 } from "@/lib/monthly-analytics";
 
 export default function OvertimeReportPage() {
-  const { employees: allEmployees, branches, departments, currentUser, currentEmployee, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } =
-    useHris();
+  const {
+    employees: allEmployees,
+    employeeDepartmentAllocations,
+    branches,
+    departments,
+    currentUser,
+    currentEmployee,
+    attendancePeriodRecords,
+    overtimeRequests,
+    payrollLineOverrides,
+    payrollPeriods,
+  } = useHris();
   const employees = useMemo(
-    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
-    [allEmployees, currentUser, currentEmployee],
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations),
+    [allEmployees, currentUser, currentEmployee, employeeDepartmentAllocations],
   );
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
@@ -53,7 +63,7 @@ export default function OvertimeReportPage() {
   const trend = overtimeTrendByMonth(facts, employees, trendFilters);
 
   const byBranch = groupByBranch(filtered, employees, branches);
-  const byDepartment = groupByDepartment(filtered, employees, departments);
+  const byDepartment = groupByDepartment(filtered, employees, departments, employeeDepartmentAllocations);
   const byEmployeeAll = groupByEmployee(filtered, employees).sort((a, b) => b.overtime.totalOtHours - a.overtime.totalOtHours);
   const byEmployee = byEmployeeAll.filter((row) => row.label.toLowerCase().includes(employeeSearch.toLowerCase()));
 

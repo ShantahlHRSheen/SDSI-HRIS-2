@@ -64,19 +64,47 @@ export function EmployeeEditModal({
   onClose: () => void;
   onSave: (data: EmployeeFormData) => void;
 }) {
-  const { branches, departments, positions } = useHris();
+  const { branches, departments, positions, employeeDepartmentAllocations, setEmployeeDepartmentAllocations } = useHris();
   const [form, setForm] = useState<EmployeeFormData>(() => defaultForm(employee, branches[0]?.id ?? "", departments[0]?.id ?? "", positions[0]?.id ?? ""));
+  const [allocRows, setAllocRows] = useState<{ departmentId: string; percent: number }[]>(() =>
+    employee
+      ? employeeDepartmentAllocations
+          .filter((a) => a.employeeId === employee.id)
+          .map((a) => ({ departmentId: a.departmentId, percent: a.percent }))
+      : [],
+  );
 
   const positionsForDept = positions.filter((p) => p.departmentId === form.departmentId);
   const otherEmployees = employees.filter((e) => e.id !== employee?.id);
+  const allocTotal = allocRows.reduce((s, r) => s + r.percent, 0);
+  const allocValid = allocRows.length === 0 || Math.round(allocTotal) === 100;
 
   function set<K extends keyof EmployeeFormData>(key: K, value: EmployeeFormData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function addAllocRow() {
+    const used = new Set(allocRows.map((r) => r.departmentId));
+    const nextDept = departments.find((d) => !used.has(d.id)) ?? departments[0];
+    if (!nextDept) return;
+    setAllocRows((rows) => [...rows, { departmentId: nextDept.id, percent: 0 }]);
+  }
+
+  function updateAllocRow(index: number, patch: Partial<{ departmentId: string; percent: number }>) {
+    setAllocRows((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function removeAllocRow(index: number) {
+    setAllocRows((rows) => rows.filter((_, i) => i !== index));
+  }
+
   function submit() {
     if (!form.firstName || !form.lastName) return;
+    if (!allocValid) return;
     onSave(form);
+    if (employee) {
+      setEmployeeDepartmentAllocations(employee.id, allocRows.filter((r) => r.percent > 0));
+    }
   }
 
   return (
@@ -151,9 +179,61 @@ export function EmployeeEditModal({
           </div>
         </FieldSection>
 
+        {employee && (
+          <FieldSection title="Department Allocation">
+            <p className="mb-2 text-xs text-[var(--text-muted)]">
+              Leave empty for a normal single-department employee. Add rows only when this person&apos;s cost and
+              headcount are genuinely split across more than one department — percentages must add up to 100.
+            </p>
+            <div className="space-y-2">
+              {allocRows.map((row, i) => {
+                const usedElsewhere = new Set(allocRows.filter((_, j) => j !== i).map((r) => r.departmentId));
+                const options = departments.filter((d) => d.id === row.departmentId || !usedElsewhere.has(d.id));
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <select
+                      value={row.departmentId}
+                      onChange={(e) => updateAllocRow(i, { departmentId: e.target.value })}
+                      className="flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
+                    >
+                      {options.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={row.percent}
+                      onChange={(e) => updateAllocRow(i, { percent: Number(e.target.value) })}
+                      className="w-20 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
+                    />
+                    <span className="text-xs text-[var(--text-muted)]">%</span>
+                    <button onClick={() => removeAllocRow(i)} className="text-xs text-[var(--text-muted)] hover:text-[var(--status-critical)]">
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                onClick={addAllocRow}
+                disabled={allocRows.length >= departments.length}
+                className="text-xs font-medium text-[var(--series-1)] hover:underline disabled:opacity-40"
+              >
+                + Add department
+              </button>
+            </div>
+            {!allocValid && (
+              <p className="mt-1 text-xs text-[var(--status-critical)]">Percentages must sum to 100 (currently {allocTotal}).</p>
+            )}
+          </FieldSection>
+        )}
+
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
-          <button onClick={submit} disabled={!form.firstName || !form.lastName} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
+          <button
+            onClick={submit}
+            disabled={!form.firstName || !form.lastName || !allocValid}
+            className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40"
+          >
             {employee ? "Save changes" : "Add employee"}
           </button>
         </div>

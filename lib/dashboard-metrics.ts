@@ -1,6 +1,6 @@
-import type { Employee, EmploymentStatus } from "./types";
+import type { Employee, EmployeeDepartmentAllocation, EmploymentStatus } from "./types";
 import { TODAY, daysBetween } from "./mock-data";
-import { branchName, fullName } from "./helpers";
+import { branchName, departmentAllocationsForEmployee, fullName } from "./helpers";
 
 export function activeEmployees(employees: Employee[]): Employee[] {
   return employees.filter((e) => e.status === "active" || e.status === "on_leave");
@@ -63,10 +63,12 @@ export function payrollExpenseByBranch(employees: Employee[]) {
     .sort((a, b) => b.value - a.value);
 }
 
-export function headcountByDepartment(employees: Employee[]) {
+export function headcountByDepartment(employees: Employee[], allocations: EmployeeDepartmentAllocation[] = []) {
   const map = new Map<string, number>();
   activeEmployees(employees).forEach((e) => {
-    map.set(e.departmentId, (map.get(e.departmentId) ?? 0) + 1);
+    for (const a of departmentAllocationsForEmployee(e, allocations)) {
+      map.set(a.departmentId, Math.round(((map.get(a.departmentId) ?? 0) + a.percent / 100) * 100) / 100);
+    }
   });
   return map;
 }

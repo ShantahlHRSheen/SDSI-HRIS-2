@@ -10,7 +10,7 @@ import { Form2316Document } from "@/components/bir/Form2316";
 import { buildForm2316, getAvailableTaxYears, type Form2316Data } from "@/lib/bir";
 import { downloadPdfBytes, fillForm2316Pdf } from "@/lib/bir-pdf-fill";
 import { getMonthlyFacts } from "@/lib/monthly-analytics";
-import { branchName, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
 async function downloadOfficial2316(data: Form2316Data) {
@@ -23,6 +23,7 @@ export default function Form2316Page() {
     currentUser,
     currentEmployee,
     employees,
+    employeeDepartmentAllocations,
     branches,
     departments,
     generatedBirForms,
@@ -50,6 +51,7 @@ export default function Form2316Page() {
   return (
     <AdminView
       employees={employees}
+      employeeDepartmentAllocations={employeeDepartmentAllocations}
       branches={branches}
       departments={departments}
       facts={facts}
@@ -163,6 +165,7 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
 
 function AdminView({
   employees,
+  employeeDepartmentAllocations,
   branches,
   departments,
   facts,
@@ -175,6 +178,7 @@ function AdminView({
   addGeneratedBirForm,
 }: {
   employees: Employee[];
+  employeeDepartmentAllocations: ReturnType<typeof useHris>["employeeDepartmentAllocations"];
   branches: ReturnType<typeof useHris>["branches"];
   departments: ReturnType<typeof useHris>["departments"];
   facts: ReturnType<typeof getMonthlyFacts>;
@@ -194,7 +198,7 @@ function AdminView({
   const active = employees.filter((e) => e.status === "active" || e.status === "on_leave");
   const filtered = active
     .filter((e) => (branchId ? e.branchId === branchId : true))
-    .filter((e) => (departmentId ? e.departmentId === departmentId : true))
+    .filter((e) => (departmentId ? departmentAllocationsForEmployee(e, employeeDepartmentAllocations).some((a) => a.departmentId === departmentId) : true))
     .filter((e) => (employeeId ? e.id === employeeId : true))
     .filter((e) => fullName(e).toLowerCase().includes(search.toLowerCase()));
 

@@ -7,6 +7,7 @@ import type {
   BranchRow,
   DepartmentRow,
   DisciplinaryRecordRow,
+  EmployeeDepartmentAllocationRow,
   EmployeeRow,
   GeneratedBirFormRow,
   GeneratedPayslipRow,
@@ -31,6 +32,7 @@ import type {
   Department,
   DisciplinaryRecord,
   Employee,
+  EmployeeDepartmentAllocation,
   GeneratedBirForm,
   GeneratedPayslip,
   GeneratedVoucher,
@@ -357,6 +359,39 @@ export async function updateEmployeeRow(id: string, patch: Partial<Omit<Employee
   const { data, error } = await getSupabaseClient().from("employees").update(employeeToRow(patch)).eq("id", id).select().single();
   if (error) throw error;
   return toEmployee(data);
+}
+
+// ---- Employee department allocations -----------------------------------------
+// Splits an employee's cost/headcount across more than one department. Most
+// employees have no rows here at all — see departmentAllocationsForEmployee()
+// in lib/helpers.ts, which falls back to the employee's plain departmentId
+// when this table has nothing for them.
+
+function toEmployeeDepartmentAllocation(r: EmployeeDepartmentAllocationRow): EmployeeDepartmentAllocation {
+  return { employeeId: r.employee_id, departmentId: r.department_id, percent: r.percent };
+}
+
+export async function fetchEmployeeDepartmentAllocations(): Promise<EmployeeDepartmentAllocation[]> {
+  const { data, error } = await getSupabaseClient().from("employee_department_allocations").select("*");
+  if (error) throw error;
+  return data.map(toEmployeeDepartmentAllocation);
+}
+
+// Replaces every allocation row for one employee in a single operation — the
+// natural shape for an "add/remove department" list in the edit UI, rather
+// than upserting one row at a time.
+export async function replaceEmployeeDepartmentAllocations(
+  employeeId: string,
+  allocations: { departmentId: string; percent: number }[],
+): Promise<EmployeeDepartmentAllocation[]> {
+  const client = getSupabaseClient();
+  const { error: deleteError } = await client.from("employee_department_allocations").delete().eq("employee_id", employeeId);
+  if (deleteError) throw deleteError;
+  if (allocations.length === 0) return [];
+  const rows = allocations.map((a) => ({ employee_id: employeeId, department_id: a.departmentId, percent: a.percent }));
+  const { data, error } = await client.from("employee_department_allocations").insert(rows).select();
+  if (error) throw error;
+  return data.map(toEmployeeDepartmentAllocation);
 }
 
 // -----------------------------------------------------------------------------

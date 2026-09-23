@@ -21,6 +21,7 @@ import {
   fetchCorrectionRequests,
   fetchDepartments,
   fetchDisciplinaryRecords,
+  fetchEmployeeDepartmentAllocations,
   fetchEmployees,
   fetchEvaluations,
   fetchGeneratedBirForms,
@@ -54,6 +55,7 @@ import {
   insertPayrollPeriod,
   insertPosition,
   insertWorkSchedule,
+  replaceEmployeeDepartmentAllocations,
   updateBranchRow,
   updateDepartmentRow,
   updateDisciplinaryStatusRow,
@@ -77,6 +79,7 @@ import {
   DEMO_USERS,
   DEPARTMENTS,
   DISCIPLINARY_RECORDS,
+  EMPLOYEE_DEPARTMENT_ALLOCATIONS,
   EMPLOYEES,
   HOLIDAYS,
   LEAVE_REQUESTS,
@@ -99,6 +102,7 @@ import type {
   DemoUser,
   DisciplinaryRecord,
   Employee,
+  EmployeeDepartmentAllocation,
   EvaluationCriterion,
   GeneratedBirForm,
   GeneratedPayslip,
@@ -141,6 +145,7 @@ interface PersistedState {
   attendancePeriodRecords: AttendancePeriodRecord[];
   payrollLineOverrides: PayrollLineOverride[];
   voucherAmountOverrides: VoucherAmountOverride[];
+  employeeDepartmentAllocations: EmployeeDepartmentAllocation[];
 }
 
 function defaultState(): PersistedState {
@@ -167,6 +172,7 @@ function defaultState(): PersistedState {
     attendancePeriodRecords: ATTENDANCE_PERIOD_RECORDS,
     payrollLineOverrides: [],
     voucherAmountOverrides: [],
+    employeeDepartmentAllocations: EMPLOYEE_DEPARTMENT_ALLOCATIONS,
   };
 }
 
@@ -205,8 +211,10 @@ interface HrisContextShape {
   attendancePeriodRecords: AttendancePeriodRecord[];
   payrollLineOverrides: PayrollLineOverride[];
   voucherAmountOverrides: VoucherAmountOverride[];
+  employeeDepartmentAllocations: EmployeeDepartmentAllocation[];
 
   updateEmployee: (id: string, patch: Partial<Omit<Employee, "id" | "employeeNumber">>) => void;
+  setEmployeeDepartmentAllocations: (employeeId: string, allocations: { departmentId: string; percent: number }[]) => void;
   addEmployee: (input: Omit<Employee, "id" | "employeeNumber">) => void;
 
   upsertAttendancePeriodRecord: (input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">) => void;
@@ -318,6 +326,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           leaveTypes,
           payrollPeriods,
           employees,
+          employeeDepartmentAllocations,
           evaluations,
           disciplinaryRecords,
           announcements,
@@ -340,6 +349,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           fetchLeaveTypes(),
           fetchPayrollPeriods(),
           fetchEmployees(),
+          fetchEmployeeDepartmentAllocations(),
           fetchEvaluations(),
           fetchDisciplinaryRecords(),
           fetchAnnouncements(),
@@ -365,6 +375,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           leaveTypes,
           payrollPeriods,
           employees,
+          employeeDepartmentAllocations,
           evaluations,
           disciplinaryRecords,
           announcements,
@@ -519,6 +530,34 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         employees: prev.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
       }));
       logAudit("Employee 201 File", "update", `Updated employee record ${id}`);
+    },
+    [logAudit, supabaseSession],
+  );
+
+  const setEmployeeDepartmentAllocations: HrisContextShape["setEmployeeDepartmentAllocations"] = useCallback(
+    async (employeeId, allocations) => {
+      if (supabaseSession) {
+        try {
+          const rows = await replaceEmployeeDepartmentAllocations(employeeId, allocations);
+          setState((prev) => ({
+            ...prev,
+            employeeDepartmentAllocations: [...prev.employeeDepartmentAllocations.filter((a) => a.employeeId !== employeeId), ...rows],
+          }));
+          logAudit("Employee 201 File", "update", `Updated department allocation for employee ${employeeId}`);
+          return;
+        } catch (err) {
+          console.error("Failed to save department allocation in Supabase", err);
+          return;
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        employeeDepartmentAllocations: [
+          ...prev.employeeDepartmentAllocations.filter((a) => a.employeeId !== employeeId),
+          ...allocations.map((a) => ({ employeeId, departmentId: a.departmentId, percent: a.percent })),
+        ],
+      }));
+      logAudit("Employee 201 File", "update", `Updated department allocation for employee ${employeeId}`);
     },
     [logAudit, supabaseSession],
   );
@@ -1187,6 +1226,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     loginWithSupabase,
     logout,
     employees: state.employees,
+    employeeDepartmentAllocations: state.employeeDepartmentAllocations,
     evaluations: state.evaluations,
     disciplinaryRecords: state.disciplinaryRecords,
     auditLogs: state.auditLogs,
@@ -1208,6 +1248,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     payrollLineOverrides: state.payrollLineOverrides,
     voucherAmountOverrides: state.voucherAmountOverrides,
     updateEmployee,
+    setEmployeeDepartmentAllocations,
     addEmployee,
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,

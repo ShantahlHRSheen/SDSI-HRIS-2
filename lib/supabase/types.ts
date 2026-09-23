@@ -114,6 +114,12 @@ export type EmployeeRow = {
   user_id: string | null;
 };
 
+export type EmployeeDepartmentAllocationRow = {
+  employee_id: string;
+  department_id: string;
+  percent: number;
+};
+
 export type PerformanceEvaluationRow = {
   id: string;
   employee_id: string;
@@ -299,6 +305,7 @@ export interface Database {
       leave_types: Table<LeaveTypeRow>;
       payroll_periods: Table<PayrollPeriodRow>;
       employees: Table<EmployeeRow>;
+      employee_department_allocations: Table<EmployeeDepartmentAllocationRow>;
       performance_evaluations: Table<PerformanceEvaluationRow>;
       disciplinary_records: Table<DisciplinaryRecordRow>;
       audit_logs: Table<AuditLogRow>;

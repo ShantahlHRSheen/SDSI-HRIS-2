@@ -44,11 +44,13 @@ insert into positions (id, title, department_id) values ('ps-jr-accounting-assis
 insert into positions (id, title, department_id) values ('ps-bookkeeper-9', 'Bookkeeper', 'dp-fin');
 insert into positions (id, title, department_id) values ('ps-corporate-treasurer-10', 'Corporate Treasurer', 'dp-fin');
 insert into positions (id, title, department_id) values ('ps-hr-manager-11', 'HR Manager', 'dp-hr');
+insert into positions (id, title, department_id) values ('ps-business-unit-president-44', 'Business Unit President', 'dp-darofy');
 insert into positions (id, title, department_id) values ('ps-content-creator-12', 'Content Creator', 'dp-darofy');
 insert into positions (id, title, department_id) values ('ps-marketing-head-13', 'Marketing Head', 'dp-darofy');
 insert into positions (id, title, department_id) values ('ps-multimedia-artist-14', 'Multimedia Artist', 'dp-darofy');
 insert into positions (id, title, department_id) values ('ps-sales-manager-15', 'Sales Manager', 'dp-darofy');
 insert into positions (id, title, department_id) values ('ps-sales-admin-16', 'Sales Admin', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-business-unit-president-45', 'Business Unit President', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-network-development-head-luzon-17', 'Network Development Head - Luzon', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-network-development-head-visayas-18', 'Network Development Head - Visayas', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-network-development-head-mindanao-19', 'Network Development Head - Mindanao', 'dp-mlm');
@@ -57,6 +59,7 @@ insert into positions (id, title, department_id) values ('ps-social-media-manage
 insert into positions (id, title, department_id) values ('ps-video-editor-22', 'Video Editor', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-ads-specialist-23', 'Ads Specialist', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-sales-admin-24', 'Sales Admin', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-business-unit-president-46', 'Business Unit President', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-platform-specialist-25', 'Platform Specialist', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-26', 'Multimedia Artist Head', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-video-editor-27', 'Video Editor', 'dp-cosmetics');
@@ -1196,6 +1199,12 @@ update employees set supervisor_id = 'emp-045', job_performance_evaluator_id = n
 update employees set supervisor_id = 'emp-045', job_performance_evaluator_id = null where id = 'emp-066';
 update employees set supervisor_id = 'emp-045', job_performance_evaluator_id = null where id = 'emp-067';
 update employees set supervisor_id = 'emp-045', job_performance_evaluator_id = null where id = 'emp-068';
+
+-- Cecil Catapang (emp-040) is genuinely shared 50/50 between MLM and Darofy
+-- — her monthly_salary (30000) is already the combined total of the two
+-- 15000 halves.
+insert into employee_department_allocations (employee_id, department_id, percent) values ('emp-040', 'dp-mlm', 50);
+insert into employee_department_allocations (employee_id, department_id, percent) values ('emp-040', 'dp-darofy', 50);
 
 -- Attach any employee whose email matches an already-created Auth user, so
 -- existing logins (Authentication > Users) resolve to their employee row.

@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
-import { branchName, departmentName, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
 const STATUS_TONE: Record<Employee["status"], BadgeTone> = {
@@ -19,10 +19,10 @@ const STATUS_TONE: Record<Employee["status"], BadgeTone> = {
 };
 
 export default function EmployeeDirectoryPage() {
-  const { employees: allEmployees, currentEmployee, branches, departments, currentUser, addEmployee } = useHris();
+  const { employees: allEmployees, employeeDepartmentAllocations, currentEmployee, branches, departments, currentUser, addEmployee } = useHris();
   const employees = useMemo(
-    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
-    [allEmployees, currentUser, currentEmployee],
+    () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations),
+    [allEmployees, currentUser, currentEmployee, employeeDepartmentAllocations],
   );
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
@@ -34,9 +34,13 @@ export default function EmployeeDirectoryPage() {
     return employees
       .filter((e) => fullName(e).toLowerCase().includes(search.toLowerCase()) || e.employeeNumber.toLowerCase().includes(search.toLowerCase()))
       .filter((e) => (branchFilter === "all" ? true : e.branchId === branchFilter))
-      .filter((e) => (deptFilter === "all" ? true : e.departmentId === deptFilter))
+      .filter((e) =>
+        deptFilter === "all"
+          ? true
+          : departmentAllocationsForEmployee(e, employeeDepartmentAllocations).some((a) => a.departmentId === deptFilter),
+      )
       .sort((a, b) => fullName(a).localeCompare(fullName(b)));
-  }, [employees, search, branchFilter, deptFilter]);
+  }, [employees, search, branchFilter, deptFilter, employeeDepartmentAllocations]);
 
   return (
     <div>
@@ -92,7 +96,13 @@ export default function EmployeeDirectoryPage() {
                     <div className="text-xs text-[var(--text-muted)]">{e.employeeNumber}</div>
                   </td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]">{positionTitle(e.positionId)}</td>
-                  <td className="px-4 py-2.5 text-xs text-[var(--text-secondary)]">{branchName(e.branchId)}<br />{departmentName(e.departmentId)}</td>
+                  <td className="px-4 py-2.5 text-xs text-[var(--text-secondary)]">
+                    {branchName(e.branchId)}
+                    <br />
+                    {departmentAllocationsForEmployee(e, employeeDepartmentAllocations)
+                      .map((a) => (a.percent < 100 ? `${departmentName(a.departmentId)} (${a.percent}%)` : departmentName(a.departmentId)))
+                      .join(" · ")}
+                  </td>
                   <td className="px-4 py-2.5"><Badge tone="info">{e.employmentStatus.replace("_", " ")}</Badge></td>
                   <td className="px-4 py-2.5"><Badge tone={STATUS_TONE[e.status]}>{e.status.replace("_", " ")}</Badge></td>
                 </tr>

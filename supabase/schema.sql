@@ -164,6 +164,20 @@ create table employees (
 create index employees_supervisor_id_idx on employees (supervisor_id);
 create index employees_user_id_idx on employees (user_id);
 
+-- Splits an employee's cost/headcount across more than one department (e.g.
+-- a role that's genuinely shared between two business units). Most
+-- employees have no rows here at all — they're fully attributed to their
+-- plain employees.department_id; only actually-split employees get rows,
+-- and those rows' percents should sum to 100 (enforced at the app layer,
+-- not here — a cross-row SUM check needs a trigger and isn't worth it for
+-- a field HR edits by hand).
+create table employee_department_allocations (
+  employee_id text not null references employees (id) on delete cascade,
+  department_id text not null references departments (id),
+  percent numeric not null check (percent > 0 and percent <= 100),
+  primary key (employee_id, department_id)
+);
+
 -- Auto-link onboarding: whenever a new Supabase Auth user is created (via the
 -- dashboard, an invite, etc.), attach it to the employees row with the same
 -- email if that row doesn't already have a login. Without this, every new
@@ -439,6 +453,23 @@ as $$
   select department_id from employees where user_id = auth.uid();
 $$;
 
+-- True if an employee counts as belonging to a department — either it's
+-- their plain department_id, or they have an explicit row in
+-- employee_department_allocations for it (an employee split across more
+-- than one department, e.g. a role shared between two business units).
+-- Every dept_head-scoped policy below uses this instead of a bare
+-- department_id equality check, so a dept_head sees the full membership.
+create or replace function app_employee_in_department(emp_id text, dept_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from employees e where e.id = emp_id and e.department_id = dept_id)
+      or exists (select 1 from employee_department_allocations a where a.employee_id = emp_id and a.department_id = dept_id);
+$$;
+
 create or replace function app_has_any_role(target_roles app_role[])
 returns boolean
 language sql
@@ -520,6 +551,7 @@ alter table holidays enable row level security;
 alter table leave_types enable row level security;
 alter table payroll_periods enable row level security;
 alter table employees enable row level security;
+alter table employee_department_allocations enable row level security;
 alter table performance_evaluations enable row level security;
 alter table disciplinary_records enable row level security;
 alter table audit_logs enable row level security;
@@ -567,9 +599,15 @@ create policy "employees read self or elevated" on employees for select
   using (
     id = app_current_employee_id()
     or app_is_elevated()
-    or (app_is_dept_head() and department_id = app_current_department_id())
+    or (app_is_dept_head() and app_employee_in_department(id, app_current_department_id()))
   );
 create policy "employees write hr" on employees for all
+  using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
+
+-- Department allocations: read for any signed-in user (same as the other
+-- reference/org-structure tables), write for HR/sys admin only.
+create policy "reference read" on employee_department_allocations for select using (auth.role() = 'authenticated');
+create policy "reference write" on employee_department_allocations for all
   using (app_is_hr_or_admin()) with check (app_is_hr_or_admin());
 
 -- Performance evaluations: the employee being evaluated, either of their two
@@ -584,7 +622,7 @@ create policy "evaluations read" on performance_evaluations for select
     or behavior_evaluator_id = app_current_employee_id()
     or job_performance_evaluator_id = app_current_employee_id()
     or app_is_elevated()
-    or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id()))
+    or (app_is_dept_head() and app_employee_in_department(employee_id, app_current_department_id()))
   );
 create policy "evaluations write" on performance_evaluations for all
   using (app_is_elevated() or behavior_evaluator_id = app_current_employee_id() or job_performance_evaluator_id = app_current_employee_id())
@@ -597,11 +635,11 @@ create policy "discipline read" on disciplinary_records for select
   using (
     employee_id = app_current_employee_id()
     or app_is_elevated()
-    or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id()))
+    or (app_is_dept_head() and app_employee_in_department(employee_id, app_current_department_id()))
   );
 create policy "discipline write" on disciplinary_records for all
-  using (app_is_elevated() or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id())))
-  with check (app_is_elevated() or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id())));
+  using (app_is_elevated() or (app_is_dept_head() and app_employee_in_department(employee_id, app_current_department_id())))
+  with check (app_is_elevated() or (app_is_dept_head() and app_employee_in_department(employee_id, app_current_department_id())));
 
 -- Audit log: read is elevated-only (dept_head is not elevated, so doesn't
 -- see this, matching the page's stated "HR and System Administrators"
@@ -646,7 +684,7 @@ create policy "attendance read" on attendance_period_records for select
   using (
     employee_id = app_current_employee_id()
     or app_is_elevated()
-    or (app_is_dept_head() and employee_id in (select id from employees where department_id = app_current_department_id()))
+    or (app_is_dept_head() and app_employee_in_department(employee_id, app_current_department_id()))
   );
 create policy "attendance write payroll" on attendance_period_records for all
   using (app_is_payroll()) with check (app_is_payroll());
