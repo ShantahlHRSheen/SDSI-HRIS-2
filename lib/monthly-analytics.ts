@@ -1,17 +1,21 @@
-import type { Employee } from "./types";
+import type { AttendancePeriodRecord, Employee, OvertimeRequest, PayrollLineOverride, PayrollPeriod } from "./types";
 import { TODAY } from "./mock-data";
 import { branchName, departmentName, fullName } from "./helpers";
+import { computePayrollForPeriod, type PayrollLine } from "./payroll";
 
 // ---------------------------------------------------------------------------
 // Monthly attendance / overtime / payroll-expense analytics.
 //
-// There is no real time-and-attendance or payroll-run backend in this demo,
-// so this module generates a deterministic per-employee, per-month "fact
-// table" (same idea as a data-warehouse fact table) and every report/chart
-// on top of it is a pure aggregation over that table. Nothing here uses
-// Math.random or Date.now — the same input always produces the same output,
-// so server and client render identically and the numbers are stable across
-// reloads.
+// This module aggregates the real, per-payroll-period figures produced by
+// lib/payroll.ts's computePayrollForPeriod — the same engine behind Payroll
+// Processing, Payslips, and Vouchers — into a per-employee, per-calendar-month
+// "fact table" (same idea as a data-warehouse fact table), so every
+// report/chart/BIR form built on top of it is a pure aggregation over that
+// table. Payroll periods are semi-monthly (1st-15th, 16th-end); a calendar
+// month's fact for an employee is the sum of whichever of its (up to two)
+// periods actually have an attendance record on file for them — so someone
+// only has a fact for the months they were actually employed, with no
+// separate status/hire-date/resignation-date filtering needed.
 // ---------------------------------------------------------------------------
 
 const MONTHS_BACK = 12;
@@ -21,14 +25,6 @@ export interface MonthMeta {
   label: string; // "Feb 2026"
   monthIndex: number; // 1-12
   year: number;
-}
-
-function hash(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h * 31 + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
 }
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -49,12 +45,6 @@ export function getMonthsList(): MonthMeta[] {
 }
 
 export const CURRENT_MONTH_KEY = getMonthsList()[MONTHS_BACK - 1].key;
-
-function monthlyCostEquivalent(e: Employee): number {
-  if (e.monthlySalary) return e.monthlySalary;
-  if (e.dailyRate) return e.dailyRate * 22;
-  return 0;
-}
 
 export interface MonthlyEmployeeFact {
   employeeId: string;
@@ -89,83 +79,76 @@ export interface MonthlyEmployeeFact {
   netPay: number;
 }
 
-// Monthly graduated withholding tax table (TRAIN law, effective 2023 onward).
-// ILLUSTRATIVE — BIR revises brackets/rates periodically; verify against the
-// current Revenue Regulation and configure as a versioned table before using
-// this for actual filings, per the build spec's guidance on statutory rates.
-const WITHHOLDING_TAX_TABLE = [
-  { over: 0, upTo: 20833, base: 0, rate: 0 },
-  { over: 20833, upTo: 33333, base: 0, rate: 0.15 },
-  { over: 33333, upTo: 66667, base: 1875, rate: 0.2 },
-  { over: 66667, upTo: 166667, base: 8541.8, rate: 0.25 },
-  { over: 166667, upTo: 666667, base: 33541.8, rate: 0.3 },
-  { over: 666667, upTo: Infinity, base: 183541.8, rate: 0.35 },
-];
-
-export function computeMonthlyWithholdingTax(taxableCompensation: number): number {
-  if (taxableCompensation <= 0) return 0;
-  const bracket = WITHHOLDING_TAX_TABLE.find((b) => taxableCompensation > b.over && taxableCompensation <= b.upTo) ?? WITHHOLDING_TAX_TABLE[WITHHOLDING_TAX_TABLE.length - 1];
-  return Math.round(bracket.base + (taxableCompensation - bracket.over) * bracket.rate);
+// Standard working days in a payroll period: every calendar day except
+// Sunday, matching the 6-day-work-week convention already used for
+// daily-rate employees' "Basis of Mandatories" (lib/payroll.ts's 313
+// days/year figure).
+function workingDaysInPeriod(period: PayrollPeriod): number {
+  let count = 0;
+  const end = new Date(period.end + "T00:00:00");
+  for (const d = new Date(period.start + "T00:00:00"); d <= end; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0) count++;
+  }
+  return count;
 }
 
-function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
-  const seed = `${employee.id}-${month.key}`;
-  const workingDays = 22;
-  // A per-employee "attendance tendency" biases their whole rolling-window
-  // history, so rates spread out across employees instead of all regressing
-  // to the same mean once summed over months.
-  const tendency = hash(employee.id + "tendency") % 5; // 0 = reliable .. 4 = spotty
-  const absentDays = Math.min(hash(seed + "a") % (2 + tendency), 6);
-  const leaveDays = Math.min(hash(seed + "l") % (2 + tendency), 6);
-  const lateDays = Math.min(hash(seed + "t") % (3 + tendency * 2), 10);
-  const presentDays = Math.max(workingDays - absentDays - leaveDays, 0);
+const round = (n: number) => Math.round(n * 100) / 100;
 
-  const isDaily = employee.payrollType === "daily";
-  const otHours = isDaily ? hash(seed + "o") % 16 : hash(seed + "o") % 5;
+function buildFact(
+  employee: Employee,
+  month: MonthMeta,
+  lines: PayrollLine[],
+  records: AttendancePeriodRecord[],
+  periods: PayrollPeriod[],
+): MonthlyEmployeeFact {
+  const sumLines = (f: (l: PayrollLine) => number) => round(lines.reduce((s, l) => s + f(l), 0));
 
-  const basicSalary = monthlyCostEquivalent(employee);
-  const dailyEquivalent = basicSalary / workingDays;
-  const hourlyRate = dailyEquivalent / 8;
+  const workingDays = periods.reduce((s, p) => s + workingDaysInPeriod(p), 0);
+  const presentDays = records.reduce((s, r) => s + r.daysWorked, 0);
+  const lateDays = records.reduce((s, r) => s + (r.lateInstances ?? 0), 0);
+  const absentDays = records.reduce((s, r) => s + (r.absenceInstances ?? 0), 0);
+  const leaveDays = records.reduce((s, r) => s + r.vlDays + r.slDays, 0);
+  const otHours = sumLines((l) => l.otHours);
 
-  const allowances =
-    employee.monthlyAllowance != null
-      ? employee.monthlyAllowance
-      : employee.dailyAllowance != null
-        ? Math.round(employee.dailyAllowance * workingDays)
-        : 500 + (hash(seed + "al") % 1500);
-  const overtimePay = Math.round(otHours * hourlyRate * 1.25);
-  const holidayWorked = hash(seed + "h") % 6 === 0; // roughly one month in six
-  const holidayPay = holidayWorked ? Math.round(dailyEquivalent) : 0;
-  const leavePay = Math.round(leaveDays * dailyEquivalent);
+  const basicSalary = Math.round(sumLines((l) => l.basicSalaryLessLate));
+  const allowances = sumLines((l) => l.netAllowances);
+  const overtimePay = sumLines((l) => l.otPay);
+  const holidayPay = sumLines((l) => l.holidayPay);
+  const leavePay = sumLines((l) => l.vlPay + l.slPay);
 
-  const employerSSS = Math.round(basicSalary * 0.095);
-  const employerHDMF = Math.round(basicSalary * 0.02);
-  const employerPhilHealth = Math.round(basicSalary * 0.025);
+  const employerSSS = sumLines((l) => l.employerSSS + l.employerSSSWisp);
+  const employerHDMF = sumLines((l) => l.employerHDMF);
+  const employerPhilHealth = sumLines((l) => l.employerPhilHealth);
+  const totalEmployerExpense = sumLines((l) => l.employerExpense);
 
-  const totalEmployerExpense =
-    Math.round(basicSalary) + allowances + overtimePay + holidayPay + leavePay + employerSSS + employerHDMF + employerPhilHealth;
+  const employeeSSS = sumLines((l) => l.sssContribution + l.sssWisp);
+  const employeeHDMF = sumLines((l) => l.hdmfContribution);
+  const employeePhilHealth = sumLines((l) => l.philHealthContribution);
+  // Summed from the real per-period semi-monthly withholding tax — the same
+  // number actually withheld in Payroll Processing — rather than recomputed
+  // from a separate monthly bracket table.
+  const withholdingTax = sumLines((l) => l.withholdingTax);
+  const netPay = sumLines((l) => l.netPay);
 
-  // Employee-side mandatory contributions (illustrative rates — see the
-  // withholding-tax table note above; same caveat applies here).
-  const employeeSSS = Math.round(basicSalary * 0.045);
-  const employeeHDMF = Math.min(Math.round(basicSalary * 0.02), 200);
-  const employeePhilHealth = Math.round(basicSalary * 0.025);
+  // 13th-month accrual off the employee's real standing monthly compensation
+  // ("Basis of Mandatories" — the same figure computePayrollForPeriod uses
+  // for statutory contributions), only for months they actually have a
+  // payroll line. De minimis / other benefits have no dedicated field
+  // anywhere in this system yet — de minimis uses the common statutory
+  // ceiling as a default, other benefits stays 0 rather than invent a figure.
+  const basis = lines[0]?.basisOfMandatories ?? 0;
+  const thirteenthMonthAccrual = lines.length ? Math.round(basis / 12) : 0;
+  const deMinimisBenefits = lines.length ? 1500 : 0;
+  const otherBenefits = 0;
 
-  const thirteenthMonthAccrual = Math.round(basicSalary / 12);
-  const deMinimisBenefits = 1500;
-  const otherBenefits = hash(seed + "ob") % 4 === 0 ? 1000 : 0;
-
-  const grossCompensation =
-    Math.round(basicSalary) + allowances + overtimePay + holidayPay + leavePay + thirteenthMonthAccrual + otherBenefits + deMinimisBenefits;
-
+  const grossCompensation = Math.round(
+    basicSalary + allowances + overtimePay + holidayPay + leavePay + thirteenthMonthAccrual + otherBenefits + deMinimisBenefits,
+  );
   // Non-taxable: mandatory employee contributions, de minimis (within
   // statutory ceilings), and 13th-month/other-benefits accrual (exempt up to
-  // the ₱90,000 annual cap — simplified here since this demo's data window
-  // rarely approaches that ceiling for a single employee).
-  const nonTaxableCompensation = employeeSSS + employeeHDMF + employeePhilHealth + deMinimisBenefits + thirteenthMonthAccrual;
-  const taxableCompensation = Math.max(grossCompensation - nonTaxableCompensation, 0);
-  const withholdingTax = computeMonthlyWithholdingTax(taxableCompensation);
-  const netPay = grossCompensation - withholdingTax - employeeSSS - employeeHDMF - employeePhilHealth;
+  // the ₱90,000 annual cap — simplified here, as elsewhere in this build).
+  const nonTaxableCompensation = round(employeeSSS + employeeHDMF + employeePhilHealth + deMinimisBenefits + thirteenthMonthAccrual);
+  const taxableCompensation = Math.max(round(grossCompensation - nonTaxableCompensation), 0);
 
   return {
     employeeId: employee.id,
@@ -176,7 +159,7 @@ function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
     absentDays,
     leaveDays,
     otHours,
-    basicSalary: Math.round(basicSalary),
+    basicSalary,
     allowances,
     overtimePay,
     holidayPay,
@@ -200,20 +183,59 @@ function buildFact(employee: Employee, month: MonthMeta): MonthlyEmployeeFact {
 }
 
 let cachedFacts: MonthlyEmployeeFact[] | null = null;
-let cachedForEmployees: Employee[] | null = null;
+let cachedInputs: unknown[] | null = null;
 
-export function getMonthlyFacts(employees: Employee[]): MonthlyEmployeeFact[] {
-  if (cachedFacts && cachedForEmployees === employees) return cachedFacts;
+function sameInputs(a: unknown[], b: unknown[]) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+export function getMonthlyFacts(
+  employees: Employee[],
+  attendanceRecords: AttendancePeriodRecord[],
+  overtimeRequests: OvertimeRequest[],
+  overrides: PayrollLineOverride[],
+  payrollPeriods: PayrollPeriod[],
+): MonthlyEmployeeFact[] {
+  const inputs = [employees, attendanceRecords, overtimeRequests, overrides, payrollPeriods];
+  if (cachedFacts && cachedInputs && sameInputs(cachedInputs, inputs)) return cachedFacts;
+
   const months = getMonthsList();
   const facts: MonthlyEmployeeFact[] = [];
-  const active = employees.filter((e) => e.status === "active" || e.status === "on_leave");
+
   for (const month of months) {
-    for (const employee of active) {
-      facts.push(buildFact(employee, month));
+    const periodsInMonth = payrollPeriods.filter((p) => p.start.slice(0, 7) === month.key);
+    if (periodsInMonth.length === 0) continue;
+
+    const linesByEmployee = new Map<string, PayrollLine[]>();
+    const recordsByEmployee = new Map<string, AttendancePeriodRecord[]>();
+    const periodsByEmployee = new Map<string, PayrollPeriod[]>();
+
+    for (const period of periodsInMonth) {
+      const lines = computePayrollForPeriod(period, employees, attendanceRecords, overtimeRequests, overrides);
+      for (const line of lines) {
+        const arr = linesByEmployee.get(line.employeeId) ?? [];
+        arr.push(line);
+        linesByEmployee.set(line.employeeId, arr);
+      }
+      for (const rec of attendanceRecords.filter((r) => r.periodId === period.id)) {
+        const recArr = recordsByEmployee.get(rec.employeeId) ?? [];
+        recArr.push(rec);
+        recordsByEmployee.set(rec.employeeId, recArr);
+        const perArr = periodsByEmployee.get(rec.employeeId) ?? [];
+        perArr.push(period);
+        periodsByEmployee.set(rec.employeeId, perArr);
+      }
+    }
+
+    for (const [employeeId, lines] of linesByEmployee) {
+      const employee = employees.find((e) => e.id === employeeId);
+      if (!employee) continue;
+      facts.push(buildFact(employee, month, lines, recordsByEmployee.get(employeeId) ?? [], periodsByEmployee.get(employeeId) ?? []));
     }
   }
+
   cachedFacts = facts;
-  cachedForEmployees = employees;
+  cachedInputs = inputs;
   return facts;
 }
 

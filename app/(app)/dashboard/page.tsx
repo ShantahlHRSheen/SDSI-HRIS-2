@@ -58,7 +58,7 @@ function variantFor(roles: string[]): "full" | "payroll" | "team" | "personal" {
 }
 
 export default function DashboardPage() {
-  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords } = useHris();
+  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
   const roles = currentUser?.roles ?? [];
   const variant = variantFor(roles);
 
@@ -70,11 +70,13 @@ export default function DashboardPage() {
   }, [variant, currentEmployee, employees]);
 
   const branchFilter = variant === "team" && currentEmployee ? currentEmployee.branchId : undefined;
-  const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+  const facts = useMemo(
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+  );
 
-  // Real (not synthetic) attendance-derived flags, across every imported
-  // period on file — separate from the monthly-analytics widgets above,
-  // which run on the fact-table generator rather than actual import data.
+  // Tardiness/absenteeism flags computed directly from every imported period
+  // on file, independent of the monthly-analytics fact table used above.
   const tardinessRows = useMemo(() => buildTardinessRows(attendancePeriodRecords, scoped), [attendancePeriodRecords, scoped]);
   const absenteeismRows = useMemo(() => buildAbsenteeismRows(attendancePeriodRecords, scoped), [attendancePeriodRecords, scoped]);
   const flaggedTardinessRows = flaggedTardiness(tardinessRows);

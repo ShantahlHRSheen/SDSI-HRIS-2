@@ -24,7 +24,8 @@ import {
 } from "@/lib/monthly-analytics";
 
 export default function OvertimeReportPage() {
-  const { employees: allEmployees, branches, departments, currentUser, currentEmployee } = useHris();
+  const { employees: allEmployees, branches, departments, currentUser, currentEmployee, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } =
+    useHris();
   const employees = useMemo(
     () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee),
     [allEmployees, currentUser, currentEmployee],
@@ -33,7 +34,10 @@ export default function OvertimeReportPage() {
   const [employeeSearch, setEmployeeSearch] = useState("");
 
   const months = getMonthsList();
-  const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+  const facts = useMemo(
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+  );
 
   const analyticsFilters = {
     monthKey: filters.monthKey || undefined,

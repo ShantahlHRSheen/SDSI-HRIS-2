@@ -1,10 +1,10 @@
 import type { AttendancePeriodRecord, Employee } from "./types";
 
 // ---------------------------------------------------------------------------
-// Aggregates the real, imported/entered AttendancePeriodRecord data (not the
-// synthetic monthly-analytics fact table the Executive Dashboard's other
-// widgets use) into per-employee instance counts across whichever periods
-// the caller selects, for the Tardiness and Absenteeism reports.
+// Aggregates the real, imported/entered AttendancePeriodRecord data directly
+// (rather than going through the monthly-analytics fact table) into
+// per-employee instance counts across whichever periods the caller selects,
+// for the Tardiness and Absenteeism reports.
 // ---------------------------------------------------------------------------
 
 export const TARDINESS_THRESHOLD = 5;

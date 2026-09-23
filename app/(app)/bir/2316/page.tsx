@@ -19,12 +19,27 @@ async function downloadOfficial2316(data: Form2316Data) {
 }
 
 export default function Form2316Page() {
-  const { currentUser, currentEmployee, employees, branches, departments, generatedBirForms, addGeneratedBirForm } = useHris();
+  const {
+    currentUser,
+    currentEmployee,
+    employees,
+    branches,
+    departments,
+    generatedBirForms,
+    addGeneratedBirForm,
+    attendancePeriodRecords,
+    overtimeRequests,
+    payrollLineOverrides,
+    payrollPeriods,
+  } = useHris();
   const years = getAvailableTaxYears();
   const [taxYear, setTaxYear] = useState(years[0]);
   const [preview, setPreview] = useState<Form2316Data | null>(null);
 
-  const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+  const facts = useMemo(
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+  );
 
   const isAdmin = currentUser?.roles.some((r) => ["hr_admin", "cfo", "payroll_officer", "upper_management"].includes(r));
 

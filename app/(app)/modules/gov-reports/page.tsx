@@ -20,12 +20,15 @@ import {
 } from "@/lib/monthly-analytics";
 
 export default function GovernmentReportsPage() {
-  const { employees, branches, departments } = useHris();
+  const { employees, branches, departments, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [search, setSearch] = useState("");
 
   const months = getMonthsList();
-  const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+  const facts = useMemo(
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+  );
 
   const analyticsFilters = {
     monthKey: filters.monthKey || undefined,

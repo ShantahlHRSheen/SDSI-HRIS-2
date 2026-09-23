@@ -26,12 +26,15 @@ import {
 } from "@/lib/monthly-analytics";
 
 export default function PayrollExpenseReportPage() {
-  const { employees, branches, departments } = useHris();
+  const { employees, branches, departments, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
 
   const months = getMonthsList();
-  const facts = useMemo(() => getMonthlyFacts(employees), [employees]);
+  const facts = useMemo(
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+  );
 
   const analyticsFilters = {
     monthKey: filters.monthKey || undefined,
@@ -284,9 +287,9 @@ export default function PayrollExpenseReportPage() {
       </div>
 
       <div className="mt-4 text-xs text-[var(--text-muted)]">
-        Illustrative figures computed from mock employee compensation records — real SSS / HDMF (Pag-IBIG) / PhilHealth
+        Figures are computed from real attendance and payroll records — SSS / HDMF (Pag-IBIG) / PhilHealth
         contribution brackets change periodically and should be configured as versioned rate tables in System
-        Administration before this is relied on for actual payroll.
+        Administration to keep this current.
       </div>
     </div>
   );
