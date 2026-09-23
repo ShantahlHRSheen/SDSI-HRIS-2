@@ -36,6 +36,7 @@ export type BranchRow = {
 export type DepartmentRow = {
   id: string;
   name: string;
+  division: "shared_services" | "business_units";
 };
 
 export type PositionRow = {

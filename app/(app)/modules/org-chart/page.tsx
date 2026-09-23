@@ -45,7 +45,7 @@ export default function OrgChartPage() {
         {/* Shantahl Main */}
         <div className={styles.dept} style={dcolor("--main")}>
           <div className={styles.deptHead}>
-            <h2>1. Shantahl Main Department</h2>
+            <h2>1. MLM Department</h2>
             <span className={styles.headName}>Lowel B. Magdadaro</span>
             <span className={styles.headTitle}>— Head / Chairman</span>
           </div>
@@ -105,7 +105,7 @@ export default function OrgChartPage() {
         {/* Shantahl Cosmetics */}
         <div className={styles.dept} style={dcolor("--cosmetics")}>
           <div className={styles.deptHead}>
-            <h2>2. Shantahl Cosmetics Department</h2>
+            <h2>2. Cosmetics Department</h2>
             <span className={styles.headName}>Junrey M. Japitan</span>
             <span className={styles.headTitle}>— Head / President</span>
           </div>

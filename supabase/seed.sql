@@ -23,19 +23,14 @@ insert into branches (id, name, code, address) values ('br-lcn', 'Lucena', 'LCN'
 insert into branches (id, name, code, address) values ('br-bcd', 'Bacolod', 'BCD', 'Lacson St, Bacolod City');
 
 -- Departments
-insert into departments (id, name) values ('dp-bod', 'BOD');
-insert into departments (id, name) values ('dp-acctg', 'Accounting');
-insert into departments (id, name) values ('dp-fin', 'Finance');
-insert into departments (id, name) values ('dp-hr', 'Human Resources');
-insert into departments (id, name) values ('dp-darofy-mktg', 'Darofy - Marketing');
-insert into departments (id, name) values ('dp-darofy-sales', 'Darofy - Sales');
-insert into departments (id, name) values ('dp-mlm-netdev', 'MLM - Network Development');
-insert into departments (id, name) values ('dp-mlm-mktg', 'MLM - Marketing');
-insert into departments (id, name) values ('dp-mlm-sales', 'MLM - Sales');
-insert into departments (id, name) values ('dp-cosmetics', 'Cosmetics');
-insert into departments (id, name) values ('dp-darofy-marketing-corp', 'Darofy Marketing');
-insert into departments (id, name) values ('dp-indie-mktg', 'Independent Marketing');
-insert into departments (id, name) values ('dp-operation', 'Operations');
+insert into departments (id, name, division) values ('dp-bod', 'BOD - Shared Services', 'shared_services');
+insert into departments (id, name, division) values ('dp-acctg', 'Accounting', 'shared_services');
+insert into departments (id, name, division) values ('dp-fin', 'Finance', 'shared_services');
+insert into departments (id, name, division) values ('dp-hr', 'Human Resources', 'shared_services');
+insert into departments (id, name, division) values ('dp-operation', 'Operations', 'shared_services');
+insert into departments (id, name, division) values ('dp-mlm', 'MLM Department', 'business_units');
+insert into departments (id, name, division) values ('dp-cosmetics', 'Cosmetics Department', 'business_units');
+insert into departments (id, name, division) values ('dp-darofy', 'Darofy Department', 'business_units');
 
 -- Positions
 insert into positions (id, title, department_id) values ('ps-chairman-of-the-board-1', 'Chairman of the Board', 'dp-bod');
@@ -49,26 +44,26 @@ insert into positions (id, title, department_id) values ('ps-jr-accounting-assis
 insert into positions (id, title, department_id) values ('ps-bookkeeper-9', 'Bookkeeper', 'dp-fin');
 insert into positions (id, title, department_id) values ('ps-corporate-treasurer-10', 'Corporate Treasurer', 'dp-fin');
 insert into positions (id, title, department_id) values ('ps-hr-manager-11', 'HR Manager', 'dp-hr');
-insert into positions (id, title, department_id) values ('ps-content-creator-12', 'Content Creator', 'dp-darofy-mktg');
-insert into positions (id, title, department_id) values ('ps-marketing-head-13', 'Marketing Head', 'dp-darofy-mktg');
-insert into positions (id, title, department_id) values ('ps-multimedia-artist-14', 'Multimedia Artist', 'dp-darofy-mktg');
-insert into positions (id, title, department_id) values ('ps-sales-manager-15', 'Sales Manager', 'dp-darofy-sales');
-insert into positions (id, title, department_id) values ('ps-sales-admin-16', 'Sales Admin', 'dp-darofy-sales');
-insert into positions (id, title, department_id) values ('ps-network-development-head-luzon-17', 'Network Development Head - Luzon', 'dp-mlm-netdev');
-insert into positions (id, title, department_id) values ('ps-network-development-head-visayas-18', 'Network Development Head - Visayas', 'dp-mlm-netdev');
-insert into positions (id, title, department_id) values ('ps-network-development-head-mindanao-19', 'Network Development Head - Mindanao', 'dp-mlm-netdev');
-insert into positions (id, title, department_id) values ('ps-multimedia-artist-20', 'Multimedia Artist', 'dp-mlm-mktg');
-insert into positions (id, title, department_id) values ('ps-social-media-manager-21', 'Social Media Manager', 'dp-mlm-mktg');
-insert into positions (id, title, department_id) values ('ps-video-editor-22', 'Video Editor', 'dp-mlm-mktg');
-insert into positions (id, title, department_id) values ('ps-ads-specialist-23', 'Ads Specialist', 'dp-mlm-sales');
-insert into positions (id, title, department_id) values ('ps-sales-admin-24', 'Sales Admin', 'dp-mlm-sales');
+insert into positions (id, title, department_id) values ('ps-content-creator-12', 'Content Creator', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-marketing-head-13', 'Marketing Head', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-multimedia-artist-14', 'Multimedia Artist', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-sales-manager-15', 'Sales Manager', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-sales-admin-16', 'Sales Admin', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-network-development-head-luzon-17', 'Network Development Head - Luzon', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-network-development-head-visayas-18', 'Network Development Head - Visayas', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-network-development-head-mindanao-19', 'Network Development Head - Mindanao', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-multimedia-artist-20', 'Multimedia Artist', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-social-media-manager-21', 'Social Media Manager', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-video-editor-22', 'Video Editor', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-ads-specialist-23', 'Ads Specialist', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-sales-admin-24', 'Sales Admin', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-platform-specialist-25', 'Platform Specialist', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-26', 'Multimedia Artist Head', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-video-editor-27', 'Video Editor', 'dp-cosmetics');
-insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-mlm-28', 'Multimedia Artist Head (MLM)', 'dp-darofy-marketing-corp');
-insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-29', 'Multimedia Artist Head', 'dp-mlm-mktg');
-insert into positions (id, title, department_id) values ('ps-marketing-assistant-30', 'Marketing Assistant', 'dp-indie-mktg');
-insert into positions (id, title, department_id) values ('ps-product-specialist-31', 'Product Specialist', 'dp-indie-mktg');
+insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-mlm-28', 'Multimedia Artist Head (MLM)', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-29', 'Multimedia Artist Head', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-marketing-assistant-30', 'Marketing Assistant', 'dp-darofy');
+insert into positions (id, title, department_id) values ('ps-product-specialist-31', 'Product Specialist', 'dp-darofy');
 insert into positions (id, title, department_id) values ('ps-cashier-32', 'Cashier', 'dp-operation');
 insert into positions (id, title, department_id) values ('ps-csr-33', 'CSR', 'dp-operation');
 insert into positions (id, title, department_id) values ('ps-warehouseman-34', 'Warehouseman', 'dp-operation');
@@ -322,7 +317,7 @@ insert into employees (
 ) values (
   'emp-013', 'SDSI-0013', 'Angela', 'Acosta', null, 'Ange', 'Female', '1987-01-13',
   'Widowed', 'Filipino', '625 Mabini St., CBT', '09834478972', 'angela.acosta@shantahl.com.ph', 'Torres, Emergency Contact', '09251593727',
-  'br-cbt', 'dp-darofy-mktg', 'ps-content-creator-12',
+  'br-cbt', 'dp-darofy', 'ps-content-creator-12',
   'regular', '2023-07-02', '2024-01-02', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -337,7 +332,7 @@ insert into employees (
 ) values (
   'emp-014', 'SDSI-0014', 'Erwin', 'Carreon', null, 'Erwi', 'Male', '1988-04-18',
   'Single', 'Filipino', '366 Mabini St., CBT', '09374213352', 'erwin.carreon@shantahl.com.ph', 'Cruz, Emergency Contact', '09640012596',
-  'br-cbt', 'dp-darofy-mktg', 'ps-content-creator-12',
+  'br-cbt', 'dp-darofy', 'ps-content-creator-12',
   'regular', '2022-07-01', '2023-01-01', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -352,7 +347,7 @@ insert into employees (
 ) values (
   'emp-015', 'SDSI-0015', 'Sarah Mae', 'Iglesia', null, 'Sara', 'Female', '1989-07-23',
   'Single', 'Filipino', '200 Mabini St., CBT', '09535272254', 'sarahmae.iglesia@shantahl.com.ph', 'Santos, Emergency Contact', '09623635778',
-  'br-cbt', 'dp-darofy-mktg', 'ps-marketing-head-13',
+  'br-cbt', 'dp-darofy', 'ps-marketing-head-13',
   'regular', '2021-06-30', '2021-12-30', null, null, null,
   'daily', 691, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -367,7 +362,7 @@ insert into employees (
 ) values (
   'emp-016', 'SDSI-0016', 'Frank', 'Delos Santos', null, 'Fran', 'Female', '1990-10-03',
   'Married', 'Filipino', '375 Mabini St., CBT', '09623078009', 'frank.delossantos@shantahl.com.ph', 'Santos, Emergency Contact', '09397007915',
-  'br-cbt', 'dp-darofy-mktg', 'ps-multimedia-artist-14',
+  'br-cbt', 'dp-darofy', 'ps-multimedia-artist-14',
   'regular', '2020-06-29', '2020-12-29', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -382,7 +377,7 @@ insert into employees (
 ) values (
   'emp-017', 'SDSI-0017', 'Mae', 'Japitan', null, 'Mae', 'Male', '1991-01-08',
   'Single', 'Filipino', '371 Mabini St., CBT', '09769192700', 'mae.japitan@shantahl.com.ph', 'Bautista, Emergency Contact', '09179040997',
-  'br-cbt', 'dp-darofy-sales', 'ps-sales-manager-15',
+  'br-cbt', 'dp-darofy', 'ps-sales-manager-15',
   'regular', '2019-06-29', '2019-12-29', null, null, null,
   'daily', 691, null, 22, null,
   'active', null, array['dept_head', 'employee']::app_role[]
@@ -397,7 +392,7 @@ insert into employees (
 ) values (
   'emp-018', 'SDSI-0018', 'Christian Mharbee', 'Mongcal', null, 'Chri', 'Female', '1992-04-13',
   'Single', 'Filipino', '157 Mabini St., CBT', '09346999412', 'christianmharbee.mongcal@shantahl.com.ph', 'Ramos, Emergency Contact', '09603287414',
-  'br-cbt', 'dp-darofy-sales', 'ps-sales-admin-16',
+  'br-cbt', 'dp-darofy', 'ps-sales-admin-16',
   'regular', '2018-06-28', '2018-12-28', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -412,7 +407,7 @@ insert into employees (
 ) values (
   'emp-019', 'SDSI-0019', 'Fernan', 'Barlinan', null, 'Fern', 'Male', '1993-07-18',
   'Single', 'Filipino', '626 Mabini St., CBT', '09108323567', 'fernan.barlinan@shantahl.com.ph', 'Castillo, Emergency Contact', '09754806675',
-  'br-cbt', 'dp-darofy-sales', 'ps-sales-admin-16',
+  'br-cbt', 'dp-darofy', 'ps-sales-admin-16',
   'regular', '2017-06-27', '2017-12-27', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -427,7 +422,7 @@ insert into employees (
 ) values (
   'emp-020', 'SDSI-0020', 'Chester', 'Rosales', null, 'Ches', 'Female', '1994-10-23',
   'Married', 'Filipino', '208 Mabini St., MNL', '09718018064', 'chester.rosales@shantahl.com.ph', 'Torres, Emergency Contact', '09374864293',
-  'br-mnl', 'dp-mlm-netdev', 'ps-network-development-head-luzon-17',
+  'br-mnl', 'dp-mlm', 'ps-network-development-head-luzon-17',
   'regular', '2016-06-26', '2016-12-26', null, null, null,
   'monthly', null, 19432, null, 5568,
   'active', null, array['employee']::app_role[]
@@ -442,7 +437,7 @@ insert into employees (
 ) values (
   'emp-021', 'SDSI-0021', 'Randel', 'Segovia', null, 'Rand', 'Male', '1995-01-03',
   'Widowed', 'Filipino', '685 Mabini St., MDU', '09155228070', 'randel.segovia@shantahl.com.ph', 'Torres, Emergency Contact', '09835109785',
-  'br-mdu', 'dp-mlm-netdev', 'ps-network-development-head-visayas-18',
+  'br-mdu', 'dp-mlm', 'ps-network-development-head-visayas-18',
   'regular', '2025-06-23', '2025-12-23', null, null, null,
   'monthly', null, 19432, null, 5568,
   'resigned', '2026-07-07', array['employee']::app_role[]
@@ -457,7 +452,7 @@ insert into employees (
 ) values (
   'emp-022', 'SDSI-0022', 'Domecillo', 'Romelito', null, 'Dome', 'Female', '1996-04-08',
   'Single', 'Filipino', '386 Mabini St., MNL', '09657433461', 'domecillo.romelito@shantahl.com.ph', 'Ramos, Emergency Contact', '09837355007',
-  'br-mnl', 'dp-mlm-netdev', 'ps-network-development-head-mindanao-19',
+  'br-mnl', 'dp-mlm', 'ps-network-development-head-mindanao-19',
   'regular', '2024-06-22', '2024-12-22', null, null, null,
   'monthly', null, 19432, null, 5568,
   'active', null, array['employee']::app_role[]
@@ -472,7 +467,7 @@ insert into employees (
 ) values (
   'emp-023', 'SDSI-0023', 'John Michael', 'De Maliwat', null, 'John', 'Male', '1997-07-13',
   'Single', 'Filipino', '410 Mabini St., CBT', '09716857942', 'johnmichael.demaliwat@shantahl.com.ph', 'Bautista, Emergency Contact', '09310118476',
-  'br-cbt', 'dp-mlm-mktg', 'ps-multimedia-artist-20',
+  'br-cbt', 'dp-mlm', 'ps-multimedia-artist-20',
   'regular', '2023-06-22', '2023-12-22', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -487,7 +482,7 @@ insert into employees (
 ) values (
   'emp-024', 'SDSI-0024', 'Jaz', 'Eusebio', null, 'Jaz', 'Male', '1998-10-18',
   'Widowed', 'Filipino', '893 Mabini St., CBT', '09564468182', 'jaz.eusebio@shantahl.com.ph', 'Santos, Emergency Contact', '09361267731',
-  'br-cbt', 'dp-mlm-mktg', 'ps-social-media-manager-21',
+  'br-cbt', 'dp-mlm', 'ps-social-media-manager-21',
   'freelance', '2022-06-21', null, null, null, null,
   'monthly', null, 18000, null, null,
   'active', null, array['employee']::app_role[]
@@ -502,7 +497,7 @@ insert into employees (
 ) values (
   'emp-025', 'SDSI-0025', 'Renz', 'Nunez', null, 'Renz', 'Male', '1999-01-23',
   'Single', 'Filipino', '832 Mabini St., MNL', '09312321708', 'renz.nunez@shantahl.com.ph', 'Bautista, Emergency Contact', '09810023459',
-  'br-mnl', 'dp-mlm-mktg', 'ps-social-media-manager-21',
+  'br-mnl', 'dp-mlm', 'ps-social-media-manager-21',
   'freelance', '2021-06-20', null, null, null, null,
   'daily', 881.79, null, 0, null,
   'active', null, array['employee']::app_role[]
@@ -517,7 +512,7 @@ insert into employees (
 ) values (
   'emp-026', 'SDSI-0026', 'Danniel', 'Borja', null, 'Dann', 'Female', '1975-04-03',
   'Widowed', 'Filipino', '798 Mabini St., MNL', '09655959362', 'danniel.borja@shantahl.com.ph', 'Ramos, Emergency Contact', '09434923531',
-  'br-mnl', 'dp-mlm-mktg', 'ps-video-editor-22',
+  'br-mnl', 'dp-mlm', 'ps-video-editor-22',
   'freelance', '2020-06-19', null, null, null, null,
   'daily', 881.79, null, 0, null,
   'active', null, array['employee']::app_role[]
@@ -532,7 +527,7 @@ insert into employees (
 ) values (
   'emp-027', 'SDSI-0027', 'Michelle', 'Ignacio', null, 'Mich', 'Male', '1976-07-08',
   'Widowed', 'Filipino', '832 Mabini St., CBT', '09202863933', 'michelle.ignacio@shantahl.com.ph', 'Mendoza, Emergency Contact', '09116476333',
-  'br-cbt', 'dp-mlm-sales', 'ps-ads-specialist-23',
+  'br-cbt', 'dp-mlm', 'ps-ads-specialist-23',
   'freelance', '2019-06-19', null, null, null, null,
   'monthly', null, 18000, null, null,
   'active', null, array['employee']::app_role[]
@@ -547,7 +542,7 @@ insert into employees (
 ) values (
   'emp-028', 'SDSI-0028', 'Eric', 'Ads Specialist', null, 'Eric', 'Female', '1977-10-13',
   'Single', 'Filipino', '351 Mabini St., CEB', '09287144025', 'eric.adsspecialist@shantahl.com.ph', 'Flores, Emergency Contact', '09173989182',
-  'br-ceb', 'dp-mlm-sales', 'ps-ads-specialist-23',
+  'br-ceb', 'dp-mlm', 'ps-ads-specialist-23',
   'freelance', '2018-06-18', null, null, null, null,
   'monthly', null, 10000, null, null,
   'active', null, array['employee']::app_role[]
@@ -562,7 +557,7 @@ insert into employees (
 ) values (
   'emp-029', 'SDSI-0029', 'Jennifer', 'Gonzales', null, 'Jenn', 'Female', '1978-01-18',
   'Single', 'Filipino', '817 Mabini St., CBT', '09522888602', 'jennifer.gonzales@shantahl.com.ph', 'Ramos, Emergency Contact', '09592651901',
-  'br-cbt', 'dp-mlm-sales', 'ps-sales-admin-24',
+  'br-cbt', 'dp-mlm', 'ps-sales-admin-24',
   'regular', '2017-06-17', '2017-12-17', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -577,7 +572,7 @@ insert into employees (
 ) values (
   'emp-030', 'SDSI-0030', 'Charm', 'Rivera', null, 'Char', 'Female', '1979-04-23',
   'Single', 'Filipino', '570 Mabini St., CBT', '09346510656', 'charm.rivera@shantahl.com.ph', 'Torres, Emergency Contact', '09587864915',
-  'br-cbt', 'dp-mlm-sales', 'ps-sales-admin-24',
+  'br-cbt', 'dp-mlm', 'ps-sales-admin-24',
   'regular', '2016-06-16', '2016-12-16', null, null, null,
   'daily', 590, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -592,7 +587,7 @@ insert into employees (
 ) values (
   'emp-031', 'SDSI-0031', 'Jai', 'Jai', null, 'Jai', 'Male', '1980-07-19',
   'Single', 'Filipino', '106 Mabini St., CEB', '09178517533', 'jai.jai@shantahl.com.ph', 'Torres, Emergency Contact', '09249762484',
-  'br-ceb', 'dp-mlm-sales', 'ps-sales-admin-24',
+  'br-ceb', 'dp-mlm', 'ps-sales-admin-24',
   'regular', '2025-07-13', '2026-01-13', null, null, null,
   'daily', 540, null, 0, null,
   'active', null, array['employee']::app_role[]
@@ -607,7 +602,7 @@ insert into employees (
 ) values (
   'emp-032', 'SDSI-0032', 'Suzanne', 'Sarona', null, 'Suza', 'Male', '1981-10-08',
   'Single', 'Filipino', '217 Mabini St., CEB', '09421037133', 'suzanne.sarona@shantahl.com.ph', 'Reyes, Emergency Contact', '09119699175',
-  'br-ceb', 'dp-mlm-sales', 'ps-sales-admin-24',
+  'br-ceb', 'dp-mlm', 'ps-sales-admin-24',
   'regular', '2024-07-12', '2025-01-12', null, null, null,
   'daily', 540, null, 0, null,
   'active', null, array['employee']::app_role[]
@@ -622,7 +617,7 @@ insert into employees (
 ) values (
   'emp-033', 'SDSI-0033', 'Marissa', 'Camposo', null, 'Mari', 'Female', '1982-01-13',
   'Single', 'Filipino', '279 Mabini St., CEB', '09686325573', 'marissa.camposo@shantahl.com.ph', 'Santos, Emergency Contact', '09518323723',
-  'br-ceb', 'dp-mlm-sales', 'ps-sales-admin-24',
+  'br-ceb', 'dp-mlm', 'ps-sales-admin-24',
   'regular', '2023-07-12', '2024-01-12', null, null, null,
   'daily', 540, null, 0, null,
   'active', null, array['employee']::app_role[]
@@ -682,7 +677,7 @@ insert into employees (
 ) values (
   'emp-037', 'SDSI-0037', 'Ronald', 'Lugtu', null, 'Rona', 'Female', '1986-01-08',
   'Single', 'Filipino', '170 Mabini St., CBT', '09155792455', 'ronald.lugtu@shantahl.com.ph', 'Castillo, Emergency Contact', '09337416176',
-  'br-cbt', 'dp-darofy-marketing-corp', 'ps-multimedia-artist-head-mlm-28',
+  'br-cbt', 'dp-darofy', 'ps-multimedia-artist-head-mlm-28',
   'regular', '2019-07-09', '2020-01-09', null, null, null,
   'daily', 690.1, null, null, null,
   'active', null, array['employee']::app_role[]
@@ -697,7 +692,7 @@ insert into employees (
 ) values (
   'emp-038', 'SDSI-0038', 'John Paul Michael', 'Papa', null, 'John', 'Male', '1987-04-13',
   'Married', 'Filipino', '687 Mabini St., CBT', '09373676433', 'johnpaulmichael.papa@shantahl.com.ph', 'Mendoza, Emergency Contact', '09610095354',
-  'br-cbt', 'dp-mlm-mktg', 'ps-multimedia-artist-head-29',
+  'br-cbt', 'dp-mlm', 'ps-multimedia-artist-head-29',
   'regular', '2018-07-08', '2019-01-08', null, null, null,
   'monthly', null, 20000, null, 5000,
   'active', null, array['employee']::app_role[]
@@ -712,7 +707,7 @@ insert into employees (
 ) values (
   'emp-039', 'SDSI-0039', 'Ara Juniella', 'Aling', null, 'Ara ', 'Female', '1988-07-18',
   'Married', 'Filipino', '368 Mabini St., MNL', '09258878968', 'arajuniella.aling@shantahl.com.ph', 'Bautista, Emergency Contact', '09566898997',
-  'br-mnl', 'dp-indie-mktg', 'ps-marketing-assistant-30',
+  'br-mnl', 'dp-darofy', 'ps-marketing-assistant-30',
   'regular', '2017-07-07', '2018-01-07', null, null, null,
   'daily', 695, null, 22, null,
   'active', null, array['employee']::app_role[]
@@ -727,7 +722,7 @@ insert into employees (
 ) values (
   'emp-040', 'SDSI-0040', 'Dra.', 'Cecil Catapang', null, 'Dra.', 'Female', '1989-10-23',
   'Widowed', 'Filipino', '155 Mabini St., MNL', '09645182813', 'dra..cecilcatapang@shantahl.com.ph', 'Flores, Emergency Contact', '09892212970',
-  'br-mnl', 'dp-indie-mktg', 'ps-product-specialist-31',
+  'br-mnl', 'dp-darofy', 'ps-product-specialist-31',
   'freelance', '2016-07-06', null, null, null, null,
   'monthly', null, 30000, null, null,
   'active', null, array['employee']::app_role[]
@@ -742,7 +737,7 @@ insert into employees (
 ) values (
   'emp-041', 'SDSI-0041', 'Shegive', 'Lee', null, 'Sheg', 'Female', '1990-01-03',
   'Single', 'Filipino', '256 Mabini St., MNL', '09613933666', 'shegive.lee@shantahl.com.ph', 'Torres, Emergency Contact', '09677316062',
-  'br-mnl', 'dp-indie-mktg', 'ps-product-specialist-31',
+  'br-mnl', 'dp-darofy', 'ps-product-specialist-31',
   'freelance', '2025-07-03', null, null, null, null,
   'monthly', null, 25000, null, null,
   'active', null, array['employee']::app_role[]

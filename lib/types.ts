@@ -28,9 +28,17 @@ export interface Branch {
   address: string;
 }
 
+export type Division = "shared_services" | "business_units";
+
+export const DIVISION_LABELS: Record<Division, string> = {
+  shared_services: "Shared Services",
+  business_units: "Business Units",
+};
+
 export interface Department {
   id: string;
   name: string;
+  division: Division;
 }
 
 export interface Position {

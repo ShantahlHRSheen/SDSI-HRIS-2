@@ -86,7 +86,7 @@ export async function deleteBranchRow(id: string): Promise<void> {
 // ---- Departments --------------------------------------------------------------
 
 function toDepartment(r: DepartmentRow): Department {
-  return { id: r.id, name: r.name };
+  return { id: r.id, name: r.name, division: r.division };
 }
 
 export async function fetchDepartments(): Promise<Department[]> {

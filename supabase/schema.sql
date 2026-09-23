@@ -68,7 +68,8 @@ create table branches (
 
 create table departments (
   id text primary key default gen_random_uuid()::text,
-  name text not null
+  name text not null,
+  division text not null check (division in ('shared_services', 'business_units'))
 );
 
 create table positions (
