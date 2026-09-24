@@ -216,6 +216,7 @@ async function main() {
 
   // Email is unique in the database: track who holds which address so a
   // clash drops the email from this row instead of failing its whole chunk.
+  const seenEmpNums = new Map(); // employee_number -> "LAST, FIRST" of its first row
   const emailOwner = new Map(existingRows.filter((e) => e.email).map((e) => [e.email.toLowerCase(), e.employee_number]));
 
   for (const row of sheetRows) {
@@ -243,6 +244,27 @@ async function main() {
       continue;
     }
 
+    if (seenEmpNums.has(employeeNumber)) {
+      skipped.push({
+        employeeNumber,
+        name: `${lastName}, ${firstName}`,
+        reason: `duplicate Employee Number — already used by ${seenEmpNums.get(employeeNumber)}`,
+      });
+      continue;
+    }
+    seenEmpNums.set(employeeNumber, `${lastName}, ${firstName}`);
+
+    // Typos like year 23019 would fail the insert — treat as blank and say so.
+    const date = (key) => {
+      const d = toDateStr(cell(key));
+      const year = d ? Number(d.slice(0, 4)) : null;
+      if (d && (year < 1900 || year > 2100)) {
+        warnings.push(`${employeeNumber}: ${key} "${d}" looks like a typo — left blank`);
+        return null;
+      }
+      return d;
+    };
+
     const existing = existingByEmpNum.get(employeeNumber);
     const civilStatusRaw = str(cell("civilStatus"));
     const employmentStatusRaw = str(cell("employmentStatus"))?.toLowerCase() ?? null;
@@ -268,7 +290,7 @@ async function main() {
       middle_name: middleRaw ?? nicknameRaw,
       nickname: middleRaw ? nicknameRaw : null,
       gender,
-      birthdate: toDateStr(cell("birthdate")),
+      birthdate: date("birthdate"),
       civil_status: civilStatusRaw ? (CIVIL_STATUSES[civilStatusRaw.toUpperCase()] ?? null) : null,
       nationality: str(cell("nationality")),
       address: str(cell("address")),
@@ -284,18 +306,18 @@ async function main() {
       department_id: departmentId,
       position_id: positionId,
       employment_status: employmentStatusRaw && EMPLOYMENT_STATUSES.has(employmentStatusRaw) ? employmentStatusRaw : null,
-      date_hired: toDateStr(cell("dateHired")),
-      date_regularized: toDateStr(cell("dateRegularized")),
-      contract_start: toDateStr(cell("contractStart")),
-      contract_end: toDateStr(cell("contractEnd")),
-      probation_ends_at: toDateStr(cell("probationEndsAt")),
+      date_hired: date("dateHired"),
+      date_regularized: date("dateRegularized"),
+      contract_start: date("contractStart"),
+      contract_end: date("contractEnd"),
+      probation_ends_at: date("probationEndsAt"),
       payroll_type: payrollTypeRaw && PAYROLL_TYPES.has(payrollTypeRaw) ? payrollTypeRaw : null,
       daily_rate: toNumber(cell("dailyRate")),
       monthly_salary: toNumber(cell("monthlySalary")),
       daily_allowance: toNumber(cell("dailyAllowance")),
       monthly_allowance: toNumber(cell("monthlyAllowance")),
       status,
-      status_changed_at: toDateStr(cell("statusChangedAt")),
+      status_changed_at: date("statusChangedAt"),
       roles: parseRoles(cell("roles")),
     };
 
