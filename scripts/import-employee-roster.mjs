@@ -20,13 +20,20 @@
 // "Unassigned" branch/department/position this script falls back to for
 // rows missing that information.
 //
-// Safe to re-run: rows are upserted by Employee Number, so filling in more
-// fields in the spreadsheet and re-running just updates the existing rows.
+// Safe to re-run: rows are matched by Employee Number. New employees are
+// inserted with whatever's on file (blanks fall back to "Unassigned" etc.).
+// Employees already in the database are merged, never clobbered:
+//   - a blank (or unrecognised) cell never clears or replaces a value
+//     already on file — only filled-in cells overwrite;
+//   - an existing company email (@shantahl.com.ph) is always kept;
+//   - roles are the union of the database's and the spreadsheet's;
+//   - Status always comes from the spreadsheet (HR's current record).
+// An email that already belongs to a different employee (or appears twice
+// in the sheet) is left off rather than failing the import.
 // Rows missing Employee Number, First/Last Name, Gender, or Status are
-// skipped (the database can't accept those — everything else is imported
-// with whatever's on file, blanks and all, exactly like the roster
-// spreadsheet). A summary of what happened is written to
-// roster-import-report.txt (gitignored) alongside a console log.
+// skipped. A summary — including every field that would change on an
+// existing employee — is written to roster-import-report.txt (gitignored),
+// in --dry-run mode too.
 
 import { createClient } from "@supabase/supabase-js";
 import ExcelJS from "exceljs";
@@ -160,21 +167,21 @@ async function main() {
     );
   }
 
+  // These return null for a blank or unrecognised cell, so an existing
+  // employee's value is kept; new employees fall back to "Unassigned".
   function resolveBranch(name) {
     const s = str(name);
-    if (!s) return UNASSIGNED_BRANCH;
-    return branchByName.get(s.toUpperCase()) ?? UNASSIGNED_BRANCH;
+    return s ? (branchByName.get(s.toUpperCase()) ?? null) : null;
   }
 
   function resolveDept(name) {
     const s = str(name);
-    if (!s) return UNASSIGNED_DEPT;
-    return deptByName.get(s.toUpperCase()) ?? UNASSIGNED_DEPT;
+    return s ? (deptByName.get(s.toUpperCase()) ?? null) : null;
   }
 
   function resolvePosition(deptId, title) {
     const s = str(title);
-    if (!s || deptId === UNASSIGNED_DEPT) return UNASSIGNED_POSITION;
+    if (!s || !deptId || deptId === UNASSIGNED_DEPT) return null;
     let titlePart = s;
     for (const sep of [" — ", " - "]) {
       if (s.includes(sep)) {
@@ -183,13 +190,25 @@ async function main() {
         break;
       }
     }
-    return posByDeptAndTitle.get(`${deptId}::${titlePart.toUpperCase()}`) ?? UNASSIGNED_POSITION;
+    return posByDeptAndTitle.get(`${deptId}::${titlePart.toUpperCase()}`) ?? null;
   }
 
+  const { data: existingRows, error: eErr } = await supabase.from("employees").select("*");
+  if (eErr) throw eErr;
+  const existingByEmpNum = new Map(existingRows.map((e) => [e.employee_number, e]));
+  const COMPANY_EMAIL = /@shantahl\.com\.ph$/i;
+
   const skipped = [];
+  const warnings = [];
   const supervisorRefs = new Map(); // employee_number -> raw supervisor cell
   const evaluatorRefs = new Map(); // employee_number -> raw evaluator cell
-  const rowsToUpsert = [];
+  const inserts = [];
+  const updates = []; // { existing, patch, changes: [field, old, new][] }
+  let unchanged = 0;
+
+  // Email is unique in the database: track who holds which address so a
+  // clash drops the email from this row instead of failing its whole chunk.
+  const emailOwner = new Map(existingRows.filter((e) => e.email).map((e) => [e.email.toLowerCase(), e.employee_number]));
 
   for (const row of sheetRows) {
     const cell = (key) => row.getCell(COLS[key]).value;
@@ -216,24 +235,25 @@ async function main() {
       continue;
     }
 
+    const existing = existingByEmpNum.get(employeeNumber);
     const civilStatusRaw = str(cell("civilStatus"));
     const employmentStatusRaw = str(cell("employmentStatus"))?.toLowerCase() ?? null;
     const payrollTypeRaw = str(cell("payrollType"))?.toLowerCase() ?? null;
     const branchId = resolveBranch(cell("branch"));
     const departmentId = resolveDept(cell("department"));
-    const positionId = resolvePosition(departmentId, cell("position"));
+    const positionId = resolvePosition(departmentId ?? existing?.department_id, cell("position"));
 
     const supervisorRaw = str(cell("supervisor"));
     const evaluatorRaw = str(cell("evaluator"));
     if (supervisorRaw) supervisorRefs.set(employeeNumber, supervisorRaw);
     if (evaluatorRaw) evaluatorRefs.set(employeeNumber, evaluatorRaw);
 
-    rowsToUpsert.push({
-      employee_number: employeeNumber,
+    // null = blank / unrecognised on the sheet.
+    const fields = {
       first_name: firstName,
       last_name: lastName,
       middle_name: str(cell("middleName")),
-      nickname: str(cell("nickname")) ?? firstName,
+      nickname: str(cell("nickname")),
       gender,
       birthdate: toDateStr(cell("birthdate")),
       civil_status: civilStatusRaw ? (CIVIL_STATUSES[civilStatusRaw.toUpperCase()] ?? null) : null,
@@ -250,13 +270,13 @@ async function main() {
       branch_id: branchId,
       department_id: departmentId,
       position_id: positionId,
-      employment_status: employmentStatusRaw && EMPLOYMENT_STATUSES.has(employmentStatusRaw) ? employmentStatusRaw : "unassigned",
+      employment_status: employmentStatusRaw && EMPLOYMENT_STATUSES.has(employmentStatusRaw) ? employmentStatusRaw : null,
       date_hired: toDateStr(cell("dateHired")),
       date_regularized: toDateStr(cell("dateRegularized")),
       contract_start: toDateStr(cell("contractStart")),
       contract_end: toDateStr(cell("contractEnd")),
       probation_ends_at: toDateStr(cell("probationEndsAt")),
-      payroll_type: payrollTypeRaw && PAYROLL_TYPES.has(payrollTypeRaw) ? payrollTypeRaw : "unassigned",
+      payroll_type: payrollTypeRaw && PAYROLL_TYPES.has(payrollTypeRaw) ? payrollTypeRaw : null,
       daily_rate: toNumber(cell("dailyRate")),
       monthly_salary: toNumber(cell("monthlySalary")),
       daily_allowance: toNumber(cell("dailyAllowance")),
@@ -264,81 +284,181 @@ async function main() {
       status,
       status_changed_at: toDateStr(cell("statusChangedAt")),
       roles: parseRoles(cell("roles")),
-    });
+    };
+
+    if (existing && existing.email && COMPANY_EMAIL.test(existing.email)) fields.email = null;
+    if (fields.email) {
+      const owner = emailOwner.get(fields.email);
+      if (owner && owner !== employeeNumber) {
+        warnings.push(`${employeeNumber}: email ${fields.email} already belongs to ${owner} — left off`);
+        fields.email = null;
+      } else {
+        emailOwner.set(fields.email, employeeNumber);
+      }
+    }
+
+    if (!existing) {
+      const deptId = fields.department_id ?? UNASSIGNED_DEPT;
+      inserts.push({
+        ...fields,
+        employee_number: employeeNumber,
+        nickname: fields.nickname ?? firstName,
+        branch_id: fields.branch_id ?? UNASSIGNED_BRANCH,
+        department_id: deptId,
+        position_id: deptId === UNASSIGNED_DEPT ? UNASSIGNED_POSITION : (fields.position_id ?? UNASSIGNED_POSITION),
+        employment_status: fields.employment_status ?? "unassigned",
+        payroll_type: fields.payroll_type ?? "unassigned",
+      });
+      continue;
+    }
+
+    // Moving to a department without a recognisable position would leave
+    // the old department's position behind — reset it instead.
+    if (fields.department_id && fields.department_id !== existing.department_id && !fields.position_id) {
+      fields.position_id = UNASSIGNED_POSITION;
+    }
+    const mergedRoles = [...new Set([...(existing.roles ?? []), ...fields.roles])];
+    fields.roles = mergedRoles.length === (existing.roles ?? []).length ? null : mergedRoles;
+
+    const patch = {};
+    const changes = [];
+    for (const [key, value] of Object.entries(fields)) {
+      if (value === null || value === undefined) continue;
+      const old = existing[key];
+      // The roster is mostly ALL CAPS — don't let that re-case "Marlyn".
+      const same = Array.isArray(value)
+        ? JSON.stringify(value) === JSON.stringify(old)
+        : old !== null && old !== undefined && String(old).toUpperCase() === String(value).toUpperCase();
+      if (same) continue;
+      patch[key] = value;
+      changes.push([key, old, value]);
+    }
+    if (changes.length) updates.push({ existing, patch, changes });
+    else unchanged++;
   }
 
-  console.log(`${rowsToUpsert.length} row(s) ready to import, ${skipped.length} skipped.\n`);
+  const fmt = (v) => (v === null || v === undefined ? "(blank)" : Array.isArray(v) ? `[${v.join(", ")}]` : String(v));
+  const changeLines = updates.flatMap((u) => [
+    `  ${u.existing.employee_number}  ${u.existing.last_name}, ${u.existing.first_name}`,
+    ...u.changes.map(([k, o, n]) => `      ${k}: ${fmt(o)} → ${fmt(n)}`),
+  ]);
+  const notable = updates.flatMap((u) =>
+    u.changes
+      .filter(([k]) => k === "status" || k === "roles" || k === "email")
+      .map(([k, o, n]) => `  ${u.existing.employee_number}  ${u.existing.last_name}, ${u.existing.first_name}  ${k}: ${fmt(o)} → ${fmt(n)}`),
+  );
+
+  console.log(`${inserts.length} new employee(s) to insert.`);
+  console.log(`${updates.length + unchanged} already in the database: ${updates.length} with changes, ${unchanged} unchanged.`);
+  console.log(`${skipped.length} skipped.\n`);
   if (skipped.length) {
     console.log("Skipped rows (fix these in the spreadsheet and re-run):");
     for (const s of skipped) console.log(`  ${s.employeeNumber}  ${s.name}  — ${s.reason}`);
     console.log("");
   }
+  if (notable.length) {
+    console.log("Status / role / email changes on existing employees:");
+    for (const l of notable) console.log(l);
+    console.log("");
+  }
+  if (warnings.length) {
+    console.log("Warnings:");
+    for (const w of warnings) console.log(`  ${w}`);
+    console.log("");
+  }
+
+  function writeReport(extra) {
+    const report = [
+      `Roster import${DRY_RUN ? " (DRY RUN — nothing written)" : ""} — ${new Date().toISOString()}`,
+      `Source: ${filePath}`,
+      `New: ${inserts.length}`,
+      `Existing with changes: ${updates.length}`,
+      `Existing unchanged: ${unchanged}`,
+      `Skipped: ${skipped.length}`,
+      ...skipped.map((s) => `  SKIPPED  ${s.employeeNumber}  ${s.name}  — ${s.reason}`),
+      `Warnings: ${warnings.length}`,
+      ...warnings.map((w) => `  ${w}`),
+      ...extra,
+      `Field changes on existing employees:`,
+      ...changeLines,
+    ].join("\n");
+    writeFileSync("roster-import-report.txt", report);
+  }
 
   if (DRY_RUN) {
-    console.log("--dry-run: no changes written. Re-run without --dry-run to import.");
+    writeReport([]);
+    console.log("--dry-run: no changes written. Every field change is listed in roster-import-report.txt.");
     return;
   }
 
-  const upsertedByEmpNum = new Map();
+  // Supervisor/evaluator references can point at anyone in the database,
+  // not just this sheet's rows.
+  const idByEmpNum = new Map(existingRows.map((e) => [normEmpNum(e.employee_number), e.id]));
+  const failed = [];
+
   const CHUNK = 50;
-  for (let i = 0; i < rowsToUpsert.length; i += CHUNK) {
-    const chunk = rowsToUpsert.slice(i, i + CHUNK);
-    const { data, error } = await supabase
-      .from("employees")
-      .upsert(chunk, { onConflict: "employee_number" })
-      .select("id, employee_number");
-    if (error) {
-      console.error(`FAILED chunk ${i / CHUNK + 1}: ${error.message}`);
+  for (let i = 0; i < inserts.length; i += CHUNK) {
+    const chunk = inserts.slice(i, i + CHUNK);
+    const { data, error } = await supabase.from("employees").insert(chunk).select("id, employee_number");
+    if (!error) {
+      for (const row of data) idByEmpNum.set(normEmpNum(row.employee_number), row.id);
+      console.log(`Inserted ${data.length} row(s) (chunk ${i / CHUNK + 1}).`);
       continue;
     }
-    for (const row of data) upsertedByEmpNum.set(normEmpNum(row.employee_number), row.id);
-    console.log(`Upserted ${data.length} row(s) (chunk ${i / CHUNK + 1}).`);
+    // Retry one by one so a single bad row doesn't sink the rest.
+    for (const one of chunk) {
+      const { data: d, error: e } = await supabase.from("employees").insert(one).select("id, employee_number").single();
+      if (e) failed.push(`${one.employee_number}: insert failed — ${e.message}`);
+      else idByEmpNum.set(normEmpNum(d.employee_number), d.id);
+    }
   }
+
+  let updated = 0;
+  for (const u of updates) {
+    const { error } = await supabase.from("employees").update(u.patch).eq("id", u.existing.id);
+    if (error) failed.push(`${u.existing.employee_number}: update failed — ${error.message}`);
+    else updated++;
+  }
+  console.log(`Updated ${updated} existing employee(s).`);
 
   console.log(`\nResolving supervisor/evaluator references...`);
   const unresolvedRefs = [];
-  const updates = [];
-  for (const [empNum, supervisorRef] of supervisorRefs) {
-    const employeeId = upsertedByEmpNum.get(normEmpNum(empNum));
-    const supervisorId = upsertedByEmpNum.get(normEmpNum(supervisorRef));
-    if (!employeeId) continue;
-    if (!supervisorId) {
-      unresolvedRefs.push(`${empNum}: supervisor ${supervisorRef} not found`);
-      continue;
+  const links = [];
+  for (const [refs, field, label] of [
+    [supervisorRefs, "supervisor_id", "supervisor"],
+    [evaluatorRefs, "job_performance_evaluator_id", "evaluator"],
+  ]) {
+    for (const [empNum, ref] of refs) {
+      const employeeId = idByEmpNum.get(normEmpNum(empNum));
+      const targetId = idByEmpNum.get(normEmpNum(ref));
+      if (!employeeId) continue;
+      if (!targetId) {
+        unresolvedRefs.push(`${empNum}: ${label} ${ref} not found`);
+        continue;
+      }
+      links.push({ employeeId, field, value: targetId });
     }
-    updates.push({ employeeId, field: "supervisor_id", value: supervisorId });
   }
-  for (const [empNum, evaluatorRef] of evaluatorRefs) {
-    const employeeId = upsertedByEmpNum.get(normEmpNum(empNum));
-    const evaluatorId = upsertedByEmpNum.get(normEmpNum(evaluatorRef));
-    if (!employeeId) continue;
-    if (!evaluatorId) {
-      unresolvedRefs.push(`${empNum}: evaluator ${evaluatorRef} not found`);
-      continue;
-    }
-    updates.push({ employeeId, field: "job_performance_evaluator_id", value: evaluatorId });
+  for (const l of links) {
+    const { error } = await supabase.from("employees").update({ [l.field]: l.value }).eq("id", l.employeeId);
+    if (error) failed.push(`failed to set ${l.field} for employee ${l.employeeId}: ${error.message}`);
   }
-
-  for (const u of updates) {
-    const { error } = await supabase.from("employees").update({ [u.field]: u.value }).eq("id", u.employeeId);
-    if (error) console.error(`FAILED to set ${u.field} for employee ${u.employeeId}: ${error.message}`);
-  }
-  console.log(`Set ${updates.length} supervisor/evaluator link(s).`);
+  console.log(`Set ${links.length} supervisor/evaluator link(s).`);
   if (unresolvedRefs.length) {
     console.log(`\n${unresolvedRefs.length} reference(s) could not be resolved (likely typo'd Employee Number):`);
     for (const r of unresolvedRefs) console.log(`  ${r}`);
   }
+  if (failed.length) {
+    console.log(`\n${failed.length} failure(s):`);
+    for (const f of failed) console.log(`  ${f}`);
+  }
 
-  const report = [
-    `Roster import — ${new Date().toISOString()}`,
-    `Source: ${filePath}`,
-    `Imported: ${upsertedByEmpNum.size} / ${rowsToUpsert.length}`,
-    `Skipped: ${skipped.length}`,
-    ...skipped.map((s) => `  SKIPPED  ${s.employeeNumber}  ${s.name}  — ${s.reason}`),
+  writeReport([
+    `Failures: ${failed.length}`,
+    ...failed.map((f) => `  ${f}`),
     `Unresolved supervisor/evaluator refs: ${unresolvedRefs.length}`,
     ...unresolvedRefs.map((r) => `  ${r}`),
-  ].join("\n");
-  writeFileSync("roster-import-report.txt", report);
+  ]);
   console.log(`\nDone. Full report written to roster-import-report.txt.`);
 }
 
