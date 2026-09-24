@@ -321,7 +321,9 @@ create table attendance_period_records (
   holiday_days numeric not null default 0,
   sl_days numeric not null default 0,
   vl_days numeric not null default 0,
-  late_adj_minutes numeric not null default 0,
+  -- Actual/raw minutes — the tracker's "Adj Mins" columns are deliberately
+  -- not read or stored anywhere in this system.
+  late_minutes numeric not null default 0,
   undertime_minutes numeric not null default 0,
   notes text not null default '',
   source attendance_record_source not null default 'manual',

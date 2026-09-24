@@ -207,7 +207,7 @@ export type AttendancePeriodRecordRow = {
   holiday_days: number;
   sl_days: number;
   vl_days: number;
-  late_adj_minutes: number;
+  late_minutes: number;
   undertime_minutes: number;
   notes: string;
   source: "import" | "manual";

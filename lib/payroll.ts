@@ -190,11 +190,12 @@ export function computePayrollForPeriod(
     const basicPayAuto = employee.payrollType === "daily" ? Math.round(rate * rec.daysWorked) : Math.round((employee.monthlySalary ?? 0) / 2);
     const basicPay = ov.basicPayOverride ?? basicPayAuto;
 
-    const latesUndertimeAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.lateAdjMinutes);
+    const latesUndertimeAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.lateMinutes);
     const latesUndertime = ov.latesUndertimeOverride ?? latesUndertimeAuto;
     // Undertime deduction — same per-minute rate formula as the late
-    // deduction, applied to the "Undertime Raw Mins" column imported
-    // separately from "Late Adj Mins".
+    // deduction, applied to the "Undertime Raw Mins" column (imported
+    // separately from "Late Raw Mins"). Both are actual/raw minutes — the
+    // tracker's "Adj Mins" columns are deliberately not used.
     const undertimeDeductionAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.undertimeMinutes);
     const undertimeDeduction = ov.undertimeDeductionOverride ?? undertimeDeductionAuto;
     const basicSalaryLessLate = basicPay - latesUndertime - undertimeDeduction;
@@ -260,7 +261,7 @@ export function computePayrollForPeriod(
       holidayDays: rec.holidayDays,
       vlDays: rec.vlDays,
       slDays: rec.slDays,
-      lateMinutes: rec.lateAdjMinutes,
+      lateMinutes: rec.lateMinutes,
       undertimeMinutes: rec.undertimeMinutes,
       otHours,
       otHoursAuto,

@@ -360,7 +360,11 @@ export interface AttendancePeriodRecord {
   holidayDays: number;
   slDays: number;
   vlDays: number;
-  lateAdjMinutes: number;
+  // Actual/raw minutes — imported from the tracker's "Late Raw Mins" /
+  // "Undertime Raw Mins" columns (or entered directly). The tracker's
+  // "Adj Mins" columns are deliberately not read or stored anywhere in this
+  // system; only the raw figures drive the payroll deduction.
+  lateMinutes: number;
   undertimeMinutes: number;
   notes: string;
   source: AttendanceRecordSource;
@@ -373,7 +377,7 @@ export interface AttendancePeriodRecord {
   // manual entry (and every pre-existing seeded record) remain valid without
   // backfilling data that was never captured at daily granularity. Instance
   // counts are day-counts (e.g. "late on 6 separate days"), not minute totals
-  // — lateAdjMinutes/undertimeMinutes above are already the period's minute
+  // — lateMinutes/undertimeMinutes above are already the period's minute
   // totals.
   lateInstances?: number;
   lateDayDetails?: LateDayDetail[];

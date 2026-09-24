@@ -14,8 +14,8 @@ import type { AttendancePeriodRecord, Employee } from "@/lib/types";
 
 const LATE_OUTLIER_AVG_MIN_PER_DAY = 60;
 
-function isLateOutlier(rec: { daysWorked: number; lateAdjMinutes: number }): boolean {
-  return rec.daysWorked > 0 && rec.lateAdjMinutes / rec.daysWorked > LATE_OUTLIER_AVG_MIN_PER_DAY;
+function isLateOutlier(rec: { daysWorked: number; lateMinutes: number }): boolean {
+  return rec.daysWorked > 0 && rec.lateMinutes / rec.daysWorked > LATE_OUTLIER_AVG_MIN_PER_DAY;
 }
 
 export default function AttendancePage() {
@@ -69,7 +69,7 @@ export default function AttendancePage() {
         holidayDays: m.parsed.holidayDays,
         slDays: m.parsed.slDays,
         vlDays: m.parsed.vlDays,
-        lateAdjMinutes: m.parsed.lateAdjMinutes,
+        lateMinutes: m.parsed.lateMinutes,
         undertimeMinutes: m.parsed.undertimeMinutes,
         notes: m.parsed.notes,
         lateInstances: m.parsed.lateInstances,
@@ -106,7 +106,7 @@ export default function AttendancePage() {
             <StatTile label="Holiday days" value={myRecord.holidayDays.toString()} />
             <StatTile label="SL days" value={myRecord.slDays.toString()} />
             <StatTile label="VL days" value={myRecord.vlDays.toString()} />
-            <StatTile label="Late (min)" value={myRecord.lateAdjMinutes.toString()} />
+            <StatTile label="Late (min)" value={myRecord.lateMinutes.toString()} />
             <StatTile label="Undertime (min)" value={myRecord.undertimeMinutes.toString()} />
           </div>
         )}
@@ -196,7 +196,7 @@ export default function AttendancePage() {
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.slDays}</td>
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.vlDays}</td>
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">
-                          <span className={outlier ? "text-[var(--status-warning)]" : ""}>{rec.lateAdjMinutes}</span>
+                          <span className={outlier ? "text-[var(--status-warning)]" : ""}>{rec.lateMinutes}</span>
                           {outlier && <AlertTriangle size={12} className="ml-1 inline text-[var(--status-warning)]" />}
                         </td>
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.undertimeMinutes}</td>
@@ -270,7 +270,7 @@ function EditAttendanceModal({
     holidayDays: target.record?.holidayDays ?? 0,
     slDays: target.record?.slDays ?? 0,
     vlDays: target.record?.vlDays ?? 0,
-    lateAdjMinutes: target.record?.lateAdjMinutes ?? 0,
+    lateMinutes: target.record?.lateMinutes ?? 0,
     undertimeMinutes: target.record?.undertimeMinutes ?? 0,
     notes: target.record?.notes ?? "",
   });
@@ -303,7 +303,7 @@ function EditAttendanceModal({
           <NumberField label="Holiday days" value={form.holidayDays} onChange={(v) => setForm((f) => ({ ...f, holidayDays: v }))} />
           <NumberField label="SL days" value={form.slDays} onChange={(v) => setForm((f) => ({ ...f, slDays: v }))} />
           <NumberField label="VL days" value={form.vlDays} onChange={(v) => setForm((f) => ({ ...f, vlDays: v }))} />
-          <NumberField label="Late (min)" value={form.lateAdjMinutes} onChange={(v) => setForm((f) => ({ ...f, lateAdjMinutes: v }))} />
+          <NumberField label="Late (min)" value={form.lateMinutes} onChange={(v) => setForm((f) => ({ ...f, lateMinutes: v }))} />
           <NumberField label="Undertime raw (min)" value={form.undertimeMinutes} onChange={(v) => setForm((f) => ({ ...f, undertimeMinutes: v }))} />
         </div>
         <div>
@@ -376,7 +376,7 @@ function ImportPreviewModal({
             <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--status-warning)]"><AlertTriangle size={14} /> Suspiciously high late/undertime minutes ({outliers.length})</div>
             <ul className="space-y-0.5 text-xs text-[var(--text-secondary)]">
               {outliers.map((o) => (
-                <li key={o.employee.id}>{fullName(o.employee)} — {o.parsed.lateAdjMinutes} min over {o.parsed.daysWorked} day(s) worked</li>
+                <li key={o.employee.id}>{fullName(o.employee)} — {o.parsed.lateMinutes} min over {o.parsed.daysWorked} day(s) worked</li>
               ))}
             </ul>
             <div className="mt-1.5 text-xs text-[var(--text-muted)]">These will still be imported as-is — double check the source file before relying on this period&rsquo;s payroll.</div>

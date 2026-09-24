@@ -433,7 +433,7 @@ interface AttendanceFormData {
   holidayDays: number;
   vlDays: number;
   slDays: number;
-  lateAdjMinutes: number;
+  lateMinutes: number;
   undertimeMinutes: number;
 }
 
@@ -467,7 +467,7 @@ function PayrollLineEditModal({
     holidayDays: attendanceRecord?.holidayDays ?? 0,
     vlDays: attendanceRecord?.vlDays ?? 0,
     slDays: attendanceRecord?.slDays ?? 0,
-    lateAdjMinutes: attendanceRecord?.lateAdjMinutes ?? 0,
+    lateMinutes: attendanceRecord?.lateMinutes ?? 0,
     undertimeMinutes: attendanceRecord?.undertimeMinutes ?? 0,
   }));
   const [rate, setRate] = useState<RateFormData>(() => ({
@@ -510,7 +510,7 @@ function PayrollLineEditModal({
       holidayDays: attendance.holidayDays,
       vlDays: attendance.vlDays,
       slDays: attendance.slDays,
-      lateAdjMinutes: attendance.lateAdjMinutes,
+      lateMinutes: attendance.lateMinutes,
       undertimeMinutes: attendance.undertimeMinutes,
       notes: attendanceRecord?.notes ?? "",
     });
@@ -556,7 +556,7 @@ function PayrollLineEditModal({
             <NumberField label="Holiday days" value={attendance.holidayDays} onChange={(v) => setAttendanceField("holidayDays", v)} />
             <NumberField label="VL days" value={attendance.vlDays} onChange={(v) => setAttendanceField("vlDays", v)} />
             <NumberField label="SL days" value={attendance.slDays} onChange={(v) => setAttendanceField("slDays", v)} />
-            <NumberField label="Late (mins)" value={attendance.lateAdjMinutes} onChange={(v) => setAttendanceField("lateAdjMinutes", v)} />
+            <NumberField label="Late (mins)" value={attendance.lateMinutes} onChange={(v) => setAttendanceField("lateMinutes", v)} />
             <NumberField label="Undertime raw (mins)" value={attendance.undertimeMinutes} onChange={(v) => setAttendanceField("undertimeMinutes", v)} />
             <OverrideField
               label="OT hours"

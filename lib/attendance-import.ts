@@ -27,7 +27,7 @@ export interface ParsedAttendanceRow {
   holidayDays: number;
   slDays: number;
   vlDays: number;
-  lateAdjMinutes: number;
+  lateMinutes: number;
   undertimeMinutes: number;
   notes: string;
   lateInstances: number;
@@ -47,7 +47,9 @@ export interface ParsedAttendanceWorkbook {
   rows: ParsedAttendanceRow[];
 }
 
-const REQUIRED_COLUMNS = ["emp id", "employee name", "branch", "department", "days worked", "holiday days", "sl days", "vl days", "late adj mins"];
+// The tracker's "Adj Mins" columns are deliberately not read anywhere in
+// this system — only the actual/raw minutes drive payroll.
+const REQUIRED_COLUMNS = ["emp id", "employee name", "branch", "department", "days worked", "holiday days", "sl days", "vl days", "late raw mins"];
 
 function toDateStr(v: unknown): string | null {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
@@ -251,7 +253,7 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
   if (daily.maxDate) periodEnd = daily.maxDate;
   const rows: ParsedAttendanceRow[] = [];
   const headerRow = headerRowNum;
-  const undertimeCol = headerMap["undertime adj mins"] ?? headerMap["undertime raw mins"];
+  const undertimeCol = headerMap["undertime raw mins"];
   // The template's Emp ID / Employee Name columns are lookup formulas bounded
   // to a fixed range far larger than the real roster (e.g. up to row 505), so
   // rows past the real data are expected to read as blank. Some Google
@@ -276,12 +278,11 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
       holidayDays: cellNumber(row, headerMap["holiday days"]),
       slDays: cellNumber(row, headerMap["sl days"]),
       vlDays: cellNumber(row, headerMap["vl days"]),
-      lateAdjMinutes: cellNumber(row, headerMap["late adj mins"]),
-      // The source template's actual header is "Undertime Adj Mins" (mirroring
-      // "Late Adj Mins"); "undertime raw mins" is also accepted in case a
-      // differently-named tracker export is used. Read like "notes" —
-      // optional, defaulting to 0 rather than failing the whole import — so
-      // older tracker exports that predate this column still import cleanly.
+      lateMinutes: cellNumber(row, headerMap["late raw mins"]),
+      // "Undertime Raw Mins" only — the tracker's "Undertime Adj Mins" column
+      // is deliberately not read. Optional, defaulting to 0 rather than
+      // failing the whole import, since older tracker exports predate this
+      // column.
       undertimeMinutes: cellNumberOptional(row, undertimeCol),
       notes: headerMap["notes"] ? cellText(row, headerMap["notes"]) : "",
       ...(dailyByName.get(normalizeName(rawName)) ?? emptyDailyAggregate()),
@@ -342,7 +343,7 @@ export function buildAttendanceImportPreview(parsed: ParsedAttendanceWorkbook, e
       unmatched.push(row);
       return;
     }
-    const isLateOutlier = row.daysWorked > 0 && row.lateAdjMinutes / row.daysWorked > LATE_OUTLIER_AVG_MIN_PER_DAY;
+    const isLateOutlier = row.daysWorked > 0 && row.lateMinutes / row.daysWorked > LATE_OUTLIER_AVG_MIN_PER_DAY;
     matched.push({ parsed: row, employee, isLateOutlier });
   });
 
