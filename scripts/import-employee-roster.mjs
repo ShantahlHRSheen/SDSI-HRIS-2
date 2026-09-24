@@ -83,6 +83,14 @@ function str(v) {
   return s === "" ? null : s;
 }
 
+// The roster has stray trailing periods ("MAGDADARO.") — drop them,
+// except on suffixes like "Jr." / "Sr.".
+function nameStr(v) {
+  const s = str(v);
+  if (!s || /\b(jr|sr)\.$/i.test(s)) return s;
+  return s.replace(/\.+$/, "").trim() || null;
+}
+
 function toDateStr(v) {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   const s = str(v);
@@ -213,8 +221,8 @@ async function main() {
   for (const row of sheetRows) {
     const cell = (key) => row.getCell(COLS[key]).value;
     const employeeNumber = str(cell("employeeNumber"));
-    const firstName = str(cell("firstName"));
-    const lastName = str(cell("lastName"));
+    const firstName = nameStr(cell("firstName"));
+    const lastName = nameStr(cell("lastName"));
     const genderRaw = str(cell("gender"));
     const gender = genderRaw ? GENDERS[genderRaw.toUpperCase()] : null;
     const statusRaw = str(cell("status"));
@@ -250,8 +258,8 @@ async function main() {
 
     // HR's roster mostly puts the middle name in the Nickname column and
     // leaves Middle Name blank — read it as the middle name in that case.
-    const middleRaw = str(cell("middleName"));
-    const nicknameRaw = str(cell("nickname"));
+    const middleRaw = nameStr(cell("middleName"));
+    const nicknameRaw = nameStr(cell("nickname"));
 
     // null = blank / unrecognised on the sheet.
     const fields = {
