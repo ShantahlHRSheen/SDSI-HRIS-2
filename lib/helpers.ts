@@ -16,6 +16,16 @@ export function fullName(e: Employee): string {
   return `${e.lastName} - ${e.firstName}${middlePart}`;
 }
 
+// Next free "EMP-####" number: one past the highest in use, so gaps and
+// legacy SDSI-#### numbers never cause a collision.
+export function nextEmployeeNumber(employees: Pick<Employee, "employeeNumber">[]): string {
+  const max = employees.reduce((m, e) => {
+    const match = /^EMP-(\d+)$/.exec(e.employeeNumber);
+    return match ? Math.max(m, Number(match[1])) : m;
+  }, 0);
+  return `EMP-${String(max + 1).padStart(4, "0")}`;
+}
+
 export function branchName(branchId: string): string {
   return BRANCHES.find((b) => b.id === branchId)?.name ?? "—";
 }

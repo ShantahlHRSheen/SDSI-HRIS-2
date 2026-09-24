@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { fullName } from "./helpers";
+import { fullName, nextEmployeeNumber } from "./helpers";
 import { getInitialSession, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   decideCorrectionRequestRow,
@@ -577,8 +577,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     async (input) => {
       if (supabaseSession) {
         try {
-          const seq = state.employees.length + 1;
-          const entry = await insertEmployee(input, `SDSI-${String(seq).padStart(4, "0")}`);
+          const entry = await insertEmployee(input, nextEmployeeNumber(state.employees));
           setState((prev) => ({ ...prev, employees: [...prev.employees, entry] }));
           logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
           return;
@@ -588,8 +587,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         }
       }
       setState((prev) => {
-        const seq = prev.employees.length + 1;
-        const entry: Employee = { ...input, id: nextId("emp"), employeeNumber: `SDSI-${String(seq).padStart(4, "0")}` };
+        const entry: Employee = { ...input, id: nextId("emp"), employeeNumber: nextEmployeeNumber(prev.employees) };
         return { ...prev, employees: [...prev.employees, entry] };
       });
       logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
