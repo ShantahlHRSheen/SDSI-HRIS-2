@@ -440,7 +440,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const supabaseEmployee = useMemo(() => {
     const email = supabaseSession?.user.email;
     if (!email) return null;
-    return state.employees.find((e) => e.email.toLowerCase() === email.toLowerCase()) ?? null;
+    return state.employees.find((e) => e.email?.toLowerCase() === email.toLowerCase()) ?? null;
   }, [supabaseSession, state.employees]);
 
   const currentUser = useMemo<DemoUser | null>(() => {
@@ -506,7 +506,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error };
       if (!session) return { error: "Sign-in did not return a session." };
 
-      const matched = state.employees.find((e) => e.email.toLowerCase() === email.toLowerCase());
+      const matched = state.employees.find((e) => e.email?.toLowerCase() === email.toLowerCase());
       if (!matched) {
         await signOutSupabase();
         return { error: `Signed in, but no employee record matches ${email}. Contact HR.` };

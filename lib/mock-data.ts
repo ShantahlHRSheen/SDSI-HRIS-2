@@ -75,6 +75,9 @@ export const DEPARTMENTS: Department[] = [
   { id: "dp-mlm", name: "MLM Department", division: "business_units" },
   { id: "dp-cosmetics", name: "Cosmetics Department", division: "business_units" },
   { id: "dp-darofy", name: "Darofy Department", division: "business_units" },
+  // Placeholder for a historical/resigned employee imported without a real
+  // department on file — never used for anyone active.
+  { id: "dp-unassigned", name: "Unassigned", division: "shared_services" },
 ];
 
 export const POSITIONS: Position[] = [
@@ -125,6 +128,7 @@ export const POSITIONS: Position[] = [
   { id: "ps-branch-manager-41", title: "Branch Manager", departmentId: "dp-operation" },
   { id: "ps-driver-warehouseman-42", title: "Driver / Warehouseman", departmentId: "dp-operation" },
   { id: "ps-stockman-43", title: "Stockman", departmentId: "dp-operation" },
+  { id: "ps-unassigned", title: "Unassigned", departmentId: "dp-unassigned" },
 ];
 
 export const WORK_SCHEDULES: WorkSchedule[] = [

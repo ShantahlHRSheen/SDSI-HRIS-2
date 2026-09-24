@@ -96,12 +96,19 @@ export default function EmployeeProfilePage() {
         <Section title="Personal Information">
           <Row label="Gender" value={employee.gender} />
           <Row label="Birthdate" value={formatDate(employee.birthdate)} />
-          <Row label="Civil status" value={employee.civilStatus} />
-          <Row label="Nationality" value={employee.nationality} />
-          <Row label="Address" value={employee.address} />
-          <Row label="Contact number" value={employee.contactNumber} />
-          <Row label="Email" value={employee.email} />
-          <Row label="Emergency contact" value={`${employee.emergencyContactName} · ${employee.emergencyContactPhone}`} />
+          <Row label="Civil status" value={employee.civilStatus ?? "—"} />
+          <Row label="Nationality" value={employee.nationality ?? "—"} />
+          <Row label="Address" value={employee.address ?? "—"} />
+          <Row label="Contact number" value={employee.contactNumber ?? "—"} />
+          <Row label="Email" value={employee.email ?? "—"} />
+          <Row
+            label="Emergency contact"
+            value={
+              employee.emergencyContactName || employee.emergencyContactPhone
+                ? `${employee.emergencyContactName ?? "—"} · ${employee.emergencyContactPhone ?? "—"}`
+                : "—"
+            }
+          />
         </Section>
 
         <Section title="Employment Details">
@@ -111,8 +118,20 @@ export default function EmployeeProfilePage() {
           <Row label="Date regularized" value={formatDate(employee.dateRegularized)} />
           <Row label="Contract period" value={employee.contractStart ? `${formatDate(employee.contractStart)} – ${formatDate(employee.contractEnd)}` : "—"} />
           <Row label="Probation ends" value={formatDate(employee.probationEndsAt)} />
-          <Row label="Payroll type" value={employee.payrollType === "monthly" ? "Fixed-rate" : "Daily-rate"} />
-          <Row label="Rate" value={employee.payrollType === "monthly" ? formatCurrency(employee.monthlySalary) + " / month" : formatCurrency(employee.dailyRate) + " / day"} />
+          <Row
+            label="Payroll type"
+            value={employee.payrollType === "monthly" ? "Fixed-rate" : employee.payrollType === "daily" ? "Daily-rate" : "Not on file"}
+          />
+          <Row
+            label="Rate"
+            value={
+              employee.payrollType === "monthly"
+                ? formatCurrency(employee.monthlySalary) + " / month"
+                : employee.payrollType === "daily"
+                  ? formatCurrency(employee.dailyRate) + " / day"
+                  : "—"
+            }
+          />
           <Row
             label="Allowance"
             value={
