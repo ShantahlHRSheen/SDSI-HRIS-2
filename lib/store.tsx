@@ -122,6 +122,13 @@ import type {
 
 const STORAGE_KEY = "sdsi-hris-demo-v1";
 
+// Bump this whenever the shape of the seed data in mock-data.ts changes in a
+// way a visitor should see (departments/positions restructured, fields
+// renamed, etc.). Demo mode (no Supabase session) persists everything to
+// localStorage, so without this a browser that already has a cached snapshot
+// would keep showing the old seed data forever instead of the new one.
+const SEED_VERSION = 2;
+
 interface PersistedState {
   currentUserId: string | null;
   employees: Employee[];
@@ -406,10 +413,14 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as PersistedState & { demoUsers?: DemoUser[] };
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setState((prev) => ({ ...prev, ...parsed }));
-        if (parsed.demoUsers) setDemoUsers(parsed.demoUsers);
+        const parsed = JSON.parse(raw) as PersistedState & { demoUsers?: DemoUser[]; __seedVersion?: number };
+        if (parsed.__seedVersion === SEED_VERSION) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setState((prev) => ({ ...prev, ...parsed }));
+          if (parsed.demoUsers) setDemoUsers(parsed.demoUsers);
+        }
+        // Stale seed version: fall through with the fresh defaultState() already
+        // in place; the write effect below persists it under the new version.
       }
     } catch {
       // ignore corrupt storage
@@ -420,7 +431,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, demoUsers }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, demoUsers, __seedVersion: SEED_VERSION }));
     } catch {
       // storage full / unavailable — demo continues in-memory only
     }
