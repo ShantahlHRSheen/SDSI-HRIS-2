@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/*
+  Deliberate single visual identity: black-and-green, always on — not adaptive
+  to OS light/dark preference. Tokens stay the same shape as before so every
+  component (which reads only var(--...) tokens) picks this up automatically.
+*/
+:root {
+  --surface-1: #0e1512;
+  --page-plane: #060908;
+  --text-primary: #ffffff;
+  --text-secondary: #b7c7bf;
+  --text-muted: #71847a;
+  --gridline: #16211b;
+  --baseline: #26372e;
+  --border-hairline: rgba(120, 255, 195, 0.14);
+
+  --accent: #2fe6a6;
+  --accent-strong: #58f0bc;
+  --accent-soft: rgba(47, 230, 166, 0.12);
+  --accent-glow: rgba(47, 230, 166, 0.35);
+  --on-accent: #052018;
+
+  --series-1: #2fe6a6;
+  --series-2: #22d3ee;
+  --series-3: #ffd166;
+  --series-4: #60a5fa;
+  --series-5: #a78bfa;
+  --series-6: #f87171;
+  --series-7: #ff6fa8;
+  --series-8: #fb923c;
+
+  --status-good: #22c55e;
+  --status-warning: #fbbf24;
+  --status-serious: #fb7185;
+  --status-critical: #ef4444;
+
+  --seq-100: #113026;
+  --seq-250: #164a37;
+  --seq-400: #1c7a55;
+  --seq-450: #22c56e;
+  --seq-550: #58e0a0;
+  --seq-700: #baf3d5;
+}
+
+body {
+  background: var(--page-plane);
+  background-image:
+    radial-gradient(ellipse 900px 480px at 12% -8%, rgba(47, 230, 166, 0.10), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(34, 211, 238, 0.06), transparent 55%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--baseline);
+  border-radius: 4px;
+}
+
+/* Subtle glow reserved for primary actions and the active nav state — keeps
+   the futuristic accent from being applied everywhere at once. */
+.glow-accent {
+  box-shadow: 0 0 0 1px var(--accent-glow), 0 0 18px -2px var(--accent-glow);
+}
+
+/* Official documents (BIR forms) always print in plain black-on-white,
+   regardless of the app's dark theme, and print-preview hides everything
+   else on the page — sidebar, topbar, buttons — showing only the form. */
+.bir-print-area {
+  background: #ffffff;
+  color: #0b0b0b;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .bir-print-area,
+  .bir-print-area * {
+    visibility: visible;
+  }
+  .bir-print-area {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 18mm;
+    overflow: visible;
+    z-index: 9999;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
