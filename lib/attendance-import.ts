@@ -57,7 +57,7 @@ function toDateStr(v: unknown): string | null {
   return null;
 }
 
-function toNumber(v: unknown): number {
+export function toNumber(v: unknown): number {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? "").replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
@@ -67,7 +67,7 @@ function toNumber(v: unknown): number {
 // be undefined (uncached) for formulas the source spreadsheet never
 // recalculated, which we treat as blank rather than falling back to the
 // formula object (which would otherwise stringify to "[object Object]").
-function cellScalar(row: ExcelJS.Row, col: number): string | number | null {
+export function cellScalar(row: ExcelJS.Row, col: number): string | number | null {
   const cell = row.getCell(col);
   const raw = cell.formula !== undefined || cell.type === 6 ? cell.result : cell.value;
   if (raw === undefined || raw === null) return null;

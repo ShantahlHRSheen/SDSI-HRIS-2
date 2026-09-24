@@ -859,6 +859,29 @@ export async function upsertPayrollLineOverrideRow(
   if (error) throw error;
   return toPayrollLineOverride(data);
 }
+// Payroll register import: each employee's day counts and every figure of
+// the line, upserted together.
+export async function importPayrollRegisterRows(
+  periodId: string,
+  rows: {
+    attendance: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">;
+    override: Omit<PayrollLineOverride, "id" | "periodId" | "updatedBy" | "updatedAt">;
+  }[],
+  updatedBy: string,
+): Promise<{ attendance: AttendancePeriodRecord[]; overrides: PayrollLineOverride[] }> {
+  const client = getSupabaseClient();
+  const { data: att, error: attErr } = await client
+    .from("attendance_period_records")
+    .upsert(rows.map((r) => attendancePeriodRecordToRow({ ...r.attendance, periodId }, "import", updatedBy)), { onConflict: "period_id,employee_id" })
+    .select();
+  if (attErr) throw attErr;
+  const { data: ov, error: ovErr } = await client
+    .from("payroll_line_overrides")
+    .upsert(rows.map((r) => payrollLineOverrideToRow({ ...r.override, periodId }, updatedBy)), { onConflict: "period_id,employee_id" })
+    .select();
+  if (ovErr) throw ovErr;
+  return { attendance: att.map(toAttendancePeriodRecord), overrides: ov.map(toPayrollLineOverride) };
+}
 
 // ---- Voucher amount overrides --------------------------------------------------------
 

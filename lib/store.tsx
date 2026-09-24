@@ -68,6 +68,7 @@ import {
   updateWorkScheduleRow,
   upsertAttendancePeriodRecordRow,
   upsertPayrollLineOverrideRow,
+  importPayrollRegisterRows,
   upsertVoucherAmountOverrideRow,
 } from "./supabase/repo";
 import {
@@ -228,6 +229,14 @@ interface HrisContextShape {
   importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => void;
 
   upsertPayrollLineOverride: (input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">) => void;
+  // Resolves to an error message, or null on success.
+  importPayrollRegister: (
+    periodId: string,
+    rows: {
+      attendance: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">;
+      override: Omit<PayrollLineOverride, "id" | "periodId" | "updatedBy" | "updatedAt">;
+    }[],
+  ) => Promise<string | null>;
   upsertVoucherAmountOverride: (input: Omit<VoucherAmountOverride, "id" | "updatedBy" | "updatedAt">) => void;
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
@@ -689,6 +698,38 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, payrollLineOverrides: [entry, ...rest] };
       });
       logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
+    },
+    [logAudit, currentUser, supabaseSession],
+  );
+
+  const importPayrollRegister: HrisContextShape["importPayrollRegister"] = useCallback(
+    async (periodId, rows) => {
+      const actor = currentUser?.name ?? "System";
+      let attendance: AttendancePeriodRecord[];
+      let overrides: PayrollLineOverride[];
+      if (supabaseSession) {
+        try {
+          ({ attendance, overrides } = await importPayrollRegisterRows(periodId, rows, actor));
+        } catch (err) {
+          console.error("Failed to import payroll register in Supabase", err);
+          return err instanceof Error ? err.message : "Could not save the imported payroll.";
+        }
+      } else {
+        attendance = rows.map((r) => ({ ...r.attendance, id: nextId("att"), periodId, source: "import", updatedBy: actor, updatedAt: TODAY }));
+        overrides = rows.map((r) => ({ ...r.override, id: nextId("plo"), periodId, updatedBy: actor, updatedAt: TODAY }));
+      }
+      // Replace only the imported employees' entries — everyone else's
+      // attendance/overrides for the period stay as they were.
+      const key = (r: { periodId: string; employeeId: string }) => `${r.periodId}::${r.employeeId}`;
+      const attKeys = new Set(attendance.map(key));
+      const ovKeys = new Set(overrides.map(key));
+      setState((prev) => ({
+        ...prev,
+        attendancePeriodRecords: [...attendance, ...prev.attendancePeriodRecords.filter((r) => !attKeys.has(key(r)))],
+        payrollLineOverrides: [...overrides, ...prev.payrollLineOverrides.filter((r) => !ovKeys.has(key(r)))],
+      }));
+      logAudit("Payroll", "import", `Imported payroll register for ${rows.length} employee(s), period ${periodId}`);
+      return null;
     },
     [logAudit, currentUser, supabaseSession],
   );
@@ -1262,6 +1303,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
     upsertPayrollLineOverride,
+    importPayrollRegister,
     upsertVoucherAmountOverride,
     addEvaluation,
     updateEvaluationSection,
