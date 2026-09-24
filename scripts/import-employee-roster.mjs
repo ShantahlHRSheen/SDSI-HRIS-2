@@ -248,12 +248,17 @@ async function main() {
     if (supervisorRaw) supervisorRefs.set(employeeNumber, supervisorRaw);
     if (evaluatorRaw) evaluatorRefs.set(employeeNumber, evaluatorRaw);
 
+    // HR's roster mostly puts the middle name in the Nickname column and
+    // leaves Middle Name blank — read it as the middle name in that case.
+    const middleRaw = str(cell("middleName"));
+    const nicknameRaw = str(cell("nickname"));
+
     // null = blank / unrecognised on the sheet.
     const fields = {
       first_name: firstName,
       last_name: lastName,
-      middle_name: str(cell("middleName")),
-      nickname: str(cell("nickname")),
+      middle_name: middleRaw ?? nicknameRaw,
+      nickname: middleRaw ? nicknameRaw : null,
       gender,
       birthdate: toDateStr(cell("birthdate")),
       civil_status: civilStatusRaw ? (CIVIL_STATUSES[civilStatusRaw.toUpperCase()] ?? null) : null,
