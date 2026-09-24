@@ -104,6 +104,7 @@ export const POSITIONS: Position[] = [
   { id: "ps-video-editor-22", title: "Video Editor", departmentId: "dp-mlm" },
   { id: "ps-ads-specialist-23", title: "Ads Specialist", departmentId: "dp-mlm" },
   { id: "ps-sales-admin-24", title: "Sales Admin", departmentId: "dp-mlm" },
+  { id: "ps-sales-manager-47", title: "Sales Manager", departmentId: "dp-mlm" },
   { id: "ps-business-unit-president-46", title: "Business Unit President", departmentId: "dp-cosmetics" },
   { id: "ps-platform-specialist-25", title: "Platform Specialist", departmentId: "dp-cosmetics" },
   { id: "ps-multimedia-artist-head-26", title: "Multimedia Artist Head", departmentId: "dp-cosmetics" },

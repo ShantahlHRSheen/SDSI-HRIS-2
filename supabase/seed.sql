@@ -59,6 +59,7 @@ insert into positions (id, title, department_id) values ('ps-social-media-manage
 insert into positions (id, title, department_id) values ('ps-video-editor-22', 'Video Editor', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-ads-specialist-23', 'Ads Specialist', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-sales-admin-24', 'Sales Admin', 'dp-mlm');
+insert into positions (id, title, department_id) values ('ps-sales-manager-47', 'Sales Manager', 'dp-mlm');
 insert into positions (id, title, department_id) values ('ps-business-unit-president-46', 'Business Unit President', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-platform-specialist-25', 'Platform Specialist', 'dp-cosmetics');
 insert into positions (id, title, department_id) values ('ps-multimedia-artist-head-26', 'Multimedia Artist Head', 'dp-cosmetics');
