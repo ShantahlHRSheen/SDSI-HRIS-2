@@ -325,10 +325,13 @@ async function main() {
       continue;
     }
 
-    // Moving to a department without a recognisable position would leave
-    // the old department's position behind — reset it instead.
+    // A department change needs a recognisable position in the new
+    // department — otherwise keep the employee where they are rather than
+    // strand them in "Unassigned" (e.g. Board members whose roster title
+    // doesn't match a position on file).
     if (fields.department_id && fields.department_id !== existing.department_id && !fields.position_id) {
-      fields.position_id = UNASSIGNED_POSITION;
+      if (str(cell("position"))) warnings.push(`${employeeNumber}: position "${str(cell("position"))}" not found — kept current department/position`);
+      fields.department_id = null;
     }
     const mergedRoles = [...new Set([...(existing.roles ?? []), ...fields.roles])];
     fields.roles = mergedRoles.length === (existing.roles ?? []).length ? null : mergedRoles;
