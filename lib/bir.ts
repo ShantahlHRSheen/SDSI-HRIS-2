@@ -148,10 +148,10 @@ export function buildForm2316(facts: MonthlyEmployeeFact[], employees: Employee[
 
 export function employeeGovIds(employee: Employee) {
   return {
-    tin: employeeTIN(employee.employeeNumber),
-    sss: employeeSssNumber(employee.employeeNumber),
-    philHealth: employeePhilHealthNumber(employee.employeeNumber),
-    hdmf: employeeHdmfNumber(employee.employeeNumber),
+    tin: employee.tin || employeeTIN(employee.employeeNumber),
+    sss: employee.sssNumber || employeeSssNumber(employee.employeeNumber),
+    philHealth: employee.philHealthNumber || employeePhilHealthNumber(employee.employeeNumber),
+    hdmf: employee.hdmfNumber || employeeHdmfNumber(employee.employeeNumber),
   };
 }
 

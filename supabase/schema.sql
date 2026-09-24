@@ -131,6 +131,13 @@ create table employees (
   emergency_contact_name text not null,
   emergency_contact_phone text not null,
 
+  -- Real government IDs, entered once known. Null means not on file yet —
+  -- BIR forms fall back to an illustrative masked placeholder in that case.
+  sss_number text,
+  philhealth_number text,
+  hdmf_number text,
+  tin text,
+
   branch_id text not null references branches (id),
   department_id text not null references departments (id),
   position_id text not null references positions (id),

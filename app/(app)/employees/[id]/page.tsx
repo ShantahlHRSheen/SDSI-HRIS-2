@@ -9,16 +9,13 @@ import {
   branchName,
   departmentAllocationsForEmployee,
   departmentName,
-  employeeHdmfNumber,
-  employeePhilHealthNumber,
-  employeeSssNumber,
-  employeeTIN,
   formatCurrency,
   formatDate,
   fullName,
   positionTitle,
   scopeEmployeesForViewer,
 } from "@/lib/helpers";
+import { employeeGovIds } from "@/lib/bir";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 
@@ -47,6 +44,7 @@ export default function EmployeeProfilePage() {
   const directReports = employees.filter((e) => e.supervisorId === employee.id);
   const empEvals = evaluations.filter((e) => e.employeeId === employee.id);
   const empDiscipline = disciplinaryRecords.filter((d) => d.employeeId === employee.id);
+  const govIds = employeeGovIds(employee);
 
   const STATUS_TONE: Record<string, BadgeTone> = { active: "good", on_leave: "warning", resigned: "muted", terminated: "critical" };
 
@@ -127,11 +125,18 @@ export default function EmployeeProfilePage() {
           />
         </Section>
 
-        <Section title="Government IDs" note="Masked placeholder values for demo purposes only.">
-          <Row label="SSS" value={employeeSssNumber(employee.employeeNumber)} />
-          <Row label="PhilHealth" value={employeePhilHealthNumber(employee.employeeNumber)} />
-          <Row label="Pag-IBIG" value={employeeHdmfNumber(employee.employeeNumber)} />
-          <Row label="TIN" value={employeeTIN(employee.employeeNumber)} />
+        <Section
+          title="Government IDs"
+          note={
+            employee.sssNumber && employee.philHealthNumber && employee.hdmfNumber && employee.tin
+              ? undefined
+              : "Any ID not yet on file shows an illustrative masked placeholder — edit this employee to enter the real number once known."
+          }
+        >
+          <Row label="SSS" value={govIds.sss} />
+          <Row label="PhilHealth" value={govIds.philHealth} />
+          <Row label="Pag-IBIG" value={govIds.hdmf} />
+          <Row label="TIN" value={govIds.tin} />
         </Section>
 
         <Section title="Bank Details" note="Masked placeholder values for demo purposes only.">

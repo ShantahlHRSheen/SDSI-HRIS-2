@@ -32,6 +32,10 @@ function defaultForm(employee: Employee | null, branchId: string, departmentId: 
     email: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
+    sssNumber: null,
+    philHealthNumber: null,
+    hdmfNumber: null,
+    tin: null,
     branchId,
     departmentId,
     positionId,
@@ -125,6 +129,19 @@ export function EmployeeEditModal({
             <TextField label="Address" value={form.address} onChange={(v) => set("address", v)} className="col-span-2" />
             <TextField label="Emergency contact name" value={form.emergencyContactName} onChange={(v) => set("emergencyContactName", v)} />
             <TextField label="Emergency contact phone" value={form.emergencyContactPhone} onChange={(v) => set("emergencyContactPhone", v)} />
+          </div>
+        </FieldSection>
+
+        <FieldSection title="Government IDs">
+          <p className="mb-2 text-xs text-[var(--text-muted)]">
+            Leave blank if not yet known — the profile page and BIR forms show an illustrative placeholder until a
+            real number is entered here.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="SSS number" value={form.sssNumber ?? ""} onChange={(v) => set("sssNumber", v || null)} />
+            <TextField label="PhilHealth number" value={form.philHealthNumber ?? ""} onChange={(v) => set("philHealthNumber", v || null)} />
+            <TextField label="Pag-IBIG (HDMF) number" value={form.hdmfNumber ?? ""} onChange={(v) => set("hdmfNumber", v || null)} />
+            <TextField label="TIN" value={form.tin ?? ""} onChange={(v) => set("tin", v || null)} />
           </div>
         </FieldSection>
 

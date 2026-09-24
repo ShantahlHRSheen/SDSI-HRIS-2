@@ -285,6 +285,10 @@ function toEmployee(r: EmployeeRow): Employee {
     email: r.email,
     emergencyContactName: r.emergency_contact_name,
     emergencyContactPhone: r.emergency_contact_phone,
+    sssNumber: r.sss_number,
+    philHealthNumber: r.philhealth_number,
+    hdmfNumber: r.hdmf_number,
+    tin: r.tin,
     branchId: r.branch_id,
     departmentId: r.department_id,
     positionId: r.position_id,
@@ -322,6 +326,10 @@ function employeeToRow(e: Partial<Omit<Employee, "id" | "employeeNumber">>): Par
   if (e.email !== undefined) row.email = e.email;
   if (e.emergencyContactName !== undefined) row.emergency_contact_name = e.emergencyContactName;
   if (e.emergencyContactPhone !== undefined) row.emergency_contact_phone = e.emergencyContactPhone;
+  if (e.sssNumber !== undefined) row.sss_number = e.sssNumber ?? null;
+  if (e.philHealthNumber !== undefined) row.philhealth_number = e.philHealthNumber ?? null;
+  if (e.hdmfNumber !== undefined) row.hdmf_number = e.hdmfNumber ?? null;
+  if (e.tin !== undefined) row.tin = e.tin ?? null;
   if (e.branchId !== undefined) row.branch_id = e.branchId;
   if (e.departmentId !== undefined) row.department_id = e.departmentId;
   if (e.positionId !== undefined) row.position_id = e.positionId;

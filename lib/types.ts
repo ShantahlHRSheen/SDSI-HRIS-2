@@ -123,6 +123,15 @@ export interface Employee {
   emergencyContactName: string;
   emergencyContactPhone: string;
 
+  // Real government-mandated IDs, entered by HR once known. Null/absent
+  // means not on file yet — see employeeGovIds() in lib/bir.ts, which falls
+  // back to an illustrative masked placeholder in that case so BIR forms
+  // and the profile page always have something to show.
+  sssNumber?: string | null;
+  philHealthNumber?: string | null;
+  hdmfNumber?: string | null;
+  tin?: string | null;
+
   branchId: string;
   departmentId: string;
   positionId: string;
