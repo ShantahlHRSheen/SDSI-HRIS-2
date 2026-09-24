@@ -39,10 +39,12 @@ create type app_role as enum (
 create type holiday_type as enum ('regular', 'special_non_working');
 create type payroll_period_status as enum ('open', 'locked', 'closed');
 create type employment_status as enum (
-  'regular', 'probationary', 'project_based', 'freelance', 'consultant', 'intern'
+  -- 'unassigned' is a placeholder for a historical/resigned employee
+  -- imported without this on file — never used for anyone active.
+  'regular', 'probationary', 'project_based', 'freelance', 'consultant', 'intern', 'unassigned'
 );
 create type employee_lifecycle_status as enum ('active', 'on_leave', 'resigned', 'terminated');
-create type payroll_type as enum ('daily', 'monthly');
+create type payroll_type as enum ('daily', 'monthly', 'unassigned');
 create type evaluation_status as enum ('draft', 'submitted', 'acknowledged');
 create type disciplinary_type as enum (
   'incident_report', 'verbal_warning', 'written_warning', 'suspension', 'nte', 'nod'
@@ -122,14 +124,17 @@ create table employees (
   middle_name text,
   nickname text not null,
   gender text not null check (gender in ('Male', 'Female')),
-  birthdate date not null,
-  civil_status text not null check (civil_status in ('Single', 'Married', 'Widowed', 'Separated')),
-  nationality text not null,
-  address text not null,
-  contact_number text not null,
-  email text not null unique,
-  emergency_contact_name text not null,
-  emergency_contact_phone text not null,
+  -- Nullable to allow importing employees whose personal details aren't on
+  -- file yet — the profile page and edit modal show "Not on file" / "—"
+  -- until HR fills these in.
+  birthdate date,
+  civil_status text check (civil_status in ('Single', 'Married', 'Widowed', 'Separated')),
+  nationality text,
+  address text,
+  contact_number text,
+  email text unique,
+  emergency_contact_name text,
+  emergency_contact_phone text,
 
   -- Real government IDs, entered once known. Null means not on file yet —
   -- BIR forms fall back to an illustrative masked placeholder in that case.

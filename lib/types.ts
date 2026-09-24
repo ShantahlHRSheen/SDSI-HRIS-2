@@ -98,7 +98,10 @@ export type EmploymentStatus =
   | "project_based"
   | "freelance"
   | "consultant"
-  | "intern";
+  | "intern"
+  // Placeholder for a historical/resigned employee imported without this on
+  // file — never used for anyone active. See "dp-unassigned" department.
+  | "unassigned";
 
 export type EmployeeLifecycleStatus =
   | "active"
@@ -114,14 +117,17 @@ export interface Employee {
   middleName?: string;
   nickname: string;
   gender: "Male" | "Female";
-  birthdate: string;
-  civilStatus: "Single" | "Married" | "Widowed" | "Separated";
-  nationality: string;
-  address: string;
-  contactNumber: string;
-  email: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
+  // Null means not on file yet — only ever happens for a historical/resigned
+  // employee imported without full personal details. Always present for an
+  // active employee.
+  birthdate: string | null;
+  civilStatus: "Single" | "Married" | "Widowed" | "Separated" | null;
+  nationality: string | null;
+  address: string | null;
+  contactNumber: string | null;
+  email: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
 
   // Real government-mandated IDs, entered by HR once known. Null/absent
   // means not on file yet — see employeeGovIds() in lib/bir.ts, which falls
@@ -150,7 +156,8 @@ export interface Employee {
   contractEnd: string | null;
   probationEndsAt: string | null;
 
-  payrollType: "daily" | "monthly";
+  // "unassigned" is the same historical-import placeholder as EmploymentStatus.
+  payrollType: "daily" | "monthly" | "unassigned";
   dailyRate: number | null;
   monthlySalary: number | null;
   dailyAllowance: number | null;

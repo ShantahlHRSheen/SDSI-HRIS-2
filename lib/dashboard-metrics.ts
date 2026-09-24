@@ -8,7 +8,7 @@ export function activeEmployees(employees: Employee[]): Employee[] {
 
 export function employmentStatusCounts(employees: Employee[]): Record<EmploymentStatus, number> {
   const base: Record<EmploymentStatus, number> = {
-    regular: 0, probationary: 0, project_based: 0, freelance: 0, consultant: 0, intern: 0,
+    regular: 0, probationary: 0, project_based: 0, freelance: 0, consultant: 0, intern: 0, unassigned: 0,
   };
   activeEmployees(employees).forEach((e) => {
     base[e.employmentStatus] += 1;
@@ -42,7 +42,8 @@ function nextBirthdayDays(birthdate: string): number {
 
 export function upcomingBirthdays(employees: Employee[], withinDays = 30) {
   return activeEmployees(employees)
-    .map((e) => ({ employee: e, daysUntil: nextBirthdayDays(e.birthdate) }))
+    .filter((e) => e.birthdate)
+    .map((e) => ({ employee: e, daysUntil: nextBirthdayDays(e.birthdate as string) }))
     .filter((x) => x.daysUntil <= withinDays)
     .sort((a, b) => a.daysUntil - b.daysUntil);
 }

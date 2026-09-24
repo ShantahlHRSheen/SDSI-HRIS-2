@@ -72,7 +72,8 @@ function rdoCodeOnly(rdoCode: string): string {
   return rdoCode.split("—")[0].trim();
 }
 
-function mmddyyyy(dateStr: string): string {
+function mmddyyyy(dateStr: string | null): string {
+  if (!dateStr) return "";
   const [y, m, d] = dateStr.split("-");
   return `${m}/${d}/${y}`;
 }
@@ -95,9 +96,9 @@ export async function fillForm2316Pdf(data: Form2316Data): Promise<Uint8Array> {
   draw(page, font, `${ids.tin}-000`, 102, 801.5, { size: 7 });
   draw(page, font, employeeNameLastFirstMi(data.employee), 48, 770);
   draw(page, font, rdoCodeOnly(COMPANY_INFO.rdoCode), 264, 770, { size: 7 });
-  draw(page, font, data.employee.address, 48, 745, { size: 7 });
+  draw(page, font, data.employee.address ?? "", 48, 745, { size: 7 });
   draw(page, font, mmddyyyy(data.employee.birthdate), 90, 677, { size: 7 });
-  draw(page, font, data.employee.contactNumber, 222, 677, { size: 7 });
+  draw(page, font, data.employee.contactNumber ?? "", 222, 677, { size: 7 });
 
   // --- Part II — Employer Information (Present) ---------------------------
   draw(page, font, COMPANY_INFO.tin, 102, 589.0, { size: 7 });

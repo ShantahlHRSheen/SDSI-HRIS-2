@@ -31,6 +31,9 @@ insert into departments (id, name, division) values ('dp-operation', 'Operations
 insert into departments (id, name, division) values ('dp-mlm', 'MLM Department', 'business_units');
 insert into departments (id, name, division) values ('dp-cosmetics', 'Cosmetics Department', 'business_units');
 insert into departments (id, name, division) values ('dp-darofy', 'Darofy Department', 'business_units');
+-- Placeholder for a historical/resigned employee imported without a real
+-- department on file — never used for anyone active.
+insert into departments (id, name, division) values ('dp-unassigned', 'Unassigned', 'shared_services');
 
 -- Positions
 insert into positions (id, title, department_id) values ('ps-chairman-of-the-board-1', 'Chairman of the Board', 'dp-bod');
@@ -80,6 +83,7 @@ insert into positions (id, title, department_id) values ('ps-branch-supervisor-4
 insert into positions (id, title, department_id) values ('ps-branch-manager-41', 'Branch Manager', 'dp-operation');
 insert into positions (id, title, department_id) values ('ps-driver-warehouseman-42', 'Driver / Warehouseman', 'dp-operation');
 insert into positions (id, title, department_id) values ('ps-stockman-43', 'Stockman', 'dp-operation');
+insert into positions (id, title, department_id) values ('ps-unassigned', 'Unassigned', 'dp-unassigned');
 
 -- Work schedules
 insert into work_schedules (id, name, time_in, time_out, days, grace_minutes) values ('ws-day', 'Day Shift', '08:00', '17:00', 'Mon–Fri', 10);

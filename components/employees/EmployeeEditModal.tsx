@@ -8,7 +8,7 @@ import type { Employee, EmployeeLifecycleStatus, EmploymentStatus } from "@/lib/
 
 type EmployeeFormData = Omit<Employee, "id" | "employeeNumber">;
 
-const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["regular", "probationary", "project_based", "freelance", "consultant", "intern"];
+const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["regular", "probationary", "project_based", "freelance", "consultant", "intern", "unassigned"];
 const LIFECYCLE_STATUSES: EmployeeLifecycleStatus[] = ["active", "on_leave", "resigned", "terminated"];
 
 function defaultForm(employee: Employee | null, branchId: string, departmentId: string, positionId: string): EmployeeFormData {
@@ -121,14 +121,19 @@ export function EmployeeEditModal({
             <TextField label="Middle name" value={form.middleName ?? ""} onChange={(v) => set("middleName", v)} />
             <TextField label="Nickname" value={form.nickname} onChange={(v) => set("nickname", v)} />
             <SelectField label="Gender" value={form.gender} onChange={(v) => set("gender", v as Employee["gender"])} options={["Male", "Female"]} />
-            <DateField label="Birthdate" value={form.birthdate} onChange={(v) => set("birthdate", v)} />
-            <SelectField label="Civil status" value={form.civilStatus} onChange={(v) => set("civilStatus", v as Employee["civilStatus"])} options={["Single", "Married", "Widowed", "Separated"]} />
-            <TextField label="Nationality" value={form.nationality} onChange={(v) => set("nationality", v)} />
-            <TextField label="Contact number" value={form.contactNumber} onChange={(v) => set("contactNumber", v)} />
-            <TextField label="Email" value={form.email} onChange={(v) => set("email", v)} className="col-span-2" />
-            <TextField label="Address" value={form.address} onChange={(v) => set("address", v)} className="col-span-2" />
-            <TextField label="Emergency contact name" value={form.emergencyContactName} onChange={(v) => set("emergencyContactName", v)} />
-            <TextField label="Emergency contact phone" value={form.emergencyContactPhone} onChange={(v) => set("emergencyContactPhone", v)} />
+            <DateField label="Birthdate" value={form.birthdate ?? ""} onChange={(v) => set("birthdate", v || null)} />
+            <SelectField
+              label="Civil status"
+              value={form.civilStatus ?? ""}
+              onChange={(v) => set("civilStatus", (v || null) as Employee["civilStatus"])}
+              options={[{ value: "", label: "Not on file" }, "Single", "Married", "Widowed", "Separated"]}
+            />
+            <TextField label="Nationality" value={form.nationality ?? ""} onChange={(v) => set("nationality", v || null)} />
+            <TextField label="Contact number" value={form.contactNumber ?? ""} onChange={(v) => set("contactNumber", v || null)} />
+            <TextField label="Email" value={form.email ?? ""} onChange={(v) => set("email", v || null)} className="col-span-2" />
+            <TextField label="Address" value={form.address ?? ""} onChange={(v) => set("address", v || null)} className="col-span-2" />
+            <TextField label="Emergency contact name" value={form.emergencyContactName ?? ""} onChange={(v) => set("emergencyContactName", v || null)} />
+            <TextField label="Emergency contact phone" value={form.emergencyContactPhone ?? ""} onChange={(v) => set("emergencyContactPhone", v || null)} />
           </div>
         </FieldSection>
 
@@ -184,13 +189,14 @@ export function EmployeeEditModal({
               options={[
                 { value: "daily", label: "Daily-rate" },
                 { value: "monthly", label: "Fixed-rate" },
+                { value: "unassigned", label: "Not on file" },
               ]}
             />
-            {form.payrollType === "daily" ? (
-              <NumberField label="Daily rate" value={form.dailyRate} onChange={(v) => set("dailyRate", v)} />
-            ) : (
+            {form.payrollType === "monthly" ? (
               <NumberField label="Monthly salary" value={form.monthlySalary} onChange={(v) => set("monthlySalary", v)} />
-            )}
+            ) : form.payrollType === "daily" ? (
+              <NumberField label="Daily rate" value={form.dailyRate} onChange={(v) => set("dailyRate", v)} />
+            ) : null}
             <NumberField label="Daily allowance" value={form.dailyAllowance} onChange={(v) => set("dailyAllowance", v)} />
             <NumberField label="Monthly allowance" value={form.monthlyAllowance} onChange={(v) => set("monthlyAllowance", v)} />
           </div>
