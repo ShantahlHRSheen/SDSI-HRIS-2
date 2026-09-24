@@ -18,8 +18,8 @@ export function employmentStatusCounts(employees: Employee[]): Record<Employment
 
 export function newHires(employees: Employee[], withinDays = 60) {
   return activeEmployees(employees)
-    .filter((e) => daysBetween(e.dateHired, TODAY) <= withinDays && daysBetween(e.dateHired, TODAY) >= 0)
-    .sort((a, b) => daysBetween(a.dateHired, TODAY) - daysBetween(b.dateHired, TODAY));
+    .filter((e) => e.dateHired && daysBetween(e.dateHired, TODAY) <= withinDays && daysBetween(e.dateHired, TODAY) >= 0)
+    .sort((a, b) => daysBetween(a.dateHired as string, TODAY) - daysBetween(b.dateHired as string, TODAY));
 }
 
 export function recentResignations(employees: Employee[], withinDays = 30) {

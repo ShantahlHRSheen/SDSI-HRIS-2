@@ -21,6 +21,7 @@ insert into branches (id, name, code, address) values ('br-cdo', 'Cagayan de Oro
 insert into branches (id, name, code, address) values ('br-pgs', 'Pangasinan', 'PGS', 'McArthur Highway, Dagupan City, Pangasinan');
 insert into branches (id, name, code, address) values ('br-lcn', 'Lucena', 'LCN', 'Merchan St, Lucena City');
 insert into branches (id, name, code, address) values ('br-bcd', 'Bacolod', 'BCD', 'Lacson St, Bacolod City');
+insert into branches (id, name, code, address) values ('br-unassigned', 'Unassigned', 'UNASSIGNED', 'Unassigned');
 
 -- Departments
 insert into departments (id, name, division) values ('dp-bod', 'BOD - Shared Services', 'shared_services');

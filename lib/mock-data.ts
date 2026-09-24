@@ -60,6 +60,9 @@ export const BRANCHES: Branch[] = [
   { id: "br-pgs", name: "Pangasinan", code: "PGS", address: "McArthur Highway, Dagupan City, Pangasinan" },
   { id: "br-lcn", name: "Lucena", code: "LCN", address: "Merchan St, Lucena City" },
   { id: "br-bcd", name: "Bacolod", code: "BCD", address: "Lacson St, Bacolod City" },
+  // Placeholder for a historical/resigned employee imported without a real
+  // branch on file — never used for anyone active.
+  { id: "br-unassigned", name: "Unassigned", code: "UNASSIGNED", address: "Unassigned" },
 ];
 
 // Consolidated into two divisions: Shared Services (BOD, Accounting,

@@ -150,7 +150,9 @@ export interface Employee {
   jobPerformanceEvaluatorId?: string | null;
 
   employmentStatus: EmploymentStatus;
-  dateHired: string;
+  // Null only for a historical/resigned employee imported without this on
+  // file — always present for anyone active.
+  dateHired: string | null;
   dateRegularized: string | null;
   contractStart: string | null;
   contractEnd: string | null;

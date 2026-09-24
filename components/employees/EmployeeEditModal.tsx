@@ -172,7 +172,7 @@ export function EmployeeEditModal({
             />
             <SelectField label="Employment status" value={form.employmentStatus} onChange={(v) => set("employmentStatus", v as EmploymentStatus)} options={EMPLOYMENT_STATUSES} />
             <SelectField label="Lifecycle status" value={form.status} onChange={(v) => set("status", v as EmployeeLifecycleStatus)} options={LIFECYCLE_STATUSES} />
-            <DateField label="Date hired" value={form.dateHired} onChange={(v) => set("dateHired", v)} />
+            <DateField label="Date hired" value={form.dateHired ?? ""} onChange={(v) => set("dateHired", v || null)} />
             <DateField label="Date regularized" value={form.dateRegularized ?? ""} onChange={(v) => set("dateRegularized", v || null)} />
             <DateField label="Contract start" value={form.contractStart ?? ""} onChange={(v) => set("contractStart", v || null)} />
             <DateField label="Contract end" value={form.contractEnd ?? ""} onChange={(v) => set("contractEnd", v || null)} />

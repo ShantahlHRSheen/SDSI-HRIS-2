@@ -40,6 +40,9 @@ yarn-error.log*
 # generated login credentials — never commit these
 created-logins.csv
 
+# roster import reports contain employee names — never commit these
+roster-import-report.txt
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

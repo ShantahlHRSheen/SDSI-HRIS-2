@@ -153,7 +153,8 @@ create table employees (
   job_performance_evaluator_id text references employees (id),
 
   employment_status employment_status not null,
-  date_hired date not null,
+  -- Nullable for the same reason as the personal-detail fields above.
+  date_hired date,
   date_regularized date,
   contract_start date,
   contract_end date,
