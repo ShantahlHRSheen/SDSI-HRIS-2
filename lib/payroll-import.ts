@@ -46,11 +46,20 @@ const COLUMNS = {
   sssLoan: "sss loan",
   hdmfLoan: "pag-ibig loan",
   hdmfMp2: "pag-ibig mp2 savings",
+  adjustmentDeduct: "adjustment (deduction)",
+  adjustmentAdd: "adjustment (additional)",
   totalDeduction: "total deduction",
   netPay: "net pay",
 } as const;
 type ColumnKey = keyof typeof COLUMNS;
 const REQUIRED: ColumnKey[] = ["employee", "basicPay", "grossSalary", "netPay"];
+
+// Headers are matched case-insensitively; a header that's a truncated form
+// of the expected one (e.g. "Adjustment (Additiona)") still counts.
+function headerMatches(key: ColumnKey, label: string): boolean {
+  const expected = COLUMNS[key];
+  return label === expected || (label.length >= expected.length - 3 && label.length > 12 && expected.startsWith(label.replace(/\)$/, "")));
+}
 
 export interface ParsedPayrollRow {
   rowNumber: number;
@@ -76,7 +85,7 @@ export async function parsePayrollWorkbook(buffer: ArrayBuffer): Promise<ParsedP
       const found: Partial<Record<ColumnKey, number>> = {};
       row.eachCell((cell, col) => {
         const label = String(cell.value ?? "").trim().toLowerCase();
-        const key = (Object.keys(COLUMNS) as ColumnKey[]).find((k) => COLUMNS[k] === label);
+        const key = (Object.keys(COLUMNS) as ColumnKey[]).find((k) => headerMatches(k, label));
         if (key && found[key] === undefined) found[key] = col;
       });
       if (REQUIRED.every((k) => found[k] !== undefined)) {
@@ -141,8 +150,17 @@ function checkRow(v: ParsedPayrollRow["values"]): string | null {
   const deductions =
     v.sss + v.sssWisp + v.philHealth + v.hdmf + v.withholdingTax + v.cashAdvance + v.lsmBizLoan + v.lsmCoopLoan + v.shortages + v.sssLoan + v.hdmfLoan + v.hdmfMp2;
   if (!close(earnings, v.grossSalary)) return `earnings add up to ${round2(earnings)}, but Gross Salary says ${v.grossSalary}`;
-  if (v.totalDeduction && !close(deductions, v.totalDeduction)) return `deductions add up to ${round2(deductions)}, but Total Deduction says ${v.totalDeduction}`;
-  if (!close(v.grossSalary - deductions, v.netPay)) return `Gross Salary − deductions is ${round2(v.grossSalary - deductions)}, but Net Pay says ${v.netPay}`;
+  // Total Deduction may or may not include Adjustment (Deduction) — accept either.
+  if (v.totalDeduction && !close(deductions, v.totalDeduction) && !close(deductions + v.adjustmentDeduct, v.totalDeduction)) {
+    return `deductions add up to ${round2(deductions)}, but Total Deduction says ${v.totalDeduction}`;
+  }
+  const expectedNet = v.grossSalary + v.adjustmentAdd - deductions - v.adjustmentDeduct;
+  if (!close(expectedNet, v.netPay)) {
+    if (v.adjustmentDeduct && close(expectedNet + v.adjustmentDeduct, v.netPay)) {
+      return `Net Pay in the file doesn't subtract its Adjustment (Deduction) of ${v.adjustmentDeduct} — the system will, giving ${round2(expectedNet)}`;
+    }
+    return `Gross Salary + adjustments − deductions is ${round2(expectedNet)}, but Net Pay says ${v.netPay}`;
+  }
   return null;
 }
 
@@ -249,8 +267,8 @@ export function buildPayrollImportPreview(
       sssLoan: v.sssLoan,
       hdmfLoan: v.hdmfLoan,
       hdmfMp2Savings: v.hdmfMp2,
-      adjustmentAdd: 0,
-      adjustmentDeduct: 0,
+      adjustmentAdd: v.adjustmentAdd,
+      adjustmentDeduct: v.adjustmentDeduct,
     };
 
     const [line] = computePayrollForPeriod(
@@ -274,7 +292,7 @@ export function buildPayrollImportPreview(
     replacing: matched.filter((m) => attendanceByEmp.has(m.employee.id) || overrideEmpIds.has(m.employee.id)).length,
     missingFromFile: employees.filter((e) => e.status === "active" && !matchedIds.has(e.id)),
     totals: matched.reduce(
-      (t, m) => ({ gross: t.gross + m.parsed.values.grossSalary, deductions: t.deductions + (m.parsed.values.grossSalary - m.parsed.values.netPay), net: t.net + m.parsed.values.netPay }),
+      (t, m) => ({ gross: t.gross + m.parsed.values.grossSalary, deductions: t.deductions + (m.parsed.values.grossSalary + m.parsed.values.adjustmentAdd - m.parsed.values.netPay), net: t.net + m.parsed.values.netPay }),
       { gross: 0, deductions: 0, net: 0 },
     ),
   };

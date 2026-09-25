@@ -125,6 +125,8 @@ export default function PayrollProcessingPage() {
           sssLoan: t.sssLoan + l.sssLoan,
           hdmfLoan: t.hdmfLoan + l.hdmfLoan,
           hdmfMp2Savings: t.hdmfMp2Savings + l.hdmfMp2Savings,
+          adjustmentDeduct: t.adjustmentDeduct + l.adjustmentDeduct,
+          adjustmentAdd: t.adjustmentAdd + l.adjustmentAdd,
           netPay: t.netPay + l.netPay,
         }),
         {
@@ -150,6 +152,8 @@ export default function PayrollProcessingPage() {
           sssLoan: 0,
           hdmfLoan: 0,
           hdmfMp2Savings: 0,
+          adjustmentDeduct: 0,
+          adjustmentAdd: 0,
           netPay: 0,
         },
       ),
@@ -200,6 +204,8 @@ export default function PayrollProcessingPage() {
         "SSS Loan",
         "Pag-IBIG Loan",
         "Pag-IBIG MP2 Savings",
+        "Adjustment (Deduction)",
+        "Adjustment (Additional)",
         "Net Pay",
       ],
       sortedLines.map((l) => {
@@ -231,6 +237,8 @@ export default function PayrollProcessingPage() {
           l.sssLoan,
           l.hdmfLoan,
           l.hdmfMp2Savings,
+          l.adjustmentDeduct,
+          l.adjustmentAdd,
           l.netPay,
         ];
       }),
@@ -330,7 +338,7 @@ export default function PayrollProcessingPage() {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[2200px] text-sm">
+                <table className="w-full min-w-[2400px] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="px-3 py-2 font-medium">Employee</th>
@@ -357,6 +365,8 @@ export default function PayrollProcessingPage() {
                       <th className="px-3 py-2 font-medium">SSS Loan</th>
                       <th className="px-3 py-2 font-medium">Pag-IBIG Loan</th>
                       <th className="px-3 py-2 font-medium">Pag-IBIG MP2</th>
+                      <th className="px-3 py-2 font-medium">Adj. (deduction)</th>
+                      <th className="px-3 py-2 font-medium">Adj. (additional)</th>
                       <th className="px-3 py-2 font-medium">Net pay</th>
                       <th className="px-3 py-2 font-medium">Payslip</th>
                       <th className="px-3 py-2 font-medium"></th>
@@ -391,6 +401,8 @@ export default function PayrollProcessingPage() {
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssLoan)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfLoan)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfMp2Savings)}</td>
+                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.adjustmentDeduct ? `-${formatCurrencyCompact(l.adjustmentDeduct)}` : "—"}</td>
+                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{l.adjustmentAdd ? formatCurrencyCompact(l.adjustmentAdd) : "—"}</td>
                           <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.netPay)}</td>
                           <td className="px-3 py-2">{alreadyGenerated.has(l.employeeId) ? <Badge tone="good">Released</Badge> : <Badge tone="muted">Not released</Badge>}</td>
                           <td className="px-3 py-2">
@@ -430,6 +442,8 @@ export default function PayrollProcessingPage() {
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssLoan)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfLoan)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfMp2Savings)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentDeduct)}</td>
+                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentAdd)}</td>
                       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netPay)}</td>
                       <td className="px-3 py-2"></td>
                       <td className="px-3 py-2"></td>
