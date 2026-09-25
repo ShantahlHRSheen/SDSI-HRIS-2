@@ -153,13 +153,15 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
 
   async function send() {
     const body = draft.trim();
-    if ((!body && !photo) || sending || preparing) return;
+    const sentPhoto = photo;
+    if ((!body && !sentPhoto) || sending || preparing) return;
     setSending(true);
     try {
-      const m = await sendHrMessage(employeeId, body, photo?.blob);
+      const m = await sendHrMessage(employeeId, body, sentPhoto?.blob);
       setMessages((prev) => [...(prev ?? []), m]);
-      setDraft("");
-      setPhoto(null);
+      // Clear only what was sent — keep anything typed or attached meanwhile.
+      setDraft((cur) => (cur.trim() === body ? "" : cur));
+      setPhoto((cur) => (cur === sentPhoto ? null : cur));
       onSent?.();
     } catch (err) {
       reportSaveError("Couldn't send the message", err);
