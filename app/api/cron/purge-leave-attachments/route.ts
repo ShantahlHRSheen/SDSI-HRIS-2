@@ -1,9 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Daily cleanup (scheduled in vercel.json): deletes leave-request files
-// (signed leave forms, medical certificates) from storage 30 days after
-// upload to free up space. The attachment record stays, with deleted_at set,
-// so the app can show that the file was removed.
+// Daily cleanup (scheduled in vercel.json), 30 days after upload, to free
+// up space:
+//   * leave-request files (signed leave forms, medical certificates). The
+//     attachment record stays, with deleted_at set, so the app can show that
+//     the file was removed.
+//   * photos sent in Chat with HR. The message stays, with image_removed_at
+//     set, so the chat shows "Photo removed".
 //
 // Needs these environment variables on the server (Vercel > Settings >
 // Environment Variables), never exposed to the browser:
@@ -11,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 //   CRON_SECRET               — Vercel sends it as a Bearer token on cron calls
 const RETENTION_DAYS = 30;
 const BUCKET = "leave-attachments";
+const CHAT_BUCKET = "hr-chat-images";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -52,5 +56,34 @@ export async function GET(request: Request) {
     else deleted += batch.length;
   }
 
-  return Response.json({ cutoff, expired: expired.length, deleted, failures }, { status: failures.length ? 500 : 200 });
+  // Chat photos: every file in the bucket older than the cut-off, including
+  // any whose message never got sent. Skipped until the chat migration runs.
+  let chatDeleted = 0;
+  const { data: chatPaths, error: chatErr } = await (supabase as unknown as {
+    rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: string[] | null; error: { message: string } | null }>;
+  }).rpc("hr_chat_expired_images", { older_than: cutoff });
+  if (chatErr) {
+    if (!/hr_chat_expired_images/.test(chatErr.message)) failures.push(chatErr.message);
+  } else {
+    const paths = chatPaths ?? [];
+    for (let i = 0; i < paths.length; i += 100) {
+      const batch = paths.slice(i, i + 100);
+      const { error: rmErr } = await supabase.storage.from(CHAT_BUCKET).remove(batch);
+      if (rmErr) {
+        failures.push(rmErr.message);
+        continue;
+      }
+      const { error: markErr } = await supabase
+        .from("hr_messages")
+        .update({ image_path: null, image_removed_at: new Date().toISOString() })
+        .in("image_path", batch);
+      if (markErr) failures.push(markErr.message);
+      else chatDeleted += batch.length;
+    }
+  }
+
+  return Response.json(
+    { cutoff, expired: expired.length, deleted, chatPhotosDeleted: chatDeleted, failures },
+    { status: failures.length ? 500 : 200 },
+  );
 }
