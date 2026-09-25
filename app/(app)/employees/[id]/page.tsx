@@ -162,15 +162,6 @@ export default function EmployeeProfilePage() {
           <Row label="TIN" value={govIds.tin} />
         </Section>
 
-        <Section title="Documents (201 File)" note="No real files stored in this demo — Supabase Storage integration is part of the full build.">
-          {["Resume / Biodata", "Employment Contract", "Government IDs", "NBI Clearance", "Medical Certificate"].map((doc) => (
-            <div key={doc} className="flex items-center justify-between py-1.5 text-sm">
-              <span className="text-[var(--text-secondary)]">{doc}</span>
-              <Badge tone="muted">On file</Badge>
-            </div>
-          ))}
-        </Section>
-
         <Section title="Performance & Discipline History">
           <div className="mb-2 text-xs font-semibold text-[var(--text-muted)] uppercase">Evaluations</div>
           {empEvals.length === 0 ? (
