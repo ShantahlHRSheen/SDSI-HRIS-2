@@ -301,6 +301,25 @@ export interface LeaveRequest extends ApprovableRequest {
   days: number;
 }
 
+export type LeaveAttachmentKind = "leave_form" | "medical_certificate";
+
+// A file attached to a leave request (signed leave form, medical
+// certificate). The file itself is deleted from storage 30 days after
+// upload; the record stays with deletedAt set.
+export interface LeaveAttachment {
+  id: string;
+  leaveRequestId: string;
+  employeeId: string;
+  kind: LeaveAttachmentKind;
+  storagePath: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string | null;
+  uploadedAt: string;
+  deletedAt: string | null;
+}
+
 export interface OvertimeRequest extends ApprovableRequest {
   date: string;
   hours: number;

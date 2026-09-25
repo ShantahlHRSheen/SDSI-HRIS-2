@@ -29,6 +29,9 @@ import {
   fetchGeneratedVouchers,
   fetchHolidays,
   fetchLeaveRequests,
+  fetchLeaveAttachments,
+  uploadLeaveAttachmentFile,
+  leaveAttachmentDownloadUrl,
   fetchLeaveTypes,
   fetchOvertimeRequests,
   fetchPayrollLineOverrides,
@@ -110,6 +113,8 @@ import type {
   GeneratedVoucher,
   Holiday,
   LeaveRequest,
+  LeaveAttachment,
+  LeaveAttachmentKind,
   LeaveType,
   OvertimeRequest,
   PayrollLineOverride,
@@ -146,6 +151,7 @@ interface PersistedState {
   payrollPeriods: PayrollPeriod[];
   generatedBirForms: GeneratedBirForm[];
   leaveRequests: LeaveRequest[];
+  leaveAttachments: LeaveAttachment[];
   overtimeRequests: OvertimeRequest[];
   correctionRequests: AttendanceCorrectionRequest[];
   generatedPayslips: GeneratedPayslip[];
@@ -173,6 +179,7 @@ function defaultState(): PersistedState {
     payrollPeriods: PAYROLL_PERIODS,
     generatedBirForms: [],
     leaveRequests: LEAVE_REQUESTS,
+    leaveAttachments: [],
     overtimeRequests: OVERTIME_REQUESTS,
     correctionRequests: CORRECTION_REQUESTS,
     generatedPayslips: [],
@@ -212,6 +219,7 @@ interface HrisContextShape {
   payrollPeriods: PayrollPeriod[];
   generatedBirForms: GeneratedBirForm[];
   leaveRequests: LeaveRequest[];
+  leaveAttachments: LeaveAttachment[];
   overtimeRequests: OvertimeRequest[];
   correctionRequests: AttendanceCorrectionRequest[];
   generatedPayslips: GeneratedPayslip[];
@@ -280,7 +288,13 @@ interface HrisContextShape {
 
   addGeneratedBirForm: (input: Omit<GeneratedBirForm, "id" | "generatedAt" | "generatedBy">) => void;
 
-  fileLeaveRequest: (input: Omit<LeaveRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
+  // Resolves to the new request's id, or null if it couldn't be saved.
+  fileLeaveRequest: (input: Omit<LeaveRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => Promise<string | null>;
+  // File attachments need a real (Supabase) sign-in — false in the demo.
+  canAttachLeaveFiles: boolean;
+  // Resolves to an error message, or null on success.
+  uploadLeaveAttachment: (input: { leaveRequestId: string; employeeId: string; kind: LeaveAttachmentKind; file: File }) => Promise<string | null>;
+  leaveAttachmentUrl: (attachment: LeaveAttachment) => Promise<string>;
   decideLeaveRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 
   fileOvertimeRequest: (input: Omit<OvertimeRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
@@ -347,6 +361,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           disciplinaryRecords,
           announcements,
           leaveRequests,
+          leaveAttachments,
           overtimeRequests,
           correctionRequests,
           attendancePeriodRecords,
@@ -370,6 +385,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           fetchDisciplinaryRecords(),
           fetchAnnouncements(),
           fetchLeaveRequests(),
+          fetchLeaveAttachments(),
           fetchOvertimeRequests(),
           fetchCorrectionRequests(),
           fetchAttendancePeriodRecords(),
@@ -396,6 +412,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           disciplinaryRecords,
           announcements,
           leaveRequests,
+          leaveAttachments,
           overtimeRequests,
           correctionRequests,
           attendancePeriodRecords,
@@ -1094,18 +1111,37 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           const entry = await insertLeaveRequest(input);
           setState((prev) => ({ ...prev, leaveRequests: [entry, ...prev.leaveRequests] }));
           logAudit("Leave Management", "file", `Filed leave request (${input.days} day(s))`);
-          return;
+          return entry.id;
         } catch (err) {
           console.error("Failed to file leave request in Supabase", err);
-          return;
+          return null;
         }
       }
       const entry: LeaveRequest = { ...input, id: nextId("lv"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
       setState((prev) => ({ ...prev, leaveRequests: [entry, ...prev.leaveRequests] }));
       logAudit("Leave Management", "file", `Filed leave request (${input.days} day(s))`);
+      return entry.id;
     },
     [logAudit, supabaseSession],
   );
+
+  const uploadLeaveAttachment: HrisContextShape["uploadLeaveAttachment"] = useCallback(
+    async (input) => {
+      if (!supabaseSession) return "Attachments need a real sign-in (not the demo login).";
+      try {
+        const entry = await uploadLeaveAttachmentFile(input, currentUser?.employeeId ?? null);
+        setState((prev) => ({ ...prev, leaveAttachments: [entry, ...prev.leaveAttachments] }));
+        logAudit("Leave Management", "upload", `Attached ${input.kind === "leave_form" ? "signed leave form" : "medical certificate"} to a leave request`);
+        return null;
+      } catch (err) {
+        console.error("Failed to upload leave attachment", err);
+        return err instanceof Error ? err.message : "Could not upload the file.";
+      }
+    },
+    [logAudit, currentUser, supabaseSession],
+  );
+
+  const leaveAttachmentUrl: HrisContextShape["leaveAttachmentUrl"] = useCallback((attachment) => leaveAttachmentDownloadUrl(attachment), []);
 
   const decideLeaveRequest: HrisContextShape["decideLeaveRequest"] = useCallback(
     async (id, decision, note) => {
@@ -1290,6 +1326,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     payrollPeriods: state.payrollPeriods,
     generatedBirForms: state.generatedBirForms,
     leaveRequests: state.leaveRequests,
+    leaveAttachments: state.leaveAttachments,
     overtimeRequests: state.overtimeRequests,
     correctionRequests: state.correctionRequests,
     generatedPayslips: state.generatedPayslips,
@@ -1335,6 +1372,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     demoUsers,
     addGeneratedBirForm,
     fileLeaveRequest,
+    canAttachLeaveFiles: !!supabaseSession,
+    uploadLeaveAttachment,
+    leaveAttachmentUrl,
     decideLeaveRequest,
     fileOvertimeRequest,
     decideOvertimeRequest,
