@@ -5,7 +5,7 @@ import { Modal } from "@/components/Modal";
 import { StatTile } from "@/components/StatTile";
 import { formatCurrency, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { PayrollImportPreview } from "@/lib/payroll-import";
-import type { PayrollPeriod } from "@/lib/types";
+import type { Employee, PayrollPeriod } from "@/lib/types";
 
 export function PayrollImportModal({
   preview,
@@ -14,6 +14,9 @@ export function PayrollImportModal({
   sheetIndex,
   onSheetChange,
   periodHasData,
+  notInFile,
+  removeNotInFile,
+  onRemoveNotInFileChange,
   payrollPeriods,
   targetPeriodId,
   onTargetPeriodChange,
@@ -28,6 +31,9 @@ export function PayrollImportModal({
   sheetIndex: number;
   onSheetChange: (index: number) => void;
   periodHasData: (periodId: string) => boolean;
+  notInFile: Employee[];
+  removeNotInFile: boolean;
+  onRemoveNotInFileChange: (v: boolean) => void;
   payrollPeriods: PayrollPeriod[];
   targetPeriodId: string;
   onTargetPeriodChange: (id: string) => void;
@@ -85,6 +91,17 @@ export function PayrollImportModal({
           <StatTile label="Deductions" value={formatCurrencyCompact(preview.totals.deductions)} />
           <StatTile label="Net pay" value={formatCurrencyCompact(preview.totals.net)} />
         </div>
+
+        {notInFile.length > 0 && (
+          <Notice tone="critical" title={`${notInFile.length} ${notInFile.length === 1 ? "person has" : "people have"} payroll saved for this period but ${notInFile.length === 1 ? "isn't" : "aren't"} in this file`}>
+            <div className="mb-2">{notInFile.map((e) => `${fullName(e)} (${e.employeeNumber})`).join(", ")}</div>
+            <label className="flex items-start gap-2 font-medium">
+              <input type="checkbox" checked={removeNotInFile} onChange={(e) => onRemoveNotInFileChange(e.target.checked)} className="mt-0.5" />
+              <span>Remove them from this period&rsquo;s payroll (and their payslips for it), so the totals match this file.</span>
+            </label>
+            {!removeNotInFile && <div className="mt-1">They&rsquo;ll stay on this period&rsquo;s payroll and be added to its totals.</div>}
+          </Notice>
+        )}
 
         {preview.replacing > 0 && (
           <Notice tone="warning" title={`Replaces existing payroll figures for ${preview.replacing} employee(s)`}>

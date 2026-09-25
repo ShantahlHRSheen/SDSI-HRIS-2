@@ -78,6 +78,8 @@ import {
   upsertAttendancePeriodRecordRow,
   upsertPayrollLineOverrideRow,
   importPayrollRegisterRows,
+  removePayrollEntries,
+  updateGeneratedPayslipRow,
   upsertVoucherAmountOverrideRow,
 } from "./supabase/repo";
 import {
@@ -245,13 +247,18 @@ interface HrisContextShape {
 
   upsertPayrollLineOverride: (input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">) => void;
   // Resolves to an error message, or null on success.
+  // removeEmployeeIds: people to take off this period's payroll (their
+  // attendance, payroll figures and payslips) — e.g. not in the new file.
   importPayrollRegister: (
     periodId: string,
     rows: {
       attendance: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">;
       override: Omit<PayrollLineOverride, "id" | "periodId" | "updatedBy" | "updatedAt">;
     }[],
+    removeEmployeeIds?: string[],
   ) => Promise<string | null>;
+  // Refreshes a payslip to the given figures. Resolves to true once saved.
+  updateGeneratedPayslip: (id: string, summary: GeneratedPayslip["summary"]) => Promise<boolean>;
   upsertVoucherAmountOverride: (input: Omit<VoucherAmountOverride, "id" | "updatedBy" | "updatedAt">) => void;
 
   addEvaluation: (input: Omit<PerformanceEvaluation, "id" | "createdAt">) => void;
@@ -771,13 +778,14 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const importPayrollRegister: HrisContextShape["importPayrollRegister"] = useCallback(
-    async (periodId, rows) => {
+    async (periodId, rows, removeEmployeeIds = []) => {
       const actor = currentUser?.name ?? "System";
       let attendance: AttendancePeriodRecord[];
       let overrides: PayrollLineOverride[];
       if (supabaseSession) {
         try {
           ({ attendance, overrides } = await importPayrollRegisterRows(periodId, rows, actor));
+          await removePayrollEntries(periodId, removeEmployeeIds);
         } catch (err) {
           console.error("Failed to import payroll register in Supabase", err);
           return err instanceof Error ? err.message : "Could not save the imported payroll.";
@@ -791,12 +799,18 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       const key = (r: { periodId: string; employeeId: string }) => `${r.periodId}::${r.employeeId}`;
       const attKeys = new Set(attendance.map(key));
       const ovKeys = new Set(overrides.map(key));
+      const removed = new Set(removeEmployeeIds.map((id) => `${periodId}::${id}`));
       setState((prev) => ({
         ...prev,
-        attendancePeriodRecords: [...attendance, ...prev.attendancePeriodRecords.filter((r) => !attKeys.has(key(r)))],
-        payrollLineOverrides: [...overrides, ...prev.payrollLineOverrides.filter((r) => !ovKeys.has(key(r)))],
+        attendancePeriodRecords: [...attendance, ...prev.attendancePeriodRecords.filter((r) => !attKeys.has(key(r)) && !removed.has(key(r)))],
+        payrollLineOverrides: [...overrides, ...prev.payrollLineOverrides.filter((r) => !ovKeys.has(key(r)) && !removed.has(key(r)))],
+        generatedPayslips: prev.generatedPayslips.filter((r) => !removed.has(key(r))),
       }));
-      logAudit("Payroll", "import", `Imported payroll register for ${rows.length} employee(s), period ${periodId}`);
+      logAudit(
+        "Payroll",
+        "import",
+        `Imported payroll register for ${rows.length} employee(s), period ${periodId}` + (removeEmployeeIds.length ? `; removed ${removeEmployeeIds.length} not in the file` : ""),
+      );
       return null;
     },
     [logAudit, currentUser, supabaseSession],
@@ -1373,6 +1387,26 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, currentUser, supabaseSession],
   );
 
+  const updateGeneratedPayslip: HrisContextShape["updateGeneratedPayslip"] = useCallback(
+    async (id, summary) => {
+      const actor = currentUser?.name ?? "System";
+      if (supabaseSession) {
+        try {
+          const entry = await updateGeneratedPayslipRow(id, summary, actor);
+          setState((prev) => ({ ...prev, generatedPayslips: prev.generatedPayslips.map((p) => (p.id === id ? entry : p)) }));
+          logAudit("Payslips", "update", `Updated payslip ${id} to current payroll figures`);
+          return true;
+        } catch (err) {
+          reportSaveError("Couldn't update the payslip", err);
+          return false;
+        }
+      }
+      setState((prev) => ({ ...prev, generatedPayslips: prev.generatedPayslips.map((p) => (p.id === id ? { ...p, summary, generatedAt: TODAY, generatedBy: actor } : p)) }));
+      return true;
+    },
+    [logAudit, currentUser, supabaseSession],
+  );
+
   const addGeneratedVoucher: HrisContextShape["addGeneratedVoucher"] = useCallback(
     async (input) => {
       const actor = currentUser;
@@ -1437,6 +1471,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     importAttendancePeriodRecords,
     upsertPayrollLineOverride,
     importPayrollRegister,
+    updateGeneratedPayslip,
     upsertVoucherAmountOverride,
     addEvaluation,
     updateEvaluationSection,
