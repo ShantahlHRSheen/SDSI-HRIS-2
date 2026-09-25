@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, IdCard, Pencil } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import {
@@ -56,6 +57,9 @@ export default function EmployeeProfilePage() {
         {canEdit && (
           <div className="flex items-center gap-2">
             {isRealAccount && <EmployeeLoginButton employee={employee} />}
+            <Link href={`/employees/${employee.id}/id-card`} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+              <IdCard size={14} /> ID card
+            </Link>
             <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
               <Pencil size={14} /> Edit
             </button>

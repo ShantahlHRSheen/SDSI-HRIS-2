@@ -116,6 +116,9 @@ export type EmployeeRow = {
   status_changed_at: string | null;
   roles: AppRole[];
   user_id: string | null;
+  // Added by supabase/migrate_phase15_employee_id_cards.sql.
+  id_photo_path?: string | null;
+  id_signature_path?: string | null;
 };
 
 export type EmployeeDepartmentAllocationRow = {

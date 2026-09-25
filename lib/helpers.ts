@@ -26,16 +26,35 @@ export function nextEmployeeNumber(employees: Pick<Employee, "employeeNumber">[]
   return `EMP-${String(max + 1).padStart(4, "0")}`;
 }
 
+// The branch / department / position lists the name helpers below read.
+// They start as the demo lists and are replaced by whatever the app has
+// loaded (the live database for real accounts) via setReferenceData, which
+// the store calls on every render — so names added in System
+// Administration (e.g. a new position) show up everywhere.
+let refBranches: { id: string; name: string }[] = BRANCHES;
+let refDepartments: { id: string; name: string }[] = DEPARTMENTS;
+let refPositions: { id: string; title: string }[] = POSITIONS;
+
+export function setReferenceData(data: {
+  branches: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
+  positions: { id: string; title: string }[];
+}): void {
+  refBranches = data.branches;
+  refDepartments = data.departments;
+  refPositions = data.positions;
+}
+
 export function branchName(branchId: string): string {
-  return BRANCHES.find((b) => b.id === branchId)?.name ?? "—";
+  return refBranches.find((b) => b.id === branchId)?.name ?? "—";
 }
 
 export function departmentName(departmentId: string): string {
-  return DEPARTMENTS.find((d) => d.id === departmentId)?.name ?? "—";
+  return refDepartments.find((d) => d.id === departmentId)?.name ?? "—";
 }
 
 export function positionTitle(positionId: string): string {
-  return POSITIONS.find((p) => p.id === positionId)?.title ?? "—";
+  return refPositions.find((p) => p.id === positionId)?.title ?? "—";
 }
 
 export function hasAnyRole(userRoles: Role[], allowed: Role[]): boolean {

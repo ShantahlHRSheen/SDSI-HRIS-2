@@ -23,6 +23,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", roles: ALL_ROLES, built: true },
       { label: "Bulletin Board", href: "/bulletin", roles: ALL_ROLES, built: true },
+      { label: "My ID Card", href: "/id-card", roles: ALL_ROLES, built: true },
       { label: "Employee Directory", href: "/employees", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin", "payroll_officer"], built: true },
       { label: "Org Chart", href: "/modules/org-chart", roles: ALL_ROLES, built: true },
     ],
