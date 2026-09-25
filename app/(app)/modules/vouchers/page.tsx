@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileCheck2, Printer, Receipt } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Modal } from "@/components/Modal";
@@ -26,8 +27,7 @@ export default function AllowanceVouchersPage() {
     currentUser,
   } = useHris();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
-  const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
-  const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
+  const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; amount: number } | null>(null);
 
   const lines = useMemo(

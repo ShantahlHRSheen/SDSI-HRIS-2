@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileCheck2, Layers, Printer, Wallet } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { PageHeader } from "@/components/PageHeader";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
@@ -26,8 +27,7 @@ export default function PayslipsPage() {
     generatedPayslips,
     addGeneratedPayslip,
   } = useHris();
-  const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
-  const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
+  const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; line: PayrollLine } | null>(null);
 
   const lines = useMemo(
