@@ -204,6 +204,22 @@ export type LeaveRequestAttachmentRow = {
   deleted_at: string | null;
 };
 
+export type AnnouncementCommentRow = {
+  id: string;
+  announcement_id: string;
+  employee_id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+};
+
+export type AnnouncementReactionRow = {
+  announcement_id: string;
+  employee_id: string;
+  reaction: "like" | "heart" | "celebrate";
+  created_at: string;
+};
+
 export type OvertimeRequestRow = ApprovableRequestRow & {
   date: string;
   hours: number;
@@ -332,6 +348,8 @@ export interface Database {
       announcements: Table<AnnouncementRow>;
       leave_requests: Table<LeaveRequestRow>;
       leave_request_attachments: Table<LeaveRequestAttachmentRow>;
+      announcement_comments: Table<AnnouncementCommentRow>;
+      announcement_reactions: Table<AnnouncementReactionRow>;
       overtime_requests: Table<OvertimeRequestRow>;
       attendance_correction_requests: Table<AttendanceCorrectionRequestRow>;
       attendance_period_records: Table<AttendancePeriodRecordRow>;
