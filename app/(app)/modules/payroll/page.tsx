@@ -43,7 +43,7 @@ export default function PayrollProcessingPage() {
   const [editing, setEditing] = useState<Employee | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importFile, setImportFile] = useState<{ name: string; parsed: ParsedPayrollWorkbook } | null>(null);
+  const [importFile, setImportFile] = useState<{ name: string; sheets: ParsedPayrollWorkbook[]; sheetIndex: number } | null>(null);
   const [importPeriodId, setImportPeriodId] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importSaving, setImportSaving] = useState(false);
@@ -51,7 +51,7 @@ export default function PayrollProcessingPage() {
   const [generateNotice, setGenerateNotice] = useState<{ tone: "good" | "info" | "error"; text: string } | null>(null);
   const importPeriod = payrollPeriods.find((p) => p.id === importPeriodId);
   const importPreview = useMemo(
-    () => (importFile && importPeriod ? buildPayrollImportPreview(importFile.parsed, employees, importPeriod, attendancePeriodRecords, payrollLineOverrides) : null),
+    () => (importFile && importPeriod ? buildPayrollImportPreview(importFile.sheets[importFile.sheetIndex], employees, importPeriod, attendancePeriodRecords, payrollLineOverrides) : null),
     [importFile, importPeriod, employees, attendancePeriodRecords, payrollLineOverrides],
   );
 
@@ -61,10 +61,15 @@ export default function PayrollProcessingPage() {
     if (!file) return;
     setImportError(null);
     try {
-      const parsed = await parsePayrollWorkbook(await file.arrayBuffer());
-      const guessed = guessPeriodFromName(parsed.sheetName, payrollPeriods) ?? guessPeriodFromName(file.name, payrollPeriods);
+      const sheets = await parsePayrollWorkbook(await file.arrayBuffer());
+      // With several payroll sheets, start on the one matching the file name's
+      // period (e.g. "May 16-30.xlsx" → the "MAY 30" sheet), else the last one.
+      const fromFileName = guessPeriodFromName(file.name, payrollPeriods);
+      const matching = fromFileName ? sheets.findIndex((s) => guessPeriodFromName(s.sheetName, payrollPeriods)?.id === fromFileName.id) : -1;
+      const sheetIndex = matching >= 0 ? matching : sheets.length - 1;
+      const guessed = guessPeriodFromName(sheets[sheetIndex].sheetName, payrollPeriods) ?? fromFileName;
       setImportPeriodId(guessed?.id ?? period?.id ?? "");
-      setImportFile({ name: file.name, parsed });
+      setImportFile({ name: file.name, sheets, sheetIndex });
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Could not read this file.");
     }
@@ -343,6 +348,14 @@ export default function PayrollProcessingPage() {
         <PayrollImportModal
           preview={importPreview}
           fileName={importFile.name}
+          sheetNames={importFile.sheets.map((s) => s.sheetName)}
+          sheetIndex={importFile.sheetIndex}
+          onSheetChange={(i) => {
+            setImportFile((f) => (f ? { ...f, sheetIndex: i } : f));
+            const guessed = guessPeriodFromName(importFile.sheets[i].sheetName, payrollPeriods);
+            if (guessed) setImportPeriodId(guessed.id);
+          }}
+          periodHasData={(id) => attendancePeriodRecords.some((r) => r.periodId === id) || payrollLineOverrides.some((r) => r.periodId === id)}
           payrollPeriods={payrollPeriods}
           targetPeriodId={importPeriodId}
           onTargetPeriodChange={setImportPeriodId}

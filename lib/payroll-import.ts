@@ -73,10 +73,14 @@ export interface ParsedPayrollWorkbook {
   rows: ParsedPayrollRow[];
 }
 
-export async function parsePayrollWorkbook(buffer: ArrayBuffer): Promise<ParsedPayrollWorkbook> {
+// Every sheet that looks like a payroll register, in workbook order. A
+// workbook often holds several cut-offs (e.g. "MAY 15" and "MAY 30"), so
+// the caller picks which one to import — never silently the first.
+export async function parsePayrollWorkbook(buffer: ArrayBuffer): Promise<ParsedPayrollWorkbook[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
 
+  const sheets: ParsedPayrollWorkbook[] = [];
   for (const ws of wb.worksheets) {
     let headerRow: number | null = null;
     const cols: Partial<Record<ColumnKey, number>> = {};
@@ -107,8 +111,9 @@ export async function parsePayrollWorkbook(buffer: ArrayBuffer): Promise<ParsedP
       }
       rows.push({ rowNumber: r, employeeNumber, rawName: String(cellScalar(row, cols.employee! + 1) ?? "").trim(), values });
     }
-    return { sheetName: ws.name, rows };
+    sheets.push({ sheetName: ws.name, rows });
   }
+  if (sheets.length) return sheets;
   throw new Error('No payroll sheet found — expected a header row with "Employee", "Basic Pay", "Gross Salary" and "Net Pay" columns.');
 }
 
@@ -299,12 +304,14 @@ export function buildPayrollImportPreview(
 }
 
 // "April 15" / "Apr 16 Payroll" -> the period starting or ending that day.
+// "MAY 15", "May 16-30", "payroll_may_30.xlsx" → the period containing that
+// day (any year; the most recent wins). The first date in the name counts.
 export function guessPeriodFromName(name: string, periods: PayrollPeriod[]): PayrollPeriod | undefined {
   name = name.replace(/[_-]+/g, " ");
   const m = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(name);
   if (!m) return undefined;
   const month = "janfebmaraprmayjunjulaugsepoctnovdec".indexOf(m[1].toLowerCase()) / 3 + 1;
-  const mmdd = `-${String(month).padStart(2, "0")}-${String(Number(m[2])).padStart(2, "0")}`;
-  const hits = periods.filter((p) => p.end.endsWith(mmdd) || p.start.endsWith(mmdd));
+  const mmdd = `${String(month).padStart(2, "0")}-${String(Number(m[2])).padStart(2, "0")}`;
+  const hits = periods.filter((p) => p.start.slice(5) <= mmdd && mmdd <= p.end.slice(5));
   return hits.sort((a, b) => b.start.localeCompare(a.start))[0];
 }
