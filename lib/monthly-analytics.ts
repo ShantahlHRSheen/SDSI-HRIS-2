@@ -350,7 +350,7 @@ export function groupByBranch(facts: MonthlyEmployeeFact[], employees: Employee[
 // a split employee's figures proportionally to each department they're
 // allocated to (a full-time-equivalent-style convention: all of their
 // numbers count fractionally toward each department, not just pay).
-function scaleFact(f: MonthlyEmployeeFact, weight: number): MonthlyEmployeeFact {
+export function scaleFact(f: MonthlyEmployeeFact, weight: number): MonthlyEmployeeFact {
   const scaled = { ...f };
   for (const key of Object.keys(scaled) as (keyof MonthlyEmployeeFact)[]) {
     const value = scaled[key];
