@@ -145,7 +145,7 @@ export default function PayrollExpenseReportPage() {
         <StatTile label="Employer PhilHealth" value={formatCurrencyCompact(summary.employerPhilHealth)} />
         <StatTile label="Employees covered" value={summary.employeeCount.toString()} />
         <StatTile label="Business Units" value={formatCurrencyCompact(divisionTotal("business_units"))} hint="MLM · Cosmetics · Darofy · Board" />
-        <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Vice Chair" />
+        <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Board staff" />
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -231,7 +231,7 @@ export default function PayrollExpenseReportPage() {
         )}
         <div className="mt-2 text-xs text-[var(--text-muted)]">
           Business Units: MLM, Cosmetics and Darofy departments, plus the Chairman and Presidents (their cost is split equally across the three).
-          Shared Services: Operations, Human Resources, Finance, Accounting and the Vice Chairperson position.
+          Shared Services: Operations, Human Resources, Finance, Accounting and the rest of the Board department (Vice Chairperson, Chemist).
         </div>
       </div>
 
