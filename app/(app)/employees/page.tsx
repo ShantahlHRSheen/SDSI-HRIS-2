@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Users } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
+import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
@@ -18,6 +19,10 @@ const STATUS_TONE: Record<Employee["status"], BadgeTone> = {
   terminated: "critical",
 };
 
+function isEmployed(e: Employee): boolean {
+  return e.status === "active" || e.status === "on_leave";
+}
+
 export default function EmployeeDirectoryPage() {
   const { employees: allEmployees, employeeDepartmentAllocations, currentEmployee, branches, departments, currentUser, addEmployee } = useHris();
   const employees = useMemo(
@@ -27,12 +32,15 @@ export default function EmployeeDirectoryPage() {
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
+  // "active" includes employees on leave — they're still employed.
+  const [statusFilter, setStatusFilter] = useState<"active" | "separated" | "all">("active");
   const [adding, setAdding] = useState(false);
   const canEdit = currentUser?.roles.includes("hr_admin");
 
   const rows = useMemo(() => {
     return employees
       .filter((e) => fullName(e).toLowerCase().includes(search.toLowerCase()) || e.employeeNumber.toLowerCase().includes(search.toLowerCase()))
+      .filter((e) => (statusFilter === "all" ? true : statusFilter === "active" ? isEmployed(e) : !isEmployed(e)))
       .filter((e) => (branchFilter === "all" ? true : e.branchId === branchFilter))
       .filter((e) =>
         deptFilter === "all"
@@ -40,13 +48,17 @@ export default function EmployeeDirectoryPage() {
           : departmentAllocationsForEmployee(e, employeeDepartmentAllocations).some((a) => a.departmentId === deptFilter),
       )
       .sort((a, b) => fullName(a).localeCompare(fullName(b)));
-  }, [employees, search, branchFilter, deptFilter, employeeDepartmentAllocations]);
+  }, [employees, search, statusFilter, branchFilter, deptFilter, employeeDepartmentAllocations]);
+
+  const activeCount = employees.filter(isEmployed).length;
+  const onLeaveCount = employees.filter((e) => e.status === "on_leave").length;
+  const separatedCount = employees.length - activeCount;
 
   return (
     <div>
       <PageHeader
         title="Employee Directory"
-        subtitle={`${employees.length} employees across ${branches.length} branches — the 201 File module foundation.`}
+        subtitle={`${activeCount} active employees across ${branches.length} branches — the 201 File module foundation.`}
         actions={
           canEdit && (
             <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
@@ -56,6 +68,12 @@ export default function EmployeeDirectoryPage() {
         }
       />
 
+      <div className="mb-4 grid grid-cols-3 gap-3 sm:max-w-xl">
+        <StatTile label="Active employees" value={activeCount.toString()} hint={onLeaveCount ? `incl. ${onLeaveCount} on leave` : undefined} compact />
+        <StatTile label="Resigned / terminated" value={separatedCount.toString()} compact />
+        <StatTile label="All records" value={employees.length.toString()} compact />
+      </div>
+
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
           value={search}
@@ -63,6 +81,11 @@ export default function EmployeeDirectoryPage() {
           placeholder="Search name or employee number…"
           className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm sm:max-w-xs"
         />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
+          <option value="active">Active</option>
+          <option value="separated">Resigned / terminated</option>
+          <option value="all">All statuses</option>
+        </select>
         <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
           <option value="all">All branches</option>
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}

@@ -6,10 +6,10 @@ import type { Department, Employee, EmployeeDepartmentAllocation, Position } fro
 //
 // Departments carry their own division (MLM / Cosmetics / Darofy are
 // Business Units; Operations, HR, Finance, Accounting are Shared Services).
-// The Board ("BOD - Shared Services") is split by position: the Vice
-// Chairperson counts as Shared Services, while the rest of the Board
-// (Chairman, Presidents) counts as Business Units — spread equally across
-// the business-unit departments so each one shows them when filtered.
+// The Board ("BOD - Shared Services") is split by position: the Chairman
+// and Presidents count as Business Units — spread equally across the
+// business-unit departments so each one shows them when filtered — while
+// everyone else there (Vice Chairperson, Chemist, …) stays Shared Services.
 //
 // These report-only allocations don't touch employee_department_allocations,
 // which also controls which dept heads can see an employee's record.
@@ -32,11 +32,13 @@ export function reportAllocations(
   positions: Position[],
 ): EmployeeDepartmentAllocation[] {
   const businessUnits = departments.filter((d) => d.division === "business_units");
-  const viceChairIds = new Set(positions.filter((p) => /vice\s*chair/i.test(p.title)).map((p) => p.id));
+  const businessUnitBoardPositions = new Set(
+    positions.filter((p) => p.departmentId === BOARD_DEPARTMENT_ID && /^(chairman|president)\b/i.test(p.title)).map((p) => p.id),
+  );
   const extra: EmployeeDepartmentAllocation[] = [];
   if (businessUnits.length === 0) return allocations;
   for (const e of employees) {
-    if (e.departmentId !== BOARD_DEPARTMENT_ID || viceChairIds.has(e.positionId)) continue;
+    if (e.departmentId !== BOARD_DEPARTMENT_ID || !businessUnitBoardPositions.has(e.positionId)) continue;
     if (allocations.some((a) => a.employeeId === e.id)) continue; // an explicit split wins
     for (const d of businessUnits) extra.push({ employeeId: e.id, departmentId: d.id, percent: 100 / businessUnits.length });
   }
