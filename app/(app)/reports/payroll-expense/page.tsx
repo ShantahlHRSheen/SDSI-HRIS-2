@@ -24,12 +24,16 @@ import {
   downloadCsv,
 } from "@/lib/monthly-analytics";
 import { filterFactsWithShares, groupByDivision, reportAllocations } from "@/lib/payroll-divisions";
+import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
+import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
 export default function PayrollExpenseReportPage() {
   const { employees, employeeDepartmentAllocations, branches, departments, positions, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } =
     useHris();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const { vouchers, lines: voucherLines } = useDepartmentVouchers();
+  const allVoucherAmounts = useMemo(() => voucherAmounts(vouchers, voucherLines, payrollPeriods), [vouchers, voucherLines, payrollPeriods]);
 
   const months = getMonthsList();
   const facts = useMemo(
@@ -57,20 +61,34 @@ export default function PayrollExpenseReportPage() {
 
   const filtered = filterFactsWithShares(facts, employees, analyticsFilters, allocations);
   const summary = summarizePayroll(filtered);
-  const trend = payrollExpenseTrendByMonth(deptFacts, employees, trendFilters);
+  // Department vouchers (Vouchers page) count as payroll expense too.
+  const voucherTotal = filterVoucherAmounts(allVoucherAmounts, analyticsFilters).reduce((t, a) => t + a.amount, 0);
+  const trendVouchers = sumBy(filterVoucherAmounts(allVoucherAmounts, { ...trendFilters, departmentId: analyticsFilters.departmentId }), (a) => a.monthKey);
+  const trend = payrollExpenseTrendByMonth(deptFacts, employees, trendFilters).map((m) => ({ ...m, value: m.value + (trendVouchers.get(m.monthKey) ?? 0) }));
   const historical = historicalPayrollAnalytics(deptFacts, employees, trendFilters);
 
   const currentMonthKey = months[months.length - 1].key;
   const previousMonthKey = months[months.length - 2]?.key;
 
-  const byDepartment = groupByDepartment(
+  const payrollByDepartment = groupByDepartment(
     filterFactsWithShares(facts, employees, { ...analyticsFilters, departmentId: undefined }, allocations),
     employees,
     departments,
     allocations,
   ).filter((r) => !analyticsFilters.departmentId || r.departmentId === analyticsFilters.departmentId);
+  const vouchersByDept = sumBy(filterVoucherAmounts(allVoucherAmounts, analyticsFilters), (a) => a.departmentId);
+  const byDepartment = [
+    ...payrollByDepartment,
+    // Departments with vouchers but no payroll lines in the selection.
+    ...departments
+      .filter((d) => vouchersByDept.has(d.id) && !payrollByDepartment.some((r) => r.departmentId === d.id))
+      .map((d) => ({ departmentId: d.id, label: d.name, payroll: summarizePayroll([]) })),
+  ].map((r) => {
+    const vouchers = vouchersByDept.get(r.departmentId) ?? 0;
+    return { ...r, payroll: { ...r.payroll, vouchers, totalWithVouchers: r.payroll.totalEmployerExpense + vouchers } };
+  });
   const byDivision = groupByDivision(byDepartment, departments);
-  const divisionTotal = (key: string) => byDivision.find((d) => d.division === key)?.payroll.totalEmployerExpense ?? 0;
+  const divisionTotal = (key: string) => byDivision.find((d) => d.division === key)?.payroll.totalWithVouchers ?? 0;
 
   const branchesThisMonth = groupByBranch(filterFactsWithShares(facts, employees, { ...analyticsFilters, monthKey: currentMonthKey }, allocations), employees, branches);
   const branchesPrevMonth = groupByBranch(filterFactsWithShares(facts, employees, { ...analyticsFilters, monthKey: previousMonthKey }, allocations), employees, branches);
@@ -86,10 +104,10 @@ export default function PayrollExpenseReportPage() {
 
   function exportDepartmentCsv() {
     const csv = toCsv(
-      ["Department", "Employees", "Basic Salary", "Allowances", "Overtime", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Total Employer Expense"],
+      ["Department", "Employees", "Basic Salary", "Allowances", "Overtime", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Payroll Expense", "Vouchers", "Total Expense"],
       byDepartment.map((r) => [
         r.label, r.payroll.employeeCount, r.payroll.basicSalary, r.payroll.allowances, r.payroll.overtimePay,
-        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense,
+        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense, r.payroll.vouchers, r.payroll.totalWithVouchers,
       ]),
     );
     downloadCsv("payroll-expense-by-department.csv", csv);
@@ -97,10 +115,10 @@ export default function PayrollExpenseReportPage() {
 
   function exportDivisionCsv() {
     const csv = toCsv(
-      ["Division", "Employees", "Basic Salary", "Allowances", "Overtime", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Total Employer Expense"],
+      ["Division", "Employees", "Basic Salary", "Allowances", "Overtime", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Payroll Expense", "Vouchers", "Total Expense"],
       byDivision.map((r) => [
         r.label, r.payroll.employeeCount, r.payroll.basicSalary, r.payroll.allowances, r.payroll.overtimePay,
-        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense,
+        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense, r.payroll.vouchers, r.payroll.totalWithVouchers,
       ]),
     );
     downloadCsv("payroll-expense-by-division.csv", csv);
@@ -129,14 +147,14 @@ export default function PayrollExpenseReportPage() {
     <div>
       <PageHeader
         title="Monthly Payroll Expense Report"
-        subtitle="Employer payroll expense = Basic Salary + Allowances + OT Pay + Holiday Pay + Leave Pay + Employer SSS + Employer HDMF + Employer PhilHealth."
+        subtitle="Employer payroll expense = Basic Salary + Allowances + OT Pay + Holiday Pay + Leave Pay + Employer SSS + Employer HDMF + Employer PhilHealth. Total expense also adds the department vouchers."
         actions={<ExportBar onExportCsv={exportEmployeeCsv} label="Export all (CSV)" />}
       />
 
       <ReportFilters months={months} branches={branches} departments={departments} employees={employees} value={filters} onChange={setFilters} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Total employer expense" value={formatCurrencyCompact(summary.totalEmployerExpense)} />
+        <StatTile label="Total expense" value={formatCurrencyCompact(summary.totalEmployerExpense + voucherTotal)} hint="payroll + vouchers" />
         <StatTile label="Basic salary" value={formatCurrencyCompact(summary.basicSalary)} />
         <StatTile label="Allowances" value={formatCurrencyCompact(summary.allowances)} />
         <StatTile label="OT + Holiday + Leave pay" value={formatCurrencyCompact(summary.overtimePay + summary.holidayPay + summary.leavePay)} />
@@ -144,12 +162,14 @@ export default function PayrollExpenseReportPage() {
         <StatTile label="Employer HDMF" value={formatCurrencyCompact(summary.employerHDMF)} />
         <StatTile label="Employer PhilHealth" value={formatCurrencyCompact(summary.employerPhilHealth)} />
         <StatTile label="Employees covered" value={summary.employeeCount.toString()} />
+        <StatTile label="Payroll expense" value={formatCurrencyCompact(summary.totalEmployerExpense)} hint="employer payroll cost" />
+        <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint={analyticsFilters.branchId ? "not tracked by branch" : "department vouchers"} />
         <StatTile label="Business Units" value={formatCurrencyCompact(divisionTotal("business_units"))} hint="MLM · Cosmetics · Darofy · Board" />
         <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Board staff" />
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-        <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 12 months</div>
+        <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend (incl. vouchers) — last 12 months</div>
         <TrendChart data={trend} valueFormatter={(v) => formatCurrencyCompact(v)} />
       </div>
 
@@ -178,7 +198,7 @@ export default function PayrollExpenseReportPage() {
           <EmptyState icon={Wallet} title="No data" description="Adjust your filters." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                   <th className="px-3 py-2 font-medium">Division</th>
@@ -191,6 +211,8 @@ export default function PayrollExpenseReportPage() {
                   <th className="px-3 py-2 font-medium">Employer SSS</th>
                   <th className="px-3 py-2 font-medium">Employer HDMF</th>
                   <th className="px-3 py-2 font-medium">Employer PhilHealth</th>
+                  <th className="px-3 py-2 font-medium">Payroll Expense</th>
+                  <th className="px-3 py-2 font-medium">Vouchers</th>
                   <th className="px-3 py-2 font-medium">Total Expense</th>
                 </tr>
               </thead>
@@ -207,7 +229,9 @@ export default function PayrollExpenseReportPage() {
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.employerSSS)}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.employerHDMF)}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.employerPhilHealth)}</td>
-                    <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(r.payroll.totalEmployerExpense)}</td>
+                    <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.totalEmployerExpense)}</td>
+                    <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.vouchers)}</td>
+                    <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(r.payroll.totalWithVouchers)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -224,6 +248,8 @@ export default function PayrollExpenseReportPage() {
                   <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.employerHDMF, 0))}</td>
                   <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.employerPhilHealth, 0))}</td>
                   <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.totalEmployerExpense, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.vouchers, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.totalWithVouchers, 0))}</td>
                 </tr>
               </tfoot>
             </table>
@@ -245,7 +271,7 @@ export default function PayrollExpenseReportPage() {
           <EmptyState icon={Wallet} title="No data" description="Adjust your filters." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                   <th className="px-3 py-2 font-medium">Department</th>
@@ -258,6 +284,8 @@ export default function PayrollExpenseReportPage() {
                   <th className="px-3 py-2 font-medium">Employer SSS</th>
                   <th className="px-3 py-2 font-medium">Employer HDMF</th>
                   <th className="px-3 py-2 font-medium">Employer PhilHealth</th>
+                  <th className="px-3 py-2 font-medium">Payroll Expense</th>
+                  <th className="px-3 py-2 font-medium">Vouchers</th>
                   <th className="px-3 py-2 font-medium">Total Expense</th>
                 </tr>
               </thead>
@@ -274,7 +302,9 @@ export default function PayrollExpenseReportPage() {
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.employerSSS)}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.employerHDMF)}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.employerPhilHealth)}</td>
-                    <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(r.payroll.totalEmployerExpense)}</td>
+                    <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.totalEmployerExpense)}</td>
+                    <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.vouchers)}</td>
+                    <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(r.payroll.totalWithVouchers)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -384,6 +414,8 @@ export default function PayrollExpenseReportPage() {
       </div>
 
       <div className="mt-4 text-xs text-[var(--text-muted)]">
+        Department vouchers count in the month their payroll period starts. They aren&rsquo;t tied to a branch, so they&rsquo;re left out when a branch is selected and
+        don&rsquo;t appear in the branch and per-employee tables; with an employee selected, only voucher lines linked to that employee count.{" "}
         Figures are computed from real attendance and payroll records — SSS / HDMF (Pag-IBIG) / PhilHealth
         contribution brackets change periodically and should be configured as versioned rate tables in System
         Administration to keep this current.
