@@ -18,11 +18,12 @@ import {
 import { employeeGovIds } from "@/lib/bir";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
+import { EmployeeLoginButton } from "@/components/employees/EmployeeLoginButton";
 
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { employees, employeeDepartmentAllocations, currentEmployee, evaluations, disciplinaryRecords, currentUser, updateEmployee } = useHris();
+  const { employees, employeeDepartmentAllocations, currentEmployee, evaluations, disciplinaryRecords, currentUser, updateEmployee, isRealAccount } = useHris();
   const visibleEmployees = scopeEmployeesForViewer(employees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations);
   // A dept_head navigating directly to another department's employee URL
   // gets the same "not found" state as a genuinely missing id — deliberately
@@ -53,9 +54,12 @@ export default function EmployeeProfilePage() {
       <div className="mb-4 flex items-center justify-between">
         <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back to directory</button>
         {canEdit && (
-          <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
-            <Pencil size={14} /> Edit
-          </button>
+          <div className="flex items-center gap-2">
+            {isRealAccount && <EmployeeLoginButton employee={employee} />}
+            <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
+              <Pencil size={14} /> Edit
+            </button>
+          </div>
         )}
       </div>
 

@@ -112,6 +112,8 @@ export type EmployeeLifecycleStatus =
 export interface Employee {
   id: string;
   employeeNumber: string;
+  // Read-only: whether the employee has a sign-in account (employees.user_id).
+  hasLogin?: boolean;
   firstName: string;
   lastName: string;
   middleName?: string;

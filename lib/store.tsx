@@ -292,6 +292,13 @@ interface HrisContextShape {
   fileLeaveRequest: (input: Omit<LeaveRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => Promise<string | null>;
   // File attachments need a real (Supabase) sign-in — false in the demo.
   canAttachLeaveFiles: boolean;
+  // Signed in with a real account (not a demo user).
+  isRealAccount: boolean;
+  // After HR issues a temporary password: marks the employee as having a
+  // login and records it in the audit trail (never the password itself).
+  recordLoginIssued: (employeeId: string, created: boolean) => void;
+  // Signed in with a temporary password HR issued — must pick their own first.
+  mustChangePassword: boolean;
   // Resolves to an error message, or null on success.
   uploadLeaveAttachment: (input: { leaveRequestId: string; employeeId: string; kind: LeaveAttachmentKind; file: File }) => Promise<string | null>;
   leaveAttachmentUrl: (attachment: LeaveAttachment) => Promise<string>;
@@ -1141,6 +1148,14 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, currentUser, supabaseSession],
   );
 
+  const recordLoginIssued: HrisContextShape["recordLoginIssued"] = useCallback(
+    (employeeId, created) => {
+      setState((prev) => ({ ...prev, employees: prev.employees.map((e) => (e.id === employeeId ? { ...e, hasLogin: true } : e)) }));
+      logAudit("User Access", created ? "create" : "update", `${created ? "Created login" : "Reset password"} for employee ${employeeId}`);
+    },
+    [logAudit],
+  );
+
   const leaveAttachmentUrl: HrisContextShape["leaveAttachmentUrl"] = useCallback((attachment) => leaveAttachmentDownloadUrl(attachment), []);
 
   const decideLeaveRequest: HrisContextShape["decideLeaveRequest"] = useCallback(
@@ -1373,6 +1388,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     addGeneratedBirForm,
     fileLeaveRequest,
     canAttachLeaveFiles: !!supabaseSession,
+    isRealAccount: !!supabaseSession,
+    recordLoginIssued,
+    mustChangePassword: supabaseSession?.user.app_metadata?.must_change_password === true,
     uploadLeaveAttachment,
     leaveAttachmentUrl,
     decideLeaveRequest,
