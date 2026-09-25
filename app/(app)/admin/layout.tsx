@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { useHris } from "@/lib/store";
 
 const TABS = [
   { href: "/admin/branches", label: "Branches" },
@@ -13,15 +14,18 @@ const TABS = [
   { href: "/admin/leave-types", label: "Leave Types" },
   { href: "/admin/payroll-periods", label: "Payroll Periods" },
   { href: "/admin/users", label: "Users & Roles" },
+  { href: "/admin/backup", label: "Backup", hrOnly: true },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { currentUser } = useHris();
+  const isHr = !!currentUser?.roles.includes("hr_admin");
   return (
     <div>
       <PageHeader title="System Administration" subtitle="Configure the organization structure, schedules, and reference data used across every module." />
       <div className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border-hairline)]">
-        {TABS.map((t) => {
+        {TABS.filter((t) => !("hrOnly" in t) || isHr).map((t) => {
           const active = pathname === t.href;
           return (
             <Link
