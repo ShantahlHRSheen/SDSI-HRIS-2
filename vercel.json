@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/purge-leave-attachments",
+      "schedule": "0 18 * * *"
+    }
+  ]
+}

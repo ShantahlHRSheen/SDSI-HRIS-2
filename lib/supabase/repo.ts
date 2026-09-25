@@ -14,6 +14,7 @@ import type {
   GeneratedVoucherRow,
   HolidayRow,
   LeaveRequestRow,
+  LeaveRequestAttachmentRow,
   LeaveTypeRow,
   OvertimeRequestRow,
   PayrollLineOverrideRow,
@@ -38,6 +39,8 @@ import type {
   GeneratedVoucher,
   Holiday,
   LeaveRequest,
+  LeaveAttachment,
+  LeaveAttachmentKind,
   LeaveType,
   OvertimeRequest,
   PayrollLineOverride,
@@ -577,6 +580,77 @@ export async function decideLeaveRequestRow(
   const { data, error } = await getSupabaseClient().from("leave_requests").update(row).eq("id", id).select().single();
   if (error) throw error;
   return toLeaveRequest(data);
+}
+
+// ---- Leave request attachments -------------------------------------------------------
+
+export const LEAVE_ATTACHMENTS_BUCKET = "leave-attachments";
+
+function toLeaveAttachment(r: LeaveRequestAttachmentRow): LeaveAttachment {
+  return {
+    id: r.id,
+    leaveRequestId: r.leave_request_id,
+    employeeId: r.employee_id,
+    kind: r.kind,
+    storagePath: r.storage_path,
+    fileName: r.file_name,
+    contentType: r.content_type,
+    sizeBytes: r.size_bytes,
+    uploadedBy: r.uploaded_by,
+    uploadedAt: r.uploaded_at,
+    deletedAt: r.deleted_at,
+  };
+}
+
+// Returns [] (rather than failing the whole initial data load) until
+// supabase/migrate_phase12_leave_attachments.sql has been run.
+export async function fetchLeaveAttachments(): Promise<LeaveAttachment[]> {
+  const { data, error } = await getSupabaseClient().from("leave_request_attachments").select("*").order("uploaded_at", { ascending: false });
+  if (error) {
+    console.warn("Leave attachments unavailable — has migrate_phase12_leave_attachments.sql been run?", error.message);
+    return [];
+  }
+  return data.map(toLeaveAttachment);
+}
+
+export async function uploadLeaveAttachmentFile(
+  input: { leaveRequestId: string; employeeId: string; kind: LeaveAttachmentKind; file: File },
+  uploadedBy: string | null,
+): Promise<LeaveAttachment> {
+  const client = getSupabaseClient();
+  const ext = (input.file.name.split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const path = `${input.employeeId}/${input.leaveRequestId}/${input.kind}-${Date.now()}.${ext}`;
+  const { error: upErr } = await client.storage.from(LEAVE_ATTACHMENTS_BUCKET).upload(path, input.file, { contentType: input.file.type || undefined });
+  if (upErr) throw upErr;
+  const { data, error } = await client
+    .from("leave_request_attachments")
+    .insert({
+      leave_request_id: input.leaveRequestId,
+      employee_id: input.employeeId,
+      kind: input.kind,
+      storage_path: path,
+      file_name: input.file.name,
+      content_type: input.file.type || "application/octet-stream",
+      size_bytes: input.file.size,
+      uploaded_by: uploadedBy,
+    })
+    .select()
+    .single();
+  if (error) {
+    // Don't leave an orphaned file behind if the record couldn't be saved.
+    await client.storage.from(LEAVE_ATTACHMENTS_BUCKET).remove([path]);
+    throw error;
+  }
+  return toLeaveAttachment(data);
+}
+
+// Short-lived link that downloads the file under its original name.
+export async function leaveAttachmentDownloadUrl(attachment: LeaveAttachment): Promise<string> {
+  const { data, error } = await getSupabaseClient()
+    .storage.from(LEAVE_ATTACHMENTS_BUCKET)
+    .createSignedUrl(attachment.storagePath, 60, { download: attachment.fileName });
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 // ---- Overtime requests ---------------------------------------------------------------

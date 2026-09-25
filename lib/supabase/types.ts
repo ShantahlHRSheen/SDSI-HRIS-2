@@ -188,6 +188,20 @@ export type LeaveRequestRow = ApprovableRequestRow & {
   days: number;
 };
 
+export type LeaveRequestAttachmentRow = {
+  id: string;
+  leave_request_id: string;
+  employee_id: string;
+  kind: "leave_form" | "medical_certificate";
+  storage_path: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_by: string | null;
+  uploaded_at: string;
+  deleted_at: string | null;
+};
+
 export type OvertimeRequestRow = ApprovableRequestRow & {
   date: string;
   hours: number;
@@ -315,6 +329,7 @@ export interface Database {
       audit_logs: Table<AuditLogRow>;
       announcements: Table<AnnouncementRow>;
       leave_requests: Table<LeaveRequestRow>;
+      leave_request_attachments: Table<LeaveRequestAttachmentRow>;
       overtime_requests: Table<OvertimeRequestRow>;
       attendance_correction_requests: Table<AttendanceCorrectionRequestRow>;
       attendance_period_records: Table<AttendancePeriodRecordRow>;
