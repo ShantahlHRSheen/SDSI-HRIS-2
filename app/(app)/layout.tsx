@@ -19,7 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!ready || !currentUser) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-muted)]">
-        Loading demo session…
+        Loading…
       </div>
     );
   }

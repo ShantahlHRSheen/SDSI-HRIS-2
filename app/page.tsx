@@ -89,36 +89,42 @@ export default function LoginPage() {
         </form>
       )}
 
-      <div className="mb-3 max-w-lg text-center text-xs text-[var(--text-muted)]">
-        {supabaseConfigured
-          ? "Not onboarded with a login yet? Preview the system below from a demo role instead."
-          : "This is a demo build with sample data only — no real database, credentials, or personal information. Pick a demo user below to preview the system from that role's point of view."}
-      </div>
+      {supabaseConfigured ? (
+        <p className="max-w-sm text-center text-xs text-[var(--text-muted)]">
+          No login yet, or forgot your password? Ask HR to issue you a temporary one.
+        </p>
+      ) : (
+        <>
+          <div className="mb-3 max-w-lg text-center text-xs text-[var(--text-muted)]">
+            This is a demo build with sample data only — no real database, credentials, or personal information. Pick a demo user below to preview the system from that role&rsquo;s point of view.
+          </div>
 
-      <div className="grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
-        {demoUsers.map((u) => (
-          <button
-            key={u.id}
-            onClick={() => signInAs(u.id)}
-            className="flex items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 text-left transition-shadow hover:shadow-md"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--on-accent)]">
-              {u.initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-[var(--text-primary)]">{u.name}</div>
-              <div className="truncate text-xs text-[var(--text-secondary)]">{u.title}</div>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {u.roles.map((r) => (
-                  <Badge key={r} tone="info">{ROLE_LABELS[r]}</Badge>
-                ))}
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+          <div className="grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+            {demoUsers.map((u) => (
+              <button
+                key={u.id}
+                onClick={() => signInAs(u.id)}
+                className="flex items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 text-left transition-shadow hover:shadow-md"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--on-accent)]">
+                  {u.initials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-[var(--text-primary)]">{u.name}</div>
+                  <div className="truncate text-xs text-[var(--text-secondary)]">{u.title}</div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {u.roles.map((r) => (
+                      <Badge key={r} tone="info">{ROLE_LABELS[r]}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
 
-      <p className="mt-8 text-xs text-[var(--text-muted)]">Build spec Section 2 role matrix — additive roles are shown as multiple badges.</p>
+          <p className="mt-8 text-xs text-[var(--text-muted)]">Build spec Section 2 role matrix — additive roles are shown as multiple badges.</p>
+        </>
+      )}
     </div>
   );
 }

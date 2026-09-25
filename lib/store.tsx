@@ -3,7 +3,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { fullName, nextEmployeeNumber } from "./helpers";
-import { getInitialSession, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
+import { getSupabaseClient } from "./supabase/client";
+import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   decideCorrectionRequestRow,
   decideLeaveRequestRow,
@@ -487,6 +488,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         initials: `${supabaseEmployee.firstName.charAt(0)}${supabaseEmployee.lastName.charAt(0)}`.toUpperCase(),
       };
     }
+    // Demo users only exist in the demo build — on a real deployment a
+    // demo sign-in left over in this browser's storage is ignored.
+    if (isSupabaseConfigured()) return null;
     return demoUsers.find((u) => u.id === state.currentUserId) ?? null;
   }, [supabaseEmployee, demoUsers, state.currentUserId, state.positions]);
   const currentEmployee = useMemo(
@@ -539,15 +543,21 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error };
       if (!session) return { error: "Sign-in did not return a session." };
 
-      const matched = state.employees.find((e) => e.email?.toLowerCase() === email.toLowerCase());
-      if (!matched) {
+      // Check the database, not this browser's saved copy of the employee
+      // list — on a new device that copy is only the demo sample data.
+      const { data: matched, error: lookupError } = await getSupabaseClient()
+        .from("employees")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (lookupError || !matched) {
         await signOutSupabase();
-        return { error: `Signed in, but no employee record matches ${email}. Contact HR.` };
+        return { error: lookupError ? "Couldn't load your employee record — please try again." : `Signed in, but no employee record is linked to ${email}. Contact HR.` };
       }
       setSupabaseSession(session);
       return { error: null };
     },
-    [state.employees],
+    [],
   );
 
   const logout = useCallback(() => {
