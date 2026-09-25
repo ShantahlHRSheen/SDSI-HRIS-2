@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { formatDate, fullName } from "@/lib/helpers";
 import { upcomingBirthdays } from "@/lib/dashboard-metrics";
 import { AnnouncementPhotoGrid, PhotoPicker } from "@/components/bulletin/AnnouncementPhotos";
+import { PostInteractions, useBulletinInteractions } from "@/components/bulletin/PostInteractions";
 import type { AnnouncementCategory } from "@/lib/types";
 
 const CATEGORY_TONE: Record<AnnouncementCategory, BadgeTone> = {
@@ -29,6 +30,7 @@ const CATEGORY_LABELS: Record<AnnouncementCategory, string> = {
 
 export default function BulletinBoardPage() {
   const { announcements, employees, currentUser, addAnnouncement, isRealAccount } = useHris();
+  const interactions = useBulletinInteractions(currentUser?.employeeId ?? null, isRealAccount);
   const [categoryFilter, setCategoryFilter] = useState<"all" | AnnouncementCategory>("all");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ title: "", body: "", category: "announcement" as AnnouncementCategory });
@@ -99,6 +101,7 @@ export default function BulletinBoardPage() {
                   <p className="text-sm whitespace-pre-line text-[var(--text-secondary)]">{a.body}</p>
                   <AnnouncementPhotoGrid images={a.images ?? []} />
                   <div className="mt-2 text-xs text-[var(--text-muted)]">Posted by {a.postedBy} · {formatDate(a.postedAt)}</div>
+                  <PostInteractions announcementId={a.id} interactions={interactions} myEmployeeId={currentUser?.employeeId ?? null} canModerate={!!canPost} />
                 </div>
               ))}
             </div>
