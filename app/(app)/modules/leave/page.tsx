@@ -9,7 +9,7 @@ import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { businessDaysBetween, formatDate, fullName } from "@/lib/helpers";
-import { TODAY } from "@/lib/mock-data";
+import { balanceFor, checkLeaveRequest, isSemiannual, todayInManila } from "@/lib/leave-policy";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_RETENTION_DAYS, KIND_LABEL, LeaveDocuments, prepareUpload, requiredKinds, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
 import type { LeaveAttachmentKind, LeaveRequest, RequestStatus } from "@/lib/types";
 
@@ -29,7 +29,7 @@ export default function LeaveManagementPage() {
   const [search, setSearch] = useState("");
 
   const isHrOrUpper = currentUser?.roles.some((r) => ["hr_admin", "upper_management"].includes(r));
-  const year = TODAY.slice(0, 4);
+  const today = useMemo(() => todayInManila(), []);
 
   const isDeptHead = !!currentUser?.roles.includes("dept_head");
 
@@ -42,15 +42,12 @@ export default function LeaveManagementPage() {
     return isDeptHead && !!target && target.supervisorId === currentEmployee.id;
   }
 
+  // Remaining credits for the current period (half-year for VL/SL, year for
+  // the rest), counting approved and pending requests.
   const balances = useMemo(() => {
     if (!currentEmployee) return [];
-    return leaveTypes.map((lt) => {
-      const used = leaveRequests
-        .filter((r) => r.employeeId === currentEmployee.id && r.leaveTypeId === lt.id && r.status === "approved" && r.startDate.startsWith(year))
-        .reduce((s, r) => s + r.days, 0);
-      return { leaveType: lt, used, remaining: Math.max(lt.defaultCredits - used, 0) };
-    });
-  }, [leaveTypes, leaveRequests, currentEmployee, year]);
+    return leaveTypes.map((lt) => ({ leaveType: lt, ...balanceFor(leaveRequests, currentEmployee.id, lt, today) }));
+  }, [leaveTypes, leaveRequests, currentEmployee, today]);
 
   const myRequests = useMemo(
     () => leaveRequests.filter((r) => r.employeeId === currentEmployee?.id).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1)),
@@ -75,11 +72,19 @@ export default function LeaveManagementPage() {
       .sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));
   }, [leaveRequests, statusFilter, search, employees]);
 
-  const [form, setForm] = useState({ leaveTypeId: leaveTypes[0]?.id ?? "", startDate: TODAY, endDate: TODAY, reason: "" });
+  const [form, setForm] = useState({ leaveTypeId: leaveTypes[0]?.id ?? "", startDate: today, endDate: today, reason: "", halfDay: false });
   const [files, setFiles] = useState<Partial<Record<LeaveAttachmentKind, File>>>({});
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const computedDays = form.startDate && form.endDate ? businessDaysBetween(form.startDate, form.endDate) : 0;
+  const businessDays = form.startDate && form.endDate ? businessDaysBetween(form.startDate, form.endDate) : 0;
+  // Half day only applies to a single-weekday request.
+  const halfDayAllowed = businessDays === 1 && form.startDate === form.endDate;
+  const computedDays = halfDayAllowed && form.halfDay ? 0.5 : businessDays;
+  const selectedLeaveType = leaveTypes.find((lt) => lt.id === form.leaveTypeId);
+  const creditError =
+    currentEmployee && selectedLeaveType && computedDays > 0
+      ? checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType: selectedLeaveType, startDate: form.startDate, endDate: form.endDate, days: computedDays })
+      : null;
   const formKinds = canAttachLeaveFiles ? requiredKinds(form.leaveTypeId) : [];
   const missingLeaveForm = formKinds.includes("leave_form") && !files.leave_form;
 
@@ -97,13 +102,13 @@ export default function LeaveManagementPage() {
 
   function closeFileModal() {
     setShowFile(false);
-    setForm({ leaveTypeId: leaveTypes[0]?.id ?? "", startDate: TODAY, endDate: TODAY, reason: "" });
+    setForm({ leaveTypeId: leaveTypes[0]?.id ?? "", startDate: today, endDate: today, reason: "", halfDay: false });
     setFiles({});
     setFileError(null);
   }
 
   async function submitFile() {
-    if (!currentEmployee || !form.leaveTypeId || !form.reason || computedDays <= 0 || missingLeaveForm) return;
+    if (!currentEmployee || !form.leaveTypeId || !form.reason || computedDays <= 0 || missingLeaveForm || creditError) return;
     setSubmitting(true);
     setFileError(null);
     const requestId = await fileLeaveRequest({
@@ -143,7 +148,7 @@ export default function LeaveManagementPage() {
     <div>
       <PageHeader
         title="Leave Management"
-        subtitle="File leave requests and track approvals — balances are computed from each leave type's default annual credits."
+        subtitle="File leave requests and track approvals. Vacation and Sick Leave credits are split into Jan–Jun and Jul–Dec; other leave types are per year. Pending requests count against your balance."
         actions={
           <button onClick={() => setShowFile(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
             <CalendarPlus size={16} /> File leave
@@ -153,7 +158,7 @@ export default function LeaveManagementPage() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {balances.map((b) => (
-          <StatTile key={b.leaveType.id} label={b.leaveType.name} value={`${b.remaining}`} hint={`of ${b.leaveType.defaultCredits}`} compact />
+          <StatTile key={b.leaveType.id} label={b.leaveType.name} value={`${b.remaining}`} hint={isSemiannual(b.leaveType.id) ? `of ${b.credits} · ${b.period.label.slice(0, 7)}` : `of ${b.credits}`} compact />
         ))}
       </div>
 
@@ -283,7 +288,14 @@ export default function LeaveManagementPage() {
               <input type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm" />
             </div>
           </div>
-          <div className="text-xs text-[var(--text-muted)]">Computed duration: {computedDays} business day(s)</div>
+          {halfDayAllowed && (
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input type="checkbox" checked={form.halfDay} onChange={(e) => setForm((f) => ({ ...f, halfDay: e.target.checked }))} />
+              Half day
+            </label>
+          )}
+          <div className="text-xs text-[var(--text-muted)]">Duration: {computedDays} business day(s)</div>
+          {creditError && <div className="text-xs text-[var(--status-critical)]">{creditError}</div>}
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Reason</label>
             <textarea value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} rows={3} className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm" placeholder="Briefly describe the reason for this leave…" />
@@ -312,7 +324,7 @@ export default function LeaveManagementPage() {
             <button onClick={closeFileModal} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">{fileError?.startsWith("Leave request filed") ? "Close" : "Cancel"}</button>
             <button
               onClick={submitFile}
-              disabled={submitting || !form.reason || computedDays <= 0 || missingLeaveForm || !!fileError?.startsWith("Leave request filed")}
+              disabled={submitting || !form.reason || computedDays <= 0 || missingLeaveForm || !!creditError || !!fileError?.startsWith("Leave request filed")}
               className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40"
             >
               {submitting ? "Submitting…" : "Submit request"}
