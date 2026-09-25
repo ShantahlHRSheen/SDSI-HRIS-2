@@ -18,7 +18,11 @@ export interface CompanyDocument {
 export async function fetchCompanyDocument(path: string, downloadName: string): Promise<CompanyDocument | null> {
   const bucket = getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET);
   const { data: files, error: listErr } = await bucket.list("", { search: path, limit: 10 });
-  if (listErr) throw listErr;
+  if (listErr) {
+    // Before the phase 17 migration runs the bucket doesn't exist yet.
+    if (/not found/i.test(listErr.message)) return null;
+    throw listErr;
+  }
   const file = files?.find((f) => f.name === path);
   if (!file) return null;
   const [view, download] = await Promise.all([bucket.createSignedUrl(path, 3600), bucket.createSignedUrl(path, 3600, { download: downloadName })]);

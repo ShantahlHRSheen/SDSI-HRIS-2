@@ -47,6 +47,8 @@ export default function PayrollProcessingPage() {
   const [importPeriodId, setImportPeriodId] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importSaving, setImportSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateNotice, setGenerateNotice] = useState<{ tone: "good" | "info" | "error"; text: string } | null>(null);
   const importPeriod = payrollPeriods.find((p) => p.id === importPeriodId);
   const importPreview = useMemo(
     () => (importFile && importPeriod ? buildPayrollImportPreview(importFile.parsed, employees, importPeriod, attendancePeriodRecords, payrollLineOverrides) : null),
@@ -162,15 +164,39 @@ export default function PayrollProcessingPage() {
 
   const alreadyGenerated = period ? new Set(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => p.employeeId)) : new Set();
 
-  function generatePayslips() {
-    if (!period) return;
-    lines.forEach((line) => {
-      if (alreadyGenerated.has(line.employeeId)) return;
-      addGeneratedPayslip({
-        periodId: period.id,
-        employeeId: line.employeeId,
-        summary: payrollLineToSummary(line),
-      });
+  async function generatePayslips() {
+    if (!period || generating) return;
+    const todo = lines.filter((line) => !alreadyGenerated.has(line.employeeId));
+    const periodName = `${formatDate(period.start)} – ${formatDate(period.end)}`;
+    if (lines.length === 0) {
+      setGenerateNotice({ tone: "info", text: `There's no one on the payroll for ${periodName} yet — import the payroll Excel for this period first.` });
+      return;
+    }
+    if (todo.length === 0) {
+      setGenerateNotice({ tone: "info", text: `All ${lines.length} payslips for ${periodName} were already generated — nothing new to create.` });
+      return;
+    }
+    setGenerating(true);
+    setGenerateNotice(null);
+    const results = await Promise.all(
+      todo.map((line) =>
+        addGeneratedPayslip({
+          periodId: period.id,
+          employeeId: line.employeeId,
+          summary: payrollLineToSummary(line),
+        }),
+      ),
+    );
+    setGenerating(false);
+    const saved = results.filter(Boolean).length;
+    const failed = results.length - saved;
+    const skipped = lines.length - todo.length;
+    setGenerateNotice({
+      tone: failed ? "error" : "good",
+      text:
+        `Generated ${saved} payslip${saved === 1 ? "" : "s"} for ${periodName}` +
+        (skipped ? ` (${skipped} already existed)` : "") +
+        (failed ? `; ${failed} couldn't be saved — try again.` : ". Employees can now see them under Payslips."),
     });
   }
 
@@ -275,8 +301,8 @@ export default function PayrollProcessingPage() {
                   </button>
                 )}
                 {period.status !== "open" && (
-                  <button onClick={generatePayslips} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
-                    <FileCheck2 size={16} /> Generate payslips
+                  <button onClick={generatePayslips} disabled={generating} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-60">
+                    <FileCheck2 size={16} /> {generating ? "Generating…" : "Generate payslips"}
                   </button>
                 )}
               </>
@@ -284,6 +310,28 @@ export default function PayrollProcessingPage() {
           </div>
         }
       />
+
+      {generateNotice && (
+        <div
+          className={`mb-4 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
+            generateNotice.tone === "error"
+              ? "border-[var(--status-critical)]/40 text-[var(--status-critical)]"
+              : generateNotice.tone === "good"
+                ? "border-[var(--status-good)]/40 text-[var(--status-good)]"
+                : "border-[var(--border-hairline)] text-[var(--text-secondary)]"
+          }`}
+        >
+          <span>
+            {generateNotice.text}{" "}
+            <Link href="/modules/payslips" className="font-medium underline">
+              View payslips
+            </Link>
+          </span>
+          <button onClick={() => setGenerateNotice(null)} className="shrink-0 text-xs text-[var(--text-muted)]" aria-label="Dismiss">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {importError && !importFile && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--status-critical)]/40 bg-[color-mix(in_srgb,var(--status-critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--status-critical)]">
