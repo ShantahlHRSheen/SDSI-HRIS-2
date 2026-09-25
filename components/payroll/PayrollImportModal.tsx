@@ -10,6 +10,10 @@ import type { PayrollPeriod } from "@/lib/types";
 export function PayrollImportModal({
   preview,
   fileName,
+  sheetNames,
+  sheetIndex,
+  onSheetChange,
+  periodHasData,
   payrollPeriods,
   targetPeriodId,
   onTargetPeriodChange,
@@ -20,6 +24,10 @@ export function PayrollImportModal({
 }: {
   preview: PayrollImportPreview;
   fileName: string;
+  sheetNames: string[];
+  sheetIndex: number;
+  onSheetChange: (index: number) => void;
+  periodHasData: (periodId: string) => boolean;
   payrollPeriods: PayrollPeriod[];
   targetPeriodId: string;
   onTargetPeriodChange: (id: string) => void;
@@ -35,8 +43,22 @@ export function PayrollImportModal({
     <Modal open onClose={onCancel} title="Review payroll import" wide>
       <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
         <div className="rounded-lg bg-[var(--gridline)]/20 p-3 text-xs text-[var(--text-secondary)]">
-          Read sheet <span className="font-medium text-[var(--text-primary)]">&ldquo;{preview.sheetName}&rdquo;</span> of {fileName}. Every figure is saved as that employee&rsquo;s payroll line for the period and stays editable afterwards.
+          Reading sheet <span className="font-medium text-[var(--text-primary)]">&ldquo;{preview.sheetName}&rdquo;</span> of {fileName}. Every figure is saved as that employee&rsquo;s payroll line for the period and stays editable afterwards.
         </div>
+
+        {sheetNames.length > 1 && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Sheet to import</label>
+            <select value={sheetIndex} onChange={(e) => onSheetChange(Number(e.target.value))} className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
+              {sheetNames.map((n, i) => (
+                <option key={i} value={i}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <div className="mt-1.5 text-xs text-[var(--status-warning)]">This workbook has {sheetNames.length} payroll sheets ({sheetNames.join(", ")}) — make sure the right one is selected.</div>
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Apply to payroll period</label>
@@ -47,6 +69,11 @@ export function PayrollImportModal({
               </option>
             ))}
           </select>
+          {target && periodHasData(target.id) && (
+            <div className="mt-1.5 text-xs font-medium text-[var(--status-critical)]">
+              {formatDate(target.start)} – {formatDate(target.end)} already has payroll saved. Importing replaces it — check this is the right period and sheet.
+            </div>
+          )}
           {target && target.status !== "open" && (
             <div className="mt-1.5 text-xs text-[var(--status-warning)]">This period is {target.status} — importing will change its payroll figures.</div>
           )}

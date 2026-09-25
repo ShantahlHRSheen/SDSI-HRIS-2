@@ -20,9 +20,13 @@ import type {
 } from "./types";
 import { computeOverallScore, KPI_TEMPLATE } from "./performance-eval";
 
-// Fixed "today" so the demo's relative dates (birthdays, payroll periods, etc.)
-// stay meaningful without depending on wall-clock time.
-export const TODAY = "2026-07-13";
+// "Today" (YYYY-MM-DD). The live app (Supabase configured) uses the real
+// date in the Philippines; the demo keeps a fixed date so its sample data's
+// relative dates (birthdays, payroll periods, etc.) stay meaningful.
+export const TODAY =
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
+    : "2026-07-13";
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T00:00:00Z");
