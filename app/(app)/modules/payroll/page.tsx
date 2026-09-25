@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, FileCheck2, Lock, LockOpen, Pencil, Upload, Wallet } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -38,8 +39,7 @@ export default function PayrollProcessingPage() {
   } = useHris();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
 
-  const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
-  const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
+  const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
   const [editing, setEditing] = useState<Employee | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
