@@ -1057,6 +1057,29 @@ export async function insertGeneratedPayslip(input: Omit<GeneratedPayslip, "id" 
   return toGeneratedPayslip(data);
 }
 
+// Re-snapshots an existing payslip with the period's current payroll figures.
+export async function updateGeneratedPayslipRow(id: string, summary: GeneratedPayslip["summary"], generatedBy: string): Promise<GeneratedPayslip> {
+  const { data, error } = await getSupabaseClient()
+    .from("generated_payslips")
+    .update({ summary, generated_by: generatedBy, generated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return toGeneratedPayslip(data);
+}
+
+// Takes employees off a period's payroll: their attendance, payroll figures
+// and generated payslips for that period.
+export async function removePayrollEntries(periodId: string, employeeIds: string[]): Promise<void> {
+  if (!employeeIds.length) return;
+  const client = getSupabaseClient();
+  for (const t of ["attendance_period_records", "payroll_line_overrides", "generated_payslips"] as const) {
+    const { error } = await client.from(t).delete().eq("period_id", periodId).in("employee_id", employeeIds);
+    if (error) throw error;
+  }
+}
+
 function toGeneratedVoucher(r: GeneratedVoucherRow): GeneratedVoucher {
   return { id: r.id, periodId: r.period_id, employeeId: r.employee_id, amount: r.amount, generatedBy: r.generated_by, generatedAt: r.generated_at };
 }

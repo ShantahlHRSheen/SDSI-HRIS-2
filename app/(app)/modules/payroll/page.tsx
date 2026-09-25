@@ -35,6 +35,7 @@ export default function PayrollProcessingPage() {
     setPayrollPeriodStatus,
     generatedPayslips,
     addGeneratedPayslip,
+    updateGeneratedPayslip,
     currentUser,
   } = useHris();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
@@ -47,6 +48,7 @@ export default function PayrollProcessingPage() {
   const [importPeriodId, setImportPeriodId] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importSaving, setImportSaving] = useState(false);
+  const [removeNotInFile, setRemoveNotInFile] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generateNotice, setGenerateNotice] = useState<{ tone: "good" | "info" | "error"; text: string } | null>(null);
   const importPeriod = payrollPeriods.find((p) => p.id === importPeriodId);
@@ -54,6 +56,14 @@ export default function PayrollProcessingPage() {
     () => (importFile && importPeriod ? buildPayrollImportPreview(importFile.sheets[importFile.sheetIndex], employees, importPeriod, attendancePeriodRecords, payrollLineOverrides) : null),
     [importFile, importPeriod, employees, attendancePeriodRecords, payrollLineOverrides],
   );
+  // People who already have payroll saved for the target period but aren't in
+  // this file — left in place, they'd still be counted (and paid) for it.
+  const notInFile = useMemo(() => {
+    if (!importPreview || !importPeriodId) return [];
+    const inFile = new Set(importPreview.matched.map((m) => m.employee.id));
+    const saved = new Set([...attendancePeriodRecords, ...payrollLineOverrides].filter((r) => r.periodId === importPeriodId).map((r) => r.employeeId));
+    return employees.filter((e) => saved.has(e.id) && !inFile.has(e.id));
+  }, [importPreview, importPeriodId, attendancePeriodRecords, payrollLineOverrides, employees]);
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -70,6 +80,7 @@ export default function PayrollProcessingPage() {
       const guessed = guessPeriodFromName(sheets[sheetIndex].sheetName, payrollPeriods) ?? fromFileName;
       setImportPeriodId(guessed?.id ?? period?.id ?? "");
       setImportFile({ name: file.name, sheets, sheetIndex });
+      setRemoveNotInFile(true);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Could not read this file.");
     }
@@ -81,6 +92,7 @@ export default function PayrollProcessingPage() {
     const error = await importPayrollRegister(
       importPeriodId,
       importPreview.matched.map((m) => ({ attendance: m.attendance, override: { ...m.override, employeeId: m.employee.id } })),
+      removeNotInFile ? notInFile.map((e) => e.id) : [],
     );
     setImportSaving(false);
     if (error) {
@@ -167,40 +179,41 @@ export default function PayrollProcessingPage() {
     [sortedLines],
   );
 
-  const alreadyGenerated = period ? new Set(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => p.employeeId)) : new Set();
+  const existingSlips = period ? new Map(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => [p.employeeId, p])) : new Map<string, (typeof generatedPayslips)[number]>();
 
+  // Creates missing payslips and refreshes ones whose figures no longer match
+  // the payroll (e.g. the payroll was re-imported after generating).
   async function generatePayslips() {
     if (!period || generating) return;
-    const todo = lines.filter((line) => !alreadyGenerated.has(line.employeeId));
     const periodName = `${formatDate(period.start)} – ${formatDate(period.end)}`;
     if (lines.length === 0) {
       setGenerateNotice({ tone: "info", text: `There's no one on the payroll for ${periodName} yet — import the payroll Excel for this period first.` });
       return;
     }
-    if (todo.length === 0) {
-      setGenerateNotice({ tone: "info", text: `All ${lines.length} payslips for ${periodName} were already generated — nothing new to create.` });
+    const toCreate = lines.filter((line) => !existingSlips.has(line.employeeId));
+    const toUpdate = lines
+      .map((line) => ({ line, slip: existingSlips.get(line.employeeId) }))
+      .filter((x): x is { line: PayrollLine; slip: NonNullable<typeof x.slip> } => !!x.slip && !sameSummary(x.slip.summary, payrollLineToSummary(x.line)));
+    if (toCreate.length === 0 && toUpdate.length === 0) {
+      setGenerateNotice({ tone: "info", text: `All ${lines.length} payslips for ${periodName} are already generated and up to date — nothing to change.` });
       return;
     }
     setGenerating(true);
     setGenerateNotice(null);
-    const results = await Promise.all(
-      todo.map((line) =>
-        addGeneratedPayslip({
-          periodId: period.id,
-          employeeId: line.employeeId,
-          summary: payrollLineToSummary(line),
-        }),
-      ),
-    );
+    const [created, updated] = await Promise.all([
+      Promise.all(toCreate.map((line) => addGeneratedPayslip({ periodId: period.id, employeeId: line.employeeId, summary: payrollLineToSummary(line) }))),
+      Promise.all(toUpdate.map(({ line, slip }) => updateGeneratedPayslip(slip.id, payrollLineToSummary(line)))),
+    ]);
     setGenerating(false);
-    const saved = results.filter(Boolean).length;
-    const failed = results.length - saved;
-    const skipped = lines.length - todo.length;
+    const nCreated = created.filter(Boolean).length;
+    const nUpdated = updated.filter(Boolean).length;
+    const failed = created.length + updated.length - nCreated - nUpdated;
+    const upToDate = lines.length - toCreate.length - toUpdate.length;
+    const parts = [nCreated && `generated ${nCreated} new`, nUpdated && `updated ${nUpdated} out-of-date`, upToDate && `${upToDate} already up to date`].filter(Boolean);
     setGenerateNotice({
       tone: failed ? "error" : "good",
       text:
-        `Generated ${saved} payslip${saved === 1 ? "" : "s"} for ${periodName}` +
-        (skipped ? ` (${skipped} already existed)` : "") +
+        `Payslips for ${periodName}: ${parts.join(", ")}` +
         (failed ? `; ${failed} couldn't be saved — try again.` : ". Employees can now see them under Payslips."),
     });
   }
@@ -355,6 +368,9 @@ export default function PayrollProcessingPage() {
             const guessed = guessPeriodFromName(importFile.sheets[i].sheetName, payrollPeriods);
             if (guessed) setImportPeriodId(guessed.id);
           }}
+          notInFile={notInFile}
+          removeNotInFile={removeNotInFile}
+          onRemoveNotInFileChange={setRemoveNotInFile}
           periodHasData={(id) => attendancePeriodRecords.some((r) => r.periodId === id) || payrollLineOverrides.some((r) => r.periodId === id)}
           payrollPeriods={payrollPeriods}
           targetPeriodId={importPeriodId}
@@ -465,7 +481,13 @@ export default function PayrollProcessingPage() {
                           <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.adjustmentDeduct ? `-${formatCurrencyCompact(l.adjustmentDeduct)}` : "—"}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{l.adjustmentAdd ? formatCurrencyCompact(l.adjustmentAdd) : "—"}</td>
                           <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.netPay)}</td>
-                          <td className="px-3 py-2">{alreadyGenerated.has(l.employeeId) ? <Badge tone="good">Released</Badge> : <Badge tone="muted">Not released</Badge>}</td>
+                          <td className="px-3 py-2">
+                            {(() => {
+                              const slip = existingSlips.get(l.employeeId);
+                              if (!slip) return <Badge tone="muted">Not released</Badge>;
+                              return sameSummary(slip.summary, payrollLineToSummary(l)) ? <Badge tone="good">Released</Badge> : <Badge tone="warning">Payslip out of date</Badge>;
+                            })()}
+                          </td>
                           <td className="px-3 py-2">
                             {canManage && emp && (
                               <button onClick={() => setEditing(emp)} className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
@@ -869,4 +891,17 @@ function OverrideField({ label, auto, value, onChange }: { label: string; auto: 
       )}
     </div>
   );
+}
+
+// Payslip snapshots vs current figures (key order doesn't matter; cents do).
+function sameSummary(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    const x = a[k];
+    const y = b[k];
+    if (typeof x === "number" || typeof y === "number") {
+      if (Math.abs(Number(x ?? 0) - Number(y ?? 0)) > 0.005) return false;
+    } else if (JSON.stringify(x ?? null) !== JSON.stringify(y ?? null)) return false;
+  }
+  return true;
 }
