@@ -46,6 +46,7 @@ import {
   fetchWorkSchedules,
   importAttendancePeriodRecordsRows,
   insertAnnouncement,
+  deleteAnnouncementRow,
   insertAuditLog,
   insertBranch,
   insertCorrectionRequest,
@@ -263,6 +264,8 @@ interface HrisContextShape {
   // Uploads any photos first. Resolves to an error message, or null on success.
   addAnnouncement: (input: Omit<Announcement, "id" | "postedAt" | "images">, photos?: File[]) => Promise<string | null>;
   announcementImageUrls: (images: AnnouncementImage[]) => Promise<Record<string, string>>;
+  // Deletes the post with its photos, comments and reactions. Resolves to an error message, or null.
+  removeAnnouncement: (id: string) => Promise<string | null>;
 
   addBranch: (input: Omit<Branch, "id">) => void;
   updateBranch: (id: string, patch: Partial<Omit<Branch, "id">>) => void;
@@ -983,6 +986,27 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
 
   const announcementImageUrlsFor: HrisContextShape["announcementImageUrls"] = useCallback((images) => announcementImageUrls(images), []);
 
+  const removeAnnouncement: HrisContextShape["removeAnnouncement"] = useCallback(
+    async (id) => {
+      const post = state.announcements.find((a) => a.id === id);
+      if (!post) return null;
+      if (supabaseSession) {
+        try {
+          await deleteAnnouncementRow(id);
+        } catch (err) {
+          console.error("Failed to delete announcement", err);
+          return err instanceof Error ? err.message : "Couldn't delete the post.";
+        }
+        // The post is gone either way; a leftover photo file is only storage.
+        await removeAnnouncementImages(post.images ?? []).catch((err) => console.warn("Couldn't remove post photos", err));
+      }
+      setState((prev) => ({ ...prev, announcements: prev.announcements.filter((a) => a.id !== id) }));
+      logAudit("Bulletin Board", "delete", `Deleted announcement: ${post.title}`);
+      return null;
+    },
+    [logAudit, supabaseSession, state.announcements],
+  );
+
   // `cloud`, when given, lets these generic CRUD helpers write through to
   // Supabase (Phase 1 tables) whenever there's a real Supabase session;
   // demo-login users (no session) keep today's local-only behavior.
@@ -1419,6 +1443,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     setDisciplinaryStatus,
     addAnnouncement,
     announcementImageUrls: announcementImageUrlsFor,
+    removeAnnouncement,
     addBranch: branchCrud.add,
     updateBranch: branchCrud.update,
     removeBranch: branchCrud.remove,
