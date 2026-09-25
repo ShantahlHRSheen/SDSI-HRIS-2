@@ -26,6 +26,7 @@ import type {
 } from "./types";
 import type {
   Announcement,
+  AnnouncementImage,
   AttendanceCorrectionRequest,
   AttendancePeriodRecord,
   AuditLog,
@@ -517,6 +518,7 @@ function toAnnouncement(r: AnnouncementRow): Announcement {
     postedBy: r.posted_by,
     postedAt: r.posted_at,
     expiresAt: r.expires_at,
+    images: r.images ?? [],
   };
 }
 
@@ -526,10 +528,55 @@ export async function fetchAnnouncements(): Promise<Announcement[]> {
   return data.map(toAnnouncement);
 }
 export async function insertAnnouncement(input: Omit<Announcement, "id" | "postedAt">): Promise<Announcement> {
-  const row = { title: input.title, body: input.body, category: input.category, posted_by: input.postedBy, expires_at: input.expiresAt };
+  const row = {
+    title: input.title,
+    body: input.body,
+    category: input.category,
+    posted_by: input.postedBy,
+    expires_at: input.expiresAt,
+    // Only sent when there are photos, so text-only posts keep working
+    // even before the photos migration has run.
+    ...(input.images?.length ? { images: input.images } : {}),
+  };
   const { data, error } = await getSupabaseClient().from("announcements").insert(row).select().single();
   if (error) throw error;
   return toAnnouncement(data);
+}
+
+export const ANNOUNCEMENT_IMAGES_BUCKET = "announcement-images";
+
+// Uploads all photos, or none: if one fails, the ones already uploaded are
+// removed again.
+export async function uploadAnnouncementImages(files: File[]): Promise<AnnouncementImage[]> {
+  const bucket = getSupabaseClient().storage.from(ANNOUNCEMENT_IMAGES_BUCKET);
+  const uploaded: AnnouncementImage[] = [];
+  try {
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await bucket.upload(path, file, { contentType: file.type || undefined });
+      if (error) throw error;
+      uploaded.push({ path, name: file.name });
+    }
+    return uploaded;
+  } catch (err) {
+    if (uploaded.length) await bucket.remove(uploaded.map((i) => i.path));
+    throw err;
+  }
+}
+
+export async function removeAnnouncementImages(images: AnnouncementImage[]): Promise<void> {
+  if (images.length) await getSupabaseClient().storage.from(ANNOUNCEMENT_IMAGES_BUCKET).remove(images.map((i) => i.path));
+}
+
+// Short-lived (1 hour) viewing links, keyed by storage path.
+export async function announcementImageUrls(images: AnnouncementImage[]): Promise<Record<string, string>> {
+  if (!images.length) return {};
+  const { data, error } = await getSupabaseClient().storage.from(ANNOUNCEMENT_IMAGES_BUCKET).createSignedUrls(images.map((i) => i.path), 3600);
+  if (error) throw error;
+  const urls: Record<string, string> = {};
+  for (const d of data) if (d.path && d.signedUrl) urls[d.path] = d.signedUrl;
+  return urls;
 }
 
 // ---- Leave requests ---------------------------------------------------------------

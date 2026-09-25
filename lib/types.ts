@@ -252,6 +252,13 @@ export type AnnouncementCategory =
   | "memo"
   | "policy";
 
+// A photo attached to an announcement (stored in the private
+// "announcement-images" bucket).
+export interface AnnouncementImage {
+  path: string;
+  name: string;
+}
+
 export interface Announcement {
   id: string;
   title: string;
@@ -260,6 +267,7 @@ export interface Announcement {
   postedBy: string;
   postedAt: string;
   expiresAt: string | null;
+  images?: AnnouncementImage[];
 }
 
 export interface DemoUser {
