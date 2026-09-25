@@ -43,9 +43,10 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col items-center bg-[var(--page-plane)] px-4 py-10 sm:py-16">
       <div className="mb-8 flex flex-col items-center text-center">
-        <h1 className="overflow-hidden rounded-2xl">
+        <h1 className="flex flex-col items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element -- small static brand logo */}
-          <img src="/brand/shantahl-logo.png" alt="Shantahl Direct Sales Inc." width={467} height={121} className="block h-auto w-72 sm:w-80" />
+          <img src="/brand/shantahl-circle.png" alt="Shantahl Direct Sales Inc." width={256} height={256} className="h-28 w-28 sm:h-32 sm:w-32" />
+          <span className="text-xl font-semibold text-[var(--text-primary)]">Shantahl HRIS</span>
         </h1>
         <p className="mt-3 text-sm text-[var(--text-secondary)]">Human Resource Information System</p>
       </div>

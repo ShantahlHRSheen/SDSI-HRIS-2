@@ -21,7 +21,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
           {/* eslint-disable-next-line @next/next/no-img-element -- tiny static brand icon */}
-          <img src="/brand/shantahl-icon.png" alt="" className="h-8 w-8 rounded-lg" />
+          <img src="/brand/shantahl-icon.png" alt="" className="h-8 w-8 rounded-full" />
           <div className="leading-tight">
             <div className="text-sm font-semibold text-[var(--text-primary)]">Shantahl HRIS</div>
             <div className="text-[11px] text-[var(--text-muted)]">{isSupabaseConfigured() ? "Shantahl Direct Sales Inc." : "Demo instance"}</div>
