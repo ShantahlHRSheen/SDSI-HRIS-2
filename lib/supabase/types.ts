@@ -168,6 +168,8 @@ export type AnnouncementRow = {
   posted_by: string;
   posted_at: string;
   expires_at: string | null;
+  // Absent until supabase/migrate_phase13_announcement_photos.sql has run.
+  images?: { path: string; name: string }[];
 };
 
 type ApprovableRequestRow = {

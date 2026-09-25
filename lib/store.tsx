@@ -31,6 +31,9 @@ import {
   fetchGeneratedVouchers,
   fetchHolidays,
   fetchLeaveRequests,
+  uploadAnnouncementImages,
+  removeAnnouncementImages,
+  announcementImageUrls,
   fetchLeaveAttachments,
   uploadLeaveAttachmentFile,
   leaveAttachmentDownloadUrl,
@@ -115,6 +118,7 @@ import type {
   GeneratedVoucher,
   Holiday,
   LeaveRequest,
+  AnnouncementImage,
   LeaveAttachment,
   LeaveAttachmentKind,
   LeaveType,
@@ -256,7 +260,9 @@ interface HrisContextShape {
   addDisciplinaryRecord: (input: Omit<DisciplinaryRecord, "id">) => void;
   setDisciplinaryStatus: (id: string, status: DisciplinaryRecord["status"]) => void;
 
-  addAnnouncement: (input: Omit<Announcement, "id" | "postedAt">) => void;
+  // Uploads any photos first. Resolves to an error message, or null on success.
+  addAnnouncement: (input: Omit<Announcement, "id" | "postedAt" | "images">, photos?: File[]) => Promise<string | null>;
+  announcementImageUrls: (images: AnnouncementImage[]) => Promise<Record<string, string>>;
 
   addBranch: (input: Omit<Branch, "id">) => void;
   updateBranch: (id: string, patch: Partial<Omit<Branch, "id">>) => void;
@@ -948,24 +954,31 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addAnnouncement: HrisContextShape["addAnnouncement"] = useCallback(
-    async (input) => {
+    async (input, photos = []) => {
       if (supabaseSession) {
+        let images: AnnouncementImage[] = [];
         try {
-          const entry = await insertAnnouncement(input);
+          images = await uploadAnnouncementImages(photos);
+          const entry = await insertAnnouncement({ ...input, images });
           setState((prev) => ({ ...prev, announcements: [entry, ...prev.announcements] }));
-          logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}`);
-          return;
+          logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}${images.length ? ` (${images.length} photo${images.length > 1 ? "s" : ""})` : ""}`);
+          return null;
         } catch (err) {
-          reportSaveError("Couldn't add announcement", err);
-          return;
+          console.error("Failed to post announcement", err);
+          await removeAnnouncementImages(images).catch(() => {});
+          return err instanceof Error ? err.message : "Couldn't post the announcement.";
         }
       }
+      if (photos.length) return "Photos need a real sign-in (not the demo login).";
       const entry: Announcement = { ...input, id: nextId("an"), postedAt: TODAY };
       setState((prev) => ({ ...prev, announcements: [entry, ...prev.announcements] }));
       logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}`);
+      return null;
     },
     [logAudit, supabaseSession],
   );
+
+  const announcementImageUrlsFor: HrisContextShape["announcementImageUrls"] = useCallback((images) => announcementImageUrls(images), []);
 
   // `cloud`, when given, lets these generic CRUD helpers write through to
   // Supabase (Phase 1 tables) whenever there's a real Supabase session;
@@ -1394,6 +1407,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     addDisciplinaryRecord,
     setDisciplinaryStatus,
     addAnnouncement,
+    announcementImageUrls: announcementImageUrlsFor,
     addBranch: branchCrud.add,
     updateBranch: branchCrud.update,
     removeBranch: branchCrud.remove,
