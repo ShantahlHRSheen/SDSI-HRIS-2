@@ -21,7 +21,7 @@ import {
 // published, not derived from employee records. Update the data below when
 // HR issues a new version.
 
-type Person = { name: string; title: string };
+type Person = { name: string; title: string; freelancer?: boolean };
 type Division = { name: string; icon: LucideIcon; people: Person[] };
 type Group = { name: string; icon: LucideIcon; lead?: Person; people?: Person[]; divisions?: Division[] };
 type Unit = {
@@ -113,7 +113,7 @@ const UNITS: Unit[] = [
         icon: ChartColumn,
         people: [
           { name: "Mharbee Mongcal", title: "Sales Admin" },
-          { name: "Shopify Specialist", title: "Ads Specialist" },
+          { name: "Shopify Specialist", title: "Ads Specialist", freelancer: true },
         ],
       },
       {
@@ -205,7 +205,7 @@ const UNITS: Unit[] = [
         name: "Manila Branch",
         icon: Store,
         people: [
-          { name: "Abegail Aboguin", title: "Branch Supervisor" },
+          { name: "Ma. Abegail Fatima Aboguin", title: "Branch Supervisor" },
           { name: "Dayanara Flores", title: "Cashier" },
           { name: "Jemuel Castillo", title: "Warehouseman" },
           { name: "Clover Riomalos", title: "Stockman" },
@@ -273,7 +273,10 @@ function PersonCard({ person }: { person: Person }) {
         <User size={16} />
       </span>
       <span className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-primary)]">{person.name}</span>
-      <span className="w-[42%] shrink-0 border-l border-[var(--border-hairline)] pl-3 text-xs text-[var(--text-secondary)]">{person.title}</span>
+      <span className="w-[42%] shrink-0 border-l border-[var(--border-hairline)] pl-3 text-xs text-[var(--text-secondary)]">
+        {person.title}
+        {person.freelancer && <span className="mt-0.5 block w-fit rounded-full border border-[var(--border-hairline)] px-1.5 text-[10px] text-[var(--text-muted)]">Freelancer</span>}
+      </span>
     </div>
   );
 }
