@@ -329,7 +329,8 @@ interface HrisContextShape {
   fileCorrectionRequest: (input: Omit<AttendanceCorrectionRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
   decideCorrectionRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 
-  addGeneratedPayslip: (input: Omit<GeneratedPayslip, "id" | "generatedAt" | "generatedBy">) => void;
+  // Resolves to true once saved (false if saving failed; the error is shown as a toast).
+  addGeneratedPayslip: (input: Omit<GeneratedPayslip, "id" | "generatedAt" | "generatedBy">) => Promise<boolean>;
   addGeneratedVoucher: (input: Omit<GeneratedVoucher, "id" | "generatedAt" | "generatedBy">) => void;
 }
 
@@ -1356,10 +1357,10 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           const entry = await insertGeneratedPayslip(input, actor?.name ?? "System");
           setState((prev) => ({ ...prev, generatedPayslips: [entry, ...prev.generatedPayslips] }));
           logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
-          return;
+          return true;
         } catch (err) {
           reportSaveError("Couldn't save generated payslip", err);
-          return;
+          return false;
         }
       }
       setState((prev) => {
@@ -1367,6 +1368,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, generatedPayslips: [entry, ...prev.generatedPayslips] };
       });
       logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
+      return true;
     },
     [logAudit, currentUser, supabaseSession],
   );
