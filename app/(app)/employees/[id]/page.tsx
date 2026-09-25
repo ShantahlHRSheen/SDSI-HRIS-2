@@ -162,12 +162,6 @@ export default function EmployeeProfilePage() {
           <Row label="TIN" value={govIds.tin} />
         </Section>
 
-        <Section title="Bank Details" note="Masked placeholder values for demo purposes only.">
-          <Row label="Bank" value="BDO Unibank" />
-          <Row label="Account name" value={fullName(employee)} />
-          <Row label="Account number" value={"•••• •••• " + employee.employeeNumber.slice(-4)} />
-        </Section>
-
         <Section title="Documents (201 File)" note="No real files stored in this demo — Supabase Storage integration is part of the full build.">
           {["Resume / Biodata", "Employment Contract", "Government IDs", "NBI Clearance", "Medical Certificate"].map((doc) => (
             <div key={doc} className="flex items-center justify-between py-1.5 text-sm">
