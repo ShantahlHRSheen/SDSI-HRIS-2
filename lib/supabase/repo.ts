@@ -275,6 +275,7 @@ function toEmployee(r: EmployeeRow): Employee {
   return {
     id: r.id,
     employeeNumber: r.employee_number,
+    hasLogin: !!r.user_id,
     firstName: r.first_name,
     lastName: r.last_name,
     middleName: r.middle_name ?? undefined,
