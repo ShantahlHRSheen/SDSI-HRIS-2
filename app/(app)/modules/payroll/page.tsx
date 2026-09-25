@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FileCheck2, Lock, LockOpen, Pencil, Wallet } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { AlertTriangle, FileCheck2, Lock, LockOpen, Pencil, Upload, Wallet } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -12,6 +12,8 @@ import Link from "next/link";
 import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, type PayrollLine } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
+import { buildPayrollImportPreview, guessPeriodFromName, parsePayrollWorkbook, type ParsedPayrollWorkbook } from "@/lib/payroll-import";
+import { PayrollImportModal } from "@/components/payroll/PayrollImportModal";
 import type { Employee, PayrollLineOverride, PayrollPeriodStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
@@ -28,6 +30,7 @@ export default function PayrollProcessingPage() {
     overtimeRequests,
     payrollLineOverrides,
     upsertPayrollLineOverride,
+    importPayrollRegister,
     setPayrollPeriodStatus,
     generatedPayslips,
     addGeneratedPayslip,
@@ -38,6 +41,49 @@ export default function PayrollProcessingPage() {
   const [periodId, setPeriodId] = useState(payrollPeriods[payrollPeriods.length - 1]?.id ?? "");
   const period = payrollPeriods.find((p) => p.id === periodId) ?? payrollPeriods[payrollPeriods.length - 1];
   const [editing, setEditing] = useState<Employee | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<{ name: string; parsed: ParsedPayrollWorkbook } | null>(null);
+  const [importPeriodId, setImportPeriodId] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSaving, setImportSaving] = useState(false);
+  const importPeriod = payrollPeriods.find((p) => p.id === importPeriodId);
+  const importPreview = useMemo(
+    () => (importFile && importPeriod ? buildPayrollImportPreview(importFile.parsed, employees, importPeriod, attendancePeriodRecords, payrollLineOverrides) : null),
+    [importFile, importPeriod, employees, attendancePeriodRecords, payrollLineOverrides],
+  );
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportError(null);
+    try {
+      const parsed = await parsePayrollWorkbook(await file.arrayBuffer());
+      const guessed = guessPeriodFromName(parsed.sheetName, payrollPeriods) ?? guessPeriodFromName(file.name, payrollPeriods);
+      setImportPeriodId(guessed?.id ?? period?.id ?? "");
+      setImportFile({ name: file.name, parsed });
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Could not read this file.");
+    }
+  }
+
+  async function confirmImport() {
+    if (!importPreview || !importPeriodId) return;
+    setImportSaving(true);
+    const error = await importPayrollRegister(
+      importPeriodId,
+      importPreview.matched.map((m) => ({ attendance: m.attendance, override: { ...m.override, employeeId: m.employee.id } })),
+    );
+    setImportSaving(false);
+    if (error) {
+      setImportError(error);
+      return;
+    }
+    setImportFile(null);
+    setImportError(null);
+    setPeriodId(importPeriodId);
+  }
 
   const lines = useMemo(
     () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides) : []),
@@ -199,6 +245,14 @@ export default function PayrollProcessingPage() {
         subtitle="Computed automatically from attendance and approved overtime records for the selected payroll period — every figure remains editable per employee, including attendance, rate, and statutory contributions."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {canManage && (
+              <>
+                <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleImportFile} />
+                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                  <Upload size={16} /> Import Excel
+                </button>
+              </>
+            )}
             <button onClick={exportCsv} className="rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Export CSV</button>
             {canManage && period && (
               <>
@@ -222,6 +276,29 @@ export default function PayrollProcessingPage() {
           </div>
         }
       />
+
+      {importError && !importFile && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--status-critical)]/40 bg-[color-mix(in_srgb,var(--status-critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--status-critical)]">
+          <AlertTriangle size={16} className="shrink-0" /> {importError}
+        </div>
+      )}
+
+      {importFile && importPreview && (
+        <PayrollImportModal
+          preview={importPreview}
+          fileName={importFile.name}
+          payrollPeriods={payrollPeriods}
+          targetPeriodId={importPeriodId}
+          onTargetPeriodChange={setImportPeriodId}
+          saving={importSaving}
+          error={importError}
+          onCancel={() => {
+            setImportFile(null);
+            setImportError(null);
+          }}
+          onConfirm={confirmImport}
+        />
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={periodId || period?.id} onChange={(e) => setPeriodId(e.target.value)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
@@ -249,7 +326,7 @@ export default function PayrollProcessingPage() {
               <EmptyState
                 icon={Wallet}
                 title="No attendance data for this period yet"
-                description="Import or manually enter this period's attendance in the Attendance module — payroll is computed directly from it."
+                description="Import this period's payroll file with Import Excel, or import/enter attendance in the Attendance module — payroll is computed from it."
               />
             ) : (
               <div className="overflow-x-auto">
