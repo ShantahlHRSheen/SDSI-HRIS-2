@@ -11,13 +11,28 @@ export interface HrMessage {
   senderName: string;
   fromHr: boolean;
   body: string;
+  imagePath: string | null;
+  // Set once the daily cleanup has deleted the photo (30 days after sending).
+  imageRemoved: boolean;
   createdAt: string;
   readAt: string | null;
 }
 
 export const HR_MESSAGE_MAX = 2000;
+export const HR_CHAT_BUCKET = "hr-chat-images";
+export const HR_CHAT_PHOTO_DAYS = 30;
 
-type Row = { id: string; employee_id: string; sender_name: string; from_hr: boolean; body: string; created_at: string; read_at: string | null };
+type Row = {
+  id: string;
+  employee_id: string;
+  sender_name: string;
+  from_hr: boolean;
+  body: string;
+  image_path?: string | null;
+  image_removed_at?: string | null;
+  created_at: string;
+  read_at: string | null;
+};
 
 const toMessage = (r: Row): HrMessage => ({
   id: r.id,
@@ -25,6 +40,8 @@ const toMessage = (r: Row): HrMessage => ({
   senderName: r.sender_name,
   fromHr: r.from_hr,
   body: r.body,
+  imagePath: r.image_path ?? null,
+  imageRemoved: !!r.image_removed_at,
   createdAt: r.created_at,
   readAt: r.read_at,
 });
@@ -43,10 +60,34 @@ export async function fetchHrInboxMessages(): Promise<HrMessage[]> {
   return (data as Row[]).map(toMessage);
 }
 
-export async function sendHrMessage(employeeId: string, body: string): Promise<HrMessage> {
-  const { data, error } = await getSupabaseClient().from("hr_messages").insert({ employee_id: employeeId, body: body.trim() }).select().single();
+// Sends text and/or a photo (already shrunk by prepareChatPhoto). The photo
+// goes in the conversation's folder; if the message then fails, the orphaned
+// file is cleaned up by the daily job with the other expired photos.
+export async function sendHrMessage(employeeId: string, body: string, photo?: Blob | null): Promise<HrMessage> {
+  const client = getSupabaseClient();
+  let imagePath: string | null = null;
+  if (photo) {
+    imagePath = `${employeeId}/${crypto.randomUUID()}.jpg`;
+    const { error: upErr } = await client.storage.from(HR_CHAT_BUCKET).upload(imagePath, photo, { contentType: "image/jpeg" });
+    if (upErr) throw upErr;
+  }
+  const { data, error } = await client
+    .from("hr_messages")
+    .insert({ employee_id: employeeId, body: body.trim(), ...(imagePath ? { image_path: imagePath } : {}) })
+    .select()
+    .single();
   if (error) throw error;
   return toMessage(data as Row);
+}
+
+// Short-lived (1 hour) viewing links for chat photos, keyed by path.
+export async function hrChatPhotoUrls(paths: string[]): Promise<Record<string, string>> {
+  if (!paths.length) return {};
+  const { data, error } = await getSupabaseClient().storage.from(HR_CHAT_BUCKET).createSignedUrls(paths, 3600);
+  if (error) throw error;
+  const urls: Record<string, string> = {};
+  for (const d of data) if (d.path && d.signedUrl) urls[d.path] = d.signedUrl;
+  return urls;
 }
 
 export async function markHrThreadRead(employeeId: string): Promise<void> {

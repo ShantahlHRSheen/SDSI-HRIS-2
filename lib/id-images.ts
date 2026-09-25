@@ -1,9 +1,10 @@
-// Browser-side preparation of ID card images, so each stored file is tiny.
-//   Photo:     centre-cropped to 3:4 and saved as a 450×600 JPEG (~40–60 KB).
+// Browser-side preparation of uploaded images (ID card, chat), so each
+// stored file is small.
+//   ID photo:  centre-cropped to 3:4 and saved as a 450×600 JPEG (~40–60 KB).
 //   Signature: the paper background is made transparent, the empty margins
 //              trimmed, and the result capped at 600×200 as a PNG (~5–20 KB).
 
-async function loadBitmap(file: Blob): Promise<ImageBitmap> {
+export async function loadBitmap(file: Blob): Promise<ImageBitmap> {
   try {
     return await createImageBitmap(file, { imageOrientation: "from-image" });
   } catch {
@@ -11,7 +12,7 @@ async function loadBitmap(file: Blob): Promise<ImageBitmap> {
   }
 }
 
-function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+export function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't process the image."))), type, quality));
 }
 
@@ -97,4 +98,19 @@ export async function prepareSignature(file: Blob): Promise<Blob> {
   out.height = Math.max(1, Math.round(ch * outScale));
   out.getContext("2d")!.drawImage(work, cx, cy, cw, ch, 0, 0, out.width, out.height);
   return toBlob(out, "image/png");
+}
+
+// Chat photo: longest side at most 1600 px, JPEG (~150–400 KB).
+export async function prepareChatPhoto(file: Blob): Promise<Blob> {
+  const img = await loadBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return toBlob(canvas, "image/jpeg", 0.8);
 }

@@ -223,6 +223,8 @@ export type HrMessageRow = {
   sender_name: string;
   from_hr: boolean;
   body: string;
+  image_path: string | null;
+  image_removed_at: string | null;
   created_at: string;
   read_at: string | null;
 };

@@ -9,7 +9,11 @@
 --     someone else's name or fake a timestamp.
 --   * Messages can't be edited or deleted from the app. Read status is set
 --     only through mark_hr_thread_read().
---   * Text only (max 2,000 characters), so storage stays tiny.
+--   * Text up to 2,000 characters, plus an optional photo. Photos are
+--     shrunk in the browser (~200–400 KB) and kept in the private
+--     "hr-chat-images" bucket for 30 days: the daily cleanup job
+--     (app/api/cron/purge-leave-attachments) deletes older ones and marks
+--     their messages image_removed_at, so the chat shows "Photo removed".
 --
 -- Safe to run any time, and safe to re-run.
 --
@@ -22,10 +26,20 @@ create table if not exists hr_messages (
   sender_employee_id text references employees (id) on delete set null,
   sender_name text not null default '',
   from_hr boolean not null default false,
-  body text not null check (char_length(btrim(body)) between 1 and 2000),
+  body text not null default '',
+  image_path text,
+  image_removed_at timestamptz,
   created_at timestamptz not null default now(),
   read_at timestamptz
 );
+-- For databases where an earlier version of this file already ran.
+alter table hr_messages add column if not exists image_path text;
+alter table hr_messages add column if not exists image_removed_at timestamptz;
+alter table hr_messages alter column body set default '';
+-- A message needs text or a photo (or a photo that has since expired).
+alter table hr_messages drop constraint if exists hr_messages_body_check;
+alter table hr_messages add constraint hr_messages_body_check
+  check (char_length(body) <= 2000 and (char_length(btrim(body)) >= 1 or image_path is not null or image_removed_at is not null));
 create index if not exists hr_messages_thread_idx on hr_messages (employee_id, created_at);
 create index if not exists hr_messages_unread_idx on hr_messages (employee_id) where read_at is null;
 
@@ -52,6 +66,10 @@ begin
     into new.sender_name
     from employees e where e.id = new.sender_employee_id;
   new.sender_name := coalesce(new.sender_name, '');
+  if new.image_path is not null and split_part(new.image_path, '/', 1) is distinct from new.employee_id then
+    raise exception 'Photo does not belong to this conversation.';
+  end if;
+  new.image_removed_at := null;
   new.created_at := now();
   new.read_at := null;
   return new;
@@ -98,3 +116,39 @@ revoke all on function mark_hr_thread_read(text) from public, anon;
 grant execute on function mark_hr_thread_read(text) to authenticated;
 revoke all on function app_is_hr_manager() from public, anon;
 grant execute on function app_is_hr_manager() to authenticated;
+
+-- Chat photos: private bucket, one folder per conversation (employee id).
+-- The employee and HR can view and upload in that conversation's folder.
+-- Nobody deletes from the app; the cleanup job removes them after 30 days.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('hr-chat-images', 'hr-chat-images', false, 3145728, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "hr chat images read" on storage.objects;
+create policy "hr chat images read" on storage.objects for select to authenticated
+  using (bucket_id = 'hr-chat-images' and ((storage.foldername(name))[1] = app_current_employee_id() or app_is_hr_manager()));
+
+drop policy if exists "hr chat images upload" on storage.objects;
+create policy "hr chat images upload" on storage.objects for insert to authenticated
+  with check (bucket_id = 'hr-chat-images' and ((storage.foldername(name))[1] = app_current_employee_id() or app_is_hr_manager()));
+
+-- For the cleanup job only: chat photo files older than the cut-off,
+-- including any uploaded without a message (e.g. a send that failed).
+create or replace function hr_chat_expired_images(older_than timestamptz)
+returns setof text
+language sql
+stable
+security definer
+set search_path = public, storage
+as $$
+  select name from storage.objects
+   where bucket_id = 'hr-chat-images' and created_at < older_than
+   order by created_at
+   limit 1000;
+$$;
+
+revoke all on function hr_chat_expired_images(timestamptz) from public, anon, authenticated;
+grant execute on function hr_chat_expired_images(timestamptz) to service_role;
