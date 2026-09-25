@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { Session } from "@supabase/supabase-js";
 import { fullName, nextEmployeeNumber } from "./helpers";
 import { getSupabaseClient } from "./supabase/client";
+import { reportSaveError } from "./save-errors";
 import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   decideCorrectionRequestRow,
@@ -295,6 +296,11 @@ interface HrisContextShape {
   canAttachLeaveFiles: boolean;
   // Signed in with a real account (not a demo user).
   isRealAccount: boolean;
+  // The latest load from the database failed — data on screen may be out of date.
+  dataLoadError: boolean;
+  // Still checking the saved sign-in / loading the signed-in user's data —
+  // don't treat the visitor as signed out yet.
+  authPending: boolean;
   // After HR issues a temporary password: marks the employee as having a
   // login and records it in the audit trail (never the password itself).
   recordLoginIssued: (employeeId: string, created: boolean) => void;
@@ -322,6 +328,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const [demoUsers, setDemoUsers] = useState<DemoUser[]>(DEMO_USERS);
   const [ready, setReady] = useState(false);
   const [supabaseSession, setSupabaseSession] = useState<Session | null>(null);
+  // Whether the saved sign-in (if any) has been checked yet, and which
+  // signed-in user's data has finished loading — until both are known the
+  // app shouldn't decide the visitor is signed out and redirect them.
+  const [sessionChecked, setSessionChecked] = useState(() => !isSupabaseConfigured());
+  const [dataLoadedFor, setDataLoadedFor] = useState<string | null>(null);
+  // The last load from the database failed, so what's shown may be stale.
+  const [dataLoadError, setDataLoadError] = useState(false);
 
   // Real per-employee login, layered on top of the demo click-to-select
   // login below rather than replacing it — not every employee has a
@@ -330,9 +343,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   // still reads/writes localStorage exactly as before.
   useEffect(() => {
     let active = true;
-    getInitialSession().then((session) => {
-      if (active) setSupabaseSession(session);
-    });
+    getInitialSession()
+      .then((session) => {
+        if (active) setSupabaseSession(session);
+      })
+      .finally(() => {
+        if (active) setSessionChecked(true);
+      });
     const unwatch = watchAuthState((session) => {
       if (active) setSupabaseSession(session);
     });
@@ -431,8 +448,12 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           generatedBirForms,
           auditLogs,
         }));
+        setDataLoadError(false);
       } catch (err) {
         console.error("Failed to load org/employee data from Supabase — keeping local data.", err);
+        if (active) setDataLoadError(true);
+      } finally {
+        if (active) setDataLoadedFor(supabaseSession.user.id);
       }
     })();
     return () => {
@@ -575,7 +596,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Employee 201 File", "update", `Updated employee record ${id}`);
           return;
         } catch (err) {
-          console.error("Failed to update employee in Supabase", err);
+          reportSaveError("Couldn't update employee", err);
           return;
         }
       }
@@ -600,7 +621,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Employee 201 File", "update", `Updated department allocation for employee ${employeeId}`);
           return;
         } catch (err) {
-          console.error("Failed to save department allocation in Supabase", err);
+          reportSaveError("Couldn't save department allocation", err);
           return;
         }
       }
@@ -625,7 +646,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
           return;
         } catch (err) {
-          console.error("Failed to add employee in Supabase", err);
+          reportSaveError("Couldn't add employee", err);
           return;
         }
       }
@@ -651,7 +672,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Attendance", "update", `Manually updated attendance for period ${input.periodId}`);
           return;
         } catch (err) {
-          console.error("Failed to save attendance record in Supabase", err);
+          reportSaveError("Couldn't save attendance record", err);
           return;
         }
       }
@@ -682,7 +703,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
           return;
         } catch (err) {
-          console.error("Failed to import attendance records in Supabase", err);
+          reportSaveError("Couldn't import attendance records", err);
           return;
         }
       }
@@ -716,7 +737,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Payroll", "update", `Adjusted payroll line for period ${input.periodId}`);
           return;
         } catch (err) {
-          console.error("Failed to save payroll line override in Supabase", err);
+          reportSaveError("Couldn't save the payroll line", err);
           return;
         }
       }
@@ -781,7 +802,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Allowance Vouchers", "update", `Adjusted voucher amount for period ${input.periodId}`);
           return;
         } catch (err) {
-          console.error("Failed to save voucher amount override in Supabase", err);
+          reportSaveError("Couldn't save the voucher amount", err);
           return;
         }
       }
@@ -810,7 +831,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Performance Evaluation", "create", `Created evaluation for period ${input.period}`);
           return;
         } catch (err) {
-          console.error("Failed to add evaluation in Supabase", err);
+          reportSaveError("Couldn't add evaluation", err);
           return;
         }
       }
@@ -844,7 +865,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Performance Evaluation", "update", `Saved ${category} section for evaluation ${id}`);
           return;
         } catch (err) {
-          console.error("Failed to save evaluation section in Supabase", err);
+          reportSaveError("Couldn't save evaluation section", err);
           return;
         }
       }
@@ -874,7 +895,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         try {
           await updateEvaluationRow(id, { status });
         } catch (err) {
-          console.error("Failed to update evaluation status in Supabase", err);
+          reportSaveError("Couldn't update evaluation status", err);
           return;
         }
       }
@@ -896,7 +917,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Discipline", "create", `Issued ${input.type.replace("_", " ")}`);
           return;
         } catch (err) {
-          console.error("Failed to add disciplinary record in Supabase", err);
+          reportSaveError("Couldn't add disciplinary record", err);
           return;
         }
       }
@@ -913,7 +934,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         try {
           await updateDisciplinaryStatusRow(id, status);
         } catch (err) {
-          console.error("Failed to update disciplinary status in Supabase", err);
+          reportSaveError("Couldn't update disciplinary status", err);
           return;
         }
       }
@@ -935,7 +956,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}`);
           return;
         } catch (err) {
-          console.error("Failed to add announcement in Supabase", err);
+          reportSaveError("Couldn't add announcement", err);
           return;
         }
       }
@@ -967,7 +988,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit(moduleLabel, "create", `Added new ${moduleLabel.toLowerCase()} record`);
           return;
         } catch (err) {
-          console.error(`Failed to add ${moduleLabel} record in Supabase`, err);
+          reportSaveError(`Couldn't add the ${moduleLabel.replace(" Config", "").toLowerCase()}`, err);
           return;
         }
       }
@@ -986,7 +1007,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit(moduleLabel, "update", `Updated ${moduleLabel.toLowerCase()} record`);
           return;
         } catch (err) {
-          console.error(`Failed to update ${moduleLabel} record in Supabase`, err);
+          reportSaveError(`Couldn't update the ${moduleLabel.replace(" Config", "").toLowerCase()}`, err);
           return;
         }
       }
@@ -1001,7 +1022,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         try {
           await cloud.remove(id);
         } catch (err) {
-          console.error(`Failed to remove ${moduleLabel} record in Supabase`, err);
+          reportSaveError(`Couldn't remove the ${moduleLabel.replace(" Config", "").toLowerCase()}`, err);
           return;
         }
       }
@@ -1051,7 +1072,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         try {
           await updatePayrollPeriodRow(id, { status });
         } catch (err) {
-          console.error("Failed to update payroll period status in Supabase", err);
+          reportSaveError("Couldn't update payroll period status", err);
           return;
         }
       }
@@ -1073,7 +1094,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Payroll", "create", `Created payroll period ${input.start} to ${input.end}`);
           return;
         } catch (err) {
-          console.error("Failed to add payroll period in Supabase", err);
+          reportSaveError("Couldn't add payroll period", err);
           return;
         }
       }
@@ -1103,7 +1124,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("BIR", "generate", `Generated ${label} for ${input.period}`);
           return;
         } catch (err) {
-          console.error("Failed to save generated BIR form in Supabase", err);
+          reportSaveError("Couldn't save generated BIR form", err);
           return;
         }
       }
@@ -1178,7 +1199,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Leave Management", "decide", `Leave request ${decision}`);
           return;
         } catch (err) {
-          console.error("Failed to decide leave request in Supabase", err);
+          reportSaveError("Couldn't save your decision on the leave request", err);
           return;
         }
       }
@@ -1202,7 +1223,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Overtime", "file", `Filed overtime request (${input.hours}h on ${input.date})`);
           return;
         } catch (err) {
-          console.error("Failed to file overtime request in Supabase", err);
+          reportSaveError("Couldn't file overtime request", err);
           return;
         }
       }
@@ -1223,7 +1244,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Overtime", "decide", `Overtime request ${decision}`);
           return;
         } catch (err) {
-          console.error("Failed to decide overtime request in Supabase", err);
+          reportSaveError("Couldn't save your decision on the overtime request", err);
           return;
         }
       }
@@ -1247,7 +1268,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Attendance Corrections", "file", `Filed attendance correction for ${input.date}`);
           return;
         } catch (err) {
-          console.error("Failed to file correction request in Supabase", err);
+          reportSaveError("Couldn't file correction request", err);
           return;
         }
       }
@@ -1268,7 +1289,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Attendance Corrections", "decide", `Correction request ${decision}`);
           return;
         } catch (err) {
-          console.error("Failed to decide correction request in Supabase", err);
+          reportSaveError("Couldn't save your decision on the correction request", err);
           return;
         }
       }
@@ -1293,7 +1314,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Payslips", "generate", `Generated payslip for period ${input.periodId}`);
           return;
         } catch (err) {
-          console.error("Failed to save generated payslip in Supabase", err);
+          reportSaveError("Couldn't save generated payslip", err);
           return;
         }
       }
@@ -1316,7 +1337,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           logAudit("Allowance Vouchers", "generate", `Generated voucher for period ${input.periodId}`);
           return;
         } catch (err) {
-          console.error("Failed to save generated voucher in Supabase", err);
+          reportSaveError("Couldn't save generated voucher", err);
           return;
         }
       }
@@ -1399,6 +1420,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     fileLeaveRequest,
     canAttachLeaveFiles: !!supabaseSession,
     isRealAccount: !!supabaseSession,
+    dataLoadError: !!supabaseSession && dataLoadError,
+    authPending: !sessionChecked || (!!supabaseSession && !currentUser && dataLoadedFor !== supabaseSession.user.id),
     recordLoginIssued,
     mustChangePassword: supabaseSession?.user.app_metadata?.must_change_password === true,
     uploadLeaveAttachment,

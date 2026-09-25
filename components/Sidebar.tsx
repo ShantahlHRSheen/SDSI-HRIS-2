@@ -1,5 +1,6 @@
 "use client";
 
+import { isSupabaseConfigured } from "@/lib/supabase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, X } from "lucide-react";
@@ -21,7 +22,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
           </div>
           <div className="leading-tight">
             <div className="text-sm font-semibold text-[var(--text-primary)]">Shantahl HRIS</div>
-            <div className="text-[11px] text-[var(--text-muted)]">Demo instance</div>
+            <div className="text-[11px] text-[var(--text-muted)]">{isSupabaseConfigured() ? "Shantahl Direct Sales Inc." : "Demo instance"}</div>
           </div>
         </Link>
         <button className="rounded-md p-1 text-[var(--text-muted)] md:hidden" onClick={onClose} aria-label="Close menu">
