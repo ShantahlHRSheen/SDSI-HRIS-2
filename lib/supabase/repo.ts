@@ -545,6 +545,14 @@ export async function insertAnnouncement(input: Omit<Announcement, "id" | "poste
   return toAnnouncement(data);
 }
 
+// Comments and reactions go with it (on delete cascade). RLS silently skips
+// rows the caller may not delete, so check that one was actually removed.
+export async function deleteAnnouncementRow(id: string): Promise<void> {
+  const { data, error } = await getSupabaseClient().from("announcements").delete().eq("id", id).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("You don't have permission to delete this post, or it was already deleted.");
+}
+
 export const ANNOUNCEMENT_IMAGES_BUCKET = "announcement-images";
 
 // Uploads all photos, or none: if one fails, the ones already uploaded are

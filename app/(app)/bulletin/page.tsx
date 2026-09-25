@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Cake, Megaphone, Plus } from "lucide-react";
+import { Cake, Megaphone, Plus, Trash2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -29,7 +29,7 @@ const CATEGORY_LABELS: Record<AnnouncementCategory, string> = {
 };
 
 export default function BulletinBoardPage() {
-  const { announcements, employees, currentUser, addAnnouncement, isRealAccount } = useHris();
+  const { announcements, employees, currentUser, addAnnouncement, removeAnnouncement, isRealAccount } = useHris();
   const interactions = useBulletinInteractions(currentUser?.employeeId ?? null, isRealAccount);
   const [categoryFilter, setCategoryFilter] = useState<"all" | AnnouncementCategory>("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -39,6 +39,25 @@ export default function BulletinBoardPage() {
   const [postError, setPostError] = useState<string | null>(null);
 
   const canPost = currentUser?.roles.some((r) => ["hr_admin", "upper_management"].includes(r));
+  const canDelete = currentUser?.roles.some((r) => r === "hr_admin" || r === "sys_admin");
+  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function closeDelete() {
+    setDeleting(null);
+    setDeleteError(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    const error = await removeAnnouncement(deleting.id);
+    setDeleteBusy(false);
+    if (error) return setDeleteError(`Couldn't delete the post: ${error}`);
+    closeDelete();
+  }
   const birthdays = useMemo(() => upcomingBirthdays(employees, 14), [employees]);
 
   const rows = useMemo(
@@ -100,7 +119,14 @@ export default function BulletinBoardPage() {
                   </div>
                   <p className="text-sm whitespace-pre-line text-[var(--text-secondary)]">{a.body}</p>
                   <AnnouncementPhotoGrid images={a.images ?? []} />
-                  <div className="mt-2 text-xs text-[var(--text-muted)]">Posted by {a.postedBy} · {formatDate(a.postedAt)}</div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
+                    <span>Posted by {a.postedBy} · {formatDate(a.postedAt)}</span>
+                    {canDelete && (
+                      <button onClick={() => setDeleting({ id: a.id, title: a.title })} className="flex items-center gap-1 rounded-md px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--gridline)]/50 hover:text-[var(--status-critical)]" aria-label={`Delete post: ${a.title}`}>
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    )}
+                  </div>
                   <PostInteractions announcementId={a.id} interactions={interactions} myEmployeeId={currentUser?.employeeId ?? null} canModerate={!!canPost} />
                 </div>
               ))}
@@ -124,6 +150,19 @@ export default function BulletinBoardPage() {
           )}
         </div>
       </div>
+
+      <Modal open={!!deleting} onClose={closeDelete} title="Delete this post?">
+        <p className="text-sm text-[var(--text-secondary)]">
+          &ldquo;{deleting?.title}&rdquo; will be removed from the Bulletin Board for everyone, together with its photos, comments and reactions. This can&rsquo;t be undone.
+        </p>
+        {deleteError && <div className="mt-2 text-xs text-[var(--status-critical)]">{deleteError}</div>}
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={closeDelete} disabled={deleteBusy} className="rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm text-[var(--text-secondary)]">Cancel</button>
+          <button onClick={confirmDelete} disabled={deleteBusy} className="rounded-lg bg-[var(--status-critical)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+            {deleteBusy ? "Deleting…" : "Delete post"}
+          </button>
+        </div>
+      </Modal>
 
       <Modal open={showCreate} onClose={closeCreate} title="Post announcement" wide>
         <div className="space-y-3">

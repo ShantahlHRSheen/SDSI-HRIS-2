@@ -1,417 +1,410 @@
-import type { CSSProperties } from "react";
-import styles from "./org-chart.module.css";
+import type { LucideIcon } from "lucide-react";
+import {
+  Calculator,
+  Camera,
+  ChartColumn,
+  Leaf,
+  Megaphone,
+  Monitor,
+  Network,
+  Settings,
+  ShoppingCart,
+  Sparkles,
+  Store,
+  TrendingUp,
+  User,
+  Users,
+} from "lucide-react";
 
-function dcolor(varName: string): CSSProperties {
-  return { "--dcolor": `var(${varName})` } as CSSProperties;
+// Company organization chart — transcribed from HR's "SDSI ORG CHART"
+// (Canva, Sept 2026). Static on purpose: it's the official chart as
+// published, not derived from employee records. Update the data below when
+// HR issues a new version.
+
+type Person = { name: string; title: string };
+type Division = { name: string; icon: LucideIcon; people: Person[] };
+type Group = { name: string; icon: LucideIcon; lead?: Person; people?: Person[]; divisions?: Division[] };
+type Unit = {
+  id: string;
+  title: string;
+  head: { name: string; title?: string };
+  leads?: Person[];
+  aside?: Person;
+  groups: Group[];
+};
+
+const BOARD = {
+  chairman: { name: "Lowel B. Magdadaro", title: "Chairman of the Board" },
+  vice: { name: "Sheilah A. Magdadaro", title: "Vice Chairperson" },
+};
+
+const BUSINESS_UNITS = [
+  { id: "mlm", label: "MLM", icon: Leaf, color: "#2e9e3f" },
+  { id: "cosmetics", label: "Shantahl Cosmetics", icon: Sparkles, color: "#db2777" },
+  { id: "darofy", label: "Darofy", icon: ShoppingCart, color: "#7c3aed" },
+];
+
+const SHARED_SERVICES = [
+  { id: "operations", label: "Operations", icon: Settings },
+  { id: "finance", label: "Finance", icon: ChartColumn },
+  { id: "accounting", label: "Accounting", icon: Calculator },
+  { id: "hr", label: "HR", icon: Users },
+];
+
+const UNITS: Unit[] = [
+  {
+    id: "mlm",
+    title: "MLM Business Unit",
+    head: { name: "Lowel B. Magdadaro", title: "Chairman / MLM Business Unit Head" },
+    groups: [
+      {
+        name: "Netdev Department",
+        icon: Network,
+        people: [
+          { name: "Romelito Domecillo", title: "Netdev Manager" },
+          { name: "Chester Rosales", title: "Netdev Manager" },
+          { name: "Randel Segovia", title: "Netdev Manager" },
+        ],
+      },
+      {
+        name: "Sales Department",
+        icon: ChartColumn,
+        people: [
+          { name: "Mae Japitan", title: "Sales Manager" },
+          { name: "Michelle Ignacio", title: "Ads Specialist" },
+          { name: "Jennifer Gonzales", title: "Sales Admin" },
+          { name: "Charm Jirah Rivera", title: "Sales Admin" },
+          { name: "Christian Aure", title: "Sales Admin" },
+        ],
+      },
+      {
+        name: "Marketing Department",
+        icon: Megaphone,
+        divisions: [
+          {
+            name: "Social Media Management Division",
+            icon: Monitor,
+            people: [
+              { name: "Jasmine Eusebio", title: "Marketing Head" },
+              { name: "Erwin Carreon", title: "Social Media Manager" },
+              { name: "Shane Garcia", title: "Social Media Manager" },
+            ],
+          },
+          {
+            name: "Creatives & Production Division",
+            icon: Camera,
+            people: [
+              { name: "John Paul Michael Papa", title: "Head MMA" },
+              { name: "Frank Dela Cruz", title: "Video Editor" },
+              { name: "John Michael De Maliwat", title: "GA" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "darofy",
+    title: "Darofy Business Unit",
+    head: { name: "Mark Anthony B. Magdadaro" },
+    groups: [
+      {
+        name: "Sales Department",
+        icon: ChartColumn,
+        people: [
+          { name: "Mharbee Mongcal", title: "Sales Admin" },
+          { name: "Shopify Specialist", title: "Ads Specialist" },
+        ],
+      },
+      {
+        name: "Marketing Department",
+        icon: Megaphone,
+        people: [
+          { name: "Sarah Mei Iglesia", title: "Marketing Head" },
+          { name: "Ronald Lugtu", title: "Video Editor" },
+          { name: "Angela Acosta", title: "Social Media Manager" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "cosmetics",
+    title: "Shantahl Cosmetics Business Unit",
+    head: { name: "Junrey M. Japitan", title: "CEO / President" },
+    groups: [
+      { name: "Sales Department", icon: TrendingUp, people: [{ name: "Jerome Canas", title: "Social Media Manager" }] },
+      {
+        name: "Marketing Department",
+        icon: Megaphone,
+        people: [
+          { name: "Loribel Garcia", title: "Head MMA" },
+          { name: "Arnie Pangilinan", title: "Video Editor" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "accounting",
+    title: "Accounting Department",
+    head: BOARD.vice,
+    groups: [
+      {
+        name: "Accounting Department",
+        icon: Settings,
+        lead: { name: "Maricris Barlinan", title: "Chief Finance Officer" },
+        people: [
+          { name: "Wendie Halog", title: "Sr. Accounting Assistant" },
+          { name: "Kathleen Surigao", title: "Accounting Clerk" },
+          { name: "Charmaine Bumanlag", title: "Jr. Accounting Assistant" },
+          { name: "Abigail Caluya", title: "Accounting Clerk" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "finance",
+    title: "Finance Department",
+    head: BOARD.vice,
+    groups: [
+      {
+        name: "Finance Department",
+        icon: Settings,
+        people: [
+          { name: "Joan Mariette Santarina", title: "Corporate Treasurer" },
+          { name: "Erika Grace Bulaclac", title: "Bookkeeper" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "hr",
+    title: "HR Department",
+    head: BOARD.vice,
+    groups: [{ name: "HR Department", icon: Settings, people: [{ name: "Sheena A. Evangelista", title: "HR Manager" }] }],
+  },
+  {
+    id: "operations",
+    title: "Operations Department",
+    head: BOARD.vice,
+    leads: [
+      { name: "Marlyn Leonardo", title: "Operations Manager" },
+      { name: "Jaimie Nucom", title: "Operations Supervisor" },
+    ],
+    aside: { name: "Cherry Ann Asuncion", title: "CSR" },
+    groups: [
+      {
+        name: "Cabanatuan Branch",
+        icon: Store,
+        people: [
+          { name: "Reynalyn Alfonso", title: "Cashier" },
+          { name: "Ardee Santarina", title: "Cashier" },
+          { name: "Jomari De Dios", title: "Warehouseman" },
+        ],
+      },
+      {
+        name: "Manila Branch",
+        icon: Store,
+        people: [
+          { name: "Abegail Aboguin", title: "Branch Supervisor" },
+          { name: "Dayanara Flores", title: "Cashier" },
+          { name: "Jemuel Castillo", title: "Warehouseman" },
+          { name: "Clover Riomalos", title: "Stockman" },
+        ],
+      },
+      {
+        name: "Cebu Branch",
+        icon: Store,
+        people: [
+          { name: "Mary Jane Pedrano", title: "Branch Manager" },
+          { name: "Karlou Japitan", title: "Branch Supervisor" },
+          { name: "Leonilyn Talisic", title: "Cashier" },
+          { name: "Jober Bersabal", title: "Warehouseman" },
+          { name: "Ricky Malasa", title: "Stockman" },
+        ],
+      },
+      {
+        name: "Other Branches",
+        icon: Store,
+        people: [
+          { name: "Daniel Bato", title: "Pangasinan Cashier" },
+          { name: "Jebeth Guinto", title: "Lucena Cashier" },
+          { name: "Gretchen De Sosa", title: "Cavite Cashier" },
+          { name: "Catherine Mogato", title: "Bacolod Cashier" },
+          { name: "Jemima Amestoso", title: "CDO Cashier" },
+          { name: "Charles Villamor", title: "Davao Cashier" },
+        ],
+      },
+    ],
+  },
+];
+
+// Brand colours are fixed (not the app theme) so the chart looks like the
+// official one in both light and dark mode.
+const DARK = "#0a3326";
+const BRIGHT = "#2e9e3f";
+const barStyle = { background: `linear-gradient(90deg, ${DARK}, #0f4a2c)`, boxShadow: `inset 0 -5px 0 ${BRIGHT}` };
+
+function IconBadge({ icon: Icon, size = "md", color = DARK }: { icon: LucideIcon; size?: "sm" | "md" | "lg"; color?: string }) {
+  const box = size === "lg" ? "h-14 w-14" : size === "md" ? "h-11 w-11" : "h-9 w-9";
+  const px = size === "lg" ? 26 : size === "md" ? 20 : 16;
+  return (
+    <span className={`${box} flex shrink-0 items-center justify-center rounded-full text-white`} style={{ background: color, boxShadow: `0 0 0 3px ${BRIGHT}66` }}>
+      <Icon size={px} />
+    </span>
+  );
+}
+
+function HeadBar({ name, title, icon = User, size = "md" }: { name: string; title?: string; icon?: LucideIcon; size?: "md" | "lg" }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 pb-3.5 text-white" style={barStyle}>
+      <IconBadge icon={icon} size={size} />
+      <div className="min-w-0 flex-1 text-center">
+        <div className={`font-bold tracking-wide uppercase ${size === "lg" ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}>{name}</div>
+        {title && <div className="text-xs text-[#c7f0cf]">{title}</div>}
+      </div>
+    </div>
+  );
+}
+
+function PersonCard({ person }: { person: Person }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] py-2 pr-3 pl-2" style={{ boxShadow: `inset 4px 0 0 ${BRIGHT}` }}>
+      <span className="ml-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style={{ background: DARK }}>
+        <User size={16} />
+      </span>
+      <span className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-primary)]">{person.name}</span>
+      <span className="w-[42%] shrink-0 border-l border-[var(--border-hairline)] pl-3 text-xs text-[var(--text-secondary)]">{person.title}</span>
+    </div>
+  );
+}
+
+function Connector() {
+  return <div className="mx-auto h-5 w-0.5" style={{ background: BRIGHT }} />;
+}
+
+function SectionTitle({ title, sub = "Organizational Structure" }: { title: string; sub?: string }) {
+  return (
+    <div className="mb-5 text-center">
+      <h2 className="text-xl font-extrabold tracking-wide text-[var(--text-primary)] uppercase sm:text-2xl">{title}</h2>
+      <div className="mx-auto mt-1 h-0.5 w-24 rounded" style={{ background: BRIGHT }} />
+      <div className="mt-1.5 text-xs tracking-[0.2em] text-[var(--text-muted)] uppercase">{sub}</div>
+    </div>
+  );
+}
+
+function GroupColumn({ group }: { group: Group }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-3 rounded-xl px-3 py-2 pb-3 text-white" style={barStyle}>
+        <IconBadge icon={group.icon} size="sm" />
+        <div className="flex-1 text-center text-sm font-bold tracking-wide uppercase">{group.name}</div>
+      </div>
+      <div className="mt-2 space-y-2">
+        {group.lead && (
+          <>
+            <PersonCard person={group.lead} />
+            <div className="h-1" />
+          </>
+        )}
+        {group.people?.map((p) => <PersonCard key={p.name} person={p} />)}
+        {group.divisions?.map((d) => (
+          <div key={d.name} className="space-y-2 pt-1">
+            <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-white" style={{ background: BRIGHT }}>
+              <IconBadge icon={d.icon} size="sm" />
+              <div className="flex-1 text-xs font-bold tracking-wide uppercase">{d.name}</div>
+            </div>
+            {d.people.map((p) => <PersonCard key={p.name} person={p} />)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UnitSection({ unit }: { unit: Unit }) {
+  const cols = unit.groups.length >= 4 ? "lg:grid-cols-2 2xl:grid-cols-4" : unit.groups.length === 3 ? "lg:grid-cols-3" : unit.groups.length === 2 ? "md:grid-cols-2" : "";
+  const single = unit.groups.length === 1;
+  return (
+    <section id={unit.id} className="scroll-mt-20 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-1)]/40 p-4 sm:p-6">
+      <SectionTitle title={unit.title} />
+      <div className="mx-auto max-w-xl">
+        <HeadBar name={unit.head.name} title={unit.head.title} size="lg" />
+      </div>
+      <Connector />
+      {(unit.leads || unit.aside) && (
+        <>
+          <div className="mx-auto grid max-w-4xl grid-cols-1 items-center gap-3 md:grid-cols-2">
+            {unit.aside && (
+              <div className="md:order-first">
+                <PersonCard person={unit.aside} />
+              </div>
+            )}
+            <div className="space-y-2">{unit.leads?.map((p) => <PersonCard key={p.name} person={p} />)}</div>
+          </div>
+          <Connector />
+        </>
+      )}
+      <div className={`grid grid-cols-1 gap-5 ${cols} ${single ? "mx-auto max-w-xl" : ""}`}>
+        {unit.groups.map((g) => (
+          <GroupColumn key={g.name} group={g} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Overview() {
+  return (
+    <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-1)]/40 p-4 sm:p-6">
+      <div className="mb-5 text-center">
+        <h1 className="text-2xl font-extrabold tracking-wide text-[var(--text-primary)] uppercase sm:text-3xl">Shantahl Direct Sales Inc</h1>
+        <div className="mx-auto mt-1.5 h-0.5 w-40 rounded" style={{ background: BRIGHT }} />
+        <div className="mt-1.5 text-xs tracking-[0.2em] text-[var(--text-muted)] uppercase">Organizational Structure</div>
+      </div>
+      <div className="mx-auto max-w-lg">
+        <HeadBar name="Board of Directors" icon={Users} size="lg" />
+        <Connector />
+        <HeadBar name={BOARD.chairman.name} title={BOARD.chairman.title} size="lg" />
+        <Connector />
+        <HeadBar name={BOARD.vice.name} title={BOARD.vice.title} size="lg" />
+        <Connector />
+      </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div>
+          <HeadBar name="Business Units" icon={Settings} />
+          <div className="mt-3 space-y-2.5 border-l-2 pl-4" style={{ borderColor: BRIGHT }}>
+            {BUSINESS_UNITS.map((u) => (
+              <a key={u.id} href={`#${u.id}`} className="flex items-center gap-3 rounded-xl px-3 py-2 text-white transition-opacity hover:opacity-90" style={{ background: `linear-gradient(90deg, ${u.color}, ${u.color}cc)` }}>
+                <IconBadge icon={u.icon} size="sm" color={u.color} />
+                <span className="flex-1 text-center text-sm font-bold tracking-wide uppercase">{u.label}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+        <div>
+          <HeadBar name="Shared Services" icon={Users} />
+          <div className="mt-3 space-y-2.5 border-l-2 pl-4" style={{ borderColor: BRIGHT }}>
+            {SHARED_SERVICES.map((u) => (
+              <a key={u.id} href={`#${u.id}`} className="flex items-center gap-3 rounded-xl px-3 py-2 text-white transition-opacity hover:opacity-90" style={{ background: `linear-gradient(90deg, ${BRIGHT}, #3fb34f)` }}>
+                <IconBadge icon={u.icon} size="sm" />
+                <span className="flex-1 text-center text-sm font-bold tracking-wide uppercase">{u.label}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="mt-4 text-center text-xs text-[var(--text-muted)]">Tap a business unit or department to jump to its chart.</p>
+    </section>
+  );
 }
 
 export default function OrgChartPage() {
   return (
-    <div className={styles.page}>
-      <div className={styles.wrap}>
-        <header className={styles.header}>
-          <div className={styles.eyebrow}>Corporate Structure</div>
-          <h1>SHANTAHL DIRECT SALES INC.</h1>
-          <p>Organization Chart</p>
-        </header>
-
-        {/* Governance */}
-        <div className={styles.gov}>
-          <div className={`${styles.node} ${styles.board}`}>
-            <div className={styles.role}>Governing Body</div>
-            <div className={styles.name}>Board of Directors</div>
-          </div>
-          <div className={styles.vline} />
-        </div>
-
-        <div className={styles.halves}>
-          <div className={styles.half}>
-            <div className={styles.node}>
-              <div className={styles.role}>Chairman of the Board</div>
-              <div className={styles.name}>Lowel B. Magdadaro</div>
-            </div>
-          </div>
-          <div className={styles.half}>
-            <div className={styles.node}>
-              <div className={styles.role}>Vice Chairperson</div>
-              <div className={styles.name}>Sheilah A. Magdadaro</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ===================== BUSINESS UNITS ===================== */}
-        <div className={styles.unitLabel}>Business Units — under the Chairman of the Board</div>
-
-        {/* Shantahl Main */}
-        <div className={styles.dept} style={dcolor("--main")}>
-          <div className={styles.deptHead}>
-            <h2>1. MLM Department</h2>
-            <span className={styles.headName}>Lowel B. Magdadaro</span>
-            <span className={styles.headTitle}>— Head / Chairman</span>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <div className={styles.division}>Marketing Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Jasmine Eusebio</span> <span className={styles.title}>— Social Media Manager</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.person}>Renz Nunez</span> <span className={styles.title}>— Social Media Manager</span>
-                    </li>
-                  </ul>
-                </li>
-                <li>
-                  <span className={styles.person}>John Paul Michael Papa</span> <span className={styles.title}>— Multimedia Artist Head</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.person}>Michael De Maliwat</span> <span className={styles.title}>— Multimedia Artist</span>
-                    </li>
-                    <li>
-                      <span className={styles.person}>Danielle Borja</span> <span className={styles.title}>— Video Editor</span>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <div className={styles.division}>Network Development Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Chester Rosales</span> <span className={styles.title}>— Network Development Manager, Luzon</span>
-                </li>
-                <li>
-                  <span className={styles.person}>Randel Segovia</span> <span className={styles.title}>— Network Development Manager, Luzon</span>
-                </li>
-                <li>
-                  <span className={styles.person}>Romelito Domecillo</span> <span className={styles.title}>— Network Development Manager, Luzon</span>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <div className={styles.division}>Sales Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.placeholder}>Ads Specialist</span>
-                </li>
-                <li>
-                  <span className={styles.placeholder}>Sales Admins</span>
-                </li>
-                <li>
-                  <span className={styles.person}>Cecil Catapang</span> <span className={styles.title}>— Product Specialist (50% — shared with Darofy Department)</span>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-
-        {/* Shantahl Cosmetics */}
-        <div className={styles.dept} style={dcolor("--cosmetics")}>
-          <div className={styles.deptHead}>
-            <h2>2. Cosmetics Department</h2>
-            <span className={styles.headName}>Junrey M. Japitan</span>
-            <span className={styles.headTitle}>— Head / President</span>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <div className={styles.division}>Marketing Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Loribel Garcia</span> <span className={styles.title}>— Multimedia Artist Head</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.person}>Arnie Pangilinan</span> <span className={styles.title}>— Video Editor</span>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <div className={styles.division}>Sales Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Jerome Canas</span> <span className={styles.title}>— Platform Specialist</span>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-
-        {/* Darofy */}
-        <div className={styles.dept} style={dcolor("--darofy")}>
-          <div className={styles.deptHead}>
-            <h2>3. Darofy Department</h2>
-            <span className={styles.headName}>Mark Anthony M. Magdadaro</span>
-            <span className={styles.headTitle}>— Head / President</span>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <div className={styles.division}>Marketing Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Sarah Mei Iglesia</span> <span className={styles.title}>— Marketing Head</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.person}>Erwin Carreon</span> <span className={styles.title}>— Content Creator</span>
-                    </li>
-                    <li>
-                      <span className={styles.person}>Angela Acosta</span> <span className={styles.title}>— Content Creator</span>
-                    </li>
-                    <li>
-                      <span className={styles.person}>Ronald Lugtu</span> <span className={styles.title}>— Video Editor</span>
-                    </li>
-                    <li>
-                      <span className={styles.person}>Michael John De Maliwat</span> <span className={styles.title}>— Multimedia Artist</span>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <div className={styles.division}>Sales Division</div>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Mae Japitan</span> <span className={styles.title}>— Sales Manager</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.placeholder}>Sales Admins</span>
-                    </li>
-                  </ul>
-                </li>
-                <li>
-                  <span className={styles.person}>Cecil Catapang</span> <span className={styles.title}>— Product Specialist (50% — shared with MLM Department)</span>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-
-        {/* ===================== SHARED SERVICES ===================== */}
-        <div className={styles.unitLabel}>V. Shared Services — reporting to the Vice Chairperson</div>
-
-        {/* HR */}
-        <div className={styles.dept} style={dcolor("--shared")}>
-          <div className={styles.deptHead}>
-            <h2>1. HR Department</h2>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <span className={styles.person}>Sheena A. Evangelista</span> <span className={styles.title}>— HR Manager</span>
-            </li>
-          </ul>
-        </div>
-
-        {/* Accounting */}
-        <div className={styles.dept} style={dcolor("--shared")}>
-          <div className={styles.deptHead}>
-            <h2>2. Accounting Department</h2>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <span className={styles.person}>Maricris Barlinan</span> <span className={styles.title}>— Chief Finance Officer</span>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Wendie Halog</span> <span className={styles.title}>— Sr. Accounting Assistant</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.person}>Charmaine Palacio</span> <span className={styles.title}>— Jr. Accounting Assistant</span>
-                    </li>
-                    <li>
-                      <span className={styles.person}>Kathleen Surigao</span> <span className={styles.title}>— Accounting Clerk</span>
-                    </li>
-                    <li>
-                      <span className={styles.person}>Abigail Caluya</span> <span className={styles.title}>— Accounting Clerk</span>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-
-        {/* Finance */}
-        <div className={styles.dept} style={dcolor("--shared")}>
-          <div className={styles.deptHead}>
-            <h2>3. Finance Department</h2>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <span className={styles.person}>Joan Mariette Santarina</span>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Erika Grace Bulaclac</span> <span className={styles.title}>— Bookkeeper</span>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-
-        {/* Operations */}
-        <div className={styles.dept} style={dcolor("--shared")}>
-          <div className={styles.deptHead}>
-            <h2>4. Operations Department</h2>
-          </div>
-          <ul className={`${styles.tree} ${styles.root}`}>
-            <li>
-              <span className={styles.person}>Marlyn Leonardo</span> <span className={styles.title}>— Operations Manager</span>
-              <ul className={styles.tree}>
-                <li>
-                  <span className={styles.person}>Charry Ann Asuncion</span> <span className={styles.title}>— CSR</span>
-                </li>
-                <li>
-                  <span className={styles.person}>Ronnel Longalong</span> <span className={styles.title}>— Driver / Messenger</span>
-                </li>
-                <li>
-                  <span className={styles.person}>Angelo Daiki Yamakawa</span> <span className={styles.title}>— Utility</span>
-                </li>
-                <li>
-                  <span className={styles.person}>Jaimie Nucom</span> <span className={styles.title}>— Operations Supervisor</span>
-                  <ul className={styles.tree}>
-                    <li>
-                      <span className={styles.branchTag}>Cabanatuan Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Reynalyn Alfonso</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                        <li>
-                          <span className={styles.person}>Jomari De Dios</span> <span className={styles.title}>— Warehouseman</span>
-                        </li>
-                        <li>
-                          <span className={styles.person}>Felix Ardee Santarina</span> <span className={styles.title}>— Logistics Staff</span>
-                        </li>
-                        <li>
-                          <span className={styles.person}>Twinkle Ann Marayag</span> <span className={styles.title}>— Logistics Staff</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Manila Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Girlie Gail Gallardo</span> <span className={styles.title}>— Branch Manager</span>
-                          <ul className={styles.tree}>
-                            <li>
-                              <span className={styles.person}>Ma. Abegail Fatima Jaba</span> <span className={styles.title}>— Branch Supervisor</span>
-                              <ul className={styles.tree}>
-                                <li>
-                                  <span className={styles.person}>Jemuel Castillo</span> <span className={styles.title}>— Warehouseman</span>
-                                </li>
-                                <li>
-                                  <span className={styles.person}>Clover Riomalos</span> <span className={styles.title}>— Stockman</span>
-                                </li>
-                                <li>
-                                  <span className={styles.person}>Abegail Bordaje</span> <span className={styles.title}>— Cashier</span>
-                                </li>
-                                <li>
-                                  <span className={styles.person}>Dayanara Flores</span> <span className={styles.title}>— Cashier</span>
-                                </li>
-                              </ul>
-                            </li>
-                          </ul>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Cebu Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Mary Jane Pedrano</span> <span className={styles.title}>— Branch Manager</span>
-                          <ul className={styles.tree}>
-                            <li>
-                              <span className={styles.person}>Karlou James Japitan</span> <span className={styles.title}>— Branch Supervisor</span>
-                              <ul className={styles.tree}>
-                                <li>
-                                  <span className={styles.person}>Leonilyn Talisic</span> <span className={styles.title}>— Cashier</span>
-                                </li>
-                                <li>
-                                  <span className={styles.person}>Ricky Malasa</span> <span className={styles.title}>— Stockman</span>
-                                </li>
-                                <li>
-                                  <span className={styles.person}>Jober Bersanal</span> <span className={styles.title}>— Driver / Warehouseman</span>
-                                </li>
-                              </ul>
-                            </li>
-                          </ul>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Cavite Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Rhea Francisco</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                        <li>
-                          <span className={styles.person}>Gretchen De Sosa</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Pangasinan Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Daniel Bato</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Lucena Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Jebeth Guinto</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Bacolod Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Catherine Mogato</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Bohol Branch (Divine Care)</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Karen Itong</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Cagayan De Oro Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Jemima Amestoso</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-
-                    <li>
-                      <span className={styles.branchTag}>Davao Branch</span>
-                      <ul className={styles.tree}>
-                        <li>
-                          <span className={styles.person}>Charles Villamor</span> <span className={styles.title}>— Cashier</span>
-                        </li>
-                      </ul>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-
-        <div className={styles.footer}>Shantahl Direct Sales Inc. — Organization Chart · Prepared for internal reference</div>
-      </div>
+    <div className="space-y-6">
+      <Overview />
+      {UNITS.map((u) => (
+        <UnitSection key={u.id} unit={u} />
+      ))}
     </div>
   );
 }
