@@ -7,11 +7,14 @@ import { X } from "lucide-react";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
+import { useHrUnreadCount } from "./messages/HrChat";
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
   const { currentUser } = useHris();
   const pathname = usePathname();
   const roles = currentUser?.roles ?? [];
+  const isHr = roles.includes("hr_admin");
+  const unread = useHrUnreadCount();
 
   const content = (
     <div className="flex h-full flex-col">
@@ -51,8 +54,11 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                           : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50"
                       }`}
                     >
-                      <span>{item.label}</span>
+                      <span>{item.href === "/messages" && isHr ? "HR Messages" : item.label}</span>
                       {!item.built && <Badge tone="muted">Preview</Badge>}
+                      {item.href === "/messages" && unread > 0 && (
+                        <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${unread} unread`}>{unread}</span>
+                      )}
                     </Link>
                   );
                 })}

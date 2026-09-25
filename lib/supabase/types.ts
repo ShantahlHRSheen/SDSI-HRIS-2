@@ -216,6 +216,17 @@ export type AnnouncementCommentRow = {
   created_at: string;
 };
 
+export type HrMessageRow = {
+  id: string;
+  employee_id: string;
+  sender_employee_id: string | null;
+  sender_name: string;
+  from_hr: boolean;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+};
+
 export type AnnouncementReactionRow = {
   announcement_id: string;
   employee_id: string;
@@ -353,6 +364,7 @@ export interface Database {
       leave_request_attachments: Table<LeaveRequestAttachmentRow>;
       announcement_comments: Table<AnnouncementCommentRow>;
       announcement_reactions: Table<AnnouncementReactionRow>;
+      hr_messages: Table<HrMessageRow>;
       overtime_requests: Table<OvertimeRequestRow>;
       attendance_correction_requests: Table<AttendanceCorrectionRequestRow>;
       attendance_period_records: Table<AttendancePeriodRecordRow>;
