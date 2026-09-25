@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Building2, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { ROLE_LABELS } from "@/lib/types";
 import { Badge } from "@/components/Badge";
@@ -43,11 +43,11 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-full flex-1 flex-col items-center bg-[var(--page-plane)] px-4 py-10 sm:py-16">
       <div className="mb-8 flex flex-col items-center text-center">
-        <div className="glow-accent mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--series-1)] text-[var(--on-accent)]">
-          <Building2 size={26} />
-        </div>
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Shantahl Direct Sales Inc.</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Human Resource Information System</p>
+        <h1 className="overflow-hidden rounded-2xl">
+          {/* eslint-disable-next-line @next/next/no-img-element -- small static brand logo */}
+          <img src="/brand/shantahl-logo.png" alt="Shantahl Direct Sales Inc." width={467} height={121} className="block h-auto w-72 sm:w-80" />
+        </h1>
+        <p className="mt-3 text-sm text-[var(--text-secondary)]">Human Resource Information System</p>
       </div>
 
       {supabaseConfigured && (

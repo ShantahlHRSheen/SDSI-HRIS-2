@@ -85,13 +85,33 @@ body {
   color: #0b0b0b;
 }
 
+/* ID cards are laid out in real millimetres; on screen they're shown
+   larger, in print at true size. */
+.id-card-screen-zoom {
+  zoom: 1.6;
+}
+
 @media print {
   body * {
     visibility: hidden;
   }
   .bir-print-area,
-  .bir-print-area * {
+  .bir-print-area *,
+  .id-print-area,
+  .id-print-area * {
     visibility: visible;
+  }
+  .id-print-area {
+    position: fixed;
+    inset: 0;
+    padding: 15mm;
+    gap: 8mm !important;
+    align-content: flex-start;
+    background: #ffffff;
+    z-index: 9999;
+  }
+  .id-card-screen-zoom {
+    zoom: 1;
   }
   .bir-print-area {
     position: fixed;

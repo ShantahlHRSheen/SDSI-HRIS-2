@@ -3,8 +3,8 @@ import "./globals.css";
 import { HrisProvider } from "@/lib/store";
 
 export const metadata: Metadata = {
-  title: "Shantahl HRIS — Demo",
-  description: "Shantahl Direct Sales Inc. Human Resource Information System (demo instance)",
+  title: "Shantahl HRIS",
+  description: "Shantahl Direct Sales Inc. Human Resource Information System",
 };
 
 export default function RootLayout({

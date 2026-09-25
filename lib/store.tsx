@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { fullName, nextEmployeeNumber } from "./helpers";
+import { fullName, nextEmployeeNumber, setReferenceData } from "./helpers";
 import { getSupabaseClient } from "./supabase/client";
 import { reportSaveError } from "./save-errors";
 import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
@@ -302,6 +302,9 @@ interface HrisContextShape {
   canAttachLeaveFiles: boolean;
   // Signed in with a real account (not a demo user).
   isRealAccount: boolean;
+  // Reflects a change already saved elsewhere (e.g. ID photo, emergency
+  // contact saved through their own database functions) in the loaded data.
+  patchEmployeeLocal: (id: string, patch: Partial<Employee>) => void;
   // The latest load from the database failed — data on screen may be out of date.
   dataLoadError: boolean;
   // Still checking the saved sign-in / loading the signed-in user's data —
@@ -1200,6 +1203,10 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit],
   );
 
+  const patchEmployeeLocal: HrisContextShape["patchEmployeeLocal"] = useCallback((id, patch) => {
+    setState((prev) => ({ ...prev, employees: prev.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
+  }, []);
+
   const leaveAttachmentUrl: HrisContextShape["leaveAttachmentUrl"] = useCallback((attachment) => leaveAttachmentDownloadUrl(attachment), []);
 
   const decideLeaveRequest: HrisContextShape["decideLeaveRequest"] = useCallback(
@@ -1363,6 +1370,10 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, currentUser, supabaseSession],
   );
 
+  // Keep the name helpers (branchName / departmentName / positionTitle) on
+  // the lists actually loaded, before anything below renders with them.
+  setReferenceData({ branches: state.branches, departments: state.departments, positions: state.positions });
+
   const value: HrisContextShape = {
     ready,
     currentUser,
@@ -1434,6 +1445,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     fileLeaveRequest,
     canAttachLeaveFiles: !!supabaseSession,
     isRealAccount: !!supabaseSession,
+    patchEmployeeLocal,
     dataLoadError: !!supabaseSession && dataLoadError,
     authPending: !sessionChecked || (!!supabaseSession && !currentUser && dataLoadedFor !== supabaseSession.user.id),
     recordLoginIssued,

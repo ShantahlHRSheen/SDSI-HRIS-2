@@ -3,7 +3,7 @@
 import { isSupabaseConfigured } from "@/lib/supabase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
@@ -17,9 +17,8 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
-          <div className="glow-accent flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--series-1)] text-[var(--on-accent)]">
-            <Building2 size={18} />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- tiny static brand icon */}
+          <img src="/brand/shantahl-icon.png" alt="" className="h-8 w-8 rounded-lg" />
           <div className="leading-tight">
             <div className="text-sm font-semibold text-[var(--text-primary)]">Shantahl HRIS</div>
             <div className="text-[11px] text-[var(--text-muted)]">{isSupabaseConfigured() ? "Shantahl Direct Sales Inc." : "Demo instance"}</div>

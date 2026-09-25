@@ -114,6 +114,9 @@ export interface Employee {
   employeeNumber: string;
   // Read-only: whether the employee has a sign-in account (employees.user_id).
   hasLogin?: boolean;
+  // ID card photo / signature (storage paths in the "employee-id-media" bucket).
+  idPhotoPath?: string | null;
+  idSignaturePath?: string | null;
   firstName: string;
   lastName: string;
   middleName?: string;
