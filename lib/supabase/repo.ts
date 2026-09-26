@@ -53,6 +53,20 @@ import type {
   WorkSchedule,
 } from "../types";
 
+// Supabase returns at most 1,000 rows per request, so tables that grow past
+// that (payroll records, payslips, the audit log…) are read in pages. The
+// extra order by id keeps the paging stable when other sort values tie.
+const PAGE_SIZE = 1000;
+async function selectAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return out;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Phase 1 of the Supabase migration: branches, departments, positions,
 // work_schedules, holidays, leave_types, payroll_periods, employees — the
@@ -70,8 +84,7 @@ function toBranch(r: BranchRow): Branch {
 }
 
 export async function fetchBranches(): Promise<Branch[]> {
-  const { data, error } = await getSupabaseClient().from("branches").select("*").order("name");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("branches").select("*").order("name").order("id").range(from, to));
   return data.map(toBranch);
 }
 export async function insertBranch(input: Omit<Branch, "id">): Promise<Branch> {
@@ -96,8 +109,7 @@ function toDepartment(r: DepartmentRow): Department {
 }
 
 export async function fetchDepartments(): Promise<Department[]> {
-  const { data, error } = await getSupabaseClient().from("departments").select("*").order("name");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("departments").select("*").order("name").order("id").range(from, to));
   return data.map(toDepartment);
 }
 export async function insertDepartment(input: Omit<Department, "id">): Promise<Department> {
@@ -128,8 +140,7 @@ function positionToRow(p: Partial<Omit<Position, "id">>): Partial<PositionRow> {
 }
 
 export async function fetchPositions(): Promise<Position[]> {
-  const { data, error } = await getSupabaseClient().from("positions").select("*").order("title");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("positions").select("*").order("title").order("id").range(from, to));
   return data.map(toPosition);
 }
 export async function insertPosition(input: Omit<Position, "id">): Promise<Position> {
@@ -163,8 +174,7 @@ function workScheduleToRow(w: Partial<Omit<WorkSchedule, "id">>): Partial<WorkSc
 }
 
 export async function fetchWorkSchedules(): Promise<WorkSchedule[]> {
-  const { data, error } = await getSupabaseClient().from("work_schedules").select("*").order("name");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("work_schedules").select("*").order("name").order("id").range(from, to));
   return data.map(toWorkSchedule);
 }
 export async function insertWorkSchedule(input: Omit<WorkSchedule, "id">): Promise<WorkSchedule> {
@@ -189,8 +199,7 @@ function toHoliday(r: HolidayRow): Holiday {
 }
 
 export async function fetchHolidays(): Promise<Holiday[]> {
-  const { data, error } = await getSupabaseClient().from("holidays").select("*").order("date");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("holidays").select("*").order("date").order("id").range(from, to));
   return data.map(toHoliday);
 }
 export async function insertHoliday(input: Omit<Holiday, "id">): Promise<Holiday> {
@@ -222,8 +231,7 @@ function leaveTypeToRow(l: Partial<Omit<LeaveType, "id">>): Partial<LeaveTypeRow
 }
 
 export async function fetchLeaveTypes(): Promise<LeaveType[]> {
-  const { data, error } = await getSupabaseClient().from("leave_types").select("*").order("name");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("leave_types").select("*").order("name").order("id").range(from, to));
   return data.map(toLeaveType);
 }
 export async function insertLeaveType(input: Omit<LeaveType, "id">): Promise<LeaveType> {
@@ -255,8 +263,7 @@ function payrollPeriodToRow(p: Partial<Omit<PayrollPeriod, "id">>): Partial<Payr
 }
 
 export async function fetchPayrollPeriods(): Promise<PayrollPeriod[]> {
-  const { data, error } = await getSupabaseClient().from("payroll_periods").select("*").order("period_start");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("payroll_periods").select("*").order("period_start").order("id").range(from, to));
   return data.map(toPayrollPeriod);
 }
 export async function insertPayrollPeriod(input: Omit<PayrollPeriod, "id">): Promise<PayrollPeriod> {
@@ -361,8 +368,7 @@ function employeeToRow(e: Partial<Omit<Employee, "id" | "employeeNumber">>): Par
 }
 
 export async function fetchEmployees(): Promise<Employee[]> {
-  const { data, error } = await getSupabaseClient().from("employees").select("*").order("last_name");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("employees").select("*").order("last_name").order("id").range(from, to));
   return data.map(toEmployee);
 }
 export async function insertEmployee(input: Omit<Employee, "id" | "employeeNumber">, employeeNumber: string): Promise<Employee> {
@@ -374,8 +380,7 @@ export async function insertEmployee(input: Omit<Employee, "id" | "employeeNumbe
 // Every employee number in the database (for picking the next free one when
 // this browser's list is out of date, e.g. someone added an employee elsewhere).
 export async function fetchEmployeeNumbers(): Promise<{ employeeNumber: string }[]> {
-  const { data, error } = await getSupabaseClient().from("employees").select("employee_number");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("employees").select("employee_number").order("id").range(from, to));
   return data.map((r) => ({ employeeNumber: r.employee_number }));
 }
 export async function updateEmployeeRow(id: string, patch: Partial<Omit<Employee, "id" | "employeeNumber">>): Promise<Employee> {
@@ -395,8 +400,7 @@ function toEmployeeDepartmentAllocation(r: EmployeeDepartmentAllocationRow): Emp
 }
 
 export async function fetchEmployeeDepartmentAllocations(): Promise<EmployeeDepartmentAllocation[]> {
-  const { data, error } = await getSupabaseClient().from("employee_department_allocations").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("employee_department_allocations").select("*").order("employee_id").order("department_id").range(from, to));
   return data.map(toEmployeeDepartmentAllocation);
 }
 
@@ -440,8 +444,7 @@ function toEvaluation(r: PerformanceEvaluationRow): PerformanceEvaluation {
 }
 
 export async function fetchEvaluations(): Promise<PerformanceEvaluation[]> {
-  const { data, error } = await getSupabaseClient().from("performance_evaluations").select("*").order("created_at", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("performance_evaluations").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
   return data.map(toEvaluation);
 }
 export async function insertEvaluation(input: Omit<PerformanceEvaluation, "id" | "createdAt">): Promise<PerformanceEvaluation> {
@@ -502,8 +505,7 @@ function disciplinaryRecordToRow(input: Omit<DisciplinaryRecord, "id">): Omit<Di
 }
 
 export async function fetchDisciplinaryRecords(): Promise<DisciplinaryRecord[]> {
-  const { data, error } = await getSupabaseClient().from("disciplinary_records").select("*").order("date", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("disciplinary_records").select("*").order("date", { ascending: false }).order("id").range(from, to));
   return data.map(toDisciplinaryRecord);
 }
 export async function insertDisciplinaryRecord(input: Omit<DisciplinaryRecord, "id">): Promise<DisciplinaryRecord> {
@@ -533,8 +535,7 @@ function toAnnouncement(r: AnnouncementRow): Announcement {
 }
 
 export async function fetchAnnouncements(): Promise<Announcement[]> {
-  const { data, error } = await getSupabaseClient().from("announcements").select("*").order("posted_at", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("announcements").select("*").order("posted_at", { ascending: false }).order("id").range(from, to));
   return data.map(toAnnouncement);
 }
 export async function insertAnnouncement(input: Omit<Announcement, "id" | "postedAt">): Promise<Announcement> {
@@ -617,8 +618,7 @@ function toLeaveRequest(r: LeaveRequestRow): LeaveRequest {
 }
 
 export async function fetchLeaveRequests(): Promise<LeaveRequest[]> {
-  const { data, error } = await getSupabaseClient().from("leave_requests").select("*").order("filed_at", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("leave_requests").select("*").order("filed_at", { ascending: false }).order("id").range(from, to));
   return data.map(toLeaveRequest);
 }
 export async function insertLeaveRequest(
@@ -737,8 +737,7 @@ function toOvertimeRequest(r: OvertimeRequestRow): OvertimeRequest {
 }
 
 export async function fetchOvertimeRequests(): Promise<OvertimeRequest[]> {
-  const { data, error } = await getSupabaseClient().from("overtime_requests").select("*").order("filed_at", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("overtime_requests").select("*").order("filed_at", { ascending: false }).order("id").range(from, to));
   return data.map(toOvertimeRequest);
 }
 export async function insertOvertimeRequest(
@@ -780,8 +779,7 @@ function toCorrectionRequest(r: AttendanceCorrectionRequestRow): AttendanceCorre
 }
 
 export async function fetchCorrectionRequests(): Promise<AttendanceCorrectionRequest[]> {
-  const { data, error } = await getSupabaseClient().from("attendance_correction_requests").select("*").order("filed_at", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("attendance_correction_requests").select("*").order("filed_at", { ascending: false }).order("id").range(from, to));
   return data.map(toCorrectionRequest);
 }
 export async function insertCorrectionRequest(
@@ -873,8 +871,7 @@ function attendancePeriodRecordToRow(
 }
 
 export async function fetchAttendancePeriodRecords(): Promise<AttendancePeriodRecord[]> {
-  const { data, error } = await getSupabaseClient().from("attendance_period_records").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("attendance_period_records").select("*").order("id").range(from, to));
   return data.map(toAttendancePeriodRecord);
 }
 export async function upsertAttendancePeriodRecordRow(
@@ -982,8 +979,7 @@ function payrollLineOverrideToRow(
 }
 
 export async function fetchPayrollLineOverrides(): Promise<PayrollLineOverride[]> {
-  const { data, error } = await getSupabaseClient().from("payroll_line_overrides").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("payroll_line_overrides").select("*").order("id").range(from, to));
   return data.map(toPayrollLineOverride);
 }
 export async function upsertPayrollLineOverrideRow(
@@ -1030,8 +1026,7 @@ function toVoucherAmountOverride(r: VoucherAmountOverrideRow): VoucherAmountOver
 }
 
 export async function fetchVoucherAmountOverrides(): Promise<VoucherAmountOverride[]> {
-  const { data, error } = await getSupabaseClient().from("voucher_amount_overrides").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("voucher_amount_overrides").select("*").order("id").range(from, to));
   return data.map(toVoucherAmountOverride);
 }
 export async function upsertVoucherAmountOverrideRow(
@@ -1054,8 +1049,7 @@ function toGeneratedPayslip(r: GeneratedPayslipRow): GeneratedPayslip {
   return { id: r.id, periodId: r.period_id, employeeId: r.employee_id, generatedBy: r.generated_by, generatedAt: r.generated_at, summary: r.summary };
 }
 export async function fetchGeneratedPayslips(): Promise<GeneratedPayslip[]> {
-  const { data, error } = await getSupabaseClient().from("generated_payslips").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("generated_payslips").select("*").order("id").range(from, to));
   return data.map(toGeneratedPayslip);
 }
 export async function insertGeneratedPayslip(input: Omit<GeneratedPayslip, "id" | "generatedAt" | "generatedBy">, generatedBy: string): Promise<GeneratedPayslip> {
@@ -1092,8 +1086,7 @@ function toGeneratedVoucher(r: GeneratedVoucherRow): GeneratedVoucher {
   return { id: r.id, periodId: r.period_id, employeeId: r.employee_id, amount: r.amount, generatedBy: r.generated_by, generatedAt: r.generated_at };
 }
 export async function fetchGeneratedVouchers(): Promise<GeneratedVoucher[]> {
-  const { data, error } = await getSupabaseClient().from("generated_vouchers").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("generated_vouchers").select("*").order("id").range(from, to));
   return data.map(toGeneratedVoucher);
 }
 export async function insertGeneratedVoucher(input: Omit<GeneratedVoucher, "id" | "generatedAt" | "generatedBy">, generatedBy: string): Promise<GeneratedVoucher> {
@@ -1115,8 +1108,7 @@ function toGeneratedBirForm(r: GeneratedBirFormRow): GeneratedBirForm {
   };
 }
 export async function fetchGeneratedBirForms(): Promise<GeneratedBirForm[]> {
-  const { data, error } = await getSupabaseClient().from("generated_bir_forms").select("*");
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("generated_bir_forms").select("*").order("id").range(from, to));
   return data.map(toGeneratedBirForm);
 }
 export async function insertGeneratedBirForm(input: Omit<GeneratedBirForm, "id" | "generatedAt" | "generatedBy">, generatedBy: string): Promise<GeneratedBirForm> {
@@ -1146,8 +1138,7 @@ function toAuditLog(r: AuditLogRow): AuditLog {
 }
 
 export async function fetchAuditLogs(): Promise<AuditLog[]> {
-  const { data, error } = await getSupabaseClient().from("audit_logs").select("*").order("created_at", { ascending: false });
-  if (error) throw error;
+  const data = await selectAll((from, to) => getSupabaseClient().from("audit_logs").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
   return data.map(toAuditLog);
 }
 export async function insertAuditLog(input: Omit<AuditLog, "id" | "createdAt">): Promise<AuditLog> {
