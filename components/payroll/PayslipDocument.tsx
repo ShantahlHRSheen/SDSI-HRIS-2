@@ -1,8 +1,9 @@
 import { FormAmountRow, FormFootnote, FormRow, FormSection, FormShell } from "@/components/bir/FormLayout";
 import { COMPANY_INFO } from "@/lib/bir";
-import { branchName, departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
+import { branchName, departmentName, formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee, PayrollPeriod } from "@/lib/types";
 import type { PayrollLine } from "@/lib/payroll";
+import { componentKind, componentLabel, netEffect, type SalaryAdjustment } from "@/lib/salary-adjustments";
 
 function DocHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -17,7 +18,13 @@ function DocHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-export function PayslipDocument({ employee, period, line }: { employee: Employee; period: PayrollPeriod; line: PayrollLine }) {
+// adjustments: this employee's salary adjustments for the period. They are
+// listed only when they add up to the adjustment amount already in this
+// payslip, so an older payslip never shows notes for changes it doesn't include.
+export function PayslipDocument({ employee, period, line, adjustments = [] }: { employee: Employee; period: PayrollPeriod; line: PayrollLine; adjustments?: SalaryAdjustment[] }) {
+  const mine = adjustments.filter((a) => a.employeeId === employee.id && a.periodId === period.id);
+  const mineNet = Math.round(mine.reduce((t, a) => t + netEffect(a), 0) * 100) / 100;
+  const showItems = mine.length > 0 && Math.abs(mineNet - line.salaryAdjustmentNet) < 0.005;
   return (
     <FormShell>
       <DocHeader title="Employee Payslip" subtitle={`Pay period: ${formatDate(period.start)} – ${formatDate(period.end)}`} />
@@ -61,16 +68,37 @@ export function PayslipDocument({ employee, period, line }: { employee: Employee
         <FormAmountRow label="Total Deductions" value={line.totalDeductionsOtherThanMandatories + line.totalMandatories + line.adjustmentDeduct} bold />
       </FormSection>
 
+      {(showItems || line.salaryAdjustmentNet !== 0) && (
+        <FormSection title="Salary Adjustments (included above)">
+          {showItems ? (
+            mine.map((a) => (
+              <div key={a.id} className="flex items-start justify-between gap-4 px-2 py-1.5">
+                <span className="text-[#52514e]">
+                  <span className="font-medium text-[#0b0b0b]">Salary adjustment — {componentLabel(a.component)}</span>
+                  {componentKind(a.component) === "deduction" && <span> (deduction)</span>}
+                  <span className="block text-xs">{a.description}</span>
+                </span>
+                <span className="tabular text-right whitespace-nowrap">
+                  {a.amount > 0 ? "+" : "−"}
+                  {formatCurrency(Math.abs(a.amount))}
+                </span>
+              </div>
+            ))
+          ) : (
+            <FormRow label="Salary adjustments (total)" value={`${line.salaryAdjustmentNet > 0 ? "+" : "−"}${formatCurrency(Math.abs(line.salaryAdjustmentNet))}`} mono />
+          )}
+          <FormAmountRow label="Total salary adjustments" value={line.salaryAdjustmentNet} bold />
+        </FormSection>
+      )}
+
       <FormSection title="Net Pay">
         <FormAmountRow label="Net Pay" value={line.netPay} bold />
       </FormSection>
 
       <FormFootnote>
-        SSS, SSS WISP, PhilHealth, and Pag-IBIG contributions are exactly half of the employee&apos;s full monthly
-        share, deducted on every cutoff. Generated automatically from finalized payroll records in the HRIS, using
-        the official SSS / PhilHealth / Pag-IBIG contribution schedules and the BIR semi-monthly withholding tax
-        table applied to each employee&apos;s Basis of Mandatories. This is a demo payslip and not an official
-        payroll document.
+        SSS, SSS WISP, PhilHealth, and Pag-IBIG contributions are exactly half of the employee&apos;s full monthly share, deducted on every cutoff. Generated automatically from
+        finalized payroll records in the HRIS, using the official SSS / PhilHealth / Pag-IBIG contribution schedules and the BIR semi-monthly withholding tax table applied to each
+        employee&apos;s Basis of Mandatories. This is a demo payslip and not an official payroll document.
       </FormFootnote>
     </FormShell>
   );

@@ -28,7 +28,7 @@ import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
 import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
 export default function PayrollExpenseReportPage() {
-  const { employees, employeeDepartmentAllocations, branches, departments, positions, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } =
+  const { employees, employeeDepartmentAllocations, branches, departments, positions, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments } =
     useHris();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
@@ -37,8 +37,8 @@ export default function PayrollExpenseReportPage() {
 
   const months = getMonthsList();
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
 
   const analyticsFilters = {

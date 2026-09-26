@@ -31,6 +31,7 @@ export default function PayrollProcessingPage() {
     attendancePeriodRecords,
     overtimeRequests,
     payrollLineOverrides,
+    salaryAdjustments,
     upsertPayrollLineOverride,
     importPayrollRegister,
     setPayrollPeriodStatus,
@@ -106,8 +107,8 @@ export default function PayrollProcessingPage() {
   }
 
   const lines = useMemo(
-    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides) : []),
-    [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides],
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, salaryAdjustments) : []),
+    [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, salaryAdjustments],
   );
   const summary = summarizePayrollLines(lines);
   const byId = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
@@ -457,7 +458,14 @@ export default function PayrollProcessingPage() {
                       const emp = byId.get(l.employeeId);
                       return (
                         <tr key={l.employeeId} className="border-b border-[var(--gridline)] last:border-0">
-                          <td className="px-3 py-2 text-[var(--text-primary)]">{emp ? fullName(emp) : l.employeeId}</td>
+                          <td className="px-3 py-2 text-[var(--text-primary)]">
+                            {emp ? fullName(emp) : l.employeeId}
+                            {l.salaryAdjustmentNet !== 0 && (
+                              <span title="Includes a salary adjustment (see Vouchers → Salary adjustments)" className="ml-1.5 inline-block rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
+                                ADJ {l.salaryAdjustmentNet > 0 ? "+" : "−"}{formatCurrencyCompact(Math.abs(l.salaryAdjustmentNet))}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{l.payrollType === "daily" ? "Daily-rate" : "Fixed-rate"}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.ratePerDay)}</td>
                           <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.basicPay)}</td>

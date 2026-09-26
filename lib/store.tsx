@@ -105,6 +105,8 @@ import {
   WORK_SCHEDULES,
 } from "./mock-data";
 import { computeOverallScore, type KpiCategory } from "./performance-eval";
+import { setSalaryAdjustments, type SalaryAdjustment } from "./salary-adjustments";
+import { deleteSalaryAdjustmentRow, fetchSalaryAdjustments, insertSalaryAdjustment, updateSalaryAdjustmentRow, type SalaryAdjustmentInput } from "./supabase/salary-adjustments";
 import type {
   Announcement,
   AttendanceCorrectionRequest,
@@ -227,6 +229,14 @@ interface HrisContextShape {
   holidays: Holiday[];
   leaveTypes: LeaveType[];
   payrollPeriods: PayrollPeriod[];
+  // Salary Adjustment Voucher lines, applied in the payroll computation.
+  // salaryAdjustmentsError is set when they can't be loaded (e.g. the
+  // phase 19 migration hasn't run yet).
+  salaryAdjustments: SalaryAdjustment[];
+  salaryAdjustmentsError: string | null;
+  addSalaryAdjustment: (input: SalaryAdjustmentInput) => Promise<boolean>;
+  updateSalaryAdjustment: (id: string, patch: Partial<Omit<SalaryAdjustmentInput, "periodId">>) => Promise<boolean>;
+  removeSalaryAdjustment: (id: string) => Promise<boolean>;
   generatedBirForms: GeneratedBirForm[];
   leaveRequests: LeaveRequest[];
   leaveAttachments: LeaveAttachment[];
@@ -356,6 +366,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const [dataLoadedFor, setDataLoadedFor] = useState<string | null>(null);
   // The last load from the database failed, so what's shown may be stale.
   const [dataLoadError, setDataLoadError] = useState(false);
+  const [salaryAdjustments, setSalaryAdjustmentsState] = useState<SalaryAdjustment[]>([]);
+  const [salaryAdjustmentsError, setSalaryAdjustmentsError] = useState<string | null>(null);
 
   // Real per-employee login, layered on top of the demo click-to-select
   // login below rather than replacing it — not every employee has a
@@ -477,6 +489,28 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         if (active) setDataLoadedFor(supabaseSession.user.id);
       }
     })();
+    return () => {
+      active = false;
+    };
+  }, [supabaseSession]);
+
+  // Loaded on their own so a missing table (migration not run yet) doesn't
+  // stop the rest of the app from loading.
+  useEffect(() => {
+    if (!supabaseSession) return;
+    let active = true;
+    fetchSalaryAdjustments().then(
+      (list) => {
+        if (!active) return;
+        setSalaryAdjustmentsState(list);
+        setSalaryAdjustmentsError(null);
+      },
+      (err) => {
+        if (!active) return;
+        console.warn("Couldn't load salary adjustments", err);
+        setSalaryAdjustmentsError(err instanceof Error ? err.message : "Couldn't load salary adjustments.");
+      },
+    );
     return () => {
       active = false;
     };
@@ -1446,6 +1480,55 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   // Keep the name helpers (branchName / departmentName / positionTitle) on
   // the lists actually loaded, before anything below renders with them.
   setReferenceData({ branches: state.branches, departments: state.departments, positions: state.positions });
+  setSalaryAdjustments(salaryAdjustments);
+
+  const addSalaryAdjustment: HrisContextShape["addSalaryAdjustment"] = useCallback(
+    async (input) => {
+      const actor = currentUser?.name ?? "System";
+      try {
+        const entry = supabaseSession
+          ? await insertSalaryAdjustment(input, actor)
+          : { ...input, id: nextId("sa"), createdBy: actor, createdAt: new Date().toISOString() };
+        setSalaryAdjustmentsState((prev) => [...prev, entry]);
+        logAudit("Salary Adjustment", "create", `Salary adjustment for ${input.employeeId}, period ${input.periodId}: ${input.component} ${input.amount}`);
+        return true;
+      } catch (err) {
+        reportSaveError("Couldn't save the salary adjustment", err);
+        return false;
+      }
+    },
+    [logAudit, currentUser, supabaseSession],
+  );
+
+  const updateSalaryAdjustment: HrisContextShape["updateSalaryAdjustment"] = useCallback(
+    async (id, patch) => {
+      try {
+        const updated = supabaseSession ? await updateSalaryAdjustmentRow(id, patch) : null;
+        setSalaryAdjustmentsState((prev) => prev.map((a) => (a.id === id ? (updated ?? { ...a, ...patch }) : a)));
+        logAudit("Salary Adjustment", "update", `Updated salary adjustment ${id}`);
+        return true;
+      } catch (err) {
+        reportSaveError("Couldn't update the salary adjustment", err);
+        return false;
+      }
+    },
+    [logAudit, supabaseSession],
+  );
+
+  const removeSalaryAdjustment: HrisContextShape["removeSalaryAdjustment"] = useCallback(
+    async (id) => {
+      try {
+        if (supabaseSession) await deleteSalaryAdjustmentRow(id);
+        setSalaryAdjustmentsState((prev) => prev.filter((a) => a.id !== id));
+        logAudit("Salary Adjustment", "delete", `Removed salary adjustment ${id}`);
+        return true;
+      } catch (err) {
+        reportSaveError("Couldn't remove the salary adjustment", err);
+        return false;
+      }
+    },
+    [logAudit, supabaseSession],
+  );
 
   const value: HrisContextShape = {
     ready,
@@ -1468,6 +1551,11 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     leaveTypes: state.leaveTypes,
     payrollPeriods: state.payrollPeriods,
     generatedBirForms: state.generatedBirForms,
+    salaryAdjustments,
+    salaryAdjustmentsError,
+    addSalaryAdjustment,
+    updateSalaryAdjustment,
+    removeSalaryAdjustment,
     leaveRequests: state.leaveRequests,
     leaveAttachments: state.leaveAttachments,
     overtimeRequests: state.overtimeRequests,

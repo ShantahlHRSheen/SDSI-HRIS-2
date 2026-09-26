@@ -8,11 +8,13 @@ import { PayslipDocument } from "@/components/payroll/PayslipDocument";
 import { summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
 import { formatCurrencyCompact, formatDate } from "@/lib/helpers";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
+import { useHris } from "@/lib/store";
 
 // An employee's own released payslips ("My Payslips") — used for every role,
 // including HR, payroll and upper management, who also see All Payslips.
 
 export function PayslipPreviewModal({ preview, onClose }: { preview: { employee: Employee; period: PayrollPeriod; line: PayrollLine } | null; onClose: () => void }) {
+  const { salaryAdjustments } = useHris();
   return (
     <Modal open={!!preview} onClose={onClose} title="Payslip preview" wide>
       {preview && (
@@ -22,7 +24,7 @@ export function PayslipPreviewModal({ preview, onClose }: { preview: { employee:
               <Printer size={14} /> Print / Download PDF
             </button>
           </div>
-          <PayslipDocument employee={preview.employee} period={preview.period} line={preview.line} />
+          <PayslipDocument employee={preview.employee} period={preview.period} line={preview.line} adjustments={salaryAdjustments} />
         </div>
       )}
     </Modal>
