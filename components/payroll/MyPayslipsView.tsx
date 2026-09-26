@@ -47,9 +47,11 @@ export function MyPayslipsView({
 }) {
   if (!employee) return null;
   const emp = employee;
+  // Oldest pay period first (January at the top), whatever order they were released in.
+  const periodStart = new Map(payrollPeriods.map((p) => [p.id, p.start]));
   const myPayslips = generatedPayslips
     .filter((p) => p.employeeId === emp.id)
-    .sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : -1));
+    .sort((a, b) => (periodStart.get(a.periodId) ?? "").localeCompare(periodStart.get(b.periodId) ?? "") || a.generatedAt.localeCompare(b.generatedAt));
 
   function view(entry: GeneratedPayslip) {
     const period = payrollPeriods.find((p) => p.id === entry.periodId);
