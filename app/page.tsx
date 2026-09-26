@@ -31,10 +31,14 @@ export default function LoginPage() {
     e.preventDefault();
     setAuthError(null);
     setSubmitting(true);
-    const { error } = await loginWithSupabase(email.trim(), password);
+    // Phones often capitalise the first letter, and copying from a chat app
+    // can add spaces around the text — neither should make a login fail.
+    const cleanEmail = email.replace(/\s+/g, "").toLowerCase();
+    let { error } = await loginWithSupabase(cleanEmail, password);
+    if (error && password.trim() !== password) ({ error } = await loginWithSupabase(cleanEmail, password.trim()));
     setSubmitting(false);
     if (error) {
-      setAuthError(error);
+      setAuthError(/invalid login credentials/i.test(error) ? "Email or password is incorrect. Check the password carefully — it is case-sensitive (capital and small letters must match)." : error);
       return;
     }
     router.push("/dashboard");
@@ -62,6 +66,10 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@shantahl.com.ph"
@@ -73,6 +81,10 @@ export default function LoginPage() {
               <input
                 type="password"
                 required
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--page-plane)] px-3 py-2 text-sm text-[var(--text-primary)]"
