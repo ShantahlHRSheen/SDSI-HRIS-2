@@ -51,8 +51,19 @@ export function SalaryAdjustmentEditor({
   const draftEmployee = useMemo(() => {
     const v = draft.employee.trim().toLowerCase();
     if (!v) return null;
-    return employees.find((e) => pickLabel(e).toLowerCase() === v) ?? employees.find((e) => fullName(e).toLowerCase() === v || e.employeeNumber.toLowerCase() === v) ?? null;
-  }, [draft.employee, employees]);
+    // Accept the picker label, the employee number, or the name typed either
+    // way round ("Arnie Pangilinan" or "Pangilinan Arnie").
+    const norm = (t: string) =>
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9ñ]+/g, " ")
+        .trim();
+    const n = norm(v);
+    const byName = (e: Employee) => [fullName(e), `${e.firstName} ${e.lastName}`, `${e.lastName} ${e.firstName}`].some((x) => norm(x) === n);
+    const matches = (list: Employee[]) => list.find((e) => pickLabel(e).toLowerCase() === v || e.employeeNumber.toLowerCase() === v) ?? list.find(byName);
+    // Prefer someone on this period's payroll when two people share a name.
+    return matches(employees.filter((e) => payrollEmployeeIds.has(e.id))) ?? matches(employees) ?? null;
+  }, [draft.employee, employees, payrollEmployeeIds]);
   const draftInPayroll = !!draftEmployee && payrollEmployeeIds.has(draftEmployee.id);
   const canAdd = draftInPayroll && amountOk(draft.amount) && draft.description.trim().length > 0 && !adding;
 
@@ -105,6 +116,16 @@ export function SalaryAdjustmentEditor({
           <div>
             Salary adjustments aren&rsquo;t set up in the database yet. Run <code>supabase/migrate_phase19_salary_adjustments.sql</code> in the Supabase SQL Editor, then refresh.
             <div className="text-xs text-[var(--text-muted)]">{loadError}</div>
+          </div>
+        </div>
+      )}
+
+      {!loadError && payrollEmployeeIds.size === 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-sm text-[var(--text-primary)]">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--status-warning)]" />
+          <div>
+            This period has no payroll yet, so there&rsquo;s no one to adjust. Import or generate this period&rsquo;s payroll in Payroll Processing first, or pick another period
+            above.
           </div>
         </div>
       )}
@@ -285,7 +306,7 @@ export function SalaryAdjustmentEditor({
           </button>
           <div className="text-[11px] text-[var(--text-muted)] sm:col-span-5">
             {draft.employee.trim() && !draftEmployee ? (
-              <span className="text-[var(--status-critical)]">Pick an employee from the list.</span>
+              <span className="text-[var(--status-critical)]">No employee matches that name — pick one from the list.</span>
             ) : draftEmployee && !draftInPayroll ? (
               <span className="text-[var(--status-critical)]">
                 {fullName(draftEmployee)} isn&rsquo;t on this period&rsquo;s payroll, so an adjustment can&rsquo;t be added here. Use a department voucher to pay them instead.
