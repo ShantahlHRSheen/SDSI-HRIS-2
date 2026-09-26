@@ -330,7 +330,8 @@ function employeeToRow(e: Partial<Omit<Employee, "id" | "employeeNumber">>): Par
   if (e.nationality !== undefined) row.nationality = e.nationality;
   if (e.address !== undefined) row.address = e.address;
   if (e.contactNumber !== undefined) row.contact_number = e.contactNumber;
-  if (e.email !== undefined) row.email = e.email;
+  // Blank → null: emails are unique, and several employees have none.
+  if (e.email !== undefined) row.email = e.email?.trim() ? e.email.trim() : null;
   if (e.emergencyContactName !== undefined) row.emergency_contact_name = e.emergencyContactName;
   if (e.emergencyContactPhone !== undefined) row.emergency_contact_phone = e.emergencyContactPhone;
   if (e.sssNumber !== undefined) row.sss_number = e.sssNumber ?? null;
@@ -369,6 +370,13 @@ export async function insertEmployee(input: Omit<Employee, "id" | "employeeNumbe
   const { data, error } = await getSupabaseClient().from("employees").insert(row).select().single();
   if (error) throw error;
   return toEmployee(data);
+}
+// Every employee number in the database (for picking the next free one when
+// this browser's list is out of date, e.g. someone added an employee elsewhere).
+export async function fetchEmployeeNumbers(): Promise<{ employeeNumber: string }[]> {
+  const { data, error } = await getSupabaseClient().from("employees").select("employee_number");
+  if (error) throw error;
+  return data.map((r) => ({ employeeNumber: r.employee_number }));
 }
 export async function updateEmployeeRow(id: string, patch: Partial<Omit<Employee, "id" | "employeeNumber">>): Promise<Employee> {
   const { data, error } = await getSupabaseClient().from("employees").update(employeeToRow(patch)).eq("id", id).select().single();

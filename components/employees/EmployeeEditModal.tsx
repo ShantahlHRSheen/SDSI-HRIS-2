@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useHris } from "@/lib/store";
 import { fullName } from "@/lib/helpers";
@@ -69,6 +69,7 @@ export function EmployeeEditModal({
   onSave: (data: EmployeeFormData) => void;
 }) {
   const { branches, departments, positions, employeeDepartmentAllocations, setEmployeeDepartmentAllocations } = useHris();
+  const submitted = useRef(false);
   const [form, setForm] = useState<EmployeeFormData>(() => defaultForm(employee, branches[0]?.id ?? "", departments[0]?.id ?? "", positions[0]?.id ?? ""));
   const [allocRows, setAllocRows] = useState<{ departmentId: string; percent: number }[]>(() =>
     employee
@@ -105,6 +106,10 @@ export function EmployeeEditModal({
   function submit() {
     if (!form.firstName || !form.lastName) return;
     if (!allocValid) return;
+    // A double-click would otherwise save twice (for a new employee: a
+    // duplicate record, or a clash over the same EMP number).
+    if (submitted.current) return;
+    submitted.current = true;
     onSave(form);
     if (employee) {
       setEmployeeDepartmentAllocations(employee.id, allocRows.filter((r) => r.percent > 0));

@@ -53,6 +53,7 @@ import {
   insertDepartment,
   insertDisciplinaryRecord,
   insertEmployee,
+  fetchEmployeeNumbers,
   insertEvaluation,
   insertGeneratedBirForm,
   insertGeneratedPayslip,
@@ -661,7 +662,19 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     async (input) => {
       if (supabaseSession) {
         try {
-          const entry = await insertEmployee(input, nextEmployeeNumber(state.employees));
+          let entry: Employee | null = null;
+          let numbers: { employeeNumber: string }[] = state.employees;
+          for (let attempt = 0; !entry; attempt++) {
+            try {
+              entry = await insertEmployee(input, nextEmployeeNumber(numbers));
+            } catch (err) {
+              // The EMP number was just taken (another tab or person added an
+              // employee): retry with the next free number from the database.
+              const code = (err as { code?: string }).code;
+              if (code !== "23505" || !/employee_number/.test(String((err as { message?: string }).message)) || attempt >= 2) throw err;
+              numbers = await fetchEmployeeNumbers();
+            }
+          }
           setState((prev) => ({ ...prev, employees: [...prev.employees, entry] }));
           logAudit("Employee 201 File", "create", `Added new employee: ${input.firstName} ${input.lastName}`);
           return;
