@@ -58,7 +58,7 @@ function variantFor(roles: string[]): "full" | "payroll" | "team" | "personal" {
 }
 
 export default function DashboardPage() {
-  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
+  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments } = useHris();
   const roles = currentUser?.roles ?? [];
   const variant = variantFor(roles);
 
@@ -71,8 +71,8 @@ export default function DashboardPage() {
 
   const branchFilter = variant === "team" && currentEmployee ? currentEmployee.branchId : undefined;
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
 
   // Tardiness/absenteeism flags computed directly from every imported period

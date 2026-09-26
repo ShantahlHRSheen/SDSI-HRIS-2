@@ -282,6 +282,7 @@ export function buildPayrollImportPreview(
       [{ ...attendance, id: "preview", periodId: period.id, source: "import", updatedBy: "", updatedAt: "" }],
       [],
       [{ ...override, id: "preview", periodId: period.id, employeeId: employee.id, updatedBy: "", updatedAt: "" }],
+      [], // compare against the file alone — no salary adjustments
     );
     matched.push({ parsed: row, employee, matchedByName: !byNum, attendance, override, computedNetPay: line?.netPay ?? 0 });
   }

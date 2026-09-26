@@ -31,15 +31,15 @@ export default function Form2316Page() {
     attendancePeriodRecords,
     overtimeRequests,
     payrollLineOverrides,
-    payrollPeriods,
+    payrollPeriods, salaryAdjustments,
   } = useHris();
   const years = getAvailableTaxYears();
   const [taxYear, setTaxYear] = useState(years[0]);
   const [preview, setPreview] = useState<Form2316Data | null>(null);
 
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
 
   const isAdmin = currentUser?.roles.some((r) => ["hr_admin", "cfo", "payroll_officer", "upper_management"].includes(r));

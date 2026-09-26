@@ -1,4 +1,5 @@
 import type { AttendancePeriodRecord, Employee, EmployeeDepartmentAllocation, OvertimeRequest, PayrollLineOverride, PayrollPeriod } from "./types";
+import { registeredSalaryAdjustments, type SalaryAdjustment } from "./salary-adjustments";
 import { TODAY } from "./mock-data";
 import { branchName, departmentAllocationsForEmployee, departmentName, fullName } from "./helpers";
 import { computePayrollForPeriod, type PayrollLine } from "./payroll";
@@ -195,8 +196,10 @@ export function getMonthlyFacts(
   overtimeRequests: OvertimeRequest[],
   overrides: PayrollLineOverride[],
   payrollPeriods: PayrollPeriod[],
+  // Salary adjustments are part of the payroll too (see lib/salary-adjustments.ts).
+  adjustments: SalaryAdjustment[] = registeredSalaryAdjustments(),
 ): MonthlyEmployeeFact[] {
-  const inputs = [employees, attendanceRecords, overtimeRequests, overrides, payrollPeriods];
+  const inputs = [employees, attendanceRecords, overtimeRequests, overrides, payrollPeriods, adjustments];
   if (cachedFacts && cachedInputs && sameInputs(cachedInputs, inputs)) return cachedFacts;
 
   const months = getMonthsList();
@@ -211,7 +214,7 @@ export function getMonthlyFacts(
     const periodsByEmployee = new Map<string, PayrollPeriod[]>();
 
     for (const period of periodsInMonth) {
-      const lines = computePayrollForPeriod(period, employees, attendanceRecords, overtimeRequests, overrides);
+      const lines = computePayrollForPeriod(period, employees, attendanceRecords, overtimeRequests, overrides, adjustments);
       for (const line of lines) {
         const arr = linesByEmployee.get(line.employeeId) ?? [];
         arr.push(line);

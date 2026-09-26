@@ -23,6 +23,7 @@ export default function PayslipsPage() {
     attendancePeriodRecords,
     overtimeRequests,
     payrollLineOverrides,
+    salaryAdjustments,
     generatedPayslips,
     addGeneratedPayslip,
   } = useHris();
@@ -30,8 +31,8 @@ export default function PayslipsPage() {
   const [preview, setPreview] = useState<{ employee: Employee; period: PayrollPeriod; line: PayrollLine } | null>(null);
 
   const lines = useMemo(
-    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides) : []),
-    [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides],
+    () => (period ? computePayrollForPeriod(period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, salaryAdjustments) : []),
+    [period, employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, salaryAdjustments],
   );
   const lineByEmployee = new Map(lines.map((l) => [l.employeeId, l]));
 

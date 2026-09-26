@@ -125,4 +125,38 @@ body {
     size: A4;
     margin: 0;
   }
+
+  /* Multi-page print jobs (e.g. "Print all vouchers"): only the stack is
+     printed, flowing across pages, one document per page. */
+  body:has(> .print-stack) {
+    background: #ffffff !important;
+  }
+  body:has(> .print-stack) > *:not(.print-stack) {
+    display: none !important;
+  }
+  .print-stack {
+    display: block !important;
+    page: print-stack;
+    background: #ffffff;
+    color: #111111;
+  }
+  .print-stack,
+  .print-stack * {
+    visibility: visible;
+  }
+  .print-stack-page {
+    break-after: page;
+  }
+  .print-stack-page:last-child {
+    break-after: auto;
+  }
+}
+
+.print-stack {
+  display: none;
+}
+
+@page print-stack {
+  size: A4;
+  margin: 14mm;
 }

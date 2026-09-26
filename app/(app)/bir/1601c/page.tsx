@@ -21,11 +21,11 @@ async function downloadOfficial1601C(data: Form1601CData, facts: ReturnType<type
 }
 
 export default function Form1601CPage() {
-  const { employees, generatedBirForms, addGeneratedBirForm, currentUser, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
+  const { employees, generatedBirForms, addGeneratedBirForm, currentUser, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments } = useHris();
   const months = getMonthsList();
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
 
   const [monthKey, setMonthKey] = useState(CURRENT_MONTH_KEY);

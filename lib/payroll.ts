@@ -1,5 +1,6 @@
 import type { AttendancePeriodRecord, Employee, OvertimeRequest, PayrollLineOverride, PayrollPeriod } from "./types";
 import { computeHdmf, computePhilHealth, computeSemiMonthlyWithholdingTax, computeSss } from "./statutory";
+import { adjustmentTotals, netEffect, registeredSalaryAdjustments, type SalaryAdjustment, type SalaryAdjustmentComponent } from "./salary-adjustments";
 
 // ---------------------------------------------------------------------------
 // Per-payroll-period payroll computation, driven entirely by real records and
@@ -107,6 +108,9 @@ export interface PayrollLine {
   // --- Adjustments + net -------------------------------------------------
   adjustmentAdd: number;
   adjustmentDeduct: number;
+  // Net effect of this period's salary adjustments (already included in the
+  // figures above); non-zero means the payslip lists them.
+  salaryAdjustmentNet: number;
   netPay: number;
 
   // --- Employer share / cost (half per cutoff) ---------------------------
@@ -173,6 +177,9 @@ export function computePayrollForPeriod(
   attendanceRecords: AttendancePeriodRecord[],
   overtimeRequests: OvertimeRequest[],
   overrides: PayrollLineOverride[],
+  // Salary adjustments to apply; defaults to the app's current list. The
+  // payroll import preview passes [] to compare against the file alone.
+  adjustments: SalaryAdjustment[] = registeredSalaryAdjustments(),
 ): PayrollLine[] {
   const byEmployeeId = new Map(employees.map((e) => [e.id, e]));
   const recordsForPeriod = attendanceRecords.filter((r) => r.periodId === period.id);
@@ -183,15 +190,17 @@ export function computePayrollForPeriod(
     const employee = byEmployeeId.get(rec.employeeId);
     if (!employee) continue;
     const ov = overrideByEmployeeId.get(employee.id) ?? emptyOverride;
+    const adj = adjustmentTotals(adjustments, period.id, employee.id);
+    const a = (k: SalaryAdjustmentComponent) => adj[k] ?? 0;
 
     const rate = ratePerDay(employee);
     const basis = basisOfMandatories(employee, rate);
 
     const basicPayAuto = employee.payrollType === "daily" ? Math.round(rate * rec.daysWorked) : Math.round((employee.monthlySalary ?? 0) / 2);
-    const basicPay = ov.basicPayOverride ?? basicPayAuto;
+    const basicPay = (ov.basicPayOverride ?? basicPayAuto) + a("basic_pay");
 
     const latesUndertimeAuto = Math.round((rate / WORK_MINUTES_PER_DAY) * rec.lateMinutes);
-    const latesUndertime = ov.latesUndertimeOverride ?? latesUndertimeAuto;
+    const latesUndertime = (ov.latesUndertimeOverride ?? latesUndertimeAuto) + a("late_deduction");
     // Undertime deduction — same per-minute rate formula as the late
     // deduction, applied to the "Undertime Raw Mins" column (imported
     // separately from "Late Raw Mins"). Both are actual/raw minutes — the
@@ -201,22 +210,22 @@ export function computePayrollForPeriod(
     const basicSalaryLessLate = basicPay - latesUndertime - undertimeDeduction;
 
     const holidayPayAuto = Math.round(rate * rec.holidayDays);
-    const holidayPay = ov.holidayPayOverride ?? holidayPayAuto;
+    const holidayPay = (ov.holidayPayOverride ?? holidayPayAuto) + a("holiday_pay");
     const vlPayAuto = Math.round(rate * rec.vlDays);
-    const vlPay = ov.vlPayOverride ?? vlPayAuto;
+    const vlPay = (ov.vlPayOverride ?? vlPayAuto) + a("vl_pay");
     const slPayAuto = Math.round(rate * rec.slDays);
-    const slPay = ov.slPayOverride ?? slPayAuto;
+    const slPay = (ov.slPayOverride ?? slPayAuto) + a("sl_pay");
 
     const otHoursAuto = approvedOtHours(employee.id, period, overtimeRequests);
     const otHours = ov.otHoursOverride ?? otHoursAuto;
     const otPayAuto = Math.round((rate / WORK_HOURS_PER_DAY) * OT_MULTIPLIER * otHours);
-    const otPay = ov.otPayOverride ?? otPayAuto;
+    const otPay = (ov.otPayOverride ?? otPayAuto) + a("ot_pay");
 
     const basicSalaryTotal = basicSalaryLessLate + holidayPay + vlPay + slPay + otPay;
 
     const dailyAllowanceAuto = Math.round((employee.dailyAllowance ?? 0) * rec.daysWorked);
     const dailyAllowance = ov.dailyAllowanceOverride ?? dailyAllowanceAuto;
-    const netAllowances = dailyAllowance + ov.travelAllowance + ov.laundryAllowance + ov.medicalCashAllowance + ov.supervisorAllowance;
+    const netAllowances = dailyAllowance + ov.travelAllowance + ov.laundryAllowance + ov.medicalCashAllowance + ov.supervisorAllowance + a("allowance");
 
     const grossSalary = basicSalaryTotal + netAllowances;
 
@@ -232,20 +241,28 @@ export function computePayrollForPeriod(
     const philHealthContributionAuto = Math.round((philHealth.employee / 2) * 100) / 100;
     const hdmfContributionAuto = Math.round((hdmf.employee / 2) * 100) / 100;
 
-    const sssContribution = ov.sssContributionOverride ?? sssContributionAuto;
+    const sssContribution = (ov.sssContributionOverride ?? sssContributionAuto) + a("sss");
     const sssWisp = ov.sssWispOverride ?? sssWispAuto;
-    const philHealthContribution = ov.philHealthContributionOverride ?? philHealthContributionAuto;
-    const hdmfContribution = ov.hdmfContributionOverride ?? hdmfContributionAuto;
+    const philHealthContribution = (ov.philHealthContributionOverride ?? philHealthContributionAuto) + a("philhealth");
+    const hdmfContribution = (ov.hdmfContributionOverride ?? hdmfContributionAuto) + a("hdmf");
 
     const nonTaxable = sssContribution + sssWisp + philHealthContribution + hdmfContribution;
     const taxableCompensation = Math.max(grossSalary - nonTaxable, 0);
-    const withholdingTax = ov.withholdingTaxOverride ?? computeSemiMonthlyWithholdingTax(taxableCompensation);
+    const withholdingTax = (ov.withholdingTaxOverride ?? computeSemiMonthlyWithholdingTax(taxableCompensation)) + a("withholding_tax");
+
+    const cashAdvance = ov.cashAdvance + a("cash_advance");
+    const shortages = ov.shortages + a("shortages");
+    const sssLoan = ov.sssLoan + a("sss_loan");
+    const hdmfLoan = ov.hdmfLoan + a("hdmf_loan");
+    const adjustmentAdd = ov.adjustmentAdd + a("other_earning");
+    const adjustmentDeduct = ov.adjustmentDeduct + a("other_deduction");
+    const salaryAdjustmentNet = Object.entries(adj).reduce((t, [k, v]) => t + netEffect({ component: k as SalaryAdjustmentComponent, amount: v ?? 0 }), 0);
 
     const totalDeductionsOtherThanMandatories =
-      ov.cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + ov.shortages + withholdingTax + ov.sssLoan + ov.hdmfLoan + ov.hdmfMp2Savings;
+      cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + shortages + withholdingTax + sssLoan + hdmfLoan + ov.hdmfMp2Savings;
     const totalMandatories = sssContribution + sssWisp + hdmfContribution + philHealthContribution;
 
-    const netPay = grossSalary + ov.adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - ov.adjustmentDeduct;
+    const netPay = grossSalary + adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - adjustmentDeduct;
 
     const employerSSS = Math.round((sss.regular.employer / 2) * 100) / 100;
     const employerSSSWisp = Math.round((sss.wisp.employer / 2) * 100) / 100;
@@ -290,10 +307,10 @@ export function computePayrollForPeriod(
       supervisorAllowance: ov.supervisorAllowance,
       netAllowances,
       grossSalary,
-      cashAdvance: ov.cashAdvance,
+      cashAdvance,
       lsmBizLoan: ov.lsmBizLoan,
       lsmCoopLoan: ov.lsmCoopLoan,
-      shortages: ov.shortages,
+      shortages,
       hdmfMp2Savings: ov.hdmfMp2Savings,
       withholdingTax,
       totalDeductionsOtherThanMandatories,
@@ -301,15 +318,16 @@ export function computePayrollForPeriod(
       sssContributionAuto,
       sssWisp,
       sssWispAuto,
-      sssLoan: ov.sssLoan,
+      sssLoan,
       hdmfContribution,
       hdmfContributionAuto,
-      hdmfLoan: ov.hdmfLoan,
+      hdmfLoan,
       philHealthContribution,
       philHealthContributionAuto,
       totalMandatories,
-      adjustmentAdd: ov.adjustmentAdd,
-      adjustmentDeduct: ov.adjustmentDeduct,
+      adjustmentAdd,
+      adjustmentDeduct,
+      salaryAdjustmentNet: Math.round(salaryAdjustmentNet * 100) / 100,
       netPay,
       employerSSS,
       employerSSSWisp,
@@ -390,6 +408,7 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     totalMandatories: summary.totalMandatories ?? 0,
     adjustmentAdd: summary.adjustmentAdd ?? 0,
     adjustmentDeduct: summary.adjustmentDeduct ?? 0,
+    salaryAdjustmentNet: summary.salaryAdjustmentNet ?? 0,
     netPay: summary.netPay ?? 0,
     employerSSS: summary.employerSSS ?? 0,
     employerSSSWisp: summary.employerSSSWisp ?? 0,

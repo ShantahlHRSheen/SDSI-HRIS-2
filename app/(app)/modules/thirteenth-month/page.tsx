@@ -12,15 +12,15 @@ import { getAvailableTaxYears } from "@/lib/bir";
 import { getMonthlyFacts, getMonthsList, toCsv, downloadCsv } from "@/lib/monthly-analytics";
 
 export default function ThirteenthMonthPayPage() {
-  const { employees, branches, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods } = useHris();
+  const { employees, branches, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments } = useHris();
   const years = getAvailableTaxYears();
   const [year, setYear] = useState(years[0]);
   const [branchId, setBranchId] = useState("");
   const [search, setSearch] = useState("");
 
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
   const monthsInYear = getMonthsList().filter((m) => m.year === year);
   const monthsElapsed = monthsInYear.length || 1;

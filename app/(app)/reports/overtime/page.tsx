@@ -34,7 +34,7 @@ export default function OvertimeReportPage() {
     attendancePeriodRecords,
     overtimeRequests,
     payrollLineOverrides,
-    payrollPeriods,
+    payrollPeriods, salaryAdjustments,
   } = useHris();
   const employees = useMemo(
     () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations),
@@ -45,8 +45,8 @@ export default function OvertimeReportPage() {
 
   const months = getMonthsList();
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
 
   const analyticsFilters = {
