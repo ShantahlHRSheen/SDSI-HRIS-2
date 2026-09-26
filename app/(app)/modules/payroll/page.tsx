@@ -15,6 +15,7 @@ import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, t
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { buildPayrollImportPreview, guessPeriodFromName, parsePayrollWorkbook, type ParsedPayrollWorkbook } from "@/lib/payroll-import";
 import { PayrollImportModal } from "@/components/payroll/PayrollImportModal";
+import { MissingPeriodsBanner } from "@/components/payroll/MissingPeriodsBanner";
 import type { Employee, PayrollLineOverride, PayrollPeriodStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
@@ -328,6 +329,8 @@ export default function PayrollProcessingPage() {
           </div>
         }
       />
+
+      {canManage && <MissingPeriodsBanner />}
 
       {generateNotice && (
         <div

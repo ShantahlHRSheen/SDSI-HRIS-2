@@ -7,6 +7,7 @@ import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { formatDate } from "@/lib/helpers";
 import type { PayrollPeriodStatus } from "@/lib/types";
+import { MissingPeriodsBanner } from "@/components/payroll/MissingPeriodsBanner";
 
 const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
   open: "good",
@@ -37,6 +38,8 @@ export default function PayrollPeriodsAdminPage() {
           <Plus size={14} /> Add period
         </button>
       </div>
+
+      <MissingPeriodsBanner />
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)]">
         <table className="w-full min-w-[560px] text-sm">
