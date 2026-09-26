@@ -56,7 +56,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Payroll Processing", href: "/modules/payroll", roles: ["hr_admin", "payroll_officer"], built: true },
       { label: "Payroll (Read-only)", href: "/modules/payroll", roles: ["sr_accounting_assistant", "treasurer", "cfo", "upper_management"], built: true },
-      { label: "Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "cfo", "upper_management", "employee"], built: true },
+      { label: "My Payslips", href: "/my-payslips", roles: ALL_ROLES, built: true },
+      { label: "All Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "cfo", "upper_management"], built: true },
       { label: "Vouchers", href: "/modules/vouchers", roles: ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management", "sys_admin"], built: true },
       { label: "Government Reports", href: "/modules/gov-reports", roles: ["hr_admin", "payroll_officer"], built: true },
       { label: "13th Month Pay", href: "/modules/thirteenth-month", roles: ["hr_admin", "payroll_officer"], built: true },
