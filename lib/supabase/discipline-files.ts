@@ -23,6 +23,7 @@ const rpc = (fn: string, args: Record<string, unknown>) =>
   (getSupabaseClient() as unknown as { rpc: (f: string, a: Record<string, unknown>) => { single: () => PromiseLike<RpcResult> } }).rpc(fn, args).single();
 
 async function upload(path: string, body: Blob, contentType: string): Promise<void> {
+  if (body.size === 0) throw new Error("That file is empty — please choose it again.");
   const { error } = await bucket().upload(path, body, { contentType, upsert: false });
   if (error) throw new Error(/row-level security/i.test(error.message) ? "You can't upload a file to this record." : error.message);
 }
