@@ -234,6 +234,19 @@ export interface DisciplinaryRecord {
   date: string;
   status: "open" | "resolved";
   attachmentName: string | null;
+  // The NTE / sanction PDF (supabase/migrate_phase20_discipline_notices.sql).
+  noticePath?: string | null;
+  noticeFileName?: string | null;
+  requiresExplanation?: boolean;
+  responseDue?: string | null;
+  // The employee's response — set only through the discipline_* functions.
+  acknowledgedAt?: string | null;
+  ackSignaturePath?: string | null;
+  explanation?: string | null;
+  explanationFilePath?: string | null;
+  explanationFileName?: string | null;
+  explanationSubmittedAt?: string | null;
+  createdAt?: string | null;
 }
 
 export interface AuditLog {
