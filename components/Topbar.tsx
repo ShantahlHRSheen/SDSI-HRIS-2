@@ -11,14 +11,14 @@ import { Modal } from "./Modal";
 import { PasswordForm } from "./account/PasswordForm";
 
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
-  const { currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes, logout, isRealAccount } = useHris();
+  const { currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes, disciplinaryRecords, logout, isRealAccount } = useHris();
   const router = useRouter();
   const [userMenu, setUserMenu] = useState(false);
   const [notifMenu, setNotifMenu] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
 
-  const notifications = buildNotifications({ currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes });
+  const notifications = buildNotifications({ currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes, disciplinaryRecords });
 
   return (
     <>

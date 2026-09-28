@@ -490,10 +490,22 @@ function toDisciplinaryRecord(r: DisciplinaryRecordRow): DisciplinaryRecord {
     date: r.date,
     status: r.status,
     attachmentName: r.attachment_name,
+    noticePath: r.notice_path ?? null,
+    noticeFileName: r.notice_file_name ?? null,
+    requiresExplanation: r.requires_explanation ?? false,
+    responseDue: r.response_due ?? null,
+    acknowledgedAt: r.acknowledged_at ?? null,
+    ackSignaturePath: r.ack_signature_path ?? null,
+    explanation: r.explanation ?? null,
+    explanationFilePath: r.explanation_file_path ?? null,
+    explanationFileName: r.explanation_file_name ?? null,
+    explanationSubmittedAt: r.explanation_submitted_at ?? null,
+    createdAt: r.created_at ?? null,
   };
 }
+export { toDisciplinaryRecord };
 function disciplinaryRecordToRow(input: Omit<DisciplinaryRecord, "id">): Omit<DisciplinaryRecordRow, "id"> {
-  return {
+  const row: Omit<DisciplinaryRecordRow, "id"> = {
     employee_id: input.employeeId,
     type: input.type,
     description: input.description,
@@ -502,6 +514,11 @@ function disciplinaryRecordToRow(input: Omit<DisciplinaryRecord, "id">): Omit<Di
     status: input.status,
     attachment_name: input.attachmentName,
   };
+  // Only send the phase 20 columns when used, so plain records still save
+  // before that migration has been run.
+  if (input.requiresExplanation) row.requires_explanation = true;
+  if (input.responseDue) row.response_due = input.responseDue;
+  return row;
 }
 
 export async function fetchDisciplinaryRecords(): Promise<DisciplinaryRecord[]> {

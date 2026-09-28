@@ -106,6 +106,7 @@ import {
 } from "./mock-data";
 import { computeOverallScore, type KpiCategory } from "./performance-eval";
 import { setSalaryAdjustments, type SalaryAdjustment } from "./salary-adjustments";
+import { acknowledgeNotice, attachNoticePdf, submitExplanation } from "./supabase/discipline-files";
 import { deleteSalaryAdjustmentRow, fetchSalaryAdjustments, insertSalaryAdjustment, updateSalaryAdjustmentRow, type SalaryAdjustmentInput } from "./supabase/salary-adjustments";
 import type {
   Announcement,
@@ -276,7 +277,12 @@ interface HrisContextShape {
   updateEvaluationSection: (id: string, category: KpiCategory, criteria: EvaluationCriterion[], evaluatorEmployeeId: string, comments?: string) => void;
   setEvaluationStatus: (id: string, status: PerformanceEvaluation["status"]) => void;
 
-  addDisciplinaryRecord: (input: Omit<DisciplinaryRecord, "id">) => void;
+  // Resolves to the saved record, or null if it couldn't be saved.
+  addDisciplinaryRecord: (input: Omit<DisciplinaryRecord, "id">) => Promise<DisciplinaryRecord | null>;
+  // Discipline notices (phase 20). Each resolves to an error message, or null on success.
+  attachDisciplinaryNotice: (id: string, file: File) => Promise<string | null>;
+  acknowledgeDisciplinaryRecord: (id: string, signaturePng: Blob) => Promise<string | null>;
+  submitDisciplinaryExplanation: (id: string, text: string, file: File | null) => Promise<string | null>;
   setDisciplinaryStatus: (id: string, status: DisciplinaryRecord["status"]) => void;
 
   // Uploads any photos first. Resolves to an error message, or null on success.
@@ -989,17 +995,77 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           const entry = await insertDisciplinaryRecord(input);
           setState((prev) => ({ ...prev, disciplinaryRecords: [entry, ...prev.disciplinaryRecords] }));
           logAudit("Discipline", "create", `Issued ${input.type.replace("_", " ")}`);
-          return;
+          return entry;
         } catch (err) {
           reportSaveError("Couldn't add disciplinary record", err);
-          return;
+          return null;
         }
       }
-      const entry: DisciplinaryRecord = { ...input, id: nextId("disc") };
+      const entry: DisciplinaryRecord = { ...input, id: nextId("disc"), createdAt: new Date().toISOString() };
       setState((prev) => ({ ...prev, disciplinaryRecords: [entry, ...prev.disciplinaryRecords] }));
       logAudit("Discipline", "create", `Issued ${input.type.replace("_", " ")}`);
+      return entry;
     },
     [logAudit, supabaseSession],
+  );
+
+  // Swaps in a record returned by the database after a notice/response step.
+  const replaceDisciplinaryRecord = useCallback((record: DisciplinaryRecord) => {
+    setState((prev) => ({ ...prev, disciplinaryRecords: prev.disciplinaryRecords.map((d) => (d.id === record.id ? record : d)) }));
+  }, []);
+  const patchDisciplinaryRecord = useCallback((id: string, patch: Partial<DisciplinaryRecord>) => {
+    setState((prev) => ({ ...prev, disciplinaryRecords: prev.disciplinaryRecords.map((d) => (d.id === id ? { ...d, ...patch } : d)) }));
+  }, []);
+  const errorText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
+
+  const attachDisciplinaryNotice: HrisContextShape["attachDisciplinaryNotice"] = useCallback(
+    async (id, file) => {
+      const record = state.disciplinaryRecords.find((d) => d.id === id);
+      try {
+        if (supabaseSession) replaceDisciplinaryRecord(await attachNoticePdf(id, file, record?.noticePath ?? null));
+        // Demo login: keep the file in this browser tab only.
+        else patchDisciplinaryRecord(id, { noticePath: URL.createObjectURL(file), noticeFileName: file.name });
+        logAudit("Discipline", "update", `Attached notice "${file.name}" to record ${id}`);
+        return null;
+      } catch (err) {
+        return errorText(err, "Couldn't upload the notice.");
+      }
+    },
+    [logAudit, supabaseSession, state.disciplinaryRecords, replaceDisciplinaryRecord, patchDisciplinaryRecord],
+  );
+
+  const acknowledgeDisciplinaryRecord: HrisContextShape["acknowledgeDisciplinaryRecord"] = useCallback(
+    async (id, signaturePng) => {
+      try {
+        if (supabaseSession) replaceDisciplinaryRecord(await acknowledgeNotice(id, signaturePng));
+        else patchDisciplinaryRecord(id, { acknowledgedAt: new Date().toISOString(), ackSignaturePath: URL.createObjectURL(signaturePng) });
+        logAudit("Discipline", "acknowledge", `Acknowledged receipt of notice ${id}`);
+        return null;
+      } catch (err) {
+        return errorText(err, "Couldn't save your acknowledgement.");
+      }
+    },
+    [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord],
+  );
+
+  const submitDisciplinaryExplanation: HrisContextShape["submitDisciplinaryExplanation"] = useCallback(
+    async (id, text, file) => {
+      try {
+        if (supabaseSession) replaceDisciplinaryRecord(await submitExplanation(id, text, file));
+        else
+          patchDisciplinaryRecord(id, {
+            explanation: text.trim() || null,
+            explanationFilePath: file ? URL.createObjectURL(file) : null,
+            explanationFileName: file?.name ?? null,
+            explanationSubmittedAt: new Date().toISOString(),
+          });
+        logAudit("Discipline", "explanation", `Submitted written explanation for notice ${id}`);
+        return null;
+      } catch (err) {
+        return errorText(err, "Couldn't submit your explanation.");
+      }
+    },
+    [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord],
   );
 
   const setDisciplinaryStatus: HrisContextShape["setDisciplinaryStatus"] = useCallback(
@@ -1578,6 +1644,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     updateEvaluationSection,
     setEvaluationStatus,
     addDisciplinaryRecord,
+    attachDisciplinaryNotice,
+    acknowledgeDisciplinaryRecord,
+    submitDisciplinaryExplanation,
     setDisciplinaryStatus,
     addAnnouncement,
     announcementImageUrls: announcementImageUrlsFor,

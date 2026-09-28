@@ -21,8 +21,8 @@ const TONE_COLOR: Record<NotificationItem["tone"], string> = {
 };
 
 export default function NotificationsPage() {
-  const { currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes } = useHris();
-  const notifications = buildNotifications({ currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes });
+  const { currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes, disciplinaryRecords } = useHris();
+  const notifications = buildNotifications({ currentUser, currentEmployee, employees, leaveRequests, overtimeRequests, correctionRequests, announcements, leaveTypes, disciplinaryRecords });
 
   return (
     <div>

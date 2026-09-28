@@ -149,6 +149,17 @@ export type DisciplinaryRecordRow = {
   date: string;
   status: "open" | "resolved";
   attachment_name: string | null;
+  notice_path?: string | null;
+  notice_file_name?: string | null;
+  requires_explanation?: boolean;
+  response_due?: string | null;
+  acknowledged_at?: string | null;
+  ack_signature_path?: string | null;
+  explanation?: string | null;
+  explanation_file_path?: string | null;
+  explanation_file_name?: string | null;
+  explanation_submitted_at?: string | null;
+  created_at?: string;
 };
 
 export type AuditLogRow = {
