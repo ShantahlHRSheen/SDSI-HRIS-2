@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ImagePlus, MessageCircle, Search, Send, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, MessageCircle, Search, Send, Smile, SmilePlus, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
 import { fullName } from "@/lib/helpers";
@@ -9,14 +9,20 @@ import { prepareChatPhoto } from "@/lib/id-images";
 import {
   countUnreadHrMessages,
   fetchHrInboxMessages,
+  fetchHrReactions,
   fetchHrThread,
   HR_CHAT_PHOTO_DAYS,
+  HR_REACTIONS,
   HR_MESSAGE_MAX,
   hrChatPhotoUrls,
   markHrThreadRead,
   sendHrMessage,
+  setHrReaction,
   type HrMessage,
+  type HrMessageReaction,
+  type HrReaction,
 } from "@/lib/supabase/hr-messages";
+import { EmojiPicker } from "./EmojiPicker";
 
 // Fired after a conversation is marked read so the menu badge refreshes now
 // instead of on its next poll.
@@ -41,6 +47,12 @@ function timeLabel(iso: string): string {
     minute: "2-digit",
   });
   return day === today ? time : `${d.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}, ${time}`;
+}
+
+// Messages that are only a few emojis are shown large, without a bubble.
+function isEmojiOnly(text: string): boolean {
+  const t = text.trim();
+  return !!t && [...t].length <= 12 && /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D|\s)+$/u.test(t);
 }
 
 function usePolling(fn: () => void, ms: number) {
@@ -72,7 +84,13 @@ export function useHrUnreadCount(): number {
 }
 
 export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { employeeId: string; viewerIsHr: boolean; otherName: string; onSent?: () => void }) {
+  const { currentUser } = useHris();
+  const myId = currentUser?.employeeId ?? "";
   const [messages, setMessages] = useState<HrMessage[] | null>(null);
+  const [reactions, setReactions] = useState<HrMessageReaction[]>([]);
+  const [reactingTo, setReactingTo] = useState<string | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -92,6 +110,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
       (m) => {
         setMessages(m);
         setLoadError(null);
+        fetchHrReactions(m.map((x) => x.id)).then(setReactions, (err) => console.warn("Couldn't load reactions", err));
         // Mark the other side's messages as read while this conversation is open.
         if (m.some((x) => !x.readAt && x.fromHr !== viewerIsHr)) {
           markHrThreadRead(employeeId).then(
@@ -151,6 +170,37 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
     }
   }
 
+  function insertEmoji(emoji: string) {
+    const el = textarea.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    const next = (draft.slice(0, start) + emoji + draft.slice(end)).slice(0, HR_MESSAGE_MAX);
+    setDraft(next);
+    // Put the cursor right after the inserted emoji.
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  }
+
+  async function react(messageId: string, reaction: HrReaction) {
+    setReactingTo(null);
+    const mine = reactions.find((r) => r.messageId === messageId && r.reactorEmployeeId === myId);
+    const next = mine?.reaction === reaction ? null : reaction;
+    const previous = reactions;
+    // Show it straight away; undo if saving fails.
+    setReactions((cur) => [
+      ...cur.filter((r) => !(r.messageId === messageId && r.reactorEmployeeId === myId)),
+      ...(next ? [{ messageId, reactorEmployeeId: myId, reactorName: currentUser?.name ?? "You", reaction: next }] : []),
+    ]);
+    try {
+      await setHrReaction(messageId, myId, next);
+    } catch (err) {
+      setReactions(previous);
+      reportSaveError("Couldn't save your reaction", err);
+    }
+  }
+
   async function send() {
     const body = draft.trim();
     const sentPhoto = photo;
@@ -180,10 +230,14 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
             {viewerIsHr ? `No messages with ${otherName} yet. Write the first one below.` : "No messages yet. Ask HR anything — only you and HR can see this conversation."}
           </div>
         )}
-        {messages?.map((m) => {
+        {messages?.map((m, idx) => {
           const mine = m.fromHr === viewerIsHr;
+          const msgReactions = reactions.filter((r) => r.messageId === m.id);
+          const grouped = HR_REACTIONS.map((r) => ({ ...r, who: msgReactions.filter((x) => x.reaction === r.value) })).filter((g) => g.who.length);
+          const myReaction = msgReactions.find((r) => r.reactorEmployeeId === myId)?.reaction;
+          const bigEmoji = !!m.body && isEmojiOnly(m.body);
           return (
-            <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+            <div key={m.id} className={`group flex items-center gap-1 ${mine ? "flex-row-reverse" : "flex-row"}`}>
               <div className={`max-w-[85%] sm:max-w-[70%]`}>
                 {m.imagePath && (
                   <a href={photoUrls.urls[m.imagePath]} target="_blank" rel="noreferrer" className={`mb-1 block ${mine ? "ml-auto" : ""} w-fit`}>
@@ -203,15 +257,39 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                     Photo removed — photos are kept for {HR_CHAT_PHOTO_DAYS} days
                   </div>
                 )}
-                {m.body && (
-                  <div
-                    className={`w-fit rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ${
-                      mine
-                        ? "ml-auto rounded-br-sm bg-[var(--series-1)] text-[var(--on-accent)]"
-                        : "rounded-bl-sm border border-[var(--border-hairline)] bg-[var(--surface-1)] text-[var(--text-primary)]"
-                    }`}
-                  >
-                    {m.body}
+                {m.body &&
+                  (bigEmoji ? (
+                    <div className={`w-fit text-4xl leading-tight ${mine ? "ml-auto" : ""}`}>{m.body}</div>
+                  ) : (
+                    <div
+                      className={`w-fit rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ${
+                        mine
+                          ? "ml-auto rounded-br-sm bg-[var(--series-1)] text-[var(--on-accent)]"
+                          : "rounded-bl-sm border border-[var(--border-hairline)] bg-[var(--surface-1)] text-[var(--text-primary)]"
+                      }`}
+                    >
+                      {m.body}
+                    </div>
+                  ))}
+                {grouped.length > 0 && (
+                  <div className={`-mt-1 flex flex-wrap gap-1 px-1 ${mine ? "justify-end" : ""}`}>
+                    {grouped.map((g) => (
+                      <button
+                        key={g.value}
+                        type="button"
+                        onClick={() => react(m.id, g.value)}
+                        title={`${g.label}: ${g.who.map((w) => (w.reactorEmployeeId === myId ? "You" : w.reactorName)).join(", ")}`}
+                        className={`flex items-center gap-0.5 rounded-full border px-1.5 py-px text-xs shadow-sm ${
+                          myReaction === g.value
+                            ? "border-[var(--series-1)] bg-[var(--series-1)]/15 text-[var(--text-primary)]"
+                            : "border-[var(--border-hairline)] bg-[var(--surface-1)] text-[var(--text-secondary)]"
+                        }`}
+                        aria-label={`${g.label} reaction by ${g.who.map((w) => (w.reactorEmployeeId === myId ? "you" : w.reactorName)).join(", ")}`}
+                      >
+                        <span className="text-sm leading-none">{g.emoji}</span>
+                        {g.who.length > 1 && <span className="tabular">{g.who.length}</span>}
+                      </button>
+                    ))}
                   </div>
                 )}
                 <div className={`mt-0.5 px-1 text-[11px] text-[var(--text-muted)] ${mine ? "text-right" : ""}`}>
@@ -220,6 +298,35 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                   {timeLabel(m.createdAt)}
                   {mine && (m.readAt ? " · Seen" : " · Sent")}
                 </div>
+              </div>
+              <div className="relative shrink-0 self-center">
+                <button
+                  type="button"
+                  onClick={() => setReactingTo(reactingTo === m.id ? null : m.id)}
+                  className={`rounded-full p-1 text-[var(--text-muted)] hover:bg-[var(--gridline)]/50 hover:text-[var(--text-primary)] focus:opacity-100 ${reactingTo === m.id ? "opacity-100" : "opacity-60 sm:opacity-0 sm:group-hover:opacity-100"}`}
+                  aria-label="React to this message"
+                  title="React"
+                >
+                  <SmilePlus size={16} />
+                </button>
+                {reactingTo === m.id && (
+                  <div
+                    className={`absolute z-10 flex gap-0.5 ${idx < 2 ? "top-full mt-1" : "bottom-full mb-1"} rounded-full border border-[var(--border-hairline)] bg-[var(--surface-1)] p-1 shadow-lg ${mine ? "right-0" : "left-0"}`}
+                  >
+                    {HR_REACTIONS.map((r) => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => react(m.id, r.value)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xl transition-transform hover:scale-125 ${myReaction === r.value ? "bg-[var(--series-1)]/20" : ""}`}
+                        aria-label={r.label}
+                        title={r.label}
+                      >
+                        {r.emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -264,7 +371,20 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
           >
             <ImagePlus size={18} />
           </button>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowEmoji((v) => !v)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+              aria-label="Add an emoji"
+              title="Add an emoji"
+            >
+              <Smile size={18} />
+            </button>
+            {showEmoji && <EmojiPicker onPick={insertEmoji} onClose={() => setShowEmoji(false)} />}
+          </div>
           <textarea
+            ref={textarea}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
