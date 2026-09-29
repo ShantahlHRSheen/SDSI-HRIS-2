@@ -36,9 +36,21 @@ export function AnnouncementPhotoGrid({ images }: { images: AnnouncementImage[] 
     <div className={`mt-3 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
       {images.map((img) =>
         urls[img.path] ? (
-          <a key={img.path} href={urls[img.path]} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-[var(--border-hairline)]">
+          <a
+            key={img.path}
+            href={urls[img.path]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block overflow-hidden rounded-lg border border-[var(--border-hairline)] ${images.length === 1 ? "w-fit max-w-full" : "bg-[var(--gridline)]/30"}`}
+          >
+            {/* Whole photo, never cropped: one photo keeps its own shape (up to most of the screen height); several are fitted into equal tiles. */}
             {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URLs from Supabase Storage */}
-            <img src={urls[img.path]} alt={img.name} className={`w-full object-cover ${images.length === 1 ? "max-h-96" : "h-40"}`} loading="lazy" />
+            <img
+              src={urls[img.path]}
+              alt={img.name}
+              className={images.length === 1 ? "block h-auto max-h-[80vh] w-auto max-w-full" : "h-48 w-full object-contain sm:h-56"}
+              loading="lazy"
+            />
           </a>
         ) : (
           <div key={img.path} className={`animate-pulse rounded-lg bg-[var(--gridline)]/40 ${images.length === 1 ? "h-60" : "h-40"}`} />
