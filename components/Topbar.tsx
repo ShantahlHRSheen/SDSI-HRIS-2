@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Bell, ChevronDown, KeyRound, LogOut, Menu, PhoneCall } from "lucide-react";
+import { Bell, ChevronDown, KeyRound, LogOut, Menu, PhoneCall, UserRound } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { ROLE_LABELS } from "@/lib/types";
 import { buildNotifications, relativeTime } from "@/lib/notifications";
@@ -93,6 +93,17 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
                     ))}
                   </div>
                 </div>
+                {currentEmployee && (
+                  <button
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+                    onClick={() => {
+                      setUserMenu(false);
+                      router.push(`/employees/${currentEmployee.id}`);
+                    }}
+                  >
+                    <UserRound size={16} /> My profile
+                  </button>
+                )}
                 {isRealAccount && (
                   <button
                     className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"

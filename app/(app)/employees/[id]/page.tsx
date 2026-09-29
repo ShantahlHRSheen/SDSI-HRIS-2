@@ -20,6 +20,7 @@ import { employeeGovIds } from "@/lib/bir";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 import { EmployeeLoginButton } from "@/components/employees/EmployeeLoginButton";
+import { EmergencyContactModal } from "@/components/employees/EmergencyContactModal";
 
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
@@ -31,6 +32,7 @@ export default function EmployeeProfilePage() {
   // not distinguishing the two, so this doesn't confirm who exists elsewhere.
   const employee = visibleEmployees.find((e) => e.id === params.id);
   const [editing, setEditing] = useState(false);
+  const [editingContact, setEditingContact] = useState(false);
   const canEdit = currentUser?.roles.includes("hr_admin");
 
   if (!employee) {
@@ -53,7 +55,7 @@ export default function EmployeeProfilePage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back to directory</button>
+        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back</button>
         {canEdit && (
           <div className="flex items-center gap-2">
             {isRealAccount && <EmployeeLoginButton employee={employee} />}
@@ -100,6 +102,8 @@ export default function EmployeeProfilePage() {
         />
       )}
 
+      {editingContact && <EmergencyContactModal employee={employee} open onClose={() => setEditingContact(false)} />}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Personal Information">
           <Row label="Gender" value={employee.gender} />
@@ -109,14 +113,23 @@ export default function EmployeeProfilePage() {
           <Row label="Address" value={employee.address ?? "—"} />
           <Row label="Contact number" value={employee.contactNumber ?? "—"} />
           <Row label="Email" value={employee.email ?? "—"} />
-          <Row
-            label="Emergency contact"
-            value={
-              employee.emergencyContactName || employee.emergencyContactPhone
-                ? `${employee.emergencyContactName ?? "—"} · ${employee.emergencyContactPhone ?? "—"}`
-                : "—"
-            }
-          />
+          <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
+            <span className="shrink-0 text-[var(--text-muted)]">Emergency contact</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="text-right break-words text-[var(--text-secondary)]">
+                {employee.emergencyContactName || employee.emergencyContactPhone ? `${employee.emergencyContactName ?? "—"} · ${employee.emergencyContactPhone ?? "—"}` : "—"}
+              </span>
+              {(canEdit || employee.id === currentEmployee?.id) && (
+                <button
+                  onClick={() => setEditingContact(true)}
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-hairline)] px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+                  aria-label="Edit emergency contact"
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
+            </span>
+          </div>
         </Section>
 
         <Section title="Employment Details">
