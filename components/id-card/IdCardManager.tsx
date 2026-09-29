@@ -36,6 +36,14 @@ export function IdCardManager({ employee }: { employee: Employee }) {
     };
   }, [employee.idPhotoPath, employee.idSignaturePath, isRealAccount]);
 
+  // Opened from the profile menu's "Emergency contact" link: jump to the form.
+  useEffect(() => {
+    if (window.location.hash !== "#emergency-contact") return;
+    const form = document.getElementById("emergency-contact");
+    form?.scrollIntoView({ behavior: "smooth", block: "start" });
+    form?.querySelector("input")?.focus({ preventScroll: true });
+  }, []);
+
   async function upload(kind: IdMediaKind, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -138,16 +146,16 @@ export function IdCardManager({ employee }: { employee: Employee }) {
         )}
 
         {isRealAccount && (
-          <form onSubmit={saveContact} className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+          <form id="emergency-contact" onSubmit={saveContact} className="scroll-mt-20 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
             <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Contact in case of emergency</div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Name</label>
-                <input value={contact.name} onChange={(e) => { setContact((c) => ({ ...c, name: e.target.value })); setContactSaved(false); }} maxLength={120} className={input} />
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Contact person&rsquo;s name</label>
+                <input value={contact.name} onChange={(e) => { setContact((c) => ({ ...c, name: e.target.value })); setContactSaved(false); }} maxLength={120} placeholder="e.g. Maria Santos (mother)" className={input} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Contact number</label>
-                <input value={contact.phone} onChange={(e) => { setContact((c) => ({ ...c, phone: e.target.value })); setContactSaved(false); }} maxLength={40} inputMode="tel" className={input} />
+                <input value={contact.phone} onChange={(e) => { setContact((c) => ({ ...c, phone: e.target.value })); setContactSaved(false); }} maxLength={40} inputMode="tel" placeholder="e.g. 0917 123 4567" className={input} />
               </div>
             </div>
             <div className="mt-3 flex items-center gap-3">
