@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
-import { saveEmergencyContact } from "@/lib/supabase/id-card";
+import { saveEmergencyContact, saveNickname } from "@/lib/supabase/id-card";
 import { fullName } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
@@ -41,12 +41,68 @@ export function EmergencyContactModal({ employee, open, onClose }: { employee: E
         <div className="text-xs text-[var(--text-muted)]">Person to contact in case of emergency for {fullName(employee)}. This also appears on the back of the ID card.</div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Contact person&rsquo;s name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="e.g. Maria Santos (mother)" className={input} aria-label="Emergency contact name" autoFocus />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={120}
+            placeholder="e.g. Maria Santos (mother)"
+            className={input}
+            aria-label="Emergency contact name"
+            autoFocus
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Contact number</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} inputMode="tel" placeholder="e.g. 0917 123 4567" className={input} aria-label="Emergency contact number" />
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            maxLength={40}
+            inputMode="tel"
+            placeholder="e.g. 0917 123 4567"
+            className={input}
+            aria-label="Emergency contact number"
+          />
         </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// The employee themself or HR (set_employee_nickname checks this).
+export function NicknameModal({ employee, onClose }: { employee: Employee; onClose: () => void }) {
+  const { isRealAccount, patchEmployeeLocal, updateEmployee } = useHris();
+  const [nickname, setNickname] = useState(employee.nickname ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (isRealAccount) {
+        await saveNickname(employee.id, nickname);
+        patchEmployeeLocal(employee.id, { nickname: nickname.trim() });
+      } else updateEmployee(employee.id, { nickname: nickname.trim() });
+      onClose();
+    } catch (err) {
+      reportSaveError("Couldn't save the nickname", err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Nickname">
+      <form onSubmit={save} className="space-y-3">
+        <div className="text-xs text-[var(--text-muted)]">What {fullName(employee)} likes to be called. Leave blank for none.</div>
+        <input value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={40} placeholder="e.g. Jem" className={input} aria-label="Nickname" autoFocus />
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
             Cancel

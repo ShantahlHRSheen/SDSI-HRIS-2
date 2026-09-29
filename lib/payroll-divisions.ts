@@ -7,8 +7,9 @@ import type { Department, Employee, EmployeeDepartmentAllocation, Position } fro
 // Departments carry their own division (MLM / Cosmetics / Darofy are
 // Business Units; Operations, HR, Finance, Accounting are Shared Services).
 // The Board ("BOD - Shared Services") is split by position: the Chairman
-// and Presidents count as Business Units — spread equally across the
-// business-unit departments so each one shows them when filtered — while
+// and Presidents count as Business Units — a "President for <unit>" fully in
+// that unit, the Chairman spread equally across the business-unit
+// departments so each one shows them when filtered — while
 // everyone else there (Vice Chairperson, Chemist, …) stays Shared Services.
 //
 // These report-only allocations don't touch employee_department_allocations,
@@ -37,12 +38,25 @@ export function reportAllocations(
   );
   const extra: EmployeeDepartmentAllocation[] = [];
   if (businessUnits.length === 0) return allocations;
+  const titleOf = new Map(positions.map((p) => [p.id, p.title]));
   for (const e of employees) {
     if (e.departmentId !== BOARD_DEPARTMENT_ID || !businessUnitBoardPositions.has(e.positionId)) continue;
     if (allocations.some((a) => a.employeeId === e.id)) continue; // an explicit split wins
-    for (const d of businessUnits) extra.push({ employeeId: e.id, departmentId: d.id, percent: 100 / businessUnits.length });
+    const own = ownBusinessUnit(titleOf.get(e.positionId) ?? "", businessUnits);
+    if (own) extra.push({ employeeId: e.id, departmentId: own.id, percent: 100 });
+    else for (const d of businessUnits) extra.push({ employeeId: e.id, departmentId: d.id, percent: 100 / businessUnits.length });
   }
   return [...allocations, ...extra];
+}
+
+// "President for Darofy" → the Darofy Department. Null when the title names
+// no single business unit (e.g. Chairman), who is then spread equally.
+function ownBusinessUnit(title: string, businessUnits: Department[]): Department | null {
+  const m = /\bfor\s+(.+)$/i.exec(title);
+  if (!m) return null;
+  const key = m[1].replace(/\s+department$/i, "").trim().toLowerCase();
+  const matches = businessUnits.filter((d) => d.name.replace(/\s+department$/i, "").trim().toLowerCase() === key);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export function divisionOf(departmentId: string, departments: Department[]): PayrollDivision {

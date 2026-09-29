@@ -6,21 +6,12 @@ import { useState } from "react";
 import { ArrowLeft, IdCard, Pencil } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Badge, type BadgeTone } from "@/components/Badge";
-import {
-  branchName,
-  departmentAllocationsForEmployee,
-  departmentName,
-  formatCurrency,
-  formatDate,
-  fullName,
-  positionTitle,
-  scopeEmployeesForViewer,
-} from "@/lib/helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, formatCurrency, formatDate, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import { employeeGovIds } from "@/lib/bir";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 import { EmployeeLoginButton } from "@/components/employees/EmployeeLoginButton";
-import { EmergencyContactModal } from "@/components/employees/EmergencyContactModal";
+import { EmergencyContactModal, NicknameModal } from "@/components/employees/EmergencyContactModal";
 
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
@@ -33,12 +24,15 @@ export default function EmployeeProfilePage() {
   const employee = visibleEmployees.find((e) => e.id === params.id);
   const [editing, setEditing] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
   const canEdit = currentUser?.roles.includes("hr_admin");
 
   if (!employee) {
     return (
       <div>
-        <button onClick={() => router.back()} className="mb-4 flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back</button>
+        <button onClick={() => router.back()} className="mb-4 flex items-center gap-1.5 text-sm text-[var(--series-1)]">
+          <ArrowLeft size={16} /> Back
+        </button>
         <div className="text-sm text-[var(--text-secondary)]">Employee not found.</div>
       </div>
     );
@@ -55,11 +49,16 @@ export default function EmployeeProfilePage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--series-1)]"><ArrowLeft size={16} /> Back</button>
+        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-[var(--series-1)]">
+          <ArrowLeft size={16} /> Back
+        </button>
         {canEdit && (
           <div className="flex items-center gap-2">
             {isRealAccount && <EmployeeLoginButton employee={employee} />}
-            <Link href={`/employees/${employee.id}/id-card`} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+            <Link
+              href={`/employees/${employee.id}/id-card`}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+            >
               <IdCard size={14} /> ID card
             </Link>
             <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
@@ -71,10 +70,13 @@ export default function EmployeeProfilePage() {
 
       <div className="mb-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xl font-semibold text-[var(--on-accent)]">
-          {employee.firstName[0]}{employee.lastName[0]}
+          {employee.firstName[0]}
+          {employee.lastName[0]}
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]">{fullName(employee)} <span className="text-sm font-normal text-[var(--text-muted)]">&ldquo;{employee.nickname}&rdquo;</span></h1>
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">
+            {fullName(employee)} {employee.nickname?.trim() && <span className="text-sm font-normal text-[var(--text-muted)]">&ldquo;{employee.nickname}&rdquo;</span>}
+          </h1>
           <div className="mt-0.5 text-sm text-[var(--text-secondary)]">
             {positionTitle(employee.positionId)} ·{" "}
             {departmentAllocationsForEmployee(employee, employeeDepartmentAllocations)
@@ -103,9 +105,25 @@ export default function EmployeeProfilePage() {
       )}
 
       {editingContact && <EmergencyContactModal employee={employee} open onClose={() => setEditingContact(false)} />}
+      {editingNickname && <NicknameModal employee={employee} onClose={() => setEditingNickname(false)} />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Personal Information">
+          <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
+            <span className="shrink-0 text-[var(--text-muted)]">Nickname</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="text-right break-words text-[var(--text-secondary)]">{employee.nickname?.trim() || "—"}</span>
+              {(canEdit || employee.id === currentEmployee?.id) && (
+                <button
+                  onClick={() => setEditingNickname(true)}
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-hairline)] px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+                  aria-label="Edit nickname"
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
+            </span>
+          </div>
           <Row label="Gender" value={employee.gender} />
           <Row label="Birthdate" value={formatDate(employee.birthdate)} />
           <Row label="Civil status" value={employee.civilStatus ?? "—"} />
@@ -139,10 +157,7 @@ export default function EmployeeProfilePage() {
           <Row label="Date regularized" value={formatDate(employee.dateRegularized)} />
           <Row label="Contract period" value={employee.contractStart ? `${formatDate(employee.contractStart)} – ${formatDate(employee.contractEnd)}` : "—"} />
           <Row label="Probation ends" value={formatDate(employee.probationEndsAt)} />
-          <Row
-            label="Payroll type"
-            value={employee.payrollType === "monthly" ? "Fixed-rate" : employee.payrollType === "daily" ? "Daily-rate" : "Not on file"}
-          />
+          <Row label="Payroll type" value={employee.payrollType === "monthly" ? "Fixed-rate" : employee.payrollType === "daily" ? "Daily-rate" : "Not on file"} />
           <Row
             label="Rate"
             value={
@@ -197,7 +212,9 @@ export default function EmployeeProfilePage() {
           ) : (
             empDiscipline.map((d) => (
               <div key={d.id} className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-[var(--text-secondary)]">{DISCIPLINARY_LABELS[d.type]} · {formatDate(d.date)}</span>
+                <span className="text-[var(--text-secondary)]">
+                  {DISCIPLINARY_LABELS[d.type]} · {formatDate(d.date)}
+                </span>
                 <Badge tone={d.status === "resolved" ? "good" : "warning"}>{d.status}</Badge>
               </div>
             ))
