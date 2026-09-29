@@ -105,3 +105,60 @@ export async function countUnreadHrMessages(myEmployeeId: string, isHr: boolean)
   if (error) throw error;
   return count ?? 0;
 }
+
+// ---- Reactions (supabase/migrate_phase21_hr_message_reactions.sql) ----------
+// One per person per message; the database fills in who reacted.
+
+export type HrReaction = "smile" | "laugh" | "sad" | "heart" | "like" | "celebrate";
+
+export const HR_REACTIONS: { value: HrReaction; emoji: string; label: string }[] = [
+  { value: "like", emoji: "👍", label: "Like" },
+  { value: "heart", emoji: "❤️", label: "Heart" },
+  { value: "smile", emoji: "😊", label: "Smile" },
+  { value: "laugh", emoji: "😂", label: "Laugh" },
+  { value: "sad", emoji: "😢", label: "Sad" },
+  { value: "celebrate", emoji: "🎉", label: "Celebrate" },
+];
+
+export interface HrMessageReaction {
+  messageId: string;
+  reactorEmployeeId: string;
+  reactorName: string;
+  reaction: HrReaction;
+}
+
+type ReactionRow = { message_id: string; reactor_employee_id: string; reactor_name: string; reaction: HrReaction };
+type LooseQuery = PromiseLike<{ data: unknown; error: { message: string } | null }> & {
+  select: (c?: string) => LooseQuery;
+  in: (col: string, v: string[]) => LooseQuery;
+  eq: (col: string, v: string) => LooseQuery;
+  upsert: (v: Record<string, unknown>, o?: { onConflict: string }) => LooseQuery;
+  delete: () => LooseQuery;
+};
+const reactionsTable = () => (getSupabaseClient() as unknown as { from: (t: string) => LooseQuery }).from("hr_message_reactions");
+
+// Reactions for these messages. Resolves to [] if reactions aren't set up yet.
+export async function fetchHrReactions(messageIds: string[]): Promise<HrMessageReaction[]> {
+  const out: HrMessageReaction[] = [];
+  for (let i = 0; i < messageIds.length; i += 200) {
+    const { data, error } = await reactionsTable()
+      .select("message_id, reactor_employee_id, reactor_name, reaction")
+      .in("message_id", messageIds.slice(i, i + 200));
+    if (error) {
+      if (/hr_message_reactions/.test(error.message)) return [];
+      throw new Error(error.message);
+    }
+    for (const r of data as ReactionRow[]) out.push({ messageId: r.message_id, reactorEmployeeId: r.reactor_employee_id, reactorName: r.reactor_name, reaction: r.reaction });
+  }
+  return out;
+}
+
+// Set my reaction (replacing any previous one), or remove it with null.
+export async function setHrReaction(messageId: string, myEmployeeId: string, reaction: HrReaction | null): Promise<void> {
+  const q =
+    reaction === null
+      ? reactionsTable().delete().eq("message_id", messageId).eq("reactor_employee_id", myEmployeeId)
+      : reactionsTable().upsert({ message_id: messageId, reactor_employee_id: myEmployeeId, reaction }, { onConflict: "message_id,reactor_employee_id" });
+  const { error } = await q;
+  if (error) throw new Error(/hr_message_reactions/.test(error.message) ? "Reactions aren't set up yet — ask HR to run the latest database update." : error.message);
+}
