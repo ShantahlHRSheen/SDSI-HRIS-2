@@ -34,6 +34,12 @@ export async function saveEmergencyContact(employeeId: string, name: string, pho
   if (error) throw new Error(error.message);
 }
 
+// supabase/migrate_phase22_employee_nickname.sql — own nickname, or HR.
+export async function saveNickname(employeeId: string, nickname: string): Promise<void> {
+  const { error } = await rpc("set_employee_nickname", { emp_id: employeeId, nick: nickname });
+  if (error) throw new Error(/set_employee_nickname/.test(error.message) ? "Nickname editing isn't set up yet — ask HR to run the latest database update." : error.message);
+}
+
 // Short-lived (1 hour) viewing links for a photo and/or signature.
 export async function idMediaUrls(paths: (string | null | undefined)[]): Promise<Record<string, string>> {
   const wanted = paths.filter((p): p is string => !!p);
