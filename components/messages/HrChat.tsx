@@ -210,7 +210,10 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
       const m = await sendHrMessage(employeeId, body, sentPhoto?.blob);
       setMessages((prev) => [...(prev ?? []), m]);
       // Clear only what was sent — keep anything typed or attached meanwhile.
-      setDraft((cur) => (cur.trim() === body ? "" : cur));
+      setDraft((cur) => {
+        const rest = cur.trimStart();
+        return rest.startsWith(body) ? rest.slice(body.length).trimStart() : cur;
+      });
       setPhoto((cur) => (cur === sentPhoto ? null : cur));
       onSent?.();
     } catch (err) {
