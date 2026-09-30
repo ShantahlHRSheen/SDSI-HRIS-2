@@ -139,6 +139,19 @@ export function useVoucherSignoffs(periodId: string | undefined) {
     },
     [periodId, currentUser, reload],
   );
+  // Sign several vouchers in one go ("Mark all as checked").
+  const signMany = useCallback(
+    async (step: SignoffStep, items: { voucherKey: string; total: number }[]) => {
+      if (!periodId || !currentUser?.employeeId) return;
+      try {
+        for (const { voucherKey, total } of items) await signVoucher(periodId, voucherKey, step, currentUser.employeeId, total);
+      } catch (err) {
+        reportSaveError(step === "checked" ? "Couldn't mark the vouchers as checked" : "Couldn't mark the vouchers as released", err);
+      }
+      reload();
+    },
+    [periodId, currentUser, reload],
+  );
   const withdraw = useCallback(
     async (voucherKey: string, step: SignoffStep) => {
       if (!periodId) return;
@@ -152,7 +165,7 @@ export function useVoucherSignoffs(periodId: string | undefined) {
     [periodId, reload],
   );
   // Only this period's (a switch of period shows nothing until its own load).
-  return { signoffs: signoffs.filter((x) => x.periodId === periodId), sign, withdraw };
+  return { signoffs: signoffs.filter((x) => x.periodId === periodId), sign, signMany, withdraw };
 }
 
 const when = (iso: string) =>

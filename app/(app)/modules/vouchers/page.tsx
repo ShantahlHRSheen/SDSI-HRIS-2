@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Check, ChevronRight, Pencil, Plus, Printer, Receipt, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { BadgeCheck, Check, ChevronRight, Pencil, Plus, Printer, Receipt, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
@@ -45,7 +45,7 @@ export default function VouchersPage() {
   const canManage = !!currentUser?.roles.some((r) => MANAGE_ROLES.includes(r));
   const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
   const signatures = useVoucherSignatures();
-  const { signoffs, sign, withdraw } = useVoucherSignoffs(period?.id);
+  const { signoffs, sign, signMany, withdraw } = useVoucherSignoffs(period?.id);
   const isHr = !!currentUser?.roles.includes("hr_admin");
   // Signatures printed on a voucher: Prepared by once uploaded; Checked by /
   // Released by only while that sign-off matches the voucher's total.
@@ -86,6 +86,35 @@ export default function VouchersPage() {
   const adjustmentNet = Math.round(periodAdjustments.reduce((s, a) => s + netEffect(a), 0) * 100) / 100;
   const payrollEmployeeIds = useMemo(() => new Set(attendancePeriodRecords.filter((r) => r.periodId === period?.id).map((r) => r.employeeId)), [attendancePeriodRecords, period]);
   const deptsWithLines = shownDepts.filter((d) => (linesByDept.get(d.id)?.length ?? 0) > 0);
+
+  // Every voucher of this period that can be signed off, with its total.
+  const signable = [
+    ...deptsWithLines.map((d) => ({ voucherKey: `dept:${d.id}`, total: totalOf(d.id) })),
+    ...(periodAdjustments.length ? [{ voucherKey: "salary_adjustments", total: adjustmentNet }] : []),
+  ];
+  const roles = currentUser?.roles ?? [];
+  const toCheck = roles.includes("sr_accounting_assistant") ? signable.filter((v) => !validSignoff(signoffs, v.voucherKey, "checked", v.total)) : [];
+  const toRelease = roles.includes("treasurer")
+    ? signable.filter((v) => validSignoff(signoffs, v.voucherKey, "checked", v.total) && !validSignoff(signoffs, v.voucherKey, "released", v.total))
+    : [];
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const bulkSign = async (step: "checked" | "released", items: typeof signable) => {
+    const what = step === "checked" ? "checked" : "released";
+    if (!confirm(`Mark ${items.length} voucher${items.length === 1 ? "" : "s"} for this payroll period as ${what}? Your signature will print on ${items.length === 1 ? "it" : "them"}.`)) return;
+    setBulkBusy(true);
+    await signMany(step, items);
+    setBulkBusy(false);
+  };
+  const signoffBadge = (voucherKey: string, total: number) => {
+    if (!isRealAccount) return null;
+    const released = validSignoff(signoffs, voucherKey, "released", total);
+    const checked = validSignoff(signoffs, voucherKey, "checked", total);
+    return released ? (
+      <span className="text-[var(--status-good)]"> · Checked · Released</span>
+    ) : checked ? (
+      <span className="text-[var(--status-good)]"> · Checked</span>
+    ) : null;
+  };
 
   // What's being printed through the multi-page print stack, if anything.
   // "all", "adjustments", or one department voucher ("dept:<id>").
@@ -130,7 +159,30 @@ export default function VouchersPage() {
           signatureKindsFor(currentUser?.roles ?? []).map((kind) => (
             <SignatureControl key={kind} kind={kind} url={signatures.urls[kind]} onChanged={signatures.reload} hrView={isHr} />
           ))}
+        {isRealAccount && period && loaded && toCheck.length > 0 && (
+          <button
+            onClick={() => bulkSign("checked", toCheck)}
+            disabled={bulkBusy}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40"
+          >
+            <BadgeCheck size={15} /> {bulkBusy ? "Saving…" : `Mark all as checked (${toCheck.length})`}
+          </button>
+        )}
+        {isRealAccount && period && loaded && toRelease.length > 0 && (
+          <button
+            onClick={() => bulkSign("released", toRelease)}
+            disabled={bulkBusy}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40"
+          >
+            <BadgeCheck size={15} /> {bulkBusy ? "Saving…" : `Mark all as released (${toRelease.length})`}
+          </button>
+        )}
       </div>
+      {isRealAccount && period && loaded && signable.length > 0 && (
+        <p className="-mt-2 mb-4 text-xs text-[var(--text-muted)] print:hidden">
+          The Checked by and Released by signatures print only on vouchers that have been marked as checked / released (and whose total hasn&rsquo;t changed since).
+        </p>
+      )}
 
       {!period ? (
         <EmptyState icon={Receipt} title="No payroll periods" description="Add a payroll period in System Administration first." />
@@ -158,7 +210,10 @@ export default function VouchersPage() {
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-[var(--text-primary)]">{voucherTitle(d)}</div>
-                    <div className="text-xs text-[var(--text-muted)]">{n ? `${n} payee${n === 1 ? "" : "s"}` : "No payees yet"}</div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      {n ? `${n} payee${n === 1 ? "" : "s"}` : "No payees yet"}
+                      {n > 0 && signoffBadge(`dept:${d.id}`, totalOf(d.id))}
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="tabular text-sm font-semibold text-[var(--text-primary)]">{peso(totalOf(d.id))}</span>
@@ -179,6 +234,7 @@ export default function VouchersPage() {
                     {periodAdjustments.length
                       ? `${periodAdjustments.length} adjustment${periodAdjustments.length === 1 ? "" : "s"} · in payroll`
                       : "Adjust any part of the payroll"}
+                    {periodAdjustments.length > 0 && signoffBadge("salary_adjustments", adjustmentNet)}
                   </div>
                 </div>
               </div>
