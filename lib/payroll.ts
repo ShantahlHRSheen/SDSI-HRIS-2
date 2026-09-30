@@ -136,9 +136,7 @@ function withinPeriod(dateStr: string, period: PayrollPeriod): boolean {
 }
 
 function approvedOtHours(employeeId: string, period: PayrollPeriod, overtimeRequests: OvertimeRequest[]): number {
-  return overtimeRequests
-    .filter((r) => r.employeeId === employeeId && r.status === "approved" && withinPeriod(r.date, period))
-    .reduce((s, r) => s + r.hours, 0);
+  return overtimeRequests.filter((r) => r.employeeId === employeeId && r.status === "approved" && withinPeriod(r.date, period)).reduce((s, r) => s + r.hours, 0);
 }
 
 const emptyOverride: Omit<PayrollLineOverride, "id" | "periodId" | "employeeId" | "updatedBy" | "updatedAt"> = {
@@ -258,16 +256,20 @@ export function computePayrollForPeriod(
     const adjustmentDeduct = ov.adjustmentDeduct + a("other_deduction");
     const salaryAdjustmentNet = Object.entries(adj).reduce((t, [k, v]) => t + netEffect({ component: k as SalaryAdjustmentComponent, amount: v ?? 0 }), 0);
 
-    const totalDeductionsOtherThanMandatories =
-      cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + shortages + withholdingTax + sssLoan + hdmfLoan + ov.hdmfMp2Savings;
+    const totalDeductionsOtherThanMandatories = cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + shortages + withholdingTax + sssLoan + hdmfLoan + ov.hdmfMp2Savings;
     const totalMandatories = sssContribution + sssWisp + hdmfContribution + philHealthContribution;
 
     const netPay = grossSalary + adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - adjustmentDeduct;
 
-    const employerSSS = Math.round((sss.regular.employer / 2) * 100) / 100;
-    const employerSSSWisp = Math.round((sss.wisp.employer / 2) * 100) / 100;
-    const employerHDMF = Math.round((hdmf.employer / 2) * 100) / 100;
-    const employerPhilHealth = Math.round((philHealth.employer / 2) * 100) / 100;
+    // No employer share when the employee isn't covered — their employee
+    // share on file is 0 (e.g. Board members without PhilHealth). Otherwise
+    // the employer share comes from the contribution table as before.
+    const employerShare = (employerAuto: number, employeeOnFile: number | null) =>
+      employeeOnFile !== null && employeeOnFile <= 0 ? 0 : Math.round((employerAuto / 2) * 100) / 100;
+    const employerSSS = employerShare(sss.regular.employer, ov.sssContributionOverride);
+    const employerSSSWisp = employerShare(sss.wisp.employer, ov.sssWispOverride);
+    const employerHDMF = employerShare(hdmf.employer, ov.hdmfContributionOverride);
+    const employerPhilHealth = employerShare(philHealth.employer, ov.philHealthContributionOverride);
     const employerExpense = grossSalary + employerSSS + employerSSSWisp + employerHDMF + employerPhilHealth;
 
     lines.push({
