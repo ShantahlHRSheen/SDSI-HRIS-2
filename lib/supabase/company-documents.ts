@@ -44,31 +44,43 @@ export async function replaceCompanyDocument(path: string, file: File): Promise<
   if (error) throw error;
 }
 
-// "Prepared by" signature printed on vouchers
-// (supabase/migrate_phase23_prepared_by_signature.sql). A transparent PNG.
-export const PREPARED_BY_SIGNATURE_PATH = "signatures/prepared-by.png";
+// Signatures printed on vouchers (supabase/migrate_phase23_prepared_by_signature.sql,
+// migrate_phase24_voucher_signoffs.sql): transparent PNGs in signatures/.
+// Prepared by = HR; Checked by = the Sr. Accounting Assistant; Released by =
+// the Corporate Treasurer (HR can manage all three).
+export type SignatureKind = "prepared-by" | "checked-by" | "released-by";
+export const SIGNATURE_KINDS: SignatureKind[] = ["prepared-by", "checked-by", "released-by"];
+const signaturePath = (kind: SignatureKind) => `signatures/${kind}.png`;
 
-// Viewing link (1 hour), or null when no signature has been uploaded.
-export async function fetchPreparedBySignatureUrl(): Promise<string | null> {
+// Viewing links (1 hour) for the signatures that have been uploaded.
+export async function fetchSignatureUrls(): Promise<Partial<Record<SignatureKind, string>>> {
   const bucket = getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET);
-  const { data: files, error } = await bucket.list("signatures", { search: "prepared-by.png", limit: 5 });
-  if (error) return null;
-  const file = files?.find((f) => f.name === "prepared-by.png");
-  if (!file) return null;
-  const { data, error: signErr } = await bucket.createSignedUrl(PREPARED_BY_SIGNATURE_PATH, 3600);
-  if (signErr) return null;
-  // The version tag makes browsers pick up a replaced signature straight away.
-  return `${data.signedUrl}&v=${encodeURIComponent(file.updated_at ?? file.created_at ?? "")}`;
+  const { data: files, error } = await bucket.list("signatures", { limit: 20 });
+  if (error || !files) return {};
+  const out: Partial<Record<SignatureKind, string>> = {};
+  for (const kind of SIGNATURE_KINDS) {
+    const file = files.find((f) => f.name === `${kind}.png`);
+    if (!file) continue;
+    const { data, error: signErr } = await bucket.createSignedUrl(signaturePath(kind), 3600);
+    // The version tag makes browsers pick up a replaced signature straight away.
+    if (!signErr) out[kind] = `${data.signedUrl}&v=${encodeURIComponent(file.updated_at ?? file.created_at ?? "")}`;
+  }
+  return out;
 }
 
-export async function uploadPreparedBySignature(png: Blob): Promise<void> {
-  const { error } = await getSupabaseClient()
+export async function uploadSignature(kind: SignatureKind, png: Blob): Promise<void> {
+  const { error } = await getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET).upload(signaturePath(kind), png, { upsert: true, contentType: "image/png", cacheControl: "60" });
+  if (error) {
+    if (/mime|type/i.test(error.message)) throw new Error("Signature upload isn't set up yet — run the latest database update first.");
+    if (/row-level security/i.test(error.message)) throw new Error("You can only upload your own signature.");
+    throw new Error(error.message);
+  }
+}
+
+export async function removeSignature(kind: SignatureKind): Promise<void> {
+  const { data, error } = await getSupabaseClient()
     .storage.from(COMPANY_DOCS_BUCKET)
-    .upload(PREPARED_BY_SIGNATURE_PATH, png, { upsert: true, contentType: "image/png", cacheControl: "60" });
-  if (error) throw new Error(/mime|type/i.test(error.message) ? "Signature upload isn't set up yet — run the latest database update (phase 23) first." : error.message);
-}
-
-export async function removePreparedBySignature(): Promise<void> {
-  const { error } = await getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET).remove([PREPARED_BY_SIGNATURE_PATH]);
+    .remove([signaturePath(kind)]);
   if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("You can only remove your own signature.");
 }

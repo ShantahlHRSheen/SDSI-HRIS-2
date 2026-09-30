@@ -36,7 +36,7 @@ export function VoucherSheet({
   total,
   minRows = 12,
   note,
-  signatureUrl,
+  signatures,
 }: {
   title: string;
   // Printed at the top right (the cut-off date), YYYY-MM-DD.
@@ -48,8 +48,9 @@ export function VoucherSheet({
   // Blank rows are added so short vouchers keep the sheet's shape.
   minRows?: number;
   note?: string;
-  // "Prepared by" signature image, if one has been uploaded.
-  signatureUrl?: string | null;
+  // Signatures to print: Prepared by always (once uploaded); Checked by and
+  // Released by only once that person has signed off this voucher.
+  signatures?: VoucherSignatureSet;
 }) {
   const cell: React.CSSProperties = { border, padding: "3px 6px", fontSize: "9pt", verticalAlign: "top" };
   const head: React.CSSProperties = { ...cell, ...exact, background: GREEN, color: "#fff", fontWeight: 700, textAlign: "center" };
@@ -121,12 +122,31 @@ export function VoucherSheet({
         </tbody>
       </table>
       {note && <div style={{ fontSize: "8pt", color: "#444", marginTop: "4px" }}>{note}</div>}
-      <VoucherSignatories signatureUrl={signatureUrl} />
+      <VoucherSignatories signatures={signatures} />
     </div>
   );
 }
 
-export function VoucherSignatories({ signatureUrl }: { signatureUrl?: string | null }) {
+export interface VoucherSignatureSet {
+  prepared?: string;
+  checked?: { url?: string; at: string };
+  released?: { url?: string; at: string };
+}
+
+const signedOn = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", year: "numeric", month: "short", day: "numeric" }).format(new Date(iso));
+
+export function VoucherSignatories({ signatures = {} }: { signatures?: VoucherSignatureSet }) {
+  // Position on the sheet → signature: [row][column].
+  const slot = (r: number, i: number): { url?: string; at?: string } | undefined =>
+    r === 0 && i === 0
+      ? signatures.prepared
+        ? { url: signatures.prepared }
+        : undefined
+      : r === 0 && i === 1
+        ? signatures.checked
+        : r === 1 && i === 0
+          ? signatures.released
+          : undefined;
   return (
     <div style={{ marginTop: "18px", breakInside: "avoid" }}>
       {VOUCHER_SIGNATORIES.map((row, r) => (
@@ -135,13 +155,14 @@ export function VoucherSignatories({ signatureUrl }: { signatureUrl?: string | n
             <div key={`${s.name}-${i}`} style={row.length === 1 ? { gridColumn: "1 / span 2" } : undefined}>
               <div style={{ fontStyle: "italic", fontSize: "9pt" }}>{s.role}</div>
               <div style={{ height: "34px", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                {signatureUrl && r === 0 && i === 0 && (
+                {slot(r, i)?.url && (
                   // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL from Supabase Storage
-                  <img src={signatureUrl} alt="Signature" style={{ maxHeight: "46px", maxWidth: "150px", marginBottom: "-10px", ...exact }} />
+                  <img src={slot(r, i)!.url} alt="Signature" style={{ maxHeight: "46px", maxWidth: "150px", marginBottom: "-10px", ...exact }} />
                 )}
               </div>
               <div style={{ textAlign: "center", fontWeight: 700, fontSize: "8pt", whiteSpace: "nowrap" }}>{s.name}</div>
               <div style={{ textAlign: "center", fontSize: "7pt", whiteSpace: "nowrap" }}>{s.title}</div>
+              {slot(r, i)?.at && <div style={{ textAlign: "center", fontSize: "6.5pt", color: "#444", whiteSpace: "nowrap" }}>{signedOn(slot(r, i)!.at!)}</div>}
             </div>
           ))}
         </div>
