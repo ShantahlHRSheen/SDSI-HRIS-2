@@ -168,7 +168,8 @@ body {
   display: none;
 }
 
+/* Vouchers (the only multi-page print job): 1 inch at the top and sides. */
 @page print-stack {
   size: A4;
-  margin: 14mm;
+  margin: 25.4mm 25.4mm 14mm 25.4mm;
 }

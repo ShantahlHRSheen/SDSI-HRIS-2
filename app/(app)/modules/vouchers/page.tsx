@@ -75,7 +75,8 @@ export default function VouchersPage() {
   const deptsWithLines = shownDepts.filter((d) => (linesByDept.get(d.id)?.length ?? 0) > 0);
 
   // What's being printed through the multi-page print stack, if anything.
-  const [printing, setPrinting] = useState<"all" | "adjustments" | null>(null);
+  // "all", "adjustments", or one department voucher ("dept:<id>").
+  const [printing, setPrinting] = useState<string | null>(null);
   const stopPrinting = useCallback(() => setPrinting(null), []);
 
   const activeEmployees = useMemo(
@@ -199,8 +200,7 @@ export default function VouchersPage() {
               lines={linesByDept.get(open.id) ?? []}
               canManage={canManage}
               employees={activeEmployees}
-              allEmployees={employees}
-              signatureUrl={signature.url}
+              onPrint={() => setPrinting(`dept:${open.id}`)}
               onAdd={(l) => addLine(period, open.id, l)}
               onEdit={editLine}
               onRemove={removeLine}
@@ -211,13 +211,12 @@ export default function VouchersPage() {
 
           {printing && (
             <PrintStack onDone={stopPrinting}>
-              {printing === "all" &&
-                deptsWithLines.map((d) => (
-                  <PrintPage key={d.id}>
-                    <VoucherDoc department={d} period={period} lines={linesByDept.get(d.id) ?? []} total={totalOf(d.id)} employees={employees} signatureUrl={signature.url} />
-                  </PrintPage>
-                ))}
-              {periodAdjustments.length > 0 && (
+              {(printing === "all" ? deptsWithLines : shownDepts.filter((d) => printing === `dept:${d.id}`)).map((d) => (
+                <PrintPage key={d.id}>
+                  <VoucherDoc department={d} period={period} lines={linesByDept.get(d.id) ?? []} total={totalOf(d.id)} employees={employees} signatureUrl={signature.url} />
+                </PrintPage>
+              ))}
+              {(printing === "all" || printing === "adjustments") && periodAdjustments.length > 0 && (
                 <PrintPage>
                   <SalaryAdjustmentVoucherDoc period={period} adjustments={periodAdjustments} employees={employees} signatureUrl={signature.url} />
                 </PrintPage>
@@ -243,8 +242,7 @@ function VoucherEditor({
   lines,
   canManage,
   employees,
-  allEmployees,
-  signatureUrl,
+  onPrint,
   onAdd,
   onEdit,
   onRemove,
@@ -254,9 +252,7 @@ function VoucherEditor({
   lines: DepartmentVoucherLine[];
   canManage: boolean;
   employees: Employee[];
-  // Everyone (including former employees), for positions on the printout.
-  allEmployees: Employee[];
-  signatureUrl: string | null;
+  onPrint: () => void;
   onAdd: (l: LineInput) => Promise<boolean>;
   onEdit: (id: string, patch: Partial<LineInput>) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
@@ -304,7 +300,7 @@ function VoucherEditor({
           </div>
         </div>
         <button
-          onClick={() => window.print()}
+          onClick={onPrint}
           disabled={!lines.length}
           className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
         >
@@ -481,22 +477,12 @@ function VoucherEditor({
           <div className="text-[11px] text-[var(--text-muted)] sm:col-span-4">Start typing to pick an employee, or type any name for a freelancer or other payee.</div>
         </form>
       )}
-
-      <VoucherPrint department={department} period={period} lines={lines} total={total} employees={allEmployees} signatureUrl={signatureUrl} />
     </div>
   );
 }
 
-// The printed voucher (A4, black on white) — hidden on screen.
+// The printed voucher (A4, black on white), shown only in the print stack.
 type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; employees: Employee[]; signatureUrl: string | null };
-
-function VoucherPrint(props: VoucherDocProps) {
-  return (
-    <div className="bir-print-area hidden print:block">
-      <VoucherDoc {...props} />
-    </div>
-  );
-}
 
 function VoucherDoc({ department, period, lines, total, employees, signatureUrl }: VoucherDocProps) {
   const byId = new Map(employees.map((e) => [e.id, e]));
