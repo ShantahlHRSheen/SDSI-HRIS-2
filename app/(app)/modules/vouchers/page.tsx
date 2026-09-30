@@ -16,7 +16,8 @@ import { netEffect } from "@/lib/salary-adjustments";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { SALARY_ADJUSTMENT_VOUCHER_TITLE, SalaryAdjustmentEditor, SalaryAdjustmentVoucherDoc } from "@/components/vouchers/SalaryAdjustmentVoucher";
 import { VoucherSheet } from "@/components/vouchers/VoucherSheet";
-import { PreparedBySignatureControl, usePreparedBySignature } from "@/components/vouchers/PreparedBySignature";
+import { SignatureControl, SignoffBar, signatureKindsFor, useVoucherSignatures, useVoucherSignoffs, validSignoff } from "@/components/vouchers/VoucherSignatures";
+import type { VoucherSignatureSet } from "@/components/vouchers/VoucherSheet";
 
 // Tile id for the Salary Adjustment Voucher among the department tiles.
 const SALARY_ADJ = "__salary_adjustments";
@@ -43,8 +44,20 @@ export default function VouchersPage() {
   } = useHris();
   const canManage = !!currentUser?.roles.some((r) => MANAGE_ROLES.includes(r));
   const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
-  const signature = usePreparedBySignature();
+  const signatures = useVoucherSignatures();
+  const { signoffs, sign, withdraw } = useVoucherSignoffs(period?.id);
   const isHr = !!currentUser?.roles.includes("hr_admin");
+  // Signatures printed on a voucher: Prepared by once uploaded; Checked by /
+  // Released by only while that sign-off matches the voucher's total.
+  const signaturesFor = (voucherKey: string, total: number): VoucherSignatureSet => {
+    const checked = validSignoff(signoffs, voucherKey, "checked", total);
+    const released = validSignoff(signoffs, voucherKey, "released", total);
+    return {
+      prepared: signatures.urls["prepared-by"],
+      checked: checked ? { url: signatures.urls["checked-by"], at: checked.signedAt } : undefined,
+      released: released ? { url: signatures.urls["released-by"], at: released.signedAt } : undefined,
+    };
+  };
   const { vouchers, lines, loaded, loadError, addLine, editLine, removeLine } = useDepartmentVouchers();
   const [openDept, setOpenDept] = useState<string | null>(null);
 
@@ -113,7 +126,10 @@ export default function VouchersPage() {
             <Printer size={15} /> Print all vouchers
           </button>
         )}
-        {isHr && isRealAccount && <PreparedBySignatureControl url={signature.url} onChanged={signature.reload} />}
+        {isRealAccount &&
+          signatureKindsFor(currentUser?.roles ?? []).map((kind) => (
+            <SignatureControl key={kind} kind={kind} url={signatures.urls[kind]} onChanged={signatures.reload} hrView={isHr} />
+          ))}
       </div>
 
       {!period ? (
@@ -178,6 +194,17 @@ export default function VouchersPage() {
             </button>
           </div>
 
+          {openDept === SALARY_ADJ && periodAdjustments.length > 0 && (
+            <div className="mt-4">
+              <SignoffBar voucherKey="salary_adjustments" total={adjustmentNet} signoffs={signoffs} onSign={sign} onWithdraw={withdraw} />
+            </div>
+          )}
+          {open && (linesByDept.get(open.id)?.length ?? 0) > 0 && (
+            <div className="mt-4">
+              <SignoffBar voucherKey={`dept:${open.id}`} total={totalOf(open.id)} signoffs={signoffs} onSign={sign} onWithdraw={withdraw} />
+            </div>
+          )}
+
           {openDept === SALARY_ADJ ? (
             <SalaryAdjustmentEditor
               key={`${period.id}-adj`}
@@ -213,12 +240,24 @@ export default function VouchersPage() {
             <PrintStack onDone={stopPrinting}>
               {(printing === "all" ? deptsWithLines : shownDepts.filter((d) => printing === `dept:${d.id}`)).map((d) => (
                 <PrintPage key={d.id}>
-                  <VoucherDoc department={d} period={period} lines={linesByDept.get(d.id) ?? []} total={totalOf(d.id)} employees={employees} signatureUrl={signature.url} />
+                  <VoucherDoc
+                    department={d}
+                    period={period}
+                    lines={linesByDept.get(d.id) ?? []}
+                    total={totalOf(d.id)}
+                    employees={employees}
+                    signatures={signaturesFor(`dept:${d.id}`, totalOf(d.id))}
+                  />
                 </PrintPage>
               ))}
               {(printing === "all" || printing === "adjustments") && periodAdjustments.length > 0 && (
                 <PrintPage>
-                  <SalaryAdjustmentVoucherDoc period={period} adjustments={periodAdjustments} employees={employees} signatureUrl={signature.url} />
+                  <SalaryAdjustmentVoucherDoc
+                    period={period}
+                    adjustments={periodAdjustments}
+                    employees={employees}
+                    signatures={signaturesFor("salary_adjustments", adjustmentNet)}
+                  />
                 </PrintPage>
               )}
             </PrintStack>
@@ -482,9 +521,9 @@ function VoucherEditor({
 }
 
 // The printed voucher (A4, black on white), shown only in the print stack.
-type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; employees: Employee[]; signatureUrl: string | null };
+type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; employees: Employee[]; signatures: VoucherSignatureSet };
 
-function VoucherDoc({ department, period, lines, total, employees, signatureUrl }: VoucherDocProps) {
+function VoucherDoc({ department, period, lines, total, employees, signatures }: VoucherDocProps) {
   const byId = new Map(employees.map((e) => [e.id, e]));
   return (
     <VoucherSheet
@@ -496,7 +535,7 @@ function VoucherDoc({ department, period, lines, total, employees, signatureUrl 
         return { key: l.id, cells: [l.payeeName, emp ? positionTitle(emp.positionId).toUpperCase() : "", l.description, money(l.amount)] };
       })}
       total={total}
-      signatureUrl={signatureUrl}
+      signatures={signatures}
     />
   );
 }

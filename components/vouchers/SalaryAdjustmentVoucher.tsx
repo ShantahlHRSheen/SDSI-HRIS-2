@@ -5,7 +5,7 @@ import { AlertTriangle, Check, Pencil, Plus, Printer, Trash2, X } from "lucide-r
 import { formatCurrency, formatDate, fullName } from "@/lib/helpers";
 import { SALARY_ADJUSTMENT_COMPONENTS, componentKind, componentLabel, netEffect, type SalaryAdjustment, type SalaryAdjustmentComponent } from "@/lib/salary-adjustments";
 import type { Employee, PayrollPeriod } from "@/lib/types";
-import { VoucherSheet } from "./VoucherSheet";
+import { VoucherSheet, type VoucherSignatureSet } from "./VoucherSheet";
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatCurrency(Math.abs(n))}`;
 const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-sm";
@@ -356,12 +356,12 @@ export function SalaryAdjustmentVoucherDoc({
   period,
   adjustments,
   employees,
-  signatureUrl,
+  signatures,
 }: {
   period: PayrollPeriod;
   adjustments: SalaryAdjustment[];
   employees: Employee[];
-  signatureUrl?: string | null;
+  signatures?: VoucherSignatureSet;
 }) {
   const byId = new Map(employees.map((e) => [e.id, e]));
   const netTotal = round2(adjustments.reduce((s, a) => s + netEffect(a), 0));
@@ -382,7 +382,7 @@ export function SalaryAdjustmentVoucherDoc({
       })}
       total={netTotal}
       minRows={8}
-      signatureUrl={signatureUrl}
+      signatures={signatures}
       note={`Payroll period ${formatDate(period.start)} – ${formatDate(period.end)}. Included in the payroll and payslips for this period. Amount: + increases / − decreases that part of the payroll; withholding tax is recomputed when a taxable part changes.`}
     />
   );
