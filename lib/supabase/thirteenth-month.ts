@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "./client";
-import type { ThirteenthMonthEntry } from "../thirteenth-month";
+import type { ThirteenthMonthEntry, ThirteenthMonthSlipData } from "../thirteenth-month";
 import type { SignoffStep, VoucherSignoff } from "./voucher-signoffs";
 
 // supabase/migrate_phase25_thirteenth_month.sql. The typed client doesn't
@@ -124,4 +124,58 @@ export async function withdrawThirteenthMonthSignoff(year: number, employeeId: s
   const { data, error } = await from("thirteenth_month_signoffs").delete().eq("year", year).eq("employee_id", employeeId).eq("step", step).select();
   if (error) throw new Error(error.message);
   if (!(data as Row[] | null)?.length) throw new Error("Only the person who signed (or HR) can undo this.");
+}
+
+// ---- Slips released to employees ------------------------------------------------
+
+export interface ReleasedThirteenthMonthSlip {
+  year: number;
+  employeeId: string;
+  slip: ThirteenthMonthSlipData;
+  total: number;
+  releasedBy: string;
+  releasedAt: string;
+}
+
+const toReleased = (r: Row): ReleasedThirteenthMonthSlip => ({
+  year: Number(r.year),
+  employeeId: String(r.employee_id),
+  slip: r.slip as ThirteenthMonthSlipData,
+  total: Number(r.total),
+  releasedBy: String(r.released_by ?? ""),
+  releasedAt: String(r.released_at ?? ""),
+});
+
+// Released slips: a year's (HR), or one employee's (their own). [] if not set up yet.
+export async function fetchReleasedThirteenthMonthSlips(filter: { year: number } | { employeeId: string }): Promise<ReleasedThirteenthMonthSlip[]> {
+  const out: ReleasedThirteenthMonthSlip[] = [];
+  for (let i = 0; ; i += 1000) {
+    const q = from("thirteenth_month_slips").select("*");
+    const { data, error } = await ("year" in filter ? q.eq("year", filter.year) : q.eq("employee_id", filter.employeeId)).order("employee_id").range(i, i + 999);
+    if (error) return out;
+    const rows = data as Row[];
+    out.push(...rows.map(toReleased));
+    if (rows.length < 1000) return out;
+  }
+}
+
+export async function releaseThirteenthMonthSlips(year: number, slips: { employeeId: string; slip: ThirteenthMonthSlipData }[], releasedBy: string): Promise<ReleasedThirteenthMonthSlip[]> {
+  const out: ReleasedThirteenthMonthSlip[] = [];
+  for (const { employeeId, slip } of slips) {
+    const { data, error } = await from("thirteenth_month_slips")
+      .upsert({ year, employee_id: employeeId, slip, total: slip.total, released_by: releasedBy, released_at: new Date().toISOString() }, { onConflict: "year,employee_id" })
+      .select();
+    if (error) {
+      if (/thirteenth_month_slips/.test(error.message) && /exist|find/i.test(error.message)) throw new Error("Releasing 13th month slips isn't set up yet — ask HR to run the latest database update.");
+      if (/row-level security/i.test(error.message)) throw new Error("Only HR and the payroll officer can release 13th month slips.");
+      throw new Error(error.message);
+    }
+    out.push(...(data as Row[]).map(toReleased));
+  }
+  return out;
+}
+
+export async function withdrawThirteenthMonthSlip(year: number, employeeId: string): Promise<void> {
+  const { error } = await from("thirteenth_month_slips").delete().eq("year", year).eq("employee_id", employeeId);
+  if (error) throw new Error(error.message);
 }

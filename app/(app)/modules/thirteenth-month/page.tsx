@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { BadgeCheck, Download, Gift, Pencil, Printer, RotateCcw } from "lucide-react";
+import { BadgeCheck, Download, Gift, Pencil, Printer, RotateCcw, Send, Undo2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -10,9 +10,9 @@ import { Modal } from "@/components/Modal";
 import { formatCurrencyCompact, fullName, positionTitle } from "@/lib/helpers";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { computePayrollForPeriod, type PayrollLine } from "@/lib/payroll";
-import { computeThirteenthMonth, emptyEntry, MONTH_NAMES, round2, type MonthFigures, type ThirteenthMonthEntry, type ThirteenthMonthRow } from "@/lib/thirteenth-month";
+import { computeThirteenthMonth, emptyEntry, MONTH_NAMES, round2, sameSlip, toSlipData, type MonthFigures, type ThirteenthMonthEntry, type ThirteenthMonthRow } from "@/lib/thirteenth-month";
 import { ThirteenthMonthSlip } from "@/components/thirteenth-month/ThirteenthMonthSlip";
-import { useThirteenthMonthEntries, useThirteenthMonthSignoffs } from "@/components/thirteenth-month/useThirteenthMonth";
+import { useReleasedThirteenthMonthSlips, useThirteenthMonthEntries, useThirteenthMonthSignoffs } from "@/components/thirteenth-month/useThirteenthMonth";
 import { SignatureControl, SignoffBar, signatureKindsFor, useVoucherSignatures, validSignoff } from "@/components/vouchers/VoucherSignatures";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import type { VoucherSignatureSet } from "@/components/vouchers/VoucherSheet";
@@ -39,6 +39,7 @@ export default function ThirteenthMonthPayPage() {
   const { entries, error: entriesError, loaded, save, reset } = useThirteenthMonthEntries(year);
   const { signoffs, sign, signMany, withdraw } = useThirteenthMonthSignoffs(year);
   const signatures = useVoucherSignatures();
+  const { released, release, withdraw: withdrawSlip } = useReleasedThirteenthMonthSlips(year);
 
   const linesByPeriod = useMemo(() => {
     const m = new Map<string, PayrollLine[]>();
@@ -79,6 +80,21 @@ export default function ThirteenthMonthPayPage() {
   };
   const status = (r: ThirteenthMonthRow) =>
     validSignoff(signoffs, r.employee.id, "released", r.total) ? "Checked · Released" : validSignoff(signoffs, r.employee.id, "checked", r.total) ? "Checked" : "";
+
+  // The copy released to the employee (My Payslips), if any.
+  const releasedBy = new Map(released.map((x) => [x.employeeId, x]));
+  const releaseState = (r: ThirteenthMonthRow) => {
+    const copy = releasedBy.get(r.employee.id);
+    return !copy ? "none" : sameSlip(copy.slip, toSlipData(r)) ? "current" : "outdated";
+  };
+  const toRelease13 = canManage ? rows.filter((r) => r.total !== 0 && releaseState(r) !== "current") : [];
+  const [releasing, setReleasing] = useState(false);
+  const releaseRows = async (items: ThirteenthMonthRow[], ask = true) => {
+    if (ask && !confirm(`Release the ${year} 13th month slip${items.length === 1 ? "" : "s"} of ${items.length} employee${items.length === 1 ? "" : "s"}? They'll see ${items.length === 1 ? "it" : "their own"} under My Payslips.`)) return;
+    setReleasing(true);
+    await release(items.map((r) => ({ employeeId: r.employee.id, slip: toSlipData(r) })));
+    setReleasing(false);
+  };
 
   const [viewing, setViewing] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -145,6 +161,16 @@ export default function ThirteenthMonthPayPage() {
         </button>
         {isRealAccount &&
           signatureKindsFor(roles).map((kind) => <SignatureControl key={kind} kind={kind} url={signatures.urls[kind]} onChanged={signatures.reload} hrView={isHr} />)}
+        {loaded && toRelease13.length > 0 && (
+          <button
+            onClick={() => releaseRows(toRelease13)}
+            disabled={releasing}
+            title="Employees see their released slip under My Payslips. Slips changed since they were released are updated."
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--series-1)] disabled:opacity-40"
+          >
+            <Send size={15} /> {releasing ? "Releasing…" : `Release to employees (${toRelease13.length})`}
+          </button>
+        )}
         {isRealAccount && loaded && toCheck.length > 0 && (
           <button onClick={() => bulkSign("checked", toCheck)} disabled={bulkBusy} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
             <BadgeCheck size={15} /> {bulkBusy ? "Saving…" : `Mark all as checked (${toCheck.length})`}
@@ -225,7 +251,11 @@ export default function ThirteenthMonthPayPage() {
                     <td className={td}>{r.philhealth ? `-${peso(r.philhealth)}` : "—"}</td>
                     <td className={td}>{r.hdmf ? `-${peso(r.hdmf)}` : "—"}</td>
                     <td className={`${td} font-semibold text-[var(--text-primary)]`}>{peso(r.total)}</td>
-                    <td className="px-2 py-1.5 text-xs whitespace-nowrap text-[var(--status-good)]">{status(r)}</td>
+                    <td className="px-2 py-1.5 text-xs whitespace-nowrap">
+                      <span className="text-[var(--status-good)]">{status(r)}</span>
+                      {releaseState(r) === "current" && <span className="block text-[var(--text-muted)]">Released to employee</span>}
+                      {releaseState(r) === "outdated" && <span className="block text-[var(--status-warning)]">Employee copy out of date</span>}
+                    </td>
                     <td className="px-2 py-1.5">
                       <div className="flex justify-end gap-1">
                         <button onClick={() => setViewing(r.employee.id)} className="rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
@@ -275,6 +305,23 @@ export default function ThirteenthMonthPayPage() {
               <button onClick={() => setPrinting(viewRow.employee.id)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
                 <Printer size={14} /> Print slip
               </button>
+              {canManage && viewRow.total !== 0 && releaseState(viewRow) !== "current" && (
+                <button
+                  onClick={() => releaseRows([viewRow])}
+                  disabled={releasing}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)] px-3 py-1.5 text-sm text-[var(--series-1)] disabled:opacity-40"
+                >
+                  <Send size={14} /> {releaseState(viewRow) === "outdated" ? "Update employee's copy" : "Release to employee"}
+                </button>
+              )}
+              {canManage && releaseState(viewRow) !== "none" && (
+                <button
+                  onClick={() => confirm("Remove this slip from the employee's My Payslips?") && withdrawSlip(viewRow.employee.id)}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+                >
+                  <Undo2 size={14} /> Withdraw from employee
+                </button>
+              )}
               {canManage && (
                 <button
                   onClick={() => {
@@ -290,7 +337,7 @@ export default function ThirteenthMonthPayPage() {
             {viewRow.total !== 0 && <SignoffBar voucherKey={viewRow.employee.id} total={viewRow.total} signoffs={signoffs} onSign={sign} onWithdraw={withdraw} />}
             <div className="overflow-x-auto rounded-lg bg-white p-3">
               <div className="min-w-[560px]">
-                <ThirteenthMonthSlip row={viewRow} signatures={signaturesFor(viewRow)} />
+                <ThirteenthMonthSlip row={toSlipData(viewRow)} signatures={signaturesFor(viewRow)} />
               </div>
             </div>
           </div>
@@ -312,7 +359,7 @@ export default function ThirteenthMonthPayPage() {
         <PrintStack onDone={stopPrinting}>
           {printRows.map((r) => (
             <PrintPage key={r.employee.id}>
-              <ThirteenthMonthSlip row={r} signatures={signaturesFor(r)} />
+              <ThirteenthMonthSlip row={toSlipData(r)} signatures={signaturesFor(r)} />
             </PrintPage>
           ))}
         </PrintStack>

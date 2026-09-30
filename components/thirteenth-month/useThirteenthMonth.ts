@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
-import type { ThirteenthMonthEntry } from "@/lib/thirteenth-month";
+import type { ThirteenthMonthEntry, ThirteenthMonthSlipData } from "@/lib/thirteenth-month";
 import {
   deleteThirteenthMonthEntry,
   fetchThirteenthMonthEntries,
+  fetchReleasedThirteenthMonthSlips,
   fetchThirteenthMonthSignoffs,
+  releaseThirteenthMonthSlips,
   saveThirteenthMonthEntry,
   signThirteenthMonth,
   withdrawThirteenthMonthSignoff,
+  withdrawThirteenthMonthSlip,
+  type ReleasedThirteenthMonthSlip,
 } from "@/lib/supabase/thirteenth-month";
 import type { SignoffStep, VoucherSignoff } from "@/lib/supabase/voucher-signoffs";
 
@@ -99,4 +103,46 @@ export function useThirteenthMonthSignoffs(year: number) {
     [year, reload],
   );
   return { signoffs: signoffs.filter((s) => s.periodId === String(year)), sign, signMany, withdraw };
+}
+
+// Slips released to employees for the year (HR's view). In the demo they're
+// kept in memory only.
+export function useReleasedThirteenthMonthSlips(year: number) {
+  const { isRealAccount, currentUser } = useHris();
+  const [state, setState] = useState<{ year: number; slips: ReleasedThirteenthMonthSlip[] }>({ year, slips: [] });
+  useEffect(() => {
+    if (!isRealAccount) return;
+    let live = true;
+    fetchReleasedThirteenthMonthSlips({ year }).then((slips) => live && setState({ year, slips }));
+    return () => {
+      live = false;
+    };
+  }, [isRealAccount, year]);
+
+  const release = useCallback(
+    async (items: { employeeId: string; slip: ThirteenthMonthSlipData }[]) => {
+      try {
+        const saved = isRealAccount
+          ? await releaseThirteenthMonthSlips(year, items, currentUser?.name ?? "")
+          : items.map((i) => ({ year, employeeId: i.employeeId, slip: i.slip, total: i.slip.total, releasedBy: currentUser?.name ?? "", releasedAt: new Date().toISOString() }));
+        const ids = new Set(saved.map((x) => x.employeeId));
+        setState((st) => ({ year, slips: [...(st.year === year ? st.slips : []).filter((x) => !ids.has(x.employeeId)), ...saved] }));
+      } catch (err) {
+        reportSaveError("Couldn't release the 13th month slips", err);
+      }
+    },
+    [isRealAccount, year, currentUser],
+  );
+  const withdraw = useCallback(
+    async (employeeId: string) => {
+      try {
+        if (isRealAccount) await withdrawThirteenthMonthSlip(year, employeeId);
+        setState((st) => ({ year, slips: (st.year === year ? st.slips : []).filter((x) => x.employeeId !== employeeId) }));
+      } catch (err) {
+        reportSaveError("Couldn't withdraw the slip", err);
+      }
+    },
+    [isRealAccount, year],
+  );
+  return { released: state.year === year ? state.slips : [], release, withdraw };
 }

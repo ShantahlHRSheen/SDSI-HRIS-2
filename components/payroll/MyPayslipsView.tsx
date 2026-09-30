@@ -9,6 +9,7 @@ import { summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
 import { formatCurrencyCompact, formatDate } from "@/lib/helpers";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 import { useHris } from "@/lib/store";
+import { MyThirteenthMonthSlips } from "@/components/thirteenth-month/MyThirteenthMonthSlips";
 
 // An employee's own released payslips ("My Payslips") — used for every role,
 // including HR, payroll and upper management, who also see All Payslips.
@@ -95,6 +96,7 @@ export function MyPayslipsView({
           </div>
         </div>
       )}
+      <MyThirteenthMonthSlips />
       <PayslipPreviewModal preview={preview} onClose={() => setPreview(null)} />
     </div>
   );

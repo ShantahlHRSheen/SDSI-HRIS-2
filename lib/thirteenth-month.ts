@@ -197,3 +197,46 @@ export function computeThirteenthMonth(input: {
   }
   return rows.sort((x, y) => x.employee.lastName.localeCompare(y.employee.lastName) || x.employee.firstName.localeCompare(y.employee.firstName));
 }
+
+// What a slip shows — also the copy released to the employee
+// (thirteenth_month_slips.slip), so it stays as released.
+export interface ThirteenthMonthSlipData {
+  name: string;
+  designation: string;
+  months: (MonthFigures & { net: number })[];
+  grossBasic: number;
+  thirteenthMonth: number;
+  vlDays: number;
+  dailyRate: number;
+  monetizedVl: number;
+  lastSalary: number;
+  sss: number;
+  philhealth: number;
+  hdmf: number;
+  deductions: number;
+  total: number;
+}
+
+export function toSlipData(r: ThirteenthMonthRow): ThirteenthMonthSlipData {
+  return {
+    name: `${r.employee.firstName} ${r.employee.lastName}`,
+    designation: r.designation,
+    months: r.months.map(({ b1, l1, b2, l2, net }) => ({ b1, l1, b2, l2, net })),
+    grossBasic: r.grossBasic,
+    thirteenthMonth: r.thirteenthMonth,
+    vlDays: r.vlDays,
+    dailyRate: r.dailyRate,
+    monetizedVl: r.monetizedVl,
+    lastSalary: r.lastSalary,
+    sss: r.sss,
+    philhealth: r.philhealth,
+    hdmf: r.hdmf,
+    deductions: r.deductions,
+    total: r.total,
+  };
+}
+
+// Whether the released copy still matches the sheet.
+export function sameSlip(a: ThirteenthMonthSlipData, b: ThirteenthMonthSlipData): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}

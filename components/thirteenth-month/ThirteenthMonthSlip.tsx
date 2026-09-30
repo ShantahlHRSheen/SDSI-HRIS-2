@@ -1,4 +1,4 @@
-import { MONTH_NAMES, type ThirteenthMonthRow } from "@/lib/thirteenth-month";
+import { MONTH_NAMES, type ThirteenthMonthSlipData } from "@/lib/thirteenth-month";
 import type { VoucherSignatureSet } from "@/components/vouchers/VoucherSheet";
 
 // The printed "13TH MONTH PAY AND LEAVE CREDITS" slip, laid out like the
@@ -22,7 +22,7 @@ export const THIRTEENTH_MONTH_SIGNATORIES = [
   { role: "Released by:", name: "Joan Mariette O. Santarina", title: "Corporate Treasurer", key: "released" },
 ] as const;
 
-export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthMonthRow; signatures?: VoucherSignatureSet }) {
+export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthMonthSlipData; signatures?: VoucherSignatureSet }) {
   const cell: React.CSSProperties = { border: line, padding: "1px 4px", fontSize: "8pt", height: "15px", verticalAlign: "bottom" };
   const num: React.CSSProperties = { ...cell, textAlign: "right" };
   const bar = (text: string) => (
@@ -32,7 +32,7 @@ export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthM
       </td>
     </tr>
   );
-  const name = `${row.employee.firstName} ${row.employee.lastName}`;
+  const name = row.name;
   const slot = (key: "prepared" | "checked" | "released") =>
     key === "prepared" ? (signatures.prepared ? { url: signatures.prepared, at: undefined as string | undefined } : undefined) : signatures[key];
 
