@@ -1,5 +1,5 @@
 import type { AttendancePeriodRecord, Employee, OvertimeRequest, PayrollLineOverride, PayrollPeriod } from "./types";
-import { computeHdmf, computePhilHealth, computeSemiMonthlyWithholdingTax, computeSss } from "./statutory";
+import { computeHdmf, computePhilHealth, computeSemiMonthlyWithholdingTax, computeSss, sssEmployeesCompensation } from "./statutory";
 import { adjustmentTotals, netEffect, registeredSalaryAdjustments, type SalaryAdjustment, type SalaryAdjustmentComponent } from "./salary-adjustments";
 
 // ---------------------------------------------------------------------------
@@ -261,15 +261,21 @@ export function computePayrollForPeriod(
 
     const netPay = grossSalary + adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - adjustmentDeduct;
 
-    // No employer share when the employee isn't covered — their employee
-    // share on file is 0 (e.g. Board members without PhilHealth). Otherwise
-    // the employer share comes from the contribution table as before.
-    const employerShare = (employerAuto: number, employeeOnFile: number | null) =>
-      employeeOnFile !== null && employeeOnFile <= 0 ? 0 : Math.round((employerAuto / 2) * 100) / 100;
-    const employerSSS = employerShare(sss.regular.employer, ov.sssContributionOverride);
-    const employerSSSWisp = employerShare(sss.wisp.employer, ov.sssWispOverride);
-    const employerHDMF = employerShare(hdmf.employer, ov.hdmfContributionOverride);
-    const employerPhilHealth = employerShare(philHealth.employer, ov.philHealthContributionOverride);
+    // Employer shares follow what the employee actually contributes (the
+    // share on file, else the table): SSS / WISP employer = 2 × employee
+    // (10% vs 5%), plus the employer-only EC (₱10 below a ₱15,000 salary
+    // credit, else ₱30 a month); PhilHealth employer = employee (50/50);
+    // Pag-IBIG from the table. Nothing when the employee isn't covered (share
+    // 0). Salary adjustments to the employee share don't change these.
+    const half = (n: number) => Math.round((n / 2) * 100) / 100;
+    const onFile = (override: number | null, tableMonthly: number) => (override !== null ? override : half(tableMonthly));
+    const sssEe = onFile(ov.sssContributionOverride, sss.regular.employee);
+    const wispEe = onFile(ov.sssWispOverride, sss.wisp.employee);
+    const sssMsc = ((sssEe + wispEe) * 2) / 0.05;
+    const employerSSS = sssEe > 0 ? Math.round((sssEe * 2 + sssEmployeesCompensation(sssMsc) / 2) * 100) / 100 : 0;
+    const employerSSSWisp = wispEe > 0 ? Math.round(wispEe * 2 * 100) / 100 : 0;
+    const employerHDMF = ov.hdmfContributionOverride !== null && ov.hdmfContributionOverride <= 0 ? 0 : half(hdmf.employer);
+    const employerPhilHealth = Math.max(0, onFile(ov.philHealthContributionOverride, philHealth.employee));
     const employerExpense = grossSalary + employerSSS + employerSSSWisp + employerHDMF + employerPhilHealth;
 
     lines.push({
