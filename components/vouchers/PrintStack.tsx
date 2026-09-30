@@ -16,12 +16,17 @@ export function PrintStack({ children, onDone }: { children: React.ReactNode; on
       onDone();
     };
     window.addEventListener("afterprint", finish);
-    const t = window.setTimeout(() => {
+    // Wait (up to 3 s) for images such as the signature before printing.
+    const t = window.setTimeout(async () => {
+      const imgs = Array.from(document.querySelectorAll<HTMLImageElement>(".print-stack img"));
+      await Promise.race([Promise.all(imgs.map((img) => img.decode().catch(() => {}))), new Promise((r) => window.setTimeout(r, 3000))]);
+      if (done) return;
       window.print();
       // Some browsers return from print() before firing afterprint.
       window.setTimeout(finish, 500);
     }, 50);
     return () => {
+      done = true;
       window.clearTimeout(t);
       window.removeEventListener("afterprint", finish);
     };
