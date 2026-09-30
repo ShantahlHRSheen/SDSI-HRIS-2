@@ -35,6 +35,7 @@ export function PrintStack({ children, onDone }: { children: React.ReactNode; on
   return createPortal(<div className="print-stack">{children}</div>, document.body);
 }
 
-export function PrintPage({ children }: { children: React.ReactNode }) {
-  return <div className="print-stack-page">{children}</div>;
+// `form`: 18mm margins (payslips) instead of the vouchers' 1 inch.
+export function PrintPage({ children, form = false }: { children: React.ReactNode; form?: boolean }) {
+  return <div className={form ? "print-stack-page print-stack-form" : "print-stack-page"}>{children}</div>;
 }

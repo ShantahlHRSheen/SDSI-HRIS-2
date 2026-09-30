@@ -169,6 +169,17 @@ body {
   .print-stack-page:last-child {
     break-after: auto;
   }
+  /* Forms (payslips) printed several at once: the same 18mm margins as a
+     single one, flowing in the stack instead of pinned to one page. */
+  .print-stack-page.print-stack-form {
+    padding: 18mm 18mm 0;
+  }
+  .print-stack .bir-print-area {
+    position: static;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 .print-stack {
