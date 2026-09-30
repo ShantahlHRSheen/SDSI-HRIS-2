@@ -140,8 +140,8 @@ export function VoucherSignatories({ signatureUrl }: { signatureUrl?: string | n
                   <img src={signatureUrl} alt="Signature" style={{ maxHeight: "46px", maxWidth: "150px", marginBottom: "-10px", ...exact }} />
                 )}
               </div>
-              <div style={{ textAlign: "center", fontWeight: 700, fontSize: "9pt" }}>{s.name}</div>
-              <div style={{ textAlign: "center", fontSize: "8.5pt" }}>{s.title}</div>
+              <div style={{ textAlign: "center", fontWeight: 700, fontSize: "8pt", whiteSpace: "nowrap" }}>{s.name}</div>
+              <div style={{ textAlign: "center", fontSize: "7pt", whiteSpace: "nowrap" }}>{s.title}</div>
             </div>
           ))}
         </div>
