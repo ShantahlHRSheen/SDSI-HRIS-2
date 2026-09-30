@@ -113,6 +113,18 @@ body {
   .id-card-screen-zoom {
     zoom: 1;
   }
+  /* Payslips: tighter rows on paper so the whole slip, signatures
+     included, fits on one A4 page. */
+  .payslip-compact .divide-y > div {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .payslip-compact .mb-4 {
+    margin-bottom: 8px;
+  }
+  .payslip-compact .mb-5 {
+    margin-bottom: 10px;
+  }
   .bir-print-area {
     position: fixed;
     inset: 0;
