@@ -1,3 +1,6 @@
+"use client";
+
+import { useLayoutEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Calculator,
@@ -21,7 +24,8 @@ import {
 // published, not derived from employee records. Update the data below when
 // HR issues a new version.
 
-type Person = { name: string; title: string; freelancer?: boolean };
+// direct: reports straight to the unit head (a line is drawn to them).
+type Person = { name: string; title: string; freelancer?: boolean; direct?: boolean };
 type Division = { name: string; icon: LucideIcon; people: Person[] };
 type Group = { name: string; icon: LucideIcon; lead?: Person; people?: Person[]; divisions?: Division[] };
 type Unit = {
@@ -61,19 +65,19 @@ const UNITS: Unit[] = [
         name: "Netdev Department",
         icon: Network,
         people: [
-          { name: "Romelito Domecillo", title: "Netdev Manager" },
-          { name: "Chester Rosales", title: "Netdev Manager" },
-          { name: "Randel Segovia", title: "Netdev Manager" },
+          { name: "Romelito Domecillo", title: "Netdev Manager", direct: true },
+          { name: "Chester Rosales", title: "Netdev Manager", direct: true },
+          { name: "Randel Segovia", title: "Netdev Manager", direct: true },
+          { name: "Mae Japitan", title: "Sales Manager", direct: true },
         ],
       },
       {
         name: "Sales Department",
         icon: ChartColumn,
         people: [
-          { name: "Mae Japitan", title: "Sales Manager" },
-          { name: "Michelle Ignacio", title: "Ads Specialist" },
+          { name: "Michelle Ignacio", title: "Sales Head", direct: true },
           { name: "Jennifer Gonzales", title: "Sales Admin" },
-          { name: "Charm Jirah Rivera", title: "Sales Admin" },
+          { name: "Charm Jireh Rivera", title: "Sales Admin" },
           { name: "Christian Aure", title: "Sales Admin" },
         ],
       },
@@ -85,7 +89,7 @@ const UNITS: Unit[] = [
             name: "Social Media Management Division",
             icon: Monitor,
             people: [
-              { name: "Jasmine Eusebio", title: "Marketing Head" },
+              { name: "Jasmine Eusebio", title: "Marketing Head", direct: true },
               { name: "Erwin Carreon", title: "Social Media Manager" },
               { name: "Shane Garcia", title: "Social Media Manager" },
             ],
@@ -94,7 +98,7 @@ const UNITS: Unit[] = [
             name: "Creatives & Production Division",
             icon: Camera,
             people: [
-              { name: "John Paul Michael Papa", title: "Head MMA" },
+              { name: "John Paul Michael Papa", title: "Head MMA", direct: true },
               { name: "Frank Dela Cruz", title: "Video Editor" },
               { name: "John Michael De Maliwat", title: "GA" },
             ],
@@ -268,7 +272,11 @@ function HeadBar({ name, title, icon = User, size = "md" }: { name: string; titl
 
 function PersonCard({ person }: { person: Person }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] py-2 pr-3 pl-2" style={{ boxShadow: `inset 4px 0 0 ${BRIGHT}` }}>
+    <div
+      data-direct={person.direct ? "" : undefined}
+      className="flex items-center gap-3 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] py-2 pr-3 pl-2"
+      style={{ boxShadow: `inset 4px 0 0 ${BRIGHT}` }}
+    >
       <span className="ml-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style={{ background: DARK }}>
         <User size={16} />
       </span>
@@ -276,6 +284,12 @@ function PersonCard({ person }: { person: Person }) {
       <span className="w-[42%] shrink-0 border-l border-[var(--border-hairline)] pl-3 text-xs text-[var(--text-secondary)]">
         {person.title}
         {person.freelancer && <span className="mt-0.5 block w-fit rounded-full border border-[var(--border-hairline)] px-1.5 text-[10px] text-[var(--text-muted)]">Freelancer</span>}
+        {/* In one column (phones) the reporting lines aren't drawn — say it instead. */}
+        {person.direct && (
+          <span className="mt-0.5 block w-fit rounded-full px-1.5 text-[10px] text-white lg:hidden" style={{ background: BRIGHT }}>
+            Reports to Chairman
+          </span>
+        )}
       </span>
     </div>
   );
@@ -324,33 +338,89 @@ function GroupColumn({ group }: { group: Group }) {
   );
 }
 
+// Lines from the unit head to the people reporting to them directly, drawn
+// once the chart is laid out: down a trunk in the gap beside the person's
+// column, then across to their card. Only while the columns sit side by side
+// (lg and up); in one column the cards say "Reports to Chairman" instead.
+function useDirectLines(enabled: boolean) {
+  const box = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLDivElement>(null);
+  const [paths, setPaths] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    const root = box.current;
+    if (!enabled || !root || !head.current) return;
+    const draw = () => {
+      if (window.innerWidth < 1024) return setPaths([]);
+      const o = root.getBoundingClientRect();
+      const h = head.current!.getBoundingClientRect();
+      const centre = h.left + h.width / 2 - o.left;
+      const top = h.bottom - o.top;
+      const half = 10; // half the column gap (gap-5)
+      setPaths(
+        [...root.querySelectorAll<HTMLElement>("[data-direct]")].map((el) => {
+          const r = el.getBoundingClientRect();
+          const left = r.left - o.left;
+          const right = r.right - o.left;
+          const y = r.top + r.height / 2 - o.top;
+          // Columns right of the head's centre join on the card's left side;
+          // the others on its right side. The two trunks sharing a gap sit
+          // 3px apart.
+          const onLeft = left > centre;
+          const x = onLeft ? left - half + 3 : right + half - 3;
+          const turn = onLeft ? 6 : -6;
+          return `M ${x} ${top} V ${y - 6} Q ${x} ${y} ${x + turn} ${y} H ${onLeft ? left : right}`;
+        }),
+      );
+    };
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [enabled]);
+  return { box, head, paths };
+}
+
 function UnitSection({ unit }: { unit: Unit }) {
   const cols = unit.groups.length >= 4 ? "lg:grid-cols-2 2xl:grid-cols-4" : unit.groups.length === 3 ? "lg:grid-cols-3" : unit.groups.length === 2 ? "md:grid-cols-2" : "";
   const single = unit.groups.length === 1;
+  const hasDirect = unit.groups.some((g) => [...(g.people ?? []), ...(g.divisions ?? []).flatMap((d) => d.people)].some((p) => p.direct));
+  const { box, head, paths } = useDirectLines(hasDirect);
   return (
     <section id={unit.id} className="scroll-mt-20 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-1)]/40 p-4 sm:p-6">
       <SectionTitle title={unit.title} />
-      <div className="mx-auto max-w-xl">
-        <HeadBar name={unit.head.name} title={unit.head.title} size="lg" />
-      </div>
-      <Connector />
-      {(unit.leads || unit.aside) && (
-        <>
-          <div className="mx-auto grid max-w-4xl grid-cols-1 items-center gap-3 md:grid-cols-2">
-            {unit.aside && (
-              <div className="md:order-first">
-                <PersonCard person={unit.aside} />
-              </div>
-            )}
-            <div className="space-y-2">{unit.leads?.map((p) => <PersonCard key={p.name} person={p} />)}</div>
-          </div>
+      <div ref={box} className="relative">
+        {paths.length > 0 && (
+          <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden>
+            {paths.map((d, i) => (
+              <path key={i} d={d} fill="none" stroke={BRIGHT} strokeOpacity={0.8} strokeWidth={2} />
+            ))}
+          </svg>
+        )}
+        <div ref={head} className="mx-auto max-w-xl">
+          <HeadBar name={unit.head.name} title={unit.head.title} size="lg" />
+        </div>
+        {/* The lines replace the single connector (kept for the spacing). */}
+        <div className={paths.length ? "invisible" : undefined}>
           <Connector />
-        </>
-      )}
-      <div className={`grid grid-cols-1 gap-5 ${cols} ${single ? "mx-auto max-w-xl" : ""}`}>
-        {unit.groups.map((g) => (
-          <GroupColumn key={g.name} group={g} />
-        ))}
+        </div>
+        {(unit.leads || unit.aside) && (
+          <>
+            <div className="mx-auto grid max-w-4xl grid-cols-1 items-center gap-3 md:grid-cols-2">
+              {unit.aside && (
+                <div className="md:order-first">
+                  <PersonCard person={unit.aside} />
+                </div>
+              )}
+              <div className="space-y-2">{unit.leads?.map((p) => <PersonCard key={p.name} person={p} />)}</div>
+            </div>
+            <Connector />
+          </>
+        )}
+        <div className={`grid grid-cols-1 gap-5 ${cols} ${single ? "mx-auto max-w-xl" : ""}`}>
+          {unit.groups.map((g) => (
+            <GroupColumn key={g.name} group={g} />
+          ))}
+        </div>
       </div>
     </section>
   );
