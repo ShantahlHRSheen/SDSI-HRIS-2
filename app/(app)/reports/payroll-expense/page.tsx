@@ -10,7 +10,7 @@ import { TrendChart } from "@/components/charts/TrendChart";
 import { ReportFilters, EMPTY_REPORT_FILTERS, type ReportFilterState } from "@/components/reports/ReportFilters";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { EmptyState } from "@/components/EmptyState";
-import { formatCurrencyCompact } from "@/lib/helpers";
+import { departmentName, formatCurrencyCompact } from "@/lib/helpers";
 import {
   getMonthlyFacts,
   getMonthsList,
@@ -28,12 +28,25 @@ import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
 import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
 export default function PayrollExpenseReportPage() {
-  const { employees, employeeDepartmentAllocations, branches, departments, positions, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments } =
-    useHris();
+  const {
+    employees,
+    employeeDepartmentAllocations,
+    branches,
+    departments,
+    positions,
+    attendancePeriodRecords,
+    overtimeRequests,
+    payrollLineOverrides,
+    payrollPeriods,
+    salaryAdjustments,
+  } = useHris();
   const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const { vouchers, lines: voucherLines } = useDepartmentVouchers();
-  const allVoucherAmounts = useMemo(() => voucherAmounts(vouchers, voucherLines, payrollPeriods), [vouchers, voucherLines, payrollPeriods]);
+  const allVoucherAmounts = useMemo(
+    () => voucherAmounts(vouchers, voucherLines, payrollPeriods, employeeDepartmentAllocations),
+    [vouchers, voucherLines, payrollPeriods, employeeDepartmentAllocations],
+  );
 
   const months = getMonthsList();
   const facts = useMemo(
@@ -54,6 +67,21 @@ export default function PayrollExpenseReportPage() {
     () => reportAllocations(employees, employeeDepartmentAllocations, departments, positions),
     [employees, employeeDepartmentAllocations, departments, positions],
   );
+  // e.g. "Dra. Cecil Catapang — 50% MLM, 50% Darofy", from the saved department splits.
+  const splitNotes = useMemo(() => {
+    const byEmployee = new Map<string, typeof employeeDepartmentAllocations>();
+    for (const a of employeeDepartmentAllocations) byEmployee.set(a.employeeId, [...(byEmployee.get(a.employeeId) ?? []), a]);
+    return [...byEmployee.entries()]
+      .filter(([, rows]) => rows.length > 1)
+      .map(([id, rows]) => {
+        const e = employees.find((x) => x.id === id);
+        const who = e ? `${e.firstName} ${e.lastName}` : id;
+        const parts = [...rows]
+          .sort((a, b) => b.percent - a.percent || departmentName(a.departmentId).localeCompare(departmentName(b.departmentId)))
+          .map((r) => `${Math.round(r.percent * 100) / 100}% ${departmentName(r.departmentId).replace(/\s+Department$/i, "")}`);
+        return `${who} — ${parts.join(", ")}`;
+      });
+  }, [employees, employeeDepartmentAllocations]);
   // Facts limited to the selected department's share (if any); later
   // filters below don't need the department again.
   const deptFacts = filterFactsWithShares(facts, employees, { departmentId: analyticsFilters.departmentId }, allocations);
@@ -65,7 +93,7 @@ export default function PayrollExpenseReportPage() {
   const voucherTotal = filterVoucherAmounts(allVoucherAmounts, analyticsFilters).reduce((t, a) => t + a.amount, 0);
   const trendVouchers = sumBy(filterVoucherAmounts(allVoucherAmounts, { ...trendFilters, departmentId: analyticsFilters.departmentId }), (a) => a.monthKey);
   const trend = payrollExpenseTrendByMonth(deptFacts, employees, trendFilters).map((m) => ({ ...m, value: m.value + (trendVouchers.get(m.monthKey) ?? 0) }));
-  const historical = historicalPayrollAnalytics(deptFacts, employees, trendFilters);
+  const historical = historicalPayrollAnalytics(deptFacts, employees, trendFilters, trendVouchers);
 
   const currentMonthKey = months[months.length - 1].key;
   const previousMonthKey = months[months.length - 2]?.key;
@@ -104,10 +132,35 @@ export default function PayrollExpenseReportPage() {
 
   function exportDepartmentCsv() {
     const csv = toCsv(
-      ["Department", "Employees", "Basic Salary", "Allowances", "Overtime", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Payroll Expense", "Vouchers", "Total Expense"],
+      [
+        "Department",
+        "Employees",
+        "Basic Salary",
+        "Allowances",
+        "Overtime",
+        "Holiday Pay",
+        "Leave Pay",
+        "Employer SSS",
+        "Employer HDMF",
+        "Employer PhilHealth",
+        "Payroll Expense",
+        "Vouchers",
+        "Total Expense",
+      ],
       byDepartment.map((r) => [
-        r.label, r.payroll.employeeCount, r.payroll.basicSalary, r.payroll.allowances, r.payroll.overtimePay,
-        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense, r.payroll.vouchers, r.payroll.totalWithVouchers,
+        r.label,
+        r.payroll.employeeCount,
+        r.payroll.basicSalary,
+        r.payroll.allowances,
+        r.payroll.overtimePay,
+        r.payroll.holidayPay,
+        r.payroll.leavePay,
+        r.payroll.employerSSS,
+        r.payroll.employerHDMF,
+        r.payroll.employerPhilHealth,
+        r.payroll.totalEmployerExpense,
+        r.payroll.vouchers,
+        r.payroll.totalWithVouchers,
       ]),
     );
     downloadCsv("payroll-expense-by-department.csv", csv);
@@ -115,10 +168,35 @@ export default function PayrollExpenseReportPage() {
 
   function exportDivisionCsv() {
     const csv = toCsv(
-      ["Division", "Employees", "Basic Salary", "Allowances", "Overtime", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Payroll Expense", "Vouchers", "Total Expense"],
+      [
+        "Division",
+        "Employees",
+        "Basic Salary",
+        "Allowances",
+        "Overtime",
+        "Holiday Pay",
+        "Leave Pay",
+        "Employer SSS",
+        "Employer HDMF",
+        "Employer PhilHealth",
+        "Payroll Expense",
+        "Vouchers",
+        "Total Expense",
+      ],
       byDivision.map((r) => [
-        r.label, r.payroll.employeeCount, r.payroll.basicSalary, r.payroll.allowances, r.payroll.overtimePay,
-        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense, r.payroll.vouchers, r.payroll.totalWithVouchers,
+        r.label,
+        r.payroll.employeeCount,
+        r.payroll.basicSalary,
+        r.payroll.allowances,
+        r.payroll.overtimePay,
+        r.payroll.holidayPay,
+        r.payroll.leavePay,
+        r.payroll.employerSSS,
+        r.payroll.employerHDMF,
+        r.payroll.employerPhilHealth,
+        r.payroll.totalEmployerExpense,
+        r.payroll.vouchers,
+        r.payroll.totalWithVouchers,
       ]),
     );
     downloadCsv("payroll-expense-by-division.csv", csv);
@@ -134,10 +212,33 @@ export default function PayrollExpenseReportPage() {
 
   function exportEmployeeCsv() {
     const csv = toCsv(
-      ["Employee", "Branch", "Department", "Basic Salary", "Allowances", "Overtime Pay", "Holiday Pay", "Leave Pay", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Total Employer Expense"],
+      [
+        "Employee",
+        "Branch",
+        "Department",
+        "Basic Salary",
+        "Allowances",
+        "Overtime Pay",
+        "Holiday Pay",
+        "Leave Pay",
+        "Employer SSS",
+        "Employer HDMF",
+        "Employer PhilHealth",
+        "Total Employer Expense",
+      ],
       byEmployeeAll.map((r) => [
-        r.label, r.employee.branchId, r.employee.departmentId, r.payroll.basicSalary, r.payroll.allowances, r.payroll.overtimePay,
-        r.payroll.holidayPay, r.payroll.leavePay, r.payroll.employerSSS, r.payroll.employerHDMF, r.payroll.employerPhilHealth, r.payroll.totalEmployerExpense,
+        r.label,
+        r.employee.branchId,
+        r.employee.departmentId,
+        r.payroll.basicSalary,
+        r.payroll.allowances,
+        r.payroll.overtimePay,
+        r.payroll.holidayPay,
+        r.payroll.leavePay,
+        r.payroll.employerSSS,
+        r.payroll.employerHDMF,
+        r.payroll.employerPhilHealth,
+        r.payroll.totalEmployerExpense,
       ]),
     );
     downloadCsv("payroll-expense-by-employee.csv", csv);
@@ -175,11 +276,13 @@ export default function PayrollExpenseReportPage() {
 
       {/* --- Historical Payroll Analytics (item 7) --- */}
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-        <div className="mb-3 flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><Wallet size={16} /> Historical payroll analytics</div>
+        <div className="mb-3 flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+          <Wallet size={16} /> Historical payroll analytics
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Average per employee" value={formatCurrencyCompact(historical.averagePerEmployee)} hint="this month" />
-          <StatTile label="Highest month" value={formatCurrencyCompact(historical.highestMonth.value)} hint={historical.highestMonth.label} />
-          <StatTile label="Lowest month" value={formatCurrencyCompact(historical.lowestMonth.value)} hint={historical.lowestMonth.label} />
+          <StatTile label="Average per employee" value={formatCurrencyCompact(historical.averagePerEmployee)} hint="this month · payroll only" />
+          <StatTile label="Highest month" value={formatCurrencyCompact(historical.highestMonth.value)} hint={`${historical.highestMonth.label} · incl. vouchers`} />
+          <StatTile label="Lowest month" value={formatCurrencyCompact(historical.lowestMonth.value)} hint={`${historical.lowestMonth.label} · incl. vouchers`} />
           <StatTile
             label="Growth rate (6mo)"
             value={`${historical.growthRatePct > 0 ? "+" : ""}${historical.growthRatePct}%`}
@@ -256,8 +359,9 @@ export default function PayrollExpenseReportPage() {
           </div>
         )}
         <div className="mt-2 text-xs text-[var(--text-muted)]">
-          Business Units: MLM, Cosmetics and Darofy departments, plus the Chairman and Presidents (their cost is split equally across the three).
-          Shared Services: Operations, Human Resources, Finance, Accounting and the rest of the Board department (Vice Chairperson, Chemist).
+          Business Units: MLM, Cosmetics and Darofy departments. Each business unit President&rsquo;s salary is counted in their own business unit.
+          {splitNotes.length > 0 && <> Shared between departments: {splitNotes.join("; ")}.</>} Shared Services: Operations, Human Resources, Finance, Accounting and the rest of
+          the Board department (Vice Chairperson, Chemist).
         </div>
       </div>
 
@@ -316,7 +420,9 @@ export default function PayrollExpenseReportPage() {
       {/* --- 6B: Payroll expense per branch --- */}
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-medium text-[var(--text-primary)]">Payroll expense per branch — {months[months.length - 1].label} vs {months[months.length - 2]?.label ?? "—"}</div>
+          <div className="text-sm font-medium text-[var(--text-primary)]">
+            Payroll expense per branch — {months[months.length - 1].label} vs {months[months.length - 2]?.label ?? "—"}
+          </div>
           <ExportBar onExportCsv={exportBranchCsv} label="Export" />
         </div>
         {byBranch.length === 0 ? (
@@ -344,9 +450,13 @@ export default function PayrollExpenseReportPage() {
                       {r.pctChange === null ? (
                         <Badge tone="muted">—</Badge>
                       ) : r.pctChange > 0 ? (
-                        <Badge tone="warning"><TrendingUp size={12} /> +{r.pctChange}%</Badge>
+                        <Badge tone="warning">
+                          <TrendingUp size={12} /> +{r.pctChange}%
+                        </Badge>
                       ) : r.pctChange < 0 ? (
-                        <Badge tone="good"><TrendingDown size={12} /> {r.pctChange}%</Badge>
+                        <Badge tone="good">
+                          <TrendingDown size={12} /> {r.pctChange}%
+                        </Badge>
                       ) : (
                         <Badge tone="muted">0%</Badge>
                       )}
@@ -414,11 +524,10 @@ export default function PayrollExpenseReportPage() {
       </div>
 
       <div className="mt-4 text-xs text-[var(--text-muted)]">
-        Department vouchers count in the month their payroll period starts. They aren&rsquo;t tied to a branch, so they&rsquo;re left out when a branch is selected and
-        don&rsquo;t appear in the branch and per-employee tables; with an employee selected, only voucher lines linked to that employee count.{" "}
-        Figures are computed from real attendance and payroll records — SSS / HDMF (Pag-IBIG) / PhilHealth
-        contribution brackets change periodically and should be configured as versioned rate tables in System
-        Administration to keep this current.
+        Department vouchers count in the month their payroll period starts. They aren&rsquo;t tied to a branch, so they&rsquo;re left out when a branch is selected and don&rsquo;t
+        appear in the branch and per-employee tables; with an employee selected, only voucher lines linked to that employee count. Figures are computed from real attendance and
+        payroll records — SSS / HDMF (Pag-IBIG) / PhilHealth contribution brackets change periodically and should be configured as versioned rate tables in System Administration to
+        keep this current.
       </div>
     </div>
   );

@@ -95,13 +95,7 @@ function workingDaysInPeriod(period: PayrollPeriod): number {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-function buildFact(
-  employee: Employee,
-  month: MonthMeta,
-  lines: PayrollLine[],
-  records: AttendancePeriodRecord[],
-  periods: PayrollPeriod[],
-): MonthlyEmployeeFact {
+function buildFact(employee: Employee, month: MonthMeta, lines: PayrollLine[], records: AttendancePeriodRecord[], periods: PayrollPeriod[]): MonthlyEmployeeFact {
   const sumLines = (f: (l: PayrollLine) => number) => round(lines.reduce((s, l) => s + f(l), 0));
 
   const workingDays = periods.reduce((s, p) => s + workingDaysInPeriod(p), 0);
@@ -142,9 +136,7 @@ function buildFact(
   const deMinimisBenefits = lines.length ? 1500 : 0;
   const otherBenefits = 0;
 
-  const grossCompensation = Math.round(
-    basicSalary + allowances + overtimePay + holidayPay + leavePay + thirteenthMonthAccrual + otherBenefits + deMinimisBenefits,
-  );
+  const grossCompensation = Math.round(basicSalary + allowances + overtimePay + holidayPay + leavePay + thirteenthMonthAccrual + otherBenefits + deMinimisBenefits);
   // Non-taxable: mandatory employee contributions, de minimis (within
   // statutory ceilings), and 13th-month/other-benefits accrual (exempt up to
   // the ₱90,000 annual cap — simplified here, as elsewhere in this build).
@@ -362,12 +354,7 @@ export function scaleFact(f: MonthlyEmployeeFact, weight: number): MonthlyEmploy
   return scaled;
 }
 
-export function groupByDepartment(
-  facts: MonthlyEmployeeFact[],
-  employees: Employee[],
-  departments: { id: string }[],
-  allocations: EmployeeDepartmentAllocation[] = [],
-) {
+export function groupByDepartment(facts: MonthlyEmployeeFact[], employees: Employee[], departments: { id: string }[], allocations: EmployeeDepartmentAllocation[] = []) {
   const byId = new Map(employees.map((e) => [e.id, e]));
   return departments
     .map((d) => {
@@ -418,8 +405,15 @@ export interface HistoricalPayrollAnalytics {
   growthRatePct: number; // vs. first month in the trend window
 }
 
-export function historicalPayrollAnalytics(facts: MonthlyEmployeeFact[], employees: Employee[], filters: AnalyticsFilters = {}): HistoricalPayrollAnalytics {
-  const trend = payrollExpenseTrendByMonth(facts, employees, filters).map((t) => ({ label: t.label, monthKey: t.monthKey, value: t.value }));
+// `extraByMonth` adds other monthly expense (the department vouchers) to the
+// trend, so the highest/lowest month and growth rate include it.
+export function historicalPayrollAnalytics(
+  facts: MonthlyEmployeeFact[],
+  employees: Employee[],
+  filters: AnalyticsFilters = {},
+  extraByMonth: Map<string, number> = new Map(),
+): HistoricalPayrollAnalytics {
+  const trend = payrollExpenseTrendByMonth(facts, employees, filters).map((t) => ({ label: t.label, monthKey: t.monthKey, value: t.value + (extraByMonth.get(t.monthKey) ?? 0) }));
   const nonZero = trend.filter((t) => t.value > 0);
   const highestMonth = nonZero.reduce((max, t) => (t.value > max.value ? t : max), nonZero[0] ?? { label: "—", value: 0 });
   const lowestMonth = nonZero.reduce((min, t) => (t.value < min.value ? t : min), nonZero[0] ?? { label: "—", value: 0 });
