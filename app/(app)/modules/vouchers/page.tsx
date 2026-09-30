@@ -8,13 +8,15 @@ import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { EmptyState } from "@/components/EmptyState";
-import { formatCurrency, formatDate, fullName } from "@/lib/helpers";
+import { formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { DepartmentVoucherLine } from "@/lib/supabase/department-vouchers";
 import { voucherTitle } from "@/lib/voucher-totals";
 import type { Department, Employee, PayrollPeriod } from "@/lib/types";
 import { netEffect } from "@/lib/salary-adjustments";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
-import { SALARY_ADJUSTMENT_VOUCHER_TITLE, SalaryAdjustmentEditor, SalaryAdjustmentVoucherDoc, Signatures } from "@/components/vouchers/SalaryAdjustmentVoucher";
+import { SALARY_ADJUSTMENT_VOUCHER_TITLE, SalaryAdjustmentEditor, SalaryAdjustmentVoucherDoc } from "@/components/vouchers/SalaryAdjustmentVoucher";
+import { VoucherSheet } from "@/components/vouchers/VoucherSheet";
+import { PreparedBySignatureControl, usePreparedBySignature } from "@/components/vouchers/PreparedBySignature";
 
 // Tile id for the Salary Adjustment Voucher among the department tiles.
 const SALARY_ADJ = "__salary_adjustments";
@@ -22,6 +24,7 @@ const SALARY_ADJ = "__salary_adjustments";
 const MANAGE_ROLES = ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "sys_admin"];
 
 const peso = (n: number) => formatCurrency(n);
+const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-sm";
 
 export default function VouchersPage() {
@@ -30,6 +33,7 @@ export default function VouchersPage() {
     employees,
     payrollPeriods,
     currentUser,
+    isRealAccount,
     attendancePeriodRecords,
     salaryAdjustments,
     salaryAdjustmentsError,
@@ -39,6 +43,8 @@ export default function VouchersPage() {
   } = useHris();
   const canManage = !!currentUser?.roles.some((r) => MANAGE_ROLES.includes(r));
   const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
+  const signature = usePreparedBySignature();
+  const isHr = !!currentUser?.roles.includes("hr_admin");
   const { vouchers, lines, loaded, loadError, addLine, editLine, removeLine } = useDepartmentVouchers();
   const [openDept, setOpenDept] = useState<string | null>(null);
 
@@ -71,7 +77,6 @@ export default function VouchersPage() {
   // What's being printed through the multi-page print stack, if anything.
   const [printing, setPrinting] = useState<"all" | "adjustments" | null>(null);
   const stopPrinting = useCallback(() => setPrinting(null), []);
-  const preparedBy = currentUser?.name ?? "";
 
   const activeEmployees = useMemo(
     () => employees.filter((e) => e.status !== "resigned" && e.status !== "terminated").sort((a, b) => fullName(a).localeCompare(fullName(b))),
@@ -107,6 +112,7 @@ export default function VouchersPage() {
             <Printer size={15} /> Print all vouchers
           </button>
         )}
+        {isHr && isRealAccount && <PreparedBySignatureControl url={signature.url} onChanged={signature.reload} />}
       </div>
 
       {!period ? (
@@ -193,7 +199,8 @@ export default function VouchersPage() {
               lines={linesByDept.get(open.id) ?? []}
               canManage={canManage}
               employees={activeEmployees}
-              preparedBy={preparedBy}
+              allEmployees={employees}
+              signatureUrl={signature.url}
               onAdd={(l) => addLine(period, open.id, l)}
               onEdit={editLine}
               onRemove={removeLine}
@@ -207,12 +214,12 @@ export default function VouchersPage() {
               {printing === "all" &&
                 deptsWithLines.map((d) => (
                   <PrintPage key={d.id}>
-                    <VoucherDoc department={d} period={period} lines={linesByDept.get(d.id) ?? []} total={totalOf(d.id)} preparedBy={preparedBy} />
+                    <VoucherDoc department={d} period={period} lines={linesByDept.get(d.id) ?? []} total={totalOf(d.id)} employees={employees} signatureUrl={signature.url} />
                   </PrintPage>
                 ))}
               {periodAdjustments.length > 0 && (
                 <PrintPage>
-                  <SalaryAdjustmentVoucherDoc period={period} adjustments={periodAdjustments} employees={employees} preparedBy={preparedBy} />
+                  <SalaryAdjustmentVoucherDoc period={period} adjustments={periodAdjustments} employees={employees} signatureUrl={signature.url} />
                 </PrintPage>
               )}
             </PrintStack>
@@ -236,7 +243,8 @@ function VoucherEditor({
   lines,
   canManage,
   employees,
-  preparedBy,
+  allEmployees,
+  signatureUrl,
   onAdd,
   onEdit,
   onRemove,
@@ -246,7 +254,9 @@ function VoucherEditor({
   lines: DepartmentVoucherLine[];
   canManage: boolean;
   employees: Employee[];
-  preparedBy: string;
+  // Everyone (including former employees), for positions on the printout.
+  allEmployees: Employee[];
+  signatureUrl: string | null;
   onAdd: (l: LineInput) => Promise<boolean>;
   onEdit: (id: string, patch: Partial<LineInput>) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
@@ -472,13 +482,13 @@ function VoucherEditor({
         </form>
       )}
 
-      <VoucherPrint department={department} period={period} lines={lines} total={total} preparedBy={preparedBy} />
+      <VoucherPrint department={department} period={period} lines={lines} total={total} employees={allEmployees} signatureUrl={signatureUrl} />
     </div>
   );
 }
 
 // The printed voucher (A4, black on white) — hidden on screen.
-type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; preparedBy: string };
+type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; employees: Employee[]; signatureUrl: string | null };
 
 function VoucherPrint(props: VoucherDocProps) {
   return (
@@ -488,47 +498,19 @@ function VoucherPrint(props: VoucherDocProps) {
   );
 }
 
-function VoucherDoc({ department, period, lines, total, preparedBy }: VoucherDocProps) {
-  const cell = { border: "1px solid #999", padding: "5px 7px", fontSize: "10pt" } as const;
+function VoucherDoc({ department, period, lines, total, employees, signatureUrl }: VoucherDocProps) {
+  const byId = new Map(employees.map((e) => [e.id, e]));
   return (
-    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111" }}>
-      <div style={{ textAlign: "center", marginBottom: "10px" }}>
-        <div style={{ fontSize: "14pt", fontWeight: 700 }}>SHANTAHL DIRECT SALES INC.</div>
-        <div style={{ fontSize: "12pt", fontWeight: 700, marginTop: "4px", textTransform: "uppercase" }}>{voucherTitle(department)}</div>
-        <div style={{ fontSize: "10pt", marginTop: "2px" }}>
-          Payroll period: {formatDate(period.start)} – {formatDate(period.end)}
-        </div>
-      </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ background: "#eee" }}>
-            <th style={{ ...cell, width: "28px" }}>#</th>
-            <th style={{ ...cell, textAlign: "left" }}>Name</th>
-            <th style={{ ...cell, textAlign: "left" }}>Description</th>
-            <th style={{ ...cell, textAlign: "right", width: "110px" }}>Amount</th>
-            <th style={{ ...cell, width: "130px" }}>Signature</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((l, i) => (
-            <tr key={l.id} style={{ breakInside: "avoid" }}>
-              <td style={{ ...cell, textAlign: "center" }}>{i + 1}</td>
-              <td style={cell}>{l.payeeName}</td>
-              <td style={cell}>{l.description}</td>
-              <td style={{ ...cell, textAlign: "right" }}>{peso(l.amount)}</td>
-              <td style={cell} />
-            </tr>
-          ))}
-          <tr>
-            <td style={{ ...cell, textAlign: "right", fontWeight: 700 }} colSpan={3}>
-              TOTAL
-            </td>
-            <td style={{ ...cell, textAlign: "right", fontWeight: 700 }}>{peso(total)}</td>
-            <td style={cell} />
-          </tr>
-        </tbody>
-      </table>
-      <Signatures preparedBy={preparedBy} />
-    </div>
+    <VoucherSheet
+      title={department.name}
+      date={period.end}
+      columns={[{ label: "NAME", width: "25%" }, { label: "POSITION", width: "25%" }, { label: "ALLOWANCE COVERAGE" }, { label: "Amount (PhP.)", width: "16%", align: "right" }]}
+      rows={lines.map((l) => {
+        const emp = l.employeeId ? byId.get(l.employeeId) : undefined;
+        return { key: l.id, cells: [l.payeeName, emp ? positionTitle(emp.positionId).toUpperCase() : "", l.description, money(l.amount)] };
+      })}
+      total={total}
+      signatureUrl={signatureUrl}
+    />
   );
 }

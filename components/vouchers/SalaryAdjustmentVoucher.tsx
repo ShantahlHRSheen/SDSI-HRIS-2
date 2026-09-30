@@ -5,6 +5,7 @@ import { AlertTriangle, Check, Pencil, Plus, Printer, Trash2, X } from "lucide-r
 import { formatCurrency, formatDate, fullName } from "@/lib/helpers";
 import { SALARY_ADJUSTMENT_COMPONENTS, componentKind, componentLabel, netEffect, type SalaryAdjustment, type SalaryAdjustmentComponent } from "@/lib/salary-adjustments";
 import type { Employee, PayrollPeriod } from "@/lib/types";
+import { VoucherSheet } from "./VoucherSheet";
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatCurrency(Math.abs(n))}`;
 const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-sm";
@@ -350,91 +351,39 @@ function ComponentSelect({ value, onChange }: { value: SalaryAdjustmentComponent
   );
 }
 
-// The printed Salary Adjustment Voucher (A4, black on white).
+// The printed Salary Adjustment Voucher, in the company voucher layout.
 export function SalaryAdjustmentVoucherDoc({
   period,
   adjustments,
   employees,
-  preparedBy,
+  signatureUrl,
 }: {
   period: PayrollPeriod;
   adjustments: SalaryAdjustment[];
   employees: Employee[];
-  preparedBy: string;
+  signatureUrl?: string | null;
 }) {
   const byId = new Map(employees.map((e) => [e.id, e]));
-  const cell = { border: "1px solid #999", padding: "5px 7px", fontSize: "9.5pt" } as const;
   const netTotal = round2(adjustments.reduce((s, a) => s + netEffect(a), 0));
   return (
-    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111" }}>
-      <div style={{ textAlign: "center", marginBottom: "10px" }}>
-        <div style={{ fontSize: "14pt", fontWeight: 700 }}>SHANTAHL DIRECT SALES INC.</div>
-        <div style={{ fontSize: "12pt", fontWeight: 700, marginTop: "4px", textTransform: "uppercase" }}>{SALARY_ADJUSTMENT_VOUCHER_TITLE}</div>
-        <div style={{ fontSize: "10pt", marginTop: "2px" }}>
-          Payroll period: {formatDate(period.start)} – {formatDate(period.end)}
-        </div>
-      </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ background: "#eee" }}>
-            <th style={{ ...cell, width: "24px" }}>#</th>
-            <th style={{ ...cell, textAlign: "left" }}>Employee</th>
-            <th style={{ ...cell, textAlign: "left" }}>Adjustment</th>
-            <th style={{ ...cell, textAlign: "left" }}>Reason</th>
-            <th style={{ ...cell, textAlign: "right", width: "85px" }}>Amount</th>
-            <th style={{ ...cell, textAlign: "right", width: "85px" }}>Effect on pay</th>
-            <th style={{ ...cell, width: "100px" }}>Signature</th>
-          </tr>
-        </thead>
-        <tbody>
-          {adjustments.map((a, i) => {
-            const emp = byId.get(a.employeeId);
-            return (
-              <tr key={a.id} style={{ breakInside: "avoid" }}>
-                <td style={{ ...cell, textAlign: "center" }}>{i + 1}</td>
-                <td style={cell}>
-                  {emp ? fullName(emp) : a.employeeId}
-                  {emp && <div style={{ fontSize: "8pt", color: "#555" }}>{emp.employeeNumber}</div>}
-                </td>
-                <td style={cell}>{componentLabel(a.component)}</td>
-                <td style={cell}>{a.description}</td>
-                <td style={{ ...cell, textAlign: "right" }}>{signed(a.amount)}</td>
-                <td style={{ ...cell, textAlign: "right" }}>{signed(netEffect(a))}</td>
-                <td style={cell} />
-              </tr>
-            );
-          })}
-          <tr>
-            <td style={{ ...cell, textAlign: "right", fontWeight: 700 }} colSpan={5}>
-              TOTAL EFFECT ON PAY (BEFORE TAX)
-            </td>
-            <td style={{ ...cell, textAlign: "right", fontWeight: 700 }}>{signed(netTotal)}</td>
-            <td style={cell} />
-          </tr>
-        </tbody>
-      </table>
-      <div style={{ fontSize: "8.5pt", color: "#444", marginTop: "6px" }}>
-        These adjustments are included in the payroll and payslips for this period. Amount: + increases / − decreases that part of the payroll. Withholding tax is recomputed when a
-        taxable part changes.
-      </div>
-      <Signatures preparedBy={preparedBy} />
-    </div>
-  );
-}
-
-export function Signatures({ preparedBy }: { preparedBy: string }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: "20px", marginTop: "40px", fontSize: "10pt", breakInside: "avoid" }}>
-      {[
-        ["Prepared by", preparedBy],
-        ["Checked by", ""],
-        ["Approved by", ""],
-      ].map(([label, name]) => (
-        <div key={label} style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ minHeight: "16px" }}>{name}</div>
-          <div style={{ borderTop: "1px solid #111", paddingTop: "3px" }}>{label}</div>
-        </div>
-      ))}
-    </div>
+    <VoucherSheet
+      title={SALARY_ADJUSTMENT_VOUCHER_TITLE}
+      date={period.end}
+      columns={[
+        { label: "NAME", width: "24%" },
+        { label: "ADJUSTMENT", width: "18%" },
+        { label: "REASON" },
+        { label: "AMOUNT", width: "12%", align: "right" },
+        { label: "Effect on pay (PhP.)", width: "15%", align: "right" },
+      ]}
+      rows={adjustments.map((a) => {
+        const emp = byId.get(a.employeeId);
+        return { key: a.id, cells: [emp ? fullName(emp) : a.employeeId, componentLabel(a.component), a.description, signed(a.amount), signed(netEffect(a))] };
+      })}
+      total={netTotal}
+      minRows={8}
+      signatureUrl={signatureUrl}
+      note={`Payroll period ${formatDate(period.start)} – ${formatDate(period.end)}. Included in the payroll and payslips for this period. Amount: + increases / − decreases that part of the payroll; withholding tax is recomputed when a taxable part changes.`}
+    />
   );
 }
