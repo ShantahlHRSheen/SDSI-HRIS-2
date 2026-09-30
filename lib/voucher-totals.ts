@@ -1,5 +1,5 @@
 import type { DepartmentVoucher, DepartmentVoucherLine } from "./supabase/department-vouchers";
-import type { Department, PayrollPeriod } from "./types";
+import type { Department, EmployeeDepartmentAllocation, PayrollPeriod } from "./types";
 
 // "MLM Department" → "MLM Voucher", "Accounting" → "Accounting Voucher".
 export function voucherTitle(d: Department): string {
@@ -17,15 +17,37 @@ export interface VoucherAmount {
   amount: number;
 }
 
-export function voucherAmounts(vouchers: DepartmentVoucher[], lines: DepartmentVoucherLine[], periods: PayrollPeriod[]): VoucherAmount[] {
+// A line linked to an employee whose cost is split across departments
+// (employee_department_allocations, e.g. 50% MLM / 50% Darofy) is divided by
+// that split — when the voucher belongs to one of their departments.
+export function voucherAmounts(
+  vouchers: DepartmentVoucher[],
+  lines: DepartmentVoucherLine[],
+  periods: PayrollPeriod[],
+  allocations: EmployeeDepartmentAllocation[] = [],
+): VoucherAmount[] {
   const periodById = new Map(periods.map((p) => [p.id, p]));
   const voucherById = new Map(vouchers.map((v) => [v.id, v]));
+  const splitOf = new Map<string, EmployeeDepartmentAllocation[]>();
+  for (const a of allocations) splitOf.set(a.employeeId, [...(splitOf.get(a.employeeId) ?? []), a]);
   const out: VoucherAmount[] = [];
   for (const l of lines) {
     const v = voucherById.get(l.voucherId);
     const p = v && periodById.get(v.periodId);
     if (!v || !p) continue;
-    out.push({ monthKey: p.start.slice(0, 7), departmentId: v.departmentId, employeeId: l.employeeId, amount: l.amount });
+    const monthKey = p.start.slice(0, 7);
+    const split = l.employeeId ? splitOf.get(l.employeeId) : undefined;
+    if (split && split.length > 1 && split.some((a) => a.departmentId === v.departmentId)) {
+      // The last share takes any centavo left over, so the parts add up exactly.
+      let left = l.amount;
+      split.forEach((a, i) => {
+        const amount = i === split.length - 1 ? Math.round(left * 100) / 100 : Math.round(l.amount * a.percent) / 100;
+        left -= amount;
+        out.push({ monthKey, departmentId: a.departmentId, employeeId: l.employeeId, amount });
+      });
+    } else {
+      out.push({ monthKey, departmentId: v.departmentId, employeeId: l.employeeId, amount: l.amount });
+    }
   }
   return out;
 }
