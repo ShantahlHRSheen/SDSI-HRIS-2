@@ -156,8 +156,15 @@ body {
   .print-stack * {
     visibility: visible;
   }
+  /* The 1-inch top/side margins are padding on each page (not @page
+     margins), so they print the same even when the print dialog's
+     "Margins" is set to None or Minimum. "clone" repeats the padding on
+     a continuation page of a long voucher. */
   .print-stack-page {
     break-after: page;
+    padding: 25.4mm 25.4mm 0;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
   .print-stack-page:last-child {
     break-after: auto;
@@ -168,8 +175,9 @@ body {
   display: none;
 }
 
-/* Vouchers (the only multi-page print job): 1 inch at the top and sides. */
+/* Vouchers (the only multi-page print job); the margins themselves are
+   padding on .print-stack-page above. */
 @page print-stack {
   size: A4;
-  margin: 25.4mm 25.4mm 14mm 25.4mm;
+  margin: 0 0 14mm 0;
 }
