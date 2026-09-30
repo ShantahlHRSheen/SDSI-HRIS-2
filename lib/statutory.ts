@@ -2,8 +2,10 @@
 // Philippine statutory contribution computations — SSS (incl. WISP/MPF),
 // PhilHealth, Pag-IBIG (HDMF), and BIR withholding tax.
 //
-// These follow the current published schedules (SSS Circular 2022-033 MSC
-// table effective Jan 2023; PhilHealth's 5% premium rate per the Universal
+// These follow the current published schedules (SSS Circular 2024-006
+// schedule effective Jan 2025 — 15% total: 5% employee / 10% employer, MSC
+// ₱5,000–₱35,000, regular up to ₱20,000 and WISP/MPF above — plus the
+// employer-only EC of ₱10 / ₱30; PhilHealth's 5% premium rate per the Universal
 // Health Care Act's rate schedule; Pag-IBIG's 2% employee / 2% employer
 // standard rate with the ₱10,000 Monthly Fund Salary ceiling effective Feb
 // 2024; and the TRAIN law semi-monthly withholding tax table). Verify
@@ -19,13 +21,22 @@ export interface ContributionSplit {
 // --- SSS (Social Security System), including WISP (Workers' Investment and
 // Savings Program / Mandatory Provident Fund) ---------------------------
 
-const SSS_RATE_EMPLOYEE = 0.045;
-const SSS_RATE_EMPLOYER = 0.095;
-const SSS_MSC_MIN = 4000;
+const SSS_RATE_EMPLOYEE = 0.05;
+const SSS_RATE_EMPLOYER = 0.1;
+const SSS_MSC_MIN = 5000;
 const SSS_MSC_REGULAR_MAX = 20000;
-const SSS_MSC_MAX = 30000; // regular (20,000) + WISP (10,000)
+const SSS_MSC_MAX = 35000; // regular (20,000) + WISP/MPF (15,000)
 const SSS_BRACKET_SIZE = 500;
-const SSS_BRACKET_FLOOR = 4250; // compensation below this uses the ₱4,000 minimum MSC
+const SSS_BRACKET_FLOOR = 5250; // compensation below this uses the ₱5,000 minimum MSC
+// Employees' Compensation (EC), employer only, per month.
+const SSS_EC_LOW = 10;
+const SSS_EC_HIGH = 30;
+const SSS_EC_THRESHOLD = 15000;
+
+// Monthly EC for a Monthly Salary Credit.
+export function sssEmployeesCompensation(msc: number): number {
+  return msc < SSS_EC_THRESHOLD ? SSS_EC_LOW : SSS_EC_HIGH;
+}
 
 // Monthly Salary Credit for a given monthly compensation, per the SSS
 // contribution schedule's ₱500 brackets.
