@@ -101,10 +101,22 @@ export default function ThirteenthMonthPayPage() {
   const viewRow = allRows.find((r) => r.employee.id === viewing) ?? null;
   const editRow = allRows.find((r) => r.employee.id === editing) ?? null;
 
-  // "all" or an employee id.
+  // Employees ticked for "Print selected" (kept per year).
+  const [picked, setPicked] = useState<{ year: number; ids: Set<string> }>({ year, ids: new Set() });
+  const selected = picked.year === year ? picked.ids : new Set<string>();
+  const toggle = (ids: string[], on: boolean) => {
+    const next = new Set(selected);
+    ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+    setPicked({ year, ids: next });
+  };
+  const allShownPicked = rows.length > 0 && rows.every((r) => selected.has(r.employee.id));
+  const selectedRows = rows.filter((r) => selected.has(r.employee.id));
+
+  // "all", "selected" or an employee id.
   const [printing, setPrinting] = useState<string | null>(null);
   const stopPrinting = useCallback(() => setPrinting(null), []);
-  const printRows = printing === "all" ? rows.filter((r) => r.total !== 0) : allRows.filter((r) => r.employee.id === printing);
+  const printRows =
+    printing === "all" ? rows.filter((r) => r.total !== 0) : printing === "selected" ? selectedRows : allRows.filter((r) => r.employee.id === printing);
 
   function exportCsv() {
     const csv = toCsv(
@@ -159,6 +171,14 @@ export default function ThirteenthMonthPayPage() {
         >
           <Printer size={15} /> Print all slips
         </button>
+        <button
+          onClick={() => setPrinting("selected")}
+          disabled={!selectedRows.length || !loaded}
+          title="Tick employees in the sheet, then print their slips at once — one per page."
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+        >
+          <Printer size={15} /> Print selected ({selectedRows.length})
+        </button>
         {isRealAccount &&
           signatureKindsFor(roles).map((kind) => <SignatureControl key={kind} kind={kind} url={signatures.urls[kind]} onChanged={signatures.reload} hrView={isHr} />)}
         {loaded && toRelease13.length > 0 && (
@@ -207,6 +227,9 @@ export default function ThirteenthMonthPayPage() {
             <table className="w-full min-w-[2300px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-hairline)] text-right text-xs text-[var(--text-muted)]">
+                  <th className="w-6 px-2 py-2">
+                    <input type="checkbox" aria-label="Select all shown" checked={allShownPicked} onChange={(e) => toggle(rows.map((r) => r.employee.id), e.target.checked)} className="accent-[var(--series-1)]" />
+                  </th>
                   <th className={`${th} text-left`}>Employee</th>
                   <th className={`${th} text-left`}>Designation</th>
                   {MONTH_NAMES.map((m) => (
@@ -231,6 +254,15 @@ export default function ThirteenthMonthPayPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.employee.id} className="border-b border-[var(--gridline)] last:border-0">
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${fullName(r.employee)}`}
+                        checked={selected.has(r.employee.id)}
+                        onChange={(e) => toggle([r.employee.id], e.target.checked)}
+                        className="accent-[var(--series-1)]"
+                      />
+                    </td>
                     <td className="px-2 py-1.5 whitespace-nowrap text-[var(--text-primary)]">
                       {fullName(r.employee)}
                       {r.edited && <span className="ml-1.5 rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--status-warning)]">EDITED</span>}
@@ -273,6 +305,7 @@ export default function ThirteenthMonthPayPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]">
+                  <td />
                   <td className="px-2 py-2">Total</td>
                   <td />
                   {MONTH_NAMES.map((m, i) => (

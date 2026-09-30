@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FileCheck2, Layers } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { FileCheck2, Layers, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { MyPayslipsView, PayslipPreviewModal } from "@/components/payroll/MyPayslipsView";
+import { PayslipDocument } from "@/components/payroll/PayslipDocument";
+import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { computePayrollForPeriod, payrollLineToSummary, summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
 import { branchName, departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
@@ -106,6 +108,18 @@ function AdminView({
   const [branchId, setBranchId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [search, setSearch] = useState("");
+  const { salaryAdjustments } = useHris();
+
+  // Employees ticked for "Print selected" (kept per period).
+  const [picked, setPicked] = useState<{ periodId: string | undefined; ids: Set<string> }>({ periodId: period?.id, ids: new Set() });
+  const selected = picked.periodId === period?.id ? picked.ids : new Set<string>();
+  const toggle = (ids: string[], on: boolean) => {
+    const next = new Set(selected);
+    ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+    setPicked({ periodId: period?.id, ids: next });
+  };
+  const [printing, setPrinting] = useState(false);
+  const stopPrinting = useCallback(() => setPrinting(false), []);
 
   const filtered = lines
     .map((l) => employees.find((e) => e.id === l.employeeId))
@@ -113,6 +127,10 @@ function AdminView({
     .filter((e) => (branchId ? e.branchId === branchId : true))
     .filter((e) => (departmentId ? departmentAllocationsForEmployee(e, employeeDepartmentAllocations).some((a) => a.departmentId === departmentId) : true))
     .filter((e) => fullName(e).toLowerCase().includes(search.toLowerCase()));
+
+  // Ticked employees, A–Z by surname.
+  const printList = filtered.filter((e) => selected.has(e.id) && lineByEmployee.has(e.id)).sort((a, b) => fullName(a).localeCompare(fullName(b)));
+  const allShownPicked = filtered.length > 0 && filtered.every((e) => selected.has(e.id));
 
   const generatedForPeriod = new Set(generatedPayslips.filter((p) => p.periodId === period?.id).map((p) => p.employeeId));
   const history = generatedPayslips.slice().sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : -1));
@@ -155,9 +173,19 @@ function AdminView({
         title="Payslips"
         subtitle="Generate and release payslips per payroll period from finalized payroll records."
         actions={
-          <button onClick={generateAll} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
-            <Layers size={16} /> Generate for all shown ({filtered.length})
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setPrinting(true)}
+              disabled={!printList.length}
+              title="Tick employees in the list, then print all their payslips at once — one per page."
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+            >
+              <Printer size={16} /> Print selected ({printList.length})
+            </button>
+            <button onClick={generateAll} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+              <Layers size={16} /> Generate for all shown ({filtered.length})
+            </button>
+          </div>
         }
       />
 
@@ -183,6 +211,9 @@ function AdminView({
           <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
+                <th className="w-8 px-3 py-2">
+                  <input type="checkbox" aria-label="Select all shown" checked={allShownPicked} onChange={(e) => toggle(filtered.map((x) => x.id), e.target.checked)} className="accent-[var(--series-1)]" />
+                </th>
                 <th className="px-3 py-2 font-medium">Employee</th>
                 <th className="px-3 py-2 font-medium">Branch / Dept</th>
                 <th className="px-3 py-2 font-medium">Net pay</th>
@@ -195,6 +226,9 @@ function AdminView({
                 const line = lineByEmployee.get(emp.id);
                 return (
                   <tr key={emp.id} className="border-b border-[var(--gridline)] last:border-0">
+                    <td className="px-3 py-2">
+                      <input type="checkbox" aria-label={`Select ${fullName(emp)}`} checked={selected.has(emp.id)} onChange={(e) => toggle([emp.id], e.target.checked)} className="accent-[var(--series-1)]" />
+                    </td>
                     <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{fullName(emp)}</td>
                     <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{branchName(emp.branchId)}<br />{departmentName(emp.departmentId)}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{line ? formatCurrencyCompact(line.netPay) : "—"}</td>
@@ -254,6 +288,15 @@ function AdminView({
       </div>
 
       <PayslipPreviewModal preview={preview} onClose={() => setPreview(null)} />
+      {printing && period && (
+        <PrintStack onDone={stopPrinting}>
+          {printList.map((emp) => (
+            <PrintPage key={emp.id} form>
+              <PayslipDocument employee={emp} period={period} line={lineByEmployee.get(emp.id)!} adjustments={salaryAdjustments} />
+            </PrintPage>
+          ))}
+        </PrintStack>
+      )}
     </div>
   );
 }
