@@ -107,7 +107,7 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
           {PAYSLIP_SIGNATORIES.map((p) => (
             <div key={p.role}>
               <div className="text-left text-[11px] text-[#52514e]">{p.role}:</div>
-              <div className="mt-6 border-t border-[#0b0b0b] pt-1 font-semibold">{p.name}</div>
+              <div className="mt-1 font-semibold">{p.name}</div>
               <div className="text-[11px] text-[#52514e]">{p.title}</div>
             </div>
           ))}
