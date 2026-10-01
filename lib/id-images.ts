@@ -1,4 +1,4 @@
-// Browser-side preparation of uploaded images (ID card, chat), so each
+// Browser-side preparation of uploaded images (ID card, chat, bulletin), so each
 // stored file is small.
 //   ID photo:  centre-cropped to 3:4 and saved as a 450×600 JPEG (~40–60 KB).
 //   Signature: the paper background is made transparent, the empty margins
@@ -113,4 +113,30 @@ export async function prepareChatPhoto(file: Blob): Promise<Blob> {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return toBlob(canvas, "image/jpeg", 0.8);
+}
+
+// Bulletin photo: longest side at most 1600 px, JPEG at 80% — clear on
+// screens (and readable for posters with text) at ~150–400 KB. Kept as is
+// if it's a GIF (may be animated), can't be read here (e.g. HEIC outside
+// Safari), or is already smaller than the result.
+export async function prepareBulletinPhoto(file: File): Promise<File> {
+  if (file.type === "image/gif") return file;
+  let img: ImageBitmap;
+  try {
+    img = await loadBitmap(file);
+  } catch {
+    return file;
+  }
+  const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await toBlob(canvas, "image/jpeg", 0.8);
+  if (blob.size >= file.size && scale === 1) return file;
+  return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
 }
