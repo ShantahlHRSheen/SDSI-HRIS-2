@@ -318,6 +318,7 @@ interface HrisContextShape {
   removeLeaveType: (id: string) => void;
 
   setPayrollPeriodStatus: (id: string, status: PayrollPeriod["status"]) => void;
+  setPayrollPeriodRequiredDays: (id: string, days: number | null) => void;
   addPayrollPeriod: (input: Omit<PayrollPeriod, "id">) => void;
 
   updateUserRoles: (userId: string, roles: DemoUser["roles"]) => void;
@@ -1262,6 +1263,25 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, supabaseSession],
   );
 
+  const setPayrollPeriodRequiredDays: HrisContextShape["setPayrollPeriodRequiredDays"] = useCallback(
+    async (id, requiredDays) => {
+      if (supabaseSession) {
+        try {
+          await updatePayrollPeriodRow(id, { requiredDays });
+        } catch (err) {
+          reportSaveError("Couldn't save the required working days", err);
+          return;
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        payrollPeriods: prev.payrollPeriods.map((p) => (p.id === id ? { ...p, requiredDays } : p)),
+      }));
+      logAudit("Payroll", "update", `Payroll period required working days set to ${requiredDays ?? "Mon–Sat"}`);
+    },
+    [logAudit, supabaseSession],
+  );
+
   const addPayrollPeriod: HrisContextShape["addPayrollPeriod"] = useCallback(
     async (input) => {
       if (supabaseSession) {
@@ -1735,6 +1755,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     updateLeaveType: leaveTypeCrud.update,
     removeLeaveType: leaveTypeCrud.remove,
     setPayrollPeriodStatus,
+    setPayrollPeriodRequiredDays,
     addPayrollPeriod,
     updateUserRoles,
     demoUsers,

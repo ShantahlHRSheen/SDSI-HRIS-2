@@ -6,7 +6,8 @@ import { useHris } from "@/lib/store";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { formatDate } from "@/lib/helpers";
-import type { PayrollPeriodStatus } from "@/lib/types";
+import type { PayrollPeriod, PayrollPeriodStatus } from "@/lib/types";
+import { workingDaysInPeriod } from "@/lib/monthly-analytics";
 import { MissingPeriodsBanner } from "@/components/payroll/MissingPeriodsBanner";
 
 const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
@@ -16,7 +17,7 @@ const STATUS_TONE: Record<PayrollPeriodStatus, BadgeTone> = {
 };
 
 export default function PayrollPeriodsAdminPage() {
-  const { payrollPeriods, setPayrollPeriodStatus, addPayrollPeriod } = useHris();
+  const { payrollPeriods, setPayrollPeriodStatus, setPayrollPeriodRequiredDays, addPayrollPeriod } = useHris();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ start: "", end: "" });
 
@@ -46,6 +47,7 @@ export default function PayrollPeriodsAdminPage() {
           <thead>
             <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
               <th className="px-4 py-2 font-medium">Period</th>
+              <th className="px-4 py-2 font-medium" title="Regular working days in the cut-off (holidays aren't required). The attendance rate is measured against this.">Required working days</th>
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2 font-medium">Actions</th>
             </tr>
@@ -54,6 +56,9 @@ export default function PayrollPeriodsAdminPage() {
             {payrollPeriods.map((p) => (
               <tr key={p.id} className="border-b border-[var(--gridline)] last:border-0">
                 <td className="tabular px-4 py-2.5 text-[var(--text-primary)]">{formatDate(p.start)} – {formatDate(p.end)}</td>
+                <td className="px-4 py-2.5">
+                  <RequiredDaysInput key={`${p.id}-${p.requiredDays ?? ""}`} period={p} onSave={(days) => setPayrollPeriodRequiredDays(p.id, days)} />
+                </td>
                 <td className="px-4 py-2.5"><Badge tone={STATUS_TONE[p.status]}>{p.status}</Badge></td>
                 <td className="px-4 py-2.5">
                   <div className="flex gap-2">
@@ -92,5 +97,30 @@ export default function PayrollPeriodsAdminPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+// Saved on blur / Enter; blank goes back to Monday–Saturday.
+function RequiredDaysInput({ period, onSave }: { period: PayrollPeriod; onSave: (days: number | null) => void }) {
+  const [value, setValue] = useState(period.requiredDays != null ? String(period.requiredDays) : "");
+  function save() {
+    const trimmed = value.trim();
+    const days = trimmed === "" ? null : Number(trimmed);
+    if (days !== null && (!Number.isFinite(days) || days <= 0 || days > 31)) return setValue(period.requiredDays != null ? String(period.requiredDays) : "");
+    if (days !== (period.requiredDays ?? null)) onSave(days);
+  }
+  return (
+    <input
+      type="number"
+      min={1}
+      max={31}
+      step="0.5"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      placeholder={`${workingDaysInPeriod({ ...period, requiredDays: null })} (Mon–Sat)`}
+      className="tabular w-32 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2 py-1 text-sm"
+    />
   );
 }

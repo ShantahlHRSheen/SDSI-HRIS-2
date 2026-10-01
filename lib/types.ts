@@ -90,6 +90,9 @@ export interface PayrollPeriod {
   start: string;
   end: string;
   status: PayrollPeriodStatus;
+  // Regular working days in the cut-off (holidays aren't required); blank =
+  // Monday to Saturday. The attendance rate is measured against it.
+  requiredDays?: number | null;
 }
 
 export type EmploymentStatus =
