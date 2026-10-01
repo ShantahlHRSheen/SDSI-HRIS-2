@@ -252,13 +252,14 @@ export async function deleteLeaveTypeRow(id: string): Promise<void> {
 // ---- Payroll periods ------------------------------------------------------------------
 
 function toPayrollPeriod(r: PayrollPeriodRow): PayrollPeriod {
-  return { id: r.id, start: r.period_start, end: r.period_end, status: r.status };
+  return { id: r.id, start: r.period_start, end: r.period_end, status: r.status, requiredDays: r.required_days == null ? null : Number(r.required_days) };
 }
 function payrollPeriodToRow(p: Partial<Omit<PayrollPeriod, "id">>): Partial<PayrollPeriodRow> {
   const row: Partial<PayrollPeriodRow> = {};
   if (p.start !== undefined) row.period_start = p.start;
   if (p.end !== undefined) row.period_end = p.end;
   if (p.status !== undefined) row.status = p.status;
+  if (p.requiredDays !== undefined) row.required_days = p.requiredDays;
   return row;
 }
 

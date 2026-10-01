@@ -80,11 +80,12 @@ export interface MonthlyEmployeeFact {
   netPay: number;
 }
 
-// Standard working days in a payroll period: every calendar day except
-// Sunday, matching the 6-day-work-week convention already used for
-// daily-rate employees' "Basis of Mandatories" (lib/payroll.ts's 313
-// days/year figure).
-function workingDaysInPeriod(period: PayrollPeriod): number {
+// Required working days in a payroll period: the regular days HR set on the
+// period (holidays aren't required), else every calendar day except Sunday,
+// matching the 6-day-work-week convention already used for daily-rate
+// employees' "Basis of Mandatories" (lib/payroll.ts's 313 days/year figure).
+export function workingDaysInPeriod(period: PayrollPeriod): number {
+  if (period.requiredDays != null && period.requiredDays > 0) return period.requiredDays;
   let count = 0;
   const end = new Date(period.end + "T00:00:00");
   for (const d = new Date(period.start + "T00:00:00"); d <= end; d.setDate(d.getDate() + 1)) {
@@ -98,10 +99,28 @@ const round = (n: number) => Math.round(n * 100) / 100;
 function buildFact(employee: Employee, month: MonthMeta, lines: PayrollLine[], records: AttendancePeriodRecord[], periods: PayrollPeriod[]): MonthlyEmployeeFact {
   const sumLines = (f: (l: PayrollLine) => number) => round(lines.reduce((s, l) => s + f(l), 0));
 
-  const workingDays = periods.reduce((s, p) => s + workingDaysInPeriod(p), 0);
-  const presentDays = records.reduce((s, r) => s + r.daysWorked, 0);
+  // Attendance counts only cut-offs where attendance was actually tracked:
+  // a record with no days worked, leave or absences (monthly-paid staff whose
+  // days the payroll file doesn't list, or someone not yet hired / already
+  // gone) says nothing about attendance, so it isn't counted as 0%.
+  const periodById = new Map(periods.map((p) => [p.id, p]));
+  const tracked = records.filter((r) => r.daysWorked > 0 || r.vlDays + r.slDays > 0 || (r.absenceInstances ?? 0) > 0);
+  let workingDays = 0;
+  let presentDays = 0;
+  let absentDays = 0;
+  for (const r of tracked) {
+    const period = periodById.get(r.periodId);
+    const required = period ? workingDaysInPeriod(period) : r.daysWorked;
+    workingDays += required;
+    // Work beyond the required days (e.g. on a holiday or rest day) doesn't
+    // push the rate past 100%.
+    presentDays += Math.min(r.daysWorked, required);
+    // Absences: as recorded, else the required days not worked or on leave.
+    absentDays += r.absenceInstances ?? Math.max(0, round(required - r.daysWorked - r.vlDays - r.slDays));
+  }
+  presentDays = round(presentDays);
+  absentDays = round(absentDays);
   const lateDays = records.reduce((s, r) => s + (r.lateInstances ?? 0), 0);
-  const absentDays = records.reduce((s, r) => s + (r.absenceInstances ?? 0), 0);
   const leaveDays = records.reduce((s, r) => s + r.vlDays + r.slDays, 0);
   const otHours = sumLines((l) => l.otHours);
 

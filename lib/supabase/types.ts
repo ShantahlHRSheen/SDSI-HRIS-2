@@ -74,6 +74,7 @@ export type PayrollPeriodRow = {
   period_start: string;
   period_end: string;
   status: "open" | "locked" | "closed";
+  required_days?: number | null;
 };
 
 export type EmployeeRow = {
