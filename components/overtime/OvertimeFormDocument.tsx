@@ -15,7 +15,7 @@ function Box({ on }: { on: boolean }) {
 
 function Signature({ url, name, caption, date }: { url?: string; name: string | null; caption: string; date?: string | null }) {
   return (
-    <div style={{ width: "290px", margin: "6px auto 0", textAlign: "center" }}>
+    <div style={{ width: "290px", margin: "2px auto 0", textAlign: "center", breakInside: "avoid" }}>
       <div style={{ height: "40px", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
         {url && (
           // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL from Supabase Storage
@@ -32,10 +32,10 @@ function Signature({ url, name, caption, date }: { url?: string; name: string | 
 export type OvertimeFormDocData = Omit<OvertimeForm, "submittedAt"> & { submittedAt: string | null };
 
 export function OvertimeFormDocument({ form, signatures = {} }: { form: OvertimeFormDocData; signatures?: Partial<Record<LeaveFormSigner, string>> }) {
-  const row: React.CSSProperties = { margin: "0 0 7px", fontSize: "10pt" };
+  const row: React.CSSProperties = { margin: "0 0 4px", fontSize: "10pt" };
   const label: React.CSSProperties = { fontWeight: 700 };
-  const rule = <hr style={{ border: 0, borderTop: "1px solid #999", margin: "12px 0 8px" }} />;
-  const section = (t: string) => <div style={{ textAlign: "center", fontWeight: 700, fontSize: "10.5pt", margin: "0 0 9px" }}>{t}</div>;
+  const rule = <hr style={{ border: 0, borderTop: "1px solid #999", margin: "8px 0 6px" }} />;
+  const section = (t: string) => <div style={{ textAlign: "center", fontWeight: 700, fontSize: "10.5pt", margin: "0 0 6px" }}>{t}</div>;
   const headDone = !!form.headDecision;
   const hrDone = !!form.hrDecision;
 
@@ -46,35 +46,39 @@ export function OvertimeFormDocument({ form, signatures = {} }: { form: Overtime
         <img src="/brand/shantahl-form-logo.png" alt="" style={{ height: "44px", width: "44px", objectFit: "contain" }} />
         <div style={{ fontWeight: 700, fontSize: "11pt" }}>SHANTAHL DIRECT SALES, INC. (SDSI)</div>
       </div>
-      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", margin: "4px 0 12px" }}>SDSI Overtime Authorization Form</div>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", margin: "2px 0 8px" }}>SDSI Overtime Authorization Form</div>
 
-      <p style={row}>
-        <span style={label}>Name:</span> {form.employeeName}
-      </p>
-      <p style={row}>
-        <span style={label}>Position:</span> {form.position}
-      </p>
-      <p style={row}>
-        <span style={label}>Branch:</span> {form.branch}
-      </p>
-      <p style={row}>
-        <span style={label}>Department:</span> {form.department}
-      </p>
-      <p style={row}>
-        <span style={label}>Department Head:</span> {form.departmentHead}
-      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "16px" }}>
+        <p style={row}>
+          <span style={label}>Name:</span> {form.employeeName}
+        </p>
+        <p style={row}>
+          <span style={label}>Position:</span> {form.position}
+        </p>
+        <p style={row}>
+          <span style={label}>Branch:</span> {form.branch}
+        </p>
+        <p style={row}>
+          <span style={label}>Department:</span> {form.department}
+        </p>
+        <p style={row}>
+          <span style={label}>Department Head:</span> {form.departmentHead}
+        </p>
+      </div>
       <p style={row}>
         <span style={label}>Regular working schedule:</span> {form.schedule}
       </p>
 
       {rule}
       {section("Overtime Details")}
-      <p style={row}>
-        <span style={label}>Date of overtime:</span> {longDate(form.otDate)}
-      </p>
-      <p style={row}>
-        <span style={label}>Number of OT hours requested:</span> {hours(form.hoursRequested)}
-      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "16px" }}>
+        <p style={row}>
+          <span style={label}>Date of overtime:</span> {longDate(form.otDate)}
+        </p>
+        <p style={row}>
+          <span style={label}>Number of OT hours requested:</span> {hours(form.hoursRequested)}
+        </p>
+      </div>
       <p style={row}>
         <span style={label}>Tasks to be done:</span>
       </p>
@@ -90,40 +94,34 @@ export function OvertimeFormDocument({ form, signatures = {} }: { form: Overtime
       <p style={row}>
         <Box on={form.headDecision === "approved"} />
         <span style={label}>Approved</span>
-      </p>
-      <p style={row}>
-        <span style={label}>Approved overtime hours:</span> {form.headDecision === "approved" ? hours(form.headHours) : ""}
+        <span style={{ ...label, marginLeft: "24px" }}>Approved overtime hours:</span> {form.headDecision === "approved" ? hours(form.headHours) : ""}
       </p>
       <p style={row}>
         <Box on={form.headDecision === "disapproved"} />
         <span style={label}>Disapproved</span>
-      </p>
-      <p style={row}>
-        <span style={label}>Reason of disapproval:</span> {form.headDecision === "disapproved" ? form.headReason : ""}
+        <span style={{ ...label, marginLeft: "24px" }}>Reason of disapproval:</span> {form.headDecision === "disapproved" ? form.headReason : ""}
       </p>
       <Signature url={headDone ? signatures.head : undefined} name={form.headSignedName} caption="Department Head’s signature over printed name" date={form.headSignedAt} />
 
       {rule}
-      {section("HR Department’s Receipt")}
-      <p style={{ ...row, marginBottom: "4px" }}>
-        <Box on={form.hrDecision === "verified"} />
-        <span style={label}>Verified</span>
-      </p>
-      <p style={{ ...row, marginBottom: "4px" }}>
-        <Box on={form.hrDecision === "disapproved"} />
-        <span style={label}>Disapproved</span>
-      </p>
-      <p style={row}>
-        <span style={label}>Reason:</span> <span style={{ borderBottom: "1px solid #555", display: "inline-block", minWidth: "260px" }}>{form.hrDecision === "disapproved" ? form.hrReason : ""}</span>
-      </p>
-      <p style={{ ...row, marginBottom: "4px" }}>
-        <Box on={form.hrDecision === "returned"} />
-        <span style={label}>Returned for clarification</span>
-      </p>
-      <p style={row}>
-        <span style={label}>Reason:</span> <span style={{ borderBottom: "1px solid #555", display: "inline-block", minWidth: "260px" }}>{form.hrDecision === "returned" ? form.hrReason : ""}</span>
-      </p>
-      <Signature url={hrDone ? signatures.hr : undefined} name={form.hrSignedName} caption="Signature over printed name" date={form.hrSignedAt} />
+      <div style={{ breakInside: "avoid" }}>
+        {section("HR Department’s Receipt")}
+        <p style={{ ...row, marginBottom: "4px" }}>
+          <Box on={form.hrDecision === "verified"} />
+          <span style={label}>Verified</span>
+        </p>
+        <p style={row}>
+          <Box on={form.hrDecision === "disapproved"} />
+          <span style={label}>Disapproved</span>
+          <span style={{ ...label, marginLeft: "24px" }}>Reason:</span> <span style={{ borderBottom: "1px solid #555", display: "inline-block", minWidth: "260px" }}>{form.hrDecision === "disapproved" ? form.hrReason : ""}</span>
+        </p>
+        <p style={row}>
+          <Box on={form.hrDecision === "returned"} />
+          <span style={label}>Returned for clarification</span>
+          <span style={{ ...label, marginLeft: "24px" }}>Reason:</span> <span style={{ borderBottom: "1px solid #555", display: "inline-block", minWidth: "200px" }}>{form.hrDecision === "returned" ? form.hrReason : ""}</span>
+        </p>
+        <Signature url={hrDone ? signatures.hr : undefined} name={form.hrSignedName} caption="Signature over printed name" date={form.hrSignedAt} />
+      </div>
     </div>
   );
 }
