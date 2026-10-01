@@ -9,6 +9,7 @@ import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabase
 import {
   decideCorrectionRequestRow,
   decideLeaveRequestRow,
+  deleteLeaveRequestRow,
   decideOvertimeRequestRow,
   deleteBranchRow,
   deleteDepartmentRow,
@@ -346,6 +347,8 @@ interface HrisContextShape {
   uploadLeaveAttachment: (input: { leaveRequestId: string; employeeId: string; kind: LeaveAttachmentKind; file: File }) => Promise<string | null>;
   leaveAttachmentUrl: (attachment: LeaveAttachment) => Promise<string>;
   decideLeaveRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
+  // HR Manager: deletes a leave request with its form and files. Returns an error message, or null.
+  deleteLeaveRequest: (id: string) => Promise<string | null>;
 
   // The new request's id, or null if it couldn't be filed.
   fileOvertimeRequest: (input: Omit<OvertimeRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => Promise<string | null>;
@@ -1389,6 +1392,32 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, currentUser, supabaseSession],
   );
 
+  const deleteLeaveRequest: HrisContextShape["deleteLeaveRequest"] = useCallback(
+    async (id) => {
+      const req = state.leaveRequests.find((r) => r.id === id);
+      const who = req ? state.employees.find((e) => e.id === req.employeeId) : undefined;
+      const what = req ? `${who ? fullName(who) : req.employeeId}'s leave request (${req.startDate} to ${req.endDate}, ${req.days} day(s))` : "a leave request";
+      if (supabaseSession) {
+        try {
+          await deleteLeaveRequestRow(
+            id,
+            state.leaveAttachments.filter((a) => a.leaveRequestId === id).map((a) => a.storagePath),
+          );
+        } catch (err) {
+          return err instanceof Error ? err.message : "Couldn't delete the leave request.";
+        }
+      }
+      setState((prev) => ({
+        ...prev,
+        leaveRequests: prev.leaveRequests.filter((r) => r.id !== id),
+        leaveAttachments: prev.leaveAttachments.filter((a) => a.leaveRequestId !== id),
+      }));
+      logAudit("Leave Management", "delete", `Deleted ${what}`);
+      return null;
+    },
+    [logAudit, supabaseSession, state.leaveRequests, state.leaveAttachments, state.employees],
+  );
+
   const fileOvertimeRequest: HrisContextShape["fileOvertimeRequest"] = useCallback(
     async (input) => {
       if (supabaseSession) {
@@ -1701,6 +1730,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     decideLeaveRequest,
     fileOvertimeRequest,
     reloadRequests,
+    deleteLeaveRequest,
     decideOvertimeRequest,
     fileCorrectionRequest,
     decideCorrectionRequest,

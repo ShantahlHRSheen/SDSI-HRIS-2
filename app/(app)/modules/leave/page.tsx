@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarPlus, CalendarRange, Check, FileText, X } from "lucide-react";
+import { CalendarPlus, CalendarRange, Check, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -23,7 +23,7 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 };
 
 export default function LeaveManagementPage() {
-  const { employees, leaveTypes, leaveRequests, currentUser, currentEmployee, fileLeaveRequest, decideLeaveRequest, canAttachLeaveFiles, uploadLeaveAttachment, isRealAccount } = useHris();
+  const { employees, leaveTypes, leaveRequests, currentUser, currentEmployee, fileLeaveRequest, decideLeaveRequest, canAttachLeaveFiles, uploadLeaveAttachment, isRealAccount, deleteLeaveRequest } = useHris();
   // The online Application for Leave (real accounts): filed by the employee,
   // approved by their department head, received by HR.
   const { forms, error: formsError, reload: reloadForms } = useLeaveForms();
@@ -45,6 +45,21 @@ export default function LeaveManagementPage() {
   const formsToSign = forms.filter((f) => canHeadForm(f, currentEmployee?.id, isHrManager));
   const formsToReceive = isHrManager ? forms.filter((f) => formStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
   const requestById = useMemo(() => new Map(leaveRequests.map((r) => [r.id, r])), [leaveRequests]);
+
+  // HR Manager: delete a leave request (with its form and files).
+  const [deleting, setDeleting] = useState<LeaveRequest | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    const err = await deleteLeaveRequest(deleting.id);
+    setDeleteBusy(false);
+    if (err) return setDeleteError(err);
+    setDeleting(null);
+    reloadForms();
+  }
 
   // HR/upper management decide on everyone; a Dept Head decides on the
   // employees they supervise.
@@ -311,6 +326,7 @@ export default function LeaveManagementPage() {
             <RequestsTable
               showEmployee
               onViewForm={setViewing}
+              onDelete={isHrManager ? (r) => (setDeleteError(null), setDeleting(r)) : undefined}
               rows={allRequests.map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
                 return {
@@ -330,6 +346,33 @@ export default function LeaveManagementPage() {
           )}
         </div>
       )}
+
+      <Modal open={!!deleting} onClose={() => !deleteBusy && setDeleting(null)} title="Delete leave request">
+        {deleting && (
+          <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+            <p>
+              Delete{" "}
+              <span className="font-medium text-[var(--text-primary)]">
+                {(() => {
+                  const emp = employees.find((e) => e.id === deleting.employeeId);
+                  return emp ? fullName(emp) : (formByRequest.get(deleting.id)?.employeeName ?? deleting.employeeId);
+                })()}
+              </span>
+              &rsquo;s {leaveTypeName(deleting.leaveTypeId)} ({formatDate(deleting.startDate)} – {formatDate(deleting.endDate)}, {deleting.days}d, {deleting.status})?
+            </p>
+            <p>Its leave form, signatures and attachments are deleted too, and the days go back to the employee&rsquo;s leave balance. This can&rsquo;t be undone.</p>
+            {deleteError && <div className="text-xs text-[var(--status-critical)]">{deleteError}</div>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setDeleting(null)} disabled={deleteBusy} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                Cancel
+              </button>
+              <button onClick={confirmDelete} disabled={deleteBusy} className="rounded-lg bg-[var(--status-critical)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+                {deleteBusy ? "Deleting…" : "Delete request"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <LeaveApplicationModal open={showApply} onClose={() => setShowApply(false)} onFiled={reloadForms} />
       {viewingForm && <LeaveFormModal key={viewingForm.leaveRequestId} form={viewingForm} request={requestById.get(viewingForm.leaveRequestId)} onClose={() => setViewing(null)} onChanged={reloadForms} />}
@@ -461,10 +504,12 @@ function RequestsTable({
   rows,
   showEmployee = false,
   onViewForm,
+  onDelete,
 }: {
   rows: { id: string; request: LeaveRequest; form?: LeaveForm; canUpload: boolean; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
   onViewForm?: (id: string) => void;
+  onDelete?: (request: LeaveRequest) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -477,6 +522,7 @@ function RequestsTable({
             <th className="px-3 py-2 font-medium">Reason</th>
             <th className="px-3 py-2 font-medium">Documents</th>
             <th className="px-3 py-2 font-medium">Status</th>
+            {onDelete && <th className="px-3 py-2" />}
           </tr>
         </thead>
         <tbody>
@@ -498,6 +544,13 @@ function RequestsTable({
                 <LeaveDocuments request={r.request} canUpload={r.canUpload} onlineForm={!!r.form} />
               </td>
               <td className="px-3 py-2">{r.form ? <FormProgress form={r.form} /> : <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>}</td>
+              {onDelete && (
+                <td className="px-3 py-2">
+                  <button onClick={() => onDelete(r.request)} className="rounded-md p-1 text-[var(--text-muted)] hover:text-[var(--status-critical)]" aria-label="Delete leave request" title="Delete leave request">
+                    <Trash2 size={15} />
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
