@@ -464,3 +464,92 @@ export function downloadCsv(filename: string, csv: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ---------------------------------------------------------------------------
+// Full-attendance payroll expense: what one month of payroll costs when every
+// active employee works 26 days (13 per cut-off) with no absences, leaves,
+// lates, overtime or holidays. Runs the same payroll engine over a
+// stand-in cut-off, keeping each employee's latest fixed allowances and
+// contribution shares on file, and doubles it into a month.
+// ---------------------------------------------------------------------------
+
+export const FULL_ATTENDANCE_DAYS_PER_MONTH = 26;
+const FULL_ATTENDANCE_MONTH: MonthMeta = { key: "full-attendance", label: "Full attendance", monthIndex: 0, year: 0 };
+
+export function fullAttendanceFacts(
+  employees: Employee[],
+  overrides: PayrollLineOverride[],
+  payrollPeriods: PayrollPeriod[],
+  attendanceRecords: AttendancePeriodRecord[],
+): MonthlyEmployeeFact[] {
+  const period: PayrollPeriod = { id: "__full_attendance__", start: "1900-01-01", end: "1900-01-15", status: "open" };
+  const active = employees.filter(
+    (e) => (e.status === "active" || e.status === "on_leave") && ((e.payrollType === "daily" && (e.dailyRate ?? 0) > 0) || (e.payrollType === "monthly" && (e.monthlySalary ?? 0) > 0)),
+  );
+  // Each employee's latest payroll line override: their fixed allowances and
+  // the contribution shares actually on file (e.g. not covered = 0).
+  const startOf = new Map(payrollPeriods.map((p) => [p.id, p.start]));
+  const latest = new Map<string, PayrollLineOverride>();
+  for (const o of overrides) {
+    const prev = latest.get(o.employeeId);
+    if (!prev || (startOf.get(o.periodId) ?? "") > (startOf.get(prev.periodId) ?? "")) latest.set(o.employeeId, o);
+  }
+  const perCutOff = FULL_ATTENDANCE_DAYS_PER_MONTH / 2;
+  const stubOverrides: PayrollLineOverride[] = [];
+  for (const e of active) {
+    const o = latest.get(e.id);
+    if (!o) continue;
+    // The allowance actually paid that cut-off: a monthly-paid employee's is
+    // fixed per cut-off; a daily-paid one's is per day worked, so scale it to
+    // a full cut-off.
+    let dailyAllowanceOverride: number | null = null;
+    if (o.dailyAllowanceOverride !== null) {
+      if (e.payrollType === "monthly") dailyAllowanceOverride = o.dailyAllowanceOverride;
+      else {
+        const worked = attendanceRecords.find((r) => r.periodId === o.periodId && r.employeeId === e.id)?.daysWorked ?? 0;
+        if (worked > 0) dailyAllowanceOverride = round((o.dailyAllowanceOverride / worked) * perCutOff);
+      }
+    }
+    stubOverrides.push({
+      ...o,
+      periodId: period.id,
+      cashAdvance: 0,
+      lsmBizLoan: 0,
+      lsmCoopLoan: 0,
+      shortages: 0,
+      sssLoan: 0,
+      hdmfLoan: 0,
+      hdmfMp2Savings: 0,
+      adjustmentAdd: 0,
+      adjustmentDeduct: 0,
+      withholdingTaxOverride: null,
+      dailyAllowanceOverride,
+      basicPayOverride: null,
+      latesUndertimeOverride: null,
+      undertimeDeductionOverride: null,
+      holidayPayOverride: null,
+      vlPayOverride: null,
+      slPayOverride: null,
+      otHoursOverride: null,
+      otPayOverride: null,
+    });
+  }
+  const records: AttendancePeriodRecord[] = active.map((e) => ({
+    id: `full-${e.id}`,
+    periodId: period.id,
+    employeeId: e.id,
+    daysWorked: perCutOff,
+    holidayDays: 0,
+    slDays: 0,
+    vlDays: 0,
+    lateMinutes: 0,
+    undertimeMinutes: 0,
+    notes: "",
+    source: "manual",
+    updatedBy: "",
+    updatedAt: "",
+  }));
+  const lines = computePayrollForPeriod(period, active, records, [], stubOverrides, []);
+  const byId = new Map(active.map((e) => [e.id, e]));
+  return lines.map((l) => buildFact(byId.get(l.employeeId)!, FULL_ATTENDANCE_MONTH, [l, l], [], [period, period]));
+}
