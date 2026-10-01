@@ -7,6 +7,7 @@ import {
   Camera,
   ChartColumn,
   Leaf,
+  Briefcase,
   Megaphone,
   Monitor,
   Network,
@@ -24,10 +25,13 @@ import {
 // published, not derived from employee records. Update the data below when
 // HR issues a new version.
 
-// direct: reports straight to the unit head (a line is drawn to them).
-type Person = { name: string; title: string; freelancer?: boolean; direct?: boolean };
-type Division = { name: string; icon: LucideIcon; people: Person[] };
-type Group = { name: string; icon: LucideIcon; lead?: Person; people?: Person[]; divisions?: Division[] };
+// direct: reports straight to the unit head — a line is drawn from the head
+// to that side of the card ("left" or "right"). team: the people listed are
+// one team under its first person, joined by a bracket on their left.
+type Side = "left" | "right";
+type Person = { name: string; title: string; freelancer?: boolean; direct?: Side };
+type Division = { name: string; icon: LucideIcon; people: Person[]; direct?: Side; team?: boolean };
+type Group = { name: string; icon: LucideIcon; lead?: Person; people?: Person[]; divisions?: Division[]; team?: boolean };
 type Unit = {
   id: string;
   title: string;
@@ -35,6 +39,9 @@ type Unit = {
   leads?: Person[];
   aside?: Person;
   groups: Group[];
+  // Lines drawn as in the official chart: the departments side by side
+  // (scrolling sideways on narrower screens).
+  lines?: boolean;
 };
 
 const BOARD = {
@@ -59,23 +66,29 @@ const UNITS: Unit[] = [
   {
     id: "mlm",
     title: "MLM Business Unit",
-    head: { name: "Lowel B. Magdadaro", title: "Chairman / MLM Business Unit Head" },
+    head: { name: "Lowel B. Magdadaro", title: "Chairman of the BOD / MLM Business Unit Head" },
+    lines: true,
     groups: [
       {
         name: "Netdev Department",
         icon: Network,
         people: [
-          { name: "Romelito Domecillo", title: "Netdev Manager", direct: true },
-          { name: "Chester Rosales", title: "Netdev Manager", direct: true },
-          { name: "Randel Segovia", title: "Netdev Manager", direct: true },
-          { name: "Mae Japitan", title: "Sales Manager", direct: true },
+          { name: "Romelito Domecillo", title: "Netdev Manager", direct: "right" },
+          { name: "Chester Rosales", title: "Netdev Manager", direct: "right" },
+          { name: "Randel Segovia", title: "Netdev Manager", direct: "right" },
         ],
+      },
+      {
+        name: "Business Development Department",
+        icon: Briefcase,
+        people: [{ name: "Mae Japitan", title: "Business Development Manager", direct: "left" }],
       },
       {
         name: "Sales Department",
         icon: ChartColumn,
+        team: true,
         people: [
-          { name: "Michelle Ignacio", title: "Sales Head", direct: true },
+          { name: "Michelle Ignacio", title: "Sales Head", direct: "right" },
           { name: "Jennifer Gonzales", title: "Sales Admin" },
           { name: "Charm Jireh Rivera", title: "Sales Admin" },
           { name: "Christian Aure", title: "Sales Admin" },
@@ -88,8 +101,10 @@ const UNITS: Unit[] = [
           {
             name: "Social Media Management Division",
             icon: Monitor,
+            direct: "left",
+            team: true,
             people: [
-              { name: "Jasmine Eusebio", title: "Marketing Head", direct: true },
+              { name: "Jasmine Eusebio", title: "Marketing Head" },
               { name: "Erwin Carreon", title: "Social Media Manager" },
               { name: "Shane Garcia", title: "Social Media Manager" },
             ],
@@ -97,8 +112,9 @@ const UNITS: Unit[] = [
           {
             name: "Creatives & Production Division",
             icon: Camera,
+            team: true,
             people: [
-              { name: "John Paul Michael Papa", title: "Head MMA", direct: true },
+              { name: "John Paul Michael Papa", title: "Head MMA", direct: "left" },
               { name: "Frank Dela Cruz", title: "Video Editor" },
               { name: "John Michael De Maliwat", title: "GA" },
             ],
@@ -270,10 +286,24 @@ function HeadBar({ name, title, icon = User, size = "md" }: { name: string; titl
   );
 }
 
-function PersonCard({ person }: { person: Person }) {
+// "Reports to Chairman", shown in place of the lines when they aren't drawn
+// (one column on phones).
+function DirectTag({ light = false }: { light?: boolean }) {
+  return (
+    <span
+      className="mt-0.5 block w-fit rounded-full px-1.5 text-[10px] text-white group-data-[lines=on]/chart:hidden"
+      style={{ background: light ? DARK : BRIGHT }}
+    >
+      Reports to Chairman
+    </span>
+  );
+}
+
+function PersonCard({ person, teamOf }: { person: Person; teamOf?: string }) {
   return (
     <div
-      data-direct={person.direct ? "" : undefined}
+      data-direct={person.direct}
+      data-team={teamOf}
       className="flex items-center gap-3 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] py-2 pr-3 pl-2"
       style={{ boxShadow: `inset 4px 0 0 ${BRIGHT}` }}
     >
@@ -284,12 +314,7 @@ function PersonCard({ person }: { person: Person }) {
       <span className="w-[42%] shrink-0 border-l border-[var(--border-hairline)] pl-3 text-xs text-[var(--text-secondary)]">
         {person.title}
         {person.freelancer && <span className="mt-0.5 block w-fit rounded-full border border-[var(--border-hairline)] px-1.5 text-[10px] text-[var(--text-muted)]">Freelancer</span>}
-        {/* In one column (phones) the reporting lines aren't drawn — say it instead. */}
-        {person.direct && (
-          <span className="mt-0.5 block w-fit rounded-full px-1.5 text-[10px] text-white lg:hidden" style={{ background: BRIGHT }}>
-            Reports to Chairman
-          </span>
-        )}
+        {person.direct && <DirectTag />}
       </span>
     </div>
   );
@@ -311,7 +336,7 @@ function SectionTitle({ title, sub = "Organizational Structure" }: { title: stri
 
 function GroupColumn({ group }: { group: Group }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-column>
       <div className="flex items-center gap-3 rounded-xl px-3 py-2 pb-3 text-white" style={barStyle}>
         <IconBadge icon={group.icon} size="sm" />
         <div className="flex-1 text-center text-sm font-bold tracking-wide uppercase">{group.name}</div>
@@ -323,14 +348,19 @@ function GroupColumn({ group }: { group: Group }) {
             <div className="h-1" />
           </>
         )}
-        {group.people?.map((p) => <PersonCard key={p.name} person={p} />)}
+        {group.people?.map((p) => <PersonCard key={p.name} person={p} teamOf={group.team ? group.name : undefined} />)}
         {group.divisions?.map((d) => (
           <div key={d.name} className="space-y-2 pt-1">
-            <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-white" style={{ background: BRIGHT }}>
+            <div data-direct={d.direct} className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-white" style={{ background: BRIGHT }}>
               <IconBadge icon={d.icon} size="sm" />
-              <div className="flex-1 text-xs font-bold tracking-wide uppercase">{d.name}</div>
+              <div className="flex-1 text-xs font-bold tracking-wide uppercase">
+                {d.name}
+                {d.direct && <DirectTag light />}
+              </div>
             </div>
-            {d.people.map((p) => <PersonCard key={p.name} person={p} />)}
+            {d.people.map((p) => (
+              <PersonCard key={p.name} person={p} teamOf={d.team ? d.name : undefined} />
+            ))}
           </div>
         ))}
       </div>
@@ -338,11 +368,14 @@ function GroupColumn({ group }: { group: Group }) {
   );
 }
 
-// Lines from the unit head to the people reporting to them directly, drawn
-// once the chart is laid out: down a trunk in the gap beside the person's
-// column, then across to their card. Only while the columns sit side by side
-// (lg and up); in one column the cards say "Reports to Chairman" instead.
-function useDirectLines(enabled: boolean) {
+// The official chart's lines, drawn over the laid-out cards:
+// - from the unit head to each direct report: out of the head's side (or
+//   down from it), along a trunk just inside the gap beside the card, then
+//   across to the card's left or right side;
+// - a bracket on the left of each team, joining its people.
+// Only while the departments sit side by side; otherwise the cards say
+// "Reports to Chairman" instead.
+function useChartLines(enabled: boolean) {
   const box = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLDivElement>(null);
   const [paths, setPaths] = useState<string[]>([]);
@@ -350,27 +383,43 @@ function useDirectLines(enabled: boolean) {
     const root = box.current;
     if (!enabled || !root || !head.current) return;
     const draw = () => {
-      if (window.innerWidth < 1024) return setPaths([]);
       const o = root.getBoundingClientRect();
-      const h = head.current!.getBoundingClientRect();
-      const centre = h.left + h.width / 2 - o.left;
-      const top = h.bottom - o.top;
-      const half = 10; // half the column gap (gap-5)
-      setPaths(
-        [...root.querySelectorAll<HTMLElement>("[data-direct]")].map((el) => {
-          const r = el.getBoundingClientRect();
-          const left = r.left - o.left;
-          const right = r.right - o.left;
-          const y = r.top + r.height / 2 - o.top;
-          // Columns right of the head's centre join on the card's left side;
-          // the others on its right side. The two trunks sharing a gap sit
-          // 3px apart.
-          const onLeft = left > centre;
-          const x = onLeft ? left - half + 3 : right + half - 3;
-          const turn = onLeft ? 6 : -6;
-          return `M ${x} ${top} V ${y - 6} Q ${x} ${y} ${x + turn} ${y} H ${onLeft ? left : right}`;
-        }),
-      );
+      const rel = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left - o.left, right: r.right - o.left, top: r.top - o.top, bottom: r.bottom - o.top, mid: r.top + r.height / 2 - o.top };
+      };
+      const columns = [...root.querySelectorAll("[data-column]")].map(rel);
+      if (columns.length < 2 || columns.some((c) => Math.abs(c.top - columns[0].top) > 2)) return setPaths([]);
+      const h = rel(head.current!);
+      const r = 8; // corner radius
+      const out: string[] = [];
+      for (const el of root.querySelectorAll<HTMLElement>("[data-direct]")) {
+        const c = rel(el);
+        const side = el.dataset.direct as Side;
+        // Trunk 14px into the gap on the joining side (gaps are 40px).
+        const x = side === "right" ? c.right + 14 : c.left - 26;
+        const end = side === "right" ? c.right : c.left;
+        const toward = end > x ? r : -r;
+        const last = `V ${c.mid - r} Q ${x} ${c.mid} ${x + toward} ${c.mid} H ${end}`;
+        if (x < h.left + 24 || x > h.right - 24) {
+          // Out of the head's side, then down.
+          const fromRight = x > h.right - 24;
+          const startX = fromRight ? h.right : h.left;
+          const y = h.top + (h.bottom - h.top) / 2;
+          out.push(`M ${startX} ${y} H ${x + (fromRight ? -r : r)} Q ${x} ${y} ${x} ${y + r} ${last}`);
+        } else out.push(`M ${x} ${h.bottom} ${last}`);
+      }
+      const teams = new Map<string, ReturnType<typeof rel>[]>();
+      for (const el of root.querySelectorAll<HTMLElement>("[data-team]")) teams.set(el.dataset.team!, [...(teams.get(el.dataset.team!) ?? []), rel(el)]);
+      for (const cards of teams.values()) {
+        if (cards.length < 2) continue;
+        const x = cards[0].left - 10;
+        const first = cards[0];
+        const lastCard = cards[cards.length - 1];
+        out.push(`M ${first.left} ${first.mid} H ${x + r} Q ${x} ${first.mid} ${x} ${first.mid + r} V ${lastCard.mid - r} Q ${x} ${lastCard.mid} ${x + r} ${lastCard.mid} H ${lastCard.left}`);
+        for (const c of cards.slice(1, -1)) out.push(`M ${x} ${c.mid} H ${c.left}`);
+      }
+      setPaths(out);
     };
     draw();
     const ro = new ResizeObserver(draw);
@@ -381,45 +430,52 @@ function useDirectLines(enabled: boolean) {
 }
 
 function UnitSection({ unit }: { unit: Unit }) {
-  const cols = unit.groups.length >= 4 ? "lg:grid-cols-2 2xl:grid-cols-4" : unit.groups.length === 3 ? "lg:grid-cols-3" : unit.groups.length === 2 ? "md:grid-cols-2" : "";
+  const cols = unit.lines
+    ? "md:grid-cols-4 md:min-w-[1000px] gap-x-10"
+    : unit.groups.length >= 4
+      ? "lg:grid-cols-2 2xl:grid-cols-4"
+      : unit.groups.length === 3
+        ? "lg:grid-cols-3"
+        : unit.groups.length === 2
+          ? "md:grid-cols-2"
+          : "";
   const single = unit.groups.length === 1;
-  const hasDirect = unit.groups.some((g) => [...(g.people ?? []), ...(g.divisions ?? []).flatMap((d) => d.people)].some((p) => p.direct));
-  const { box, head, paths } = useDirectLines(hasDirect);
+  const { box, head, paths } = useChartLines(!!unit.lines);
   return (
     <section id={unit.id} className="scroll-mt-20 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-1)]/40 p-4 sm:p-6">
       <SectionTitle title={unit.title} />
-      <div ref={box} className="relative">
-        {paths.length > 0 && (
-          <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden>
-            {paths.map((d, i) => (
-              <path key={i} d={d} fill="none" stroke={BRIGHT} strokeOpacity={0.8} strokeWidth={2} />
+      <div className={unit.lines ? "-mx-2 overflow-x-auto px-2 pb-1" : undefined}>
+        <div ref={box} data-lines={paths.length ? "on" : "off"} className={`group/chart relative ${unit.lines ? "md:min-w-[1000px]" : ""}`}>
+          {paths.length > 0 && (
+            <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden>
+              {paths.map((d, i) => (
+                <path key={i} d={d} fill="none" stroke={BRIGHT} strokeOpacity={0.8} strokeWidth={2} />
+              ))}
+            </svg>
+          )}
+          <div ref={head} className={`mx-auto ${unit.lines ? "max-w-md" : "max-w-xl"}`}>
+            <HeadBar name={unit.head.name} title={unit.head.title} size="lg" />
+          </div>
+          {/* With lines, more room under the head instead of the connector. */}
+          {paths.length ? <div className="h-12" /> : <Connector />}
+          {(unit.leads || unit.aside) && (
+            <>
+              <div className="mx-auto grid max-w-4xl grid-cols-1 items-center gap-3 md:grid-cols-2">
+                {unit.aside && (
+                  <div className="md:order-first">
+                    <PersonCard person={unit.aside} />
+                  </div>
+                )}
+                <div className="space-y-2">{unit.leads?.map((p) => <PersonCard key={p.name} person={p} />)}</div>
+              </div>
+              <Connector />
+            </>
+          )}
+          <div className={`grid grid-cols-1 gap-5 ${cols} ${single ? "mx-auto max-w-xl" : ""}`}>
+            {unit.groups.map((g) => (
+              <GroupColumn key={g.name} group={g} />
             ))}
-          </svg>
-        )}
-        <div ref={head} className="mx-auto max-w-xl">
-          <HeadBar name={unit.head.name} title={unit.head.title} size="lg" />
-        </div>
-        {/* The lines replace the single connector (kept for the spacing). */}
-        <div className={paths.length ? "invisible" : undefined}>
-          <Connector />
-        </div>
-        {(unit.leads || unit.aside) && (
-          <>
-            <div className="mx-auto grid max-w-4xl grid-cols-1 items-center gap-3 md:grid-cols-2">
-              {unit.aside && (
-                <div className="md:order-first">
-                  <PersonCard person={unit.aside} />
-                </div>
-              )}
-              <div className="space-y-2">{unit.leads?.map((p) => <PersonCard key={p.name} person={p} />)}</div>
-            </div>
-            <Connector />
-          </>
-        )}
-        <div className={`grid grid-cols-1 gap-5 ${cols} ${single ? "mx-auto max-w-xl" : ""}`}>
-          {unit.groups.map((g) => (
-            <GroupColumn key={g.name} group={g} />
-          ))}
+          </div>
         </div>
       </div>
     </section>
