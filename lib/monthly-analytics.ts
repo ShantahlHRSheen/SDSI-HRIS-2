@@ -474,7 +474,8 @@ export function downloadCsv(filename: string, csv: string) {
 // ---------------------------------------------------------------------------
 
 export const FULL_ATTENDANCE_DAYS_PER_MONTH = 26;
-const FULL_ATTENDANCE_MONTH: MonthMeta = { key: "full-attendance", label: "Full attendance", monthIndex: 0, year: 0 };
+export const FULL_ATTENDANCE_MONTH_KEY = "full-attendance";
+const FULL_ATTENDANCE_MONTH: MonthMeta = { key: FULL_ATTENDANCE_MONTH_KEY, label: "Full attendance", monthIndex: 0, year: 0 };
 
 export function fullAttendanceFacts(
   employees: Employee[],

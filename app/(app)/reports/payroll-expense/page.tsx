@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { departmentName, formatCurrencyCompact } from "@/lib/helpers";
 import {
   FULL_ATTENDANCE_DAYS_PER_MONTH,
+  FULL_ATTENDANCE_MONTH_KEY,
   fullAttendanceFacts,
   getMonthlyFacts,
   getMonthsList,
@@ -25,7 +26,7 @@ import {
   toCsv,
   downloadCsv,
 } from "@/lib/monthly-analytics";
-import { divisionOf, filterFactsWithShares, groupByDivision, reportAllocations } from "@/lib/payroll-divisions";
+import { filterFactsWithShares, groupByDivision, reportAllocations } from "@/lib/payroll-divisions";
 import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
 import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
@@ -56,9 +57,19 @@ export default function PayrollExpenseReportPage() {
     [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
   );
 
+  // "Full attendance" in the month filter: every active employee working 26
+  // days a month with no absences, leaves, lates, OT or holidays, at today's
+  // rates (lib/monthly-analytics.ts) — so the year filter doesn't apply.
+  const isFull = filters.monthKey === FULL_ATTENDANCE_MONTH_KEY;
+  const fullFacts = useMemo(
+    () => fullAttendanceFacts(employees, payrollLineOverrides, payrollPeriods, attendancePeriodRecords),
+    [employees, payrollLineOverrides, payrollPeriods, attendancePeriodRecords],
+  );
+  const viewFacts = isFull ? fullFacts : facts;
+
   const analyticsFilters = {
     monthKey: filters.monthKey || undefined,
-    year: filters.year ? Number(filters.year) : undefined,
+    year: filters.year && !isFull ? Number(filters.year) : undefined,
     branchId: filters.branchId || undefined,
     departmentId: filters.departmentId || undefined,
     employeeId: filters.employeeId || undefined,
@@ -89,7 +100,7 @@ export default function PayrollExpenseReportPage() {
   const deptFacts = filterFactsWithShares(facts, employees, { departmentId: analyticsFilters.departmentId }, allocations);
   const trendFilters = { ...analyticsFilters, monthKey: undefined, departmentId: undefined };
 
-  const filtered = filterFactsWithShares(facts, employees, analyticsFilters, allocations);
+  const filtered = filterFactsWithShares(viewFacts, employees, analyticsFilters, allocations);
   const summary = summarizePayroll(filtered);
   // Department vouchers (Vouchers page) count as payroll expense too.
   const voucherTotal = filterVoucherAmounts(allVoucherAmounts, analyticsFilters).reduce((t, a) => t + a.amount, 0);
@@ -97,11 +108,16 @@ export default function PayrollExpenseReportPage() {
   const trend = payrollExpenseTrendByMonth(deptFacts, employees, trendFilters).map((m) => ({ ...m, value: m.value + (trendVouchers.get(m.monthKey) ?? 0) }));
   const historical = historicalPayrollAnalytics(deptFacts, employees, trendFilters, trendVouchers);
 
-  const currentMonthKey = months[months.length - 1].key;
-  const previousMonthKey = months[months.length - 2]?.key;
+  // Branch comparison: this month vs last; with full attendance, full
+  // attendance vs the latest month with payroll on file.
+  const latestActual = [...trend].reverse().find((m) => m.value > 0);
+  const currentMonthKey = isFull ? FULL_ATTENDANCE_MONTH_KEY : months[months.length - 1].key;
+  const previousMonthKey = isFull ? latestActual?.monthKey : months[months.length - 2]?.key;
+  const currentMonthLabel = isFull ? "Full attendance" : months[months.length - 1].label;
+  const previousMonthLabel = isFull ? (latestActual?.label ?? "—") : (months[months.length - 2]?.label ?? "—");
 
   const payrollByDepartment = groupByDepartment(
-    filterFactsWithShares(facts, employees, { ...analyticsFilters, departmentId: undefined }, allocations),
+    filterFactsWithShares(viewFacts, employees, { ...analyticsFilters, departmentId: undefined }, allocations),
     employees,
     departments,
     allocations,
@@ -120,7 +136,7 @@ export default function PayrollExpenseReportPage() {
   const byDivision = groupByDivision(byDepartment, departments);
   const divisionTotal = (key: string) => byDivision.find((d) => d.division === key)?.payroll.totalWithVouchers ?? 0;
 
-  const branchesThisMonth = groupByBranch(filterFactsWithShares(facts, employees, { ...analyticsFilters, monthKey: currentMonthKey }, allocations), employees, branches);
+  const branchesThisMonth = groupByBranch(filterFactsWithShares(viewFacts, employees, { ...analyticsFilters, monthKey: currentMonthKey }, allocations), employees, branches);
   const branchesPrevMonth = groupByBranch(filterFactsWithShares(facts, employees, { ...analyticsFilters, monthKey: previousMonthKey }, allocations), employees, branches);
   const byBranch = branchesThisMonth.map((row) => {
     const prev = branchesPrevMonth.find((p) => p.branchId === row.branchId);
@@ -128,47 +144,6 @@ export default function PayrollExpenseReportPage() {
     const pctChange = prevTotal ? Math.round(((row.payroll.totalEmployerExpense - prevTotal) / prevTotal) * 1000) / 10 : null;
     return { ...row, prevTotal, pctChange };
   });
-
-  // Full attendance: every active employee working 26 days a month with no
-  // absences, leaves, lates, OT or holidays. Today's headcount and rates, so
-  // the month / year filters don't apply.
-  const fullFacts = useMemo(
-    () => fullAttendanceFacts(employees, payrollLineOverrides, payrollPeriods, attendancePeriodRecords),
-    [employees, payrollLineOverrides, payrollPeriods, attendancePeriodRecords],
-  );
-  const fullFilters = { ...analyticsFilters, monthKey: undefined, year: undefined };
-  const fullSummary = summarizePayroll(filterFactsWithShares(fullFacts, employees, fullFilters, allocations));
-  const fullByDepartment = groupByDepartment(
-    filterFactsWithShares(fullFacts, employees, { ...fullFilters, departmentId: undefined }, allocations),
-    employees,
-    departments,
-    allocations,
-  ).filter((r) => !analyticsFilters.departmentId || r.departmentId === analyticsFilters.departmentId);
-  const fullByDivision = groupByDivision(fullByDepartment, departments);
-  const fullByEmployee = groupByEmployee(filterFactsWithShares(fullFacts, employees, fullFilters, allocations), employees).sort(
-    (a, b) => b.payroll.totalEmployerExpense - a.payroll.totalEmployerExpense,
-  );
-  const fullContributions = fullSummary.employerSSS + fullSummary.employerHDMF + fullSummary.employerPhilHealth;
-  // The latest month with payroll on file, to compare against.
-  const latestActual = [...trend].reverse().find((m) => m.value > 0);
-
-  function exportFullAttendanceCsv() {
-    const csv = toCsv(
-      ["Employee", "Branch", "Department", "Basic Salary", "Allowances", "Employer SSS", "Employer HDMF", "Employer PhilHealth", "Monthly Payroll Expense"],
-      fullByEmployee.map((r) => [
-        r.label,
-        r.employee.branchId,
-        r.employee.departmentId,
-        r.payroll.basicSalary,
-        r.payroll.allowances,
-        r.payroll.employerSSS,
-        r.payroll.employerHDMF,
-        r.payroll.employerPhilHealth,
-        r.payroll.totalEmployerExpense,
-      ]),
-    );
-    downloadCsv("payroll-expense-full-attendance.csv", csv);
-  }
 
   const byEmployeeAll = groupByEmployee(filtered, employees).sort((a, b) => b.payroll.totalEmployerExpense - a.payroll.totalEmployerExpense);
   const byEmployee = byEmployeeAll.filter((row) => row.label.toLowerCase().includes(employeeSearch.toLowerCase()));
@@ -295,7 +270,23 @@ export default function PayrollExpenseReportPage() {
         actions={<ExportBar onExportCsv={exportEmployeeCsv} label="Export all (CSV)" />}
       />
 
-      <ReportFilters months={months} branches={branches} departments={departments} employees={employees} value={filters} onChange={setFilters} />
+      <ReportFilters
+        months={months}
+        branches={branches}
+        departments={departments}
+        employees={employees}
+        value={filters}
+        onChange={setFilters}
+        extraMonthOptions={[{ value: FULL_ATTENDANCE_MONTH_KEY, label: `Full attendance — ${FULL_ATTENDANCE_DAYS_PER_MONTH} days, no absences` }]}
+      />
+
+      {isFull && (
+        <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-4 py-3 text-xs text-[var(--text-secondary)]">
+          <span className="font-medium text-[var(--text-primary)]">Full attendance:</span> one month&rsquo;s payroll if every active employee worked all{" "}
+          {FULL_ATTENDANCE_DAYS_PER_MONTH} days, with no absences, leaves, lates, overtime or holiday pay — today&rsquo;s employees, rates, allowances and employer SSS /
+          HDMF / PhilHealth shares. Vouchers aren&rsquo;t included. The trend and historical figures below stay actual.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label="Total expense" value={formatCurrencyCompact(summary.totalEmployerExpense + voucherTotal)} hint="payroll + vouchers" />
@@ -332,106 +323,6 @@ export default function PayrollExpenseReportPage() {
             deltaTone={historical.growthRatePct > 0 ? "bad" : historical.growthRatePct < 0 ? "good" : "neutral"}
           />
         </div>
-      </div>
-
-      {/* --- Full-attendance payroll expense --- */}
-      <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-        <div className="mb-1 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
-            <Wallet size={16} /> Full-attendance payroll expense — {FULL_ATTENDANCE_DAYS_PER_MONTH} working days a month
-          </div>
-          <ExportBar onExportCsv={exportFullAttendanceCsv} label="Export" />
-        </div>
-        <div className="mb-3 text-xs text-[var(--text-muted)]">
-          The monthly payroll cost if every active employee worked all {FULL_ATTENDANCE_DAYS_PER_MONTH} days, with no absences, leaves, lates, overtime or holiday pay. Uses
-          today&rsquo;s employees, rates, fixed allowances and employer SSS / HDMF / PhilHealth shares; vouchers aren&rsquo;t included. The branch, department and employee
-          filters apply; the month and year filters don&rsquo;t.
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Monthly payroll expense" value={formatCurrencyCompact(fullSummary.totalEmployerExpense)} hint="full attendance" />
-          <StatTile label="Basic salary" value={formatCurrencyCompact(fullSummary.basicSalary)} />
-          <StatTile label="Allowances" value={formatCurrencyCompact(fullSummary.allowances)} />
-          <StatTile label="Employer SSS + HDMF + PhilHealth" value={formatCurrencyCompact(fullContributions)} />
-          <StatTile label="Employees" value={fullSummary.employeeCount.toString()} />
-          <StatTile label="Per year (× 12)" value={formatCurrencyCompact(fullSummary.totalEmployerExpense * 12)} hint="excl. 13th month" />
-          {latestActual && (
-            <StatTile
-              label={`Actual payroll, ${latestActual.label}`}
-              value={formatCurrencyCompact(latestActual.value - (trendVouchers.get(latestActual.monthKey) ?? 0))}
-              hint={`${fullSummary.totalEmployerExpense >= latestActual.value - (trendVouchers.get(latestActual.monthKey) ?? 0) ? "below" : "above"} full attendance`}
-            />
-          )}
-        </div>
-
-        {fullByDivision.length > 0 && (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
-                  <th className="px-3 py-2 font-medium">Division / Department</th>
-                  <th className="px-3 py-2 font-medium"># Employees</th>
-                  <th className="px-3 py-2 font-medium">Basic Salary</th>
-                  <th className="px-3 py-2 font-medium">Allowances</th>
-                  <th className="px-3 py-2 font-medium">Employer SSS</th>
-                  <th className="px-3 py-2 font-medium">Employer HDMF</th>
-                  <th className="px-3 py-2 font-medium">Employer PhilHealth</th>
-                  <th className="px-3 py-2 font-medium">Monthly Expense</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fullByDivision.map((d) => (
-                  <FullAttendanceRows key={d.division} label={d.label} payroll={d.payroll} rows={fullByDepartment.filter((r) => divisionOf(r.departmentId, departments) === d.division)} />
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-[var(--border-hairline)] font-medium text-[var(--text-primary)]">
-                  <td className="px-3 py-2">Total</td>
-                  <td className="tabular px-3 py-2">{Math.round(fullByDivision.reduce((t, r) => t + r.payroll.employeeCount, 0) * 100) / 100}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(fullByDivision.reduce((t, r) => t + r.payroll.basicSalary, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(fullByDivision.reduce((t, r) => t + r.payroll.allowances, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(fullByDivision.reduce((t, r) => t + r.payroll.employerSSS, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(fullByDivision.reduce((t, r) => t + r.payroll.employerHDMF, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(fullByDivision.reduce((t, r) => t + r.payroll.employerPhilHealth, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(fullByDivision.reduce((t, r) => t + r.payroll.totalEmployerExpense, 0))}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-
-        {fullByEmployee.length > 0 && (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-xs font-medium text-[var(--text-secondary)]">Per employee ({fullByEmployee.length})</summary>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
-                    <th className="px-3 py-2 font-medium">Employee</th>
-                    <th className="px-3 py-2 font-medium">Basic Salary</th>
-                    <th className="px-3 py-2 font-medium">Allowances</th>
-                    <th className="px-3 py-2 font-medium">SSS</th>
-                    <th className="px-3 py-2 font-medium">HDMF</th>
-                    <th className="px-3 py-2 font-medium">PhilHealth</th>
-                    <th className="px-3 py-2 font-medium">Monthly Expense</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fullByEmployee.map((row) => (
-                    <tr key={row.employee.id} className="border-b border-[var(--gridline)] last:border-0">
-                      <td className="px-3 py-2 text-[var(--text-primary)]">{row.label}</td>
-                      <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(row.payroll.basicSalary)}</td>
-                      <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(row.payroll.allowances)}</td>
-                      <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(row.payroll.employerSSS)}</td>
-                      <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(row.payroll.employerHDMF)}</td>
-                      <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(row.payroll.employerPhilHealth)}</td>
-                      <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(row.payroll.totalEmployerExpense)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        )}
       </div>
 
       {/* --- Business Units vs Shared Services --- */}
@@ -564,7 +455,7 @@ export default function PayrollExpenseReportPage() {
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-medium text-[var(--text-primary)]">
-            Payroll expense per branch — {months[months.length - 1].label} vs {months[months.length - 2]?.label ?? "—"}
+            Payroll expense per branch — {currentMonthLabel} vs {previousMonthLabel}
           </div>
           <ExportBar onExportCsv={exportBranchCsv} label="Export" />
         </div>
@@ -577,8 +468,8 @@ export default function PayrollExpenseReportPage() {
                 <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                   <th className="px-3 py-2 font-medium">Branch</th>
                   <th className="px-3 py-2 font-medium"># Employees</th>
-                  <th className="px-3 py-2 font-medium">This Month</th>
-                  <th className="px-3 py-2 font-medium">Previous Month</th>
+                  <th className="px-3 py-2 font-medium">{isFull ? "Full Attendance" : "This Month"}</th>
+                  <th className="px-3 py-2 font-medium">{isFull ? `Actual, ${previousMonthLabel}` : "Previous Month"}</th>
                   <th className="px-3 py-2 font-medium">Change</th>
                 </tr>
               </thead>
@@ -676,32 +567,3 @@ export default function PayrollExpenseReportPage() {
   );
 }
 
-type FullPayroll = { employeeCount: number; basicSalary: number; allowances: number; employerSSS: number; employerHDMF: number; employerPhilHealth: number; totalEmployerExpense: number };
-
-function FullAttendanceRows({ label, payroll, rows }: { label: string; payroll: FullPayroll; rows: { departmentId: string; label: string; payroll: FullPayroll }[] }) {
-  const cells = (p: FullPayroll) => (
-    <>
-      <td className="tabular px-3 py-2">{Math.round(p.employeeCount * 100) / 100}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(p.basicSalary)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(p.allowances)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(p.employerSSS)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(p.employerHDMF)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(p.employerPhilHealth)}</td>
-      <td className="tabular px-3 py-2 font-medium">{formatCurrencyCompact(p.totalEmployerExpense)}</td>
-    </>
-  );
-  return (
-    <>
-      <tr className="border-b border-[var(--gridline)] bg-[var(--gridline)]/20 font-medium text-[var(--text-primary)]">
-        <td className="px-3 py-2">{label}</td>
-        {cells(payroll)}
-      </tr>
-      {rows.map((r) => (
-        <tr key={r.departmentId} className="border-b border-[var(--gridline)] text-[var(--text-secondary)] last:border-0">
-          <td className="py-2 pl-7 pr-3">{r.label}</td>
-          {cells(r.payroll)}
-        </tr>
-      ))}
-    </>
-  );
-}

@@ -27,6 +27,7 @@ export function ReportFilters({
   employees,
   value,
   onChange,
+  extraMonthOptions = [],
 }: {
   months: MonthMeta[];
   branches: Branch[];
@@ -34,6 +35,8 @@ export function ReportFilters({
   employees: Employee[];
   value: ReportFilterState;
   onChange: (next: ReportFilterState) => void;
+  // Extra choices at the end of the month list (e.g. a full-attendance view).
+  extraMonthOptions?: { value: string; label: string }[];
 }) {
   const years = Array.from(new Set(months.map((m) => m.year))).sort();
 
@@ -47,6 +50,9 @@ export function ReportFilters({
         <option value="">All months (12-mo window)</option>
         {months.map((m) => (
           <option key={m.key} value={m.key}>{m.label}</option>
+        ))}
+        {extraMonthOptions.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
       <select
