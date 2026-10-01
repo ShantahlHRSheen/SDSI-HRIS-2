@@ -1158,8 +1158,12 @@ export async function fetchAuditLogs(): Promise<AuditLog[]> {
   const data = await selectAll((from, to) => getSupabaseClient().from("audit_logs").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
   return data.map(toAuditLog);
 }
+// Inserted without reading the row back: everyone can write audit logs, but
+// only company-wide roles may read them, so asking for the new row would
+// fail the whole insert for everyone else.
 export async function insertAuditLog(input: Omit<AuditLog, "id" | "createdAt">): Promise<AuditLog> {
   const row = {
+    id: crypto.randomUUID(),
     actor_employee_id: input.userId === "system" ? null : input.userId,
     actor_name: input.userName,
     module: input.module,
@@ -1168,7 +1172,7 @@ export async function insertAuditLog(input: Omit<AuditLog, "id" | "createdAt">):
     previous_value: input.previousValue,
     new_value: input.newValue,
   };
-  const { data, error } = await getSupabaseClient().from("audit_logs").insert(row).select().single();
+  const { error } = await getSupabaseClient().from("audit_logs").insert(row);
   if (error) throw error;
-  return toAuditLog(data);
+  return toAuditLog({ ...row, created_at: new Date().toISOString() } as AuditLogRow);
 }
