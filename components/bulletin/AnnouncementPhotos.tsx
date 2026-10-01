@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { useHris } from "@/lib/store";
-import { prepareUpload, withFileType } from "@/components/leave/LeaveAttachments";
+import { withFileType } from "@/components/leave/LeaveAttachments";
+import { prepareBulletinPhoto } from "@/lib/id-images";
 import type { AnnouncementImage } from "@/lib/types";
 
 export const MAX_PHOTOS = 5;
@@ -75,7 +76,7 @@ export function PhotoPicker({ files, onChange }: { files: File[]; onChange: (fil
     if (bad) return setError(`"${bad.name}" isn't a photo — use JPG, PNG, WebP, GIF or HEIC.`);
     const room = MAX_PHOTOS - files.length;
     if (picked.length > room) setError(`Up to ${MAX_PHOTOS} photos per announcement — only the first ${Math.max(room, 0)} were added.`);
-    const prepared = await Promise.all(picked.slice(0, Math.max(room, 0)).map(prepareUpload));
+    const prepared = await Promise.all(picked.slice(0, Math.max(room, 0)).map(prepareBulletinPhoto));
     const tooBig = prepared.find((f) => f.size > MAX_BYTES);
     if (tooBig) return setError(`"${tooBig.name}" is over 10 MB.`);
     onChange([...files, ...prepared]);
