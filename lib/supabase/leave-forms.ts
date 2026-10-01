@@ -8,6 +8,7 @@ type Row = Record<string, unknown>;
 type Query = PromiseLike<{ data: unknown; error: { message: string } | null }> & {
   select: (c?: string) => Query;
   insert: (v: Row) => Query;
+  eq: (c: string, v: string) => Query;
   order: (c: string, o?: { ascending: boolean }) => Query;
   range: (from: number, to: number) => Query;
 };
@@ -119,7 +120,16 @@ export async function submitLeaveForm(input: {
     reason: input.reason.trim(),
     credits: input.credits,
   });
+  // Already submitted (a retry after a dropped connection): nothing to do.
+  if (error && /duplicate key|already exists/i.test(error.message)) return;
   if (error) throw new Error(/row-level security/i.test(error.message) ? "Couldn't submit the form — sign it first." : friendly(error.message));
+}
+
+// Whether the form for this request was already submitted.
+export async function leaveFormExists(leaveRequestId: string): Promise<boolean> {
+  const { data, error } = await client().from("leave_forms").select("leave_request_id").eq("leave_request_id", leaveRequestId);
+  if (error) throw new Error(friendly(error.message));
+  return ((data as Row[] | null) ?? []).length > 0;
 }
 
 export async function decideLeaveForm(leaveRequestId: string, decision: "approved" | "disapproved", reason: string, days: HeadDays): Promise<void> {

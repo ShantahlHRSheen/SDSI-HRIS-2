@@ -29,7 +29,7 @@ function Signature({ url }: { url?: string }) {
 export type LeaveFormDocData = Omit<LeaveForm, "submittedAt"> & { submittedAt: string | null; startDate: string; endDate: string; days: number };
 
 export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDocData; signatures?: Partial<Record<LeaveFormSigner, string>> }) {
-  const cell: React.CSSProperties = { border: line, padding: "5px 8px", fontSize: "9.5pt", verticalAlign: "top" };
+  const cell: React.CSSProperties = { border: line, padding: "4px 8px", fontSize: "9.5pt", verticalAlign: "top" };
   const head: React.CSSProperties = { ...cell, ...exact, background: "#e8e8e8", fontWeight: 700, textAlign: "center", letterSpacing: "0.5px" };
   const label: React.CSSProperties = { fontWeight: 700 };
   const cat = (id: string) => form.category === id;
@@ -41,12 +41,12 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
 
   return (
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", fontSize: "9.5pt", background: "#fff" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "2px solid #c2185b", paddingBottom: "6px", marginBottom: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "2px solid #c2185b", paddingBottom: "4px", marginBottom: "6px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
-        <img src="/brand/shantahl-logo.png" alt="" style={{ height: "46px", width: "46px", objectFit: "contain" }} />
+        <img src="/brand/shantahl-form-logo.png" alt="" style={{ height: "48px", width: "48px", objectFit: "contain" }} />
         <div style={{ fontWeight: 700, fontSize: "12pt" }}>SHANTAHL DIRECT SALES, INC. (SDSI)</div>
       </div>
-      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "13pt", letterSpacing: "1px", margin: "4px 0 10px" }}>APPLICATION FOR LEAVE</div>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "13pt", letterSpacing: "1px", margin: "2px 0 8px" }}>APPLICATION FOR LEAVE</div>
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <tbody>
@@ -85,7 +85,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
             </td>
           </tr>
           <tr>
-            <td style={{ ...cell, width: "45%", lineHeight: 1.9 }}>
+            <td style={{ ...cell, width: "45%", lineHeight: 1.55 }}>
               {LEAVE_CATEGORIES.map((k) => (
                 <div key={k.id}>
                   <Box on={cat(k.id)} />
@@ -104,13 +104,13 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
                 Out Patient{sick && form.sickPlace === "out_patient" && form.sickDetails ? `: ${form.sickDetails}` : ""}
               </div>
               <div style={{ ...label, marginTop: "10px" }}>Reason: (In Case of Vacation/Absent)</div>
-              <div style={{ minHeight: "54px", whiteSpace: "pre-wrap" }}>{form.reason}</div>
+              <div style={{ minHeight: "40px", whiteSpace: "pre-wrap" }}>{form.reason}</div>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "18px", alignItems: "end" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "10px", alignItems: "end" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ borderBottom: "1px solid #111", paddingBottom: "2px", fontWeight: 700 }}>
             {dates} ({num(form.days)} day{form.days === 1 ? "" : "s"})
@@ -124,7 +124,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
         </div>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "12px" }}>
         <tbody>
           <tr>
             <td style={head} colSpan={4}>
@@ -158,7 +158,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
         </tbody>
       </table>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "16px", breakInside: "avoid" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "12px", breakInside: "avoid" }}>
         <tbody>
           <tr>
             <td style={head} colSpan={2}>
@@ -166,7 +166,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
             </td>
           </tr>
           <tr>
-            <td style={{ ...cell, width: "45%", lineHeight: 1.9 }}>
+            <td style={{ ...cell, width: "45%", lineHeight: 1.55 }}>
               {HEAD_DAY_FIELDS.map((f) => (
                 <div key={f.id}>
                   <span style={{ display: "inline-block", minWidth: "34px", borderBottom: "1px solid #555", textAlign: "center", marginRight: "6px" }}>{decided ? num(headDays[f.id]) : ""}</span>
@@ -184,7 +184,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
                 Disapproved due to: <span style={{ borderBottom: "1px solid #555" }}>{form.headDecision === "disapproved" ? form.headReason : ""}</span>
               </div>
               {form.headDecision === "approved" && form.headReason && <div style={{ color: "#333" }}>Remarks: {form.headReason}</div>}
-              <div style={{ marginTop: "12px" }}>Approved by:</div>
+              <div style={{ marginTop: "6px" }}>Approved by:</div>
               <div style={{ textAlign: "center" }}>
                 <Signature url={signatures.head} />
                 <div style={{ borderBottom: "1px solid #111", fontWeight: 700, textTransform: "uppercase", minHeight: "16px" }}>{form.headSignedName ?? ""}</div>
@@ -196,7 +196,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
         </tbody>
       </table>
 
-      <div style={{ marginTop: "20px", width: "260px", breakInside: "avoid" }}>
+      <div style={{ marginTop: "12px", width: "260px", breakInside: "avoid" }}>
         <div>Received by:</div>
         <div style={{ textAlign: "center" }}>
           <Signature url={signatures.hr} />

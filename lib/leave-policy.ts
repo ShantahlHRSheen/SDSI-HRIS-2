@@ -74,10 +74,10 @@ export interface PeriodBalance {
   remaining: number;
 }
 
-export function balanceFor(requests: LeaveRequest[], employeeId: string, leaveType: LeaveType, onDate: string): PeriodBalance {
+export function balanceFor(requests: LeaveRequest[], employeeId: string, leaveType: LeaveType, onDate: string, excludeRequestId?: string): PeriodBalance {
   const period = creditPeriodOf(leaveType.id, onDate);
   const credits = creditsPerPeriod(leaveType);
-  const used = usedInPeriod(requests, employeeId, leaveType.id, period.key);
+  const used = usedInPeriod(requests, employeeId, leaveType.id, period.key, excludeRequestId);
   return { period, credits, used, remaining: Math.max(credits - used, 0) };
 }
 

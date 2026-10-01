@@ -24,6 +24,7 @@ import {
   decideLeaveForm,
   fetchLeaveForms,
   fetchMyLeaveFormDetails,
+  leaveFormExists,
   leaveFormSignatureUrls,
   mySignatureUrl,
   receiveLeaveForm,
@@ -152,7 +153,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
   const halfDayAllowed = businessDays === 1 && form.startDate === form.endDate;
   const days = halfDayAllowed && form.halfDay ? 0.5 : businessDays;
   const sick = isSickCategory(form.category);
-  const credits = currentEmployee ? leaveCredits(leaveRequests, currentEmployee.id, leaveTypes, form.category, form.startDate, days, form.applicationDate || today) : null;
+  const credits = currentEmployee ? leaveCredits(leaveRequests, currentEmployee.id, leaveTypes, form.category, form.startDate, days, form.applicationDate || today, filedId ?? undefined) : null;
   const creditError =
     currentEmployee && leaveType && days > 0 && !filedId
       ? checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType, startDate: form.startDate, endDate: form.endDate, days })
@@ -193,8 +194,10 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
         if (!id) throw new Error("Couldn't file the leave request — please try again.");
         setFiledId(id);
       }
-      await signLeaveForm(id, currentEmployee.id, "applicant");
-      await submitLeaveForm({
+      // A retry after a dropped connection may find the form already in.
+      const done = filedId ? await leaveFormExists(id) : false;
+      if (!done) await signLeaveForm(id, currentEmployee.id, "applicant");
+      if (!done) await submitLeaveForm({
         leaveRequestId: id,
         employeeId: currentEmployee.id,
         applicationDate: form.applicationDate,

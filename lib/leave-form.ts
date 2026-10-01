@@ -38,12 +38,14 @@ export interface LeaveCredits {
   lessSl: number;
 }
 
-export function leaveCredits(requests: LeaveRequest[], employeeId: string, leaveTypes: LeaveType[], category: LeaveCategory, startDate: string, days: number, asOf: string): LeaveCredits {
+// thisRequestId: the application's own request, once filed — not counted
+// in the balance it's deducted from.
+export function leaveCredits(requests: LeaveRequest[], employeeId: string, leaveTypes: LeaveType[], category: LeaveCategory, startDate: string, days: number, asOf: string, thisRequestId?: string): LeaveCredits {
   const vlType = leaveTypes.find((t) => t.id === "lt-vl");
   const slType = leaveTypes.find((t) => t.id === "lt-sl");
   // The balance of the half-year the leave falls in.
-  const vl = vlType ? balanceFor(requests, employeeId, vlType, startDate || asOf).remaining : 0;
-  const sl = slType ? balanceFor(requests, employeeId, slType, startDate || asOf).remaining : 0;
+  const vl = vlType ? balanceFor(requests, employeeId, vlType, startDate || asOf, thisRequestId).remaining : 0;
+  const sl = slType ? balanceFor(requests, employeeId, slType, startDate || asOf, thisRequestId).remaining : 0;
   return { asOf, vl, sl, lessVl: category === "vacation_with_pay" ? days : 0, lessSl: category === "sick_with_pay" ? days : 0 };
 }
 
