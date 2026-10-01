@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Clock, FileText, X } from "lucide-react";
+import { Check, Clock, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -11,7 +11,7 @@ import { formatDate, fullName } from "@/lib/helpers";
 import { TODAY } from "@/lib/mock-data";
 import { OvertimeApplicationModal, OvertimeFormModal, OtProgress, canHeadOt, useOvertimeForms } from "@/components/overtime/OvertimeApplication";
 import { otStage, type OvertimeForm } from "@/lib/overtime-form";
-import type { RequestStatus } from "@/lib/types";
+import type { OvertimeRequest, RequestStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
   pending: "warning",
@@ -21,7 +21,7 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 };
 
 export default function OvertimePage() {
-  const { employees, overtimeRequests, currentUser, currentEmployee, fileOvertimeRequest, decideOvertimeRequest, isRealAccount } = useHris();
+  const { employees, overtimeRequests, currentUser, currentEmployee, fileOvertimeRequest, decideOvertimeRequest, isRealAccount, deleteOvertimeRequest } = useHris();
   // The online Overtime Authorization Form (real accounts): filed by the
   // employee, approved by their department head, verified by HR.
   const { forms, error: formsError, reload: reloadForms } = useOvertimeForms();
@@ -36,6 +36,20 @@ export default function OvertimePage() {
   const toClarify = forms.filter((f) => f.employeeId === currentEmployee?.id && otStage(f) === "returned");
   const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
+  // HR Manager: delete an overtime request (with its form).
+  const [deleting, setDeleting] = useState<OvertimeRequest | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    const err = await deleteOvertimeRequest(deleting.id);
+    setDeleteBusy(false);
+    if (err) return setDeleteError(err);
+    setDeleting(null);
+    reloadForms();
+  }
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>("all");
@@ -167,6 +181,14 @@ export default function OvertimePage() {
             <RequestsTable
               showEmployee
               onViewForm={setViewing}
+              onDelete={
+                isHrManager
+                  ? (id) => {
+                      setDeleteError(null);
+                      setDeleting(overtimeRequests.find((r) => r.id === id) ?? null);
+                    }
+                  : undefined
+              }
               rows={allRequests.map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
                 const form = formByRequest.get(r.id);
@@ -176,6 +198,33 @@ export default function OvertimePage() {
           )}
         </div>
       )}
+
+      <Modal open={!!deleting} onClose={() => !deleteBusy && setDeleting(null)} title="Delete overtime request">
+        {deleting && (
+          <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+            <p>
+              Delete{" "}
+              <span className="font-medium text-[var(--text-primary)]">
+                {(() => {
+                  const emp = employees.find((e) => e.id === deleting.employeeId);
+                  return emp ? fullName(emp) : (formByRequest.get(deleting.id)?.employeeName ?? deleting.employeeId);
+                })()}
+              </span>
+              &rsquo;s overtime request ({formatDate(deleting.date)}, {deleting.hours}h, {deleting.status})?
+            </p>
+            <p>Its overtime form and signatures are deleted too. This can&rsquo;t be undone.</p>
+            {deleteError && <div className="text-xs text-[var(--status-critical)]">{deleteError}</div>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setDeleting(null)} disabled={deleteBusy} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                Cancel
+              </button>
+              <button onClick={confirmDelete} disabled={deleteBusy} className="rounded-lg bg-[var(--status-critical)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+                {deleteBusy ? "Deleting…" : "Delete request"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {showApply && <OvertimeApplicationModal open onClose={() => setShowApply(false)} onDone={reloadForms} />}
       {clarifying && <OvertimeApplicationModal key={clarifying.overtimeRequestId} open returned={clarifying} onClose={() => setClarifying(null)} onDone={reloadForms} />}
@@ -272,10 +321,12 @@ function RequestsTable({
   rows,
   showEmployee = false,
   onViewForm,
+  onDelete,
 }: {
   rows: { id: string; form?: OvertimeForm; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
   onViewForm?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -288,6 +339,7 @@ function RequestsTable({
             <th className="px-3 py-2 font-medium">Reason</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 font-medium">Form</th>
+            {onDelete && <th className="px-3 py-2" />}
           </tr>
         </thead>
         <tbody>
@@ -310,6 +362,13 @@ function RequestsTable({
                   <span className="text-xs text-[var(--text-muted)]">—</span>
                 )}
               </td>
+              {onDelete && (
+                <td className="px-3 py-2 text-right">
+                  <button onClick={() => onDelete(r.id)} className="rounded-md p-1 text-[var(--text-muted)] hover:text-[var(--status-critical)]" aria-label="Delete overtime request" title="Delete overtime request">
+                    <Trash2 size={15} />
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
