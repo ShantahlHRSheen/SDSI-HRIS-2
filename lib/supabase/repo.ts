@@ -669,6 +669,20 @@ export async function decideLeaveRequestRow(
 
 export const LEAVE_ATTACHMENTS_BUCKET = "leave-attachments";
 
+// HR Manager only (migrate_phase29_delete_leave_requests.sql): removes the
+// request's files (form signatures, attachments) from storage — first, while
+// the request still exists to grant access to them — then deletes the
+// request; its online form and attachment records go with it.
+export async function deleteLeaveRequestRow(id: string, attachmentPaths: string[]): Promise<void> {
+  const client = getSupabaseClient();
+  // Best effort: a leftover file is harmless.
+  await client.storage.from("leave-forms").remove(["applicant", "head", "hr"].map((n) => `forms/${id}/${n}.png`)).catch(() => {});
+  if (attachmentPaths.length) await client.storage.from(LEAVE_ATTACHMENTS_BUCKET).remove(attachmentPaths).catch(() => {});
+  const { data, error } = await client.from("leave_requests").delete().eq("id", id).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Only the HR Manager can delete leave requests (or it was already deleted).");
+}
+
 function toLeaveAttachment(r: LeaveRequestAttachmentRow): LeaveAttachment {
   return {
     id: r.id,
