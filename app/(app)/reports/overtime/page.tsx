@@ -64,7 +64,10 @@ export default function OvertimeReportPage() {
 
   const byBranch = groupByBranch(filtered, employees, branches);
   const byDepartment = groupByDepartment(filtered, employees, departments, employeeDepartmentAllocations);
-  const byEmployeeAll = groupByEmployee(filtered, employees).sort((a, b) => b.overtime.totalOtHours - a.overtime.totalOtHours);
+  const byEmployeeAll = groupByEmployee(filtered, employees)
+    // Highest overtime on top: by OT pay (imported payroll files carry OT as
+    // pay without hours), then OT hours.
+    .sort((a, b) => b.overtime.totalOtPay - a.overtime.totalOtPay || b.overtime.totalOtHours - a.overtime.totalOtHours);
   const byEmployee = byEmployeeAll.filter((row) => row.label.toLowerCase().includes(employeeSearch.toLowerCase()));
 
   function exportCsv() {
