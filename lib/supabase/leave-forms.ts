@@ -92,12 +92,31 @@ export async function saveMySignature(employeeId: string, png: Blob): Promise<vo
 
 export type LeaveFormSigner = "applicant" | "head" | "hr";
 
-// Puts a copy of the user's saved signature on the form.
-export async function signLeaveForm(leaveRequestId: string, employeeId: string, as: LeaveFormSigner): Promise<void> {
+// Puts a copy of the user's saved signature at `path` (a form's signature)
+// in the same bucket.
+export async function placeMySignature(employeeId: string, path: string): Promise<void> {
   const { data: own, error: dlErr } = await bucket().download(ownPath(employeeId));
   if (dlErr || !own) throw new Error("Upload your signature first.");
-  const { error } = await bucket().upload(`forms/${leaveRequestId}/${as}.png`, own, { upsert: true, contentType: "image/png" });
+  const { error } = await bucket().upload(path, own, { upsert: true, contentType: "image/png" });
   if (error) throw new Error(/row-level security/i.test(error.message) ? "You can't sign this part of the form." : friendly(error.message));
+}
+
+export async function signLeaveForm(leaveRequestId: string, employeeId: string, as: LeaveFormSigner): Promise<void> {
+  await placeMySignature(employeeId, `forms/${leaveRequestId}/${as}.png`);
+}
+
+// Viewing links for the signatures in a folder of the bucket
+// (forms/<id> or ot/<id>), by signer.
+export async function signatureUrlsIn(folder: string): Promise<Partial<Record<LeaveFormSigner, string>>> {
+  const { data: list } = await bucket().list(folder, { limit: 10 });
+  const out: Partial<Record<LeaveFormSigner, string>> = {};
+  for (const f of list ?? []) {
+    const as = f.name.replace(/\.png$/, "") as LeaveFormSigner;
+    if (!["applicant", "head", "hr"].includes(as)) continue;
+    const { data } = await bucket().createSignedUrl(`${folder}/${f.name}`, 3600);
+    if (data?.signedUrl) out[as] = `${data.signedUrl}&v=${encodeURIComponent(f.updated_at ?? "")}`;
+  }
+  return out;
 }
 
 export async function submitLeaveForm(input: {
@@ -143,14 +162,6 @@ export async function receiveLeaveForm(leaveRequestId: string): Promise<void> {
 }
 
 // Viewing links for the signatures on a form.
-export async function leaveFormSignatureUrls(leaveRequestId: string): Promise<Partial<Record<LeaveFormSigner, string>>> {
-  const { data: list } = await bucket().list(`forms/${leaveRequestId}`, { limit: 10 });
-  const out: Partial<Record<LeaveFormSigner, string>> = {};
-  for (const f of list ?? []) {
-    const as = f.name.replace(/\.png$/, "") as LeaveFormSigner;
-    if (!["applicant", "head", "hr"].includes(as)) continue;
-    const { data } = await bucket().createSignedUrl(`forms/${leaveRequestId}/${f.name}`, 3600);
-    if (data?.signedUrl) out[as] = `${data.signedUrl}&v=${encodeURIComponent(f.updated_at ?? "")}`;
-  }
-  return out;
+export function leaveFormSignatureUrls(leaveRequestId: string): Promise<Partial<Record<LeaveFormSigner, string>>> {
+  return signatureUrlsIn(`forms/${leaveRequestId}`);
 }

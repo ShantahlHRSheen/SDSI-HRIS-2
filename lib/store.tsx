@@ -347,7 +347,10 @@ interface HrisContextShape {
   leaveAttachmentUrl: (attachment: LeaveAttachment) => Promise<string>;
   decideLeaveRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 
-  fileOvertimeRequest: (input: Omit<OvertimeRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
+  // The new request's id, or null if it couldn't be filed.
+  fileOvertimeRequest: (input: Omit<OvertimeRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => Promise<string | null>;
+  // Re-reads leave and overtime requests (after a form step changed them on the server).
+  reloadRequests: () => Promise<void>;
   decideOvertimeRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 
   fileCorrectionRequest: (input: Omit<AttendanceCorrectionRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
@@ -1393,18 +1396,29 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           const entry = await insertOvertimeRequest(input);
           setState((prev) => ({ ...prev, overtimeRequests: [entry, ...prev.overtimeRequests] }));
           logAudit("Overtime", "file", `Filed overtime request (${input.hours}h on ${input.date})`);
-          return;
+          return entry.id;
         } catch (err) {
           reportSaveError("Couldn't file overtime request", err);
-          return;
+          return null;
         }
       }
       const entry: OvertimeRequest = { ...input, id: nextId("ot"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
       setState((prev) => ({ ...prev, overtimeRequests: [entry, ...prev.overtimeRequests] }));
       logAudit("Overtime", "file", `Filed overtime request (${input.hours}h on ${input.date})`);
+      return entry.id;
     },
     [logAudit, supabaseSession],
   );
+
+  const reloadRequests: HrisContextShape["reloadRequests"] = useCallback(async () => {
+    if (!supabaseSession) return;
+    try {
+      const [leaveRequests, overtimeRequests] = await Promise.all([fetchLeaveRequests(), fetchOvertimeRequests()]);
+      setState((prev) => ({ ...prev, leaveRequests, overtimeRequests }));
+    } catch (err) {
+      console.error("Couldn't refresh requests", err);
+    }
+  }, [supabaseSession]);
 
   const decideOvertimeRequest: HrisContextShape["decideOvertimeRequest"] = useCallback(
     async (id, decision, note) => {
@@ -1686,6 +1700,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     leaveAttachmentUrl,
     decideLeaveRequest,
     fileOvertimeRequest,
+    reloadRequests,
     decideOvertimeRequest,
     fileCorrectionRequest,
     decideCorrectionRequest,

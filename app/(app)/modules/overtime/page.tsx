@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Clock, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, Clock, FileText, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -9,6 +9,8 @@ import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDate, fullName } from "@/lib/helpers";
 import { TODAY } from "@/lib/mock-data";
+import { OvertimeApplicationModal, OvertimeFormModal, OtProgress, canHeadOt, useOvertimeForms } from "@/components/overtime/OvertimeApplication";
+import { otStage, type OvertimeForm } from "@/lib/overtime-form";
 import type { RequestStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
@@ -19,7 +21,20 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 };
 
 export default function OvertimePage() {
-  const { employees, overtimeRequests, currentUser, currentEmployee, fileOvertimeRequest, decideOvertimeRequest } = useHris();
+  const { employees, overtimeRequests, currentUser, currentEmployee, fileOvertimeRequest, decideOvertimeRequest, isRealAccount } = useHris();
+  // The online Overtime Authorization Form (real accounts): filed by the
+  // employee, approved by their department head, verified by HR.
+  const { forms, error: formsError, reload: reloadForms } = useOvertimeForms();
+  const formByRequest = useMemo(() => new Map(forms.map((f) => [f.overtimeRequestId, f])), [forms]);
+  const [showApply, setShowApply] = useState(false);
+  const [clarifying, setClarifying] = useState<OvertimeForm | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const viewingForm = viewing ? formByRequest.get(viewing) : undefined;
+  const isHrManager = !!currentUser?.roles.includes("hr_admin");
+  const formsToSign = forms.filter((f) => canHeadOt(f, currentEmployee?.id, isHrManager));
+  const formsToVerify = isHrManager ? forms.filter((f) => otStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
+  const toClarify = forms.filter((f) => f.employeeId === currentEmployee?.id && otStage(f) === "returned");
+  const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -36,7 +51,8 @@ export default function OvertimePage() {
   }
 
   const myRequests = overtimeRequests.filter((r) => r.employeeId === currentEmployee?.id).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));
-  const pendingForMe = overtimeRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && canDecide(r.employeeId));
+  // Requests filed without the online form (older ones) are still decided here directly.
+  const pendingForMe = overtimeRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && !formByRequest.has(r.id) && canDecide(r.employeeId));
 
   const allRequests = overtimeRequests
     .filter((r) => (statusFilter === "all" ? true : r.status === statusFilter))
@@ -61,11 +77,16 @@ export default function OvertimePage() {
         title="Overtime"
         subtitle="File overtime requests and track supervisor approval."
         actions={
-          <button onClick={() => setShowFile(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+          <button onClick={() => (isRealAccount ? setShowApply(true) : setShowFile(true))} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
             <Clock size={16} /> File overtime
           </button>
         }
       />
+
+      {formsError && <div className="mb-4 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">{formsError}</div>}
+      <FormQueue title={`Returned to you for clarification (${toClarify.length})`} forms={toClarify} action="Clarify & resubmit" onOpen={(f) => setClarifying(f)} />
+      <FormQueue title={`Overtime forms for your approval (${formsToSign.length})`} forms={formsToSign} action="Review & sign" onOpen={(f) => setViewing(f.overtimeRequestId)} />
+      <FormQueue title={`Overtime forms to verify (${formsToVerify.length})`} forms={formsToVerify} action="Review & verify" onOpen={(f) => setViewing(f.overtimeRequestId)} />
 
       {pendingForMe.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -97,10 +118,34 @@ export default function OvertimePage() {
           <EmptyState icon={Clock} title="No overtime requests yet" description="Requests you file will appear here with their approval status." />
         ) : (
           <RequestsTable
-            rows={myRequests.map((r) => ({ id: r.id, primary: `${r.hours}h`, secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote }))}
+            onViewForm={setViewing}
+            rows={myRequests.map((r) => ({ id: r.id, form: formByRequest.get(r.id), primary: `${r.hours}h`, secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote }))}
           />
         )}
       </div>
+
+      {!isHrOrUpper && teamForms.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+          <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">My team&rsquo;s overtime forms</div>
+          <RequestsTable
+            showEmployee
+            onViewForm={setViewing}
+            rows={teamForms.map((f) => {
+              const r = overtimeRequests.find((x) => x.id === f.overtimeRequestId);
+              return {
+                id: f.overtimeRequestId,
+                form: f,
+                employee: f.employeeName,
+                primary: `${r?.hours ?? f.hoursRequested}h`,
+                secondary: formatDate(f.otDate),
+                reason: f.reason,
+                status: r?.status ?? "pending",
+                decisionNote: r?.decisionNote ?? null,
+              };
+            })}
+          />
+        </div>
+      )}
 
       {isHrOrUpper && (
         <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -121,13 +166,30 @@ export default function OvertimePage() {
           ) : (
             <RequestsTable
               showEmployee
+              onViewForm={setViewing}
               rows={allRequests.map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
-                return { id: r.id, employee: emp ? fullName(emp) : r.employeeId, primary: `${r.hours}h`, secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote };
+                const form = formByRequest.get(r.id);
+                return { id: r.id, form, employee: emp ? fullName(emp) : (form?.employeeName ?? r.employeeId), primary: `${r.hours}h`, secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote };
               })}
             />
           )}
         </div>
+      )}
+
+      {showApply && <OvertimeApplicationModal open onClose={() => setShowApply(false)} onDone={reloadForms} />}
+      {clarifying && <OvertimeApplicationModal key={clarifying.overtimeRequestId} open returned={clarifying} onClose={() => setClarifying(null)} onDone={reloadForms} />}
+      {viewingForm && (
+        <OvertimeFormModal
+          key={viewingForm.overtimeRequestId}
+          form={viewingForm}
+          onClose={() => setViewing(null)}
+          onChanged={reloadForms}
+          onClarify={() => {
+            setViewing(null);
+            setClarifying(viewingForm);
+          }}
+        />
       )}
 
       <Modal open={showFile} onClose={() => setShowFile(false)} title="File an overtime request">
@@ -178,12 +240,42 @@ export default function OvertimePage() {
   );
 }
 
+// Forms waiting on the user (to approve, verify, or clarify).
+function FormQueue({ title, forms, action, onOpen }: { title: string; forms: OvertimeForm[]; action: string; onOpen: (f: OvertimeForm) => void }) {
+  if (!forms.length) return null;
+  return (
+    <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
+      <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">{title}</div>
+      <div className="space-y-2">
+        {forms.map((f) => (
+          <div key={f.overtimeRequestId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
+            <div>
+              <span className="font-medium text-[var(--text-primary)]">{f.employeeName}</span>
+              <span className="text-[var(--text-secondary)]">
+                {" "}
+                — {f.hoursRequested}h on {formatDate(f.otDate)}
+              </span>
+              <div className="line-clamp-1 text-xs text-[var(--text-muted)]">{f.tasks}</div>
+              {f.hrDecision === "returned" && f.hrReason && <div className="text-xs text-[var(--status-serious)]">HR: {f.hrReason}</div>}
+            </div>
+            <button onClick={() => onOpen(f)} className="flex items-center gap-1 rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+              <FileText size={13} /> {action}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RequestsTable({
   rows,
   showEmployee = false,
+  onViewForm,
 }: {
-  rows: { id: string; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
+  rows: { id: string; form?: OvertimeForm; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
+  onViewForm?: (id: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -195,6 +287,7 @@ function RequestsTable({
             <th className="px-3 py-2 font-medium">Date</th>
             <th className="px-3 py-2 font-medium">Reason</th>
             <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Form</th>
           </tr>
         </thead>
         <tbody>
@@ -207,7 +300,16 @@ function RequestsTable({
                 <div className="line-clamp-2">{r.reason}</div>
                 {r.decisionNote && <div className="mt-1 text-xs text-[var(--text-muted)]">Note: {r.decisionNote}</div>}
               </td>
-              <td className="px-3 py-2"><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge></td>
+              <td className="px-3 py-2">{r.form ? <OtProgress form={r.form} /> : <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>}</td>
+              <td className="px-3 py-2">
+                {r.form && onViewForm ? (
+                  <button onClick={() => onViewForm(r.id)} className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                    <FileText size={12} /> Overtime form
+                  </button>
+                ) : (
+                  <span className="text-xs text-[var(--text-muted)]">—</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
