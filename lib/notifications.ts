@@ -27,6 +27,8 @@ export interface NotificationItem {
   tone: "info" | "good" | "warning" | "critical";
 }
 
+const ELEVATED = ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management", "sys_admin"];
+
 function canDecide(currentUser: DemoUser | null, currentEmployeeId: string | undefined, targetEmployeeId: string, employees: Employee[]): boolean {
   if (!currentUser || !currentEmployeeId) return false;
   if (currentUser.roles.some((r) => ["hr_admin", "upper_management"].includes(r))) return true;
@@ -62,10 +64,18 @@ export function buildNotifications(params: {
   };
   const leaveTypeName = (id: string) => leaveTypes.find((lt) => lt.id === id)?.name ?? "Leave";
 
+  // Someone without a company-wide role only sees other people's leave
+  // requests as their supervisor — they approve those leave forms.
+  const companyWide = currentUser.roles.some((r) => ELEVATED.includes(r));
   leaveRequests
-    .filter((r) => r.status === "pending" && r.employeeId !== currentEmployee.id && canDecide(currentUser, currentEmployee.id, r.employeeId, employees))
+    .filter((r) => r.status === "pending" && r.employeeId !== currentEmployee.id && (canDecide(currentUser, currentEmployee.id, r.employeeId, employees) || !companyWide))
     .forEach((r) =>
-      items.push({ id: `lv-${r.id}`, text: `${empName(r.employeeId)} filed a ${leaveTypeName(r.leaveTypeId)} request pending your approval.`, date: r.filedAt, tone: "warning" }),
+      items.push({
+        id: `lv-${r.id}`,
+        text: `${employees.some((e) => e.id === r.employeeId) ? empName(r.employeeId) : "A team member"} filed a ${leaveTypeName(r.leaveTypeId)} request pending your approval.`,
+        date: r.filedAt,
+        tone: "warning",
+      }),
     );
 
   overtimeRequests
