@@ -69,9 +69,11 @@ export function latestAttachments(attachments: LeaveAttachment[], requestId: str
 
 // Per-request documents: download links for whoever can see the request,
 // plus an upload button for the employee's own missing documents.
-export function LeaveDocuments({ request, canUpload }: { request: LeaveRequest; canUpload: boolean }) {
+// onlineForm: the request was filed with the online leave form, so no paper
+// form needs uploading.
+export function LeaveDocuments({ request, canUpload, onlineForm = false }: { request: LeaveRequest; canUpload: boolean; onlineForm?: boolean }) {
   const { leaveAttachments, uploadLeaveAttachment, leaveAttachmentUrl, canAttachLeaveFiles } = useHris();
-  const kinds = requiredKinds(request.leaveTypeId);
+  const kinds = requiredKinds(request.leaveTypeId).filter((k) => !(onlineForm && k === "leave_form"));
   const latest = latestAttachments(leaveAttachments, request.id);
   const [busy, setBusy] = useState<LeaveAttachmentKind | null>(null);
   const [error, setError] = useState<string | null>(null);

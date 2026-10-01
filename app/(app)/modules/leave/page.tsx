@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarPlus, CalendarRange, Check, X } from "lucide-react";
+import { CalendarPlus, CalendarRange, Check, FileText, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -11,6 +11,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { businessDaysBetween, formatDate, fullName } from "@/lib/helpers";
 import { balanceFor, checkLeaveRequest, isSemiannual, todayInManila } from "@/lib/leave-policy";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_RETENTION_DAYS, KIND_LABEL, LeaveDocuments, prepareUpload, requiredKinds, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
+import { LeaveApplicationModal, LeaveFormModal, FormProgress, canHeadForm, useLeaveForms } from "@/components/leave/LeaveApplication";
+import { LEAVE_CATEGORIES, formStage, type LeaveForm } from "@/lib/leave-form";
 import type { LeaveAttachmentKind, LeaveRequest, RequestStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
@@ -21,7 +23,14 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 };
 
 export default function LeaveManagementPage() {
-  const { employees, leaveTypes, leaveRequests, currentUser, currentEmployee, fileLeaveRequest, decideLeaveRequest, canAttachLeaveFiles, uploadLeaveAttachment } = useHris();
+  const { employees, leaveTypes, leaveRequests, currentUser, currentEmployee, fileLeaveRequest, decideLeaveRequest, canAttachLeaveFiles, uploadLeaveAttachment, isRealAccount } = useHris();
+  // The online Application for Leave (real accounts): filed by the employee,
+  // approved by their department head, received by HR.
+  const { forms, error: formsError, reload: reloadForms } = useLeaveForms();
+  const formByRequest = useMemo(() => new Map(forms.map((f) => [f.leaveRequestId, f])), [forms]);
+  const [showApply, setShowApply] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const viewingForm = viewing ? formByRequest.get(viewing) : undefined;
   const [showFile, setShowFile] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -32,6 +41,10 @@ export default function LeaveManagementPage() {
   const today = useMemo(() => todayInManila(), []);
 
   const isDeptHead = !!currentUser?.roles.includes("dept_head");
+  const isHrManager = !!currentUser?.roles.includes("hr_admin");
+  const formsToSign = forms.filter((f) => canHeadForm(f, currentEmployee?.id, isHrManager));
+  const formsToReceive = isHrManager ? forms.filter((f) => formStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
+  const requestById = useMemo(() => new Map(leaveRequests.map((r) => [r.id, r])), [leaveRequests]);
 
   // HR/upper management decide on everyone; a Dept Head decides on the
   // employees they supervise.
@@ -54,7 +67,11 @@ export default function LeaveManagementPage() {
     [leaveRequests, currentEmployee],
   );
 
-  const pendingForMe = leaveRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && canDecide(r.employeeId));
+  // Requests filed without the online form (older ones) are still decided here directly.
+  const pendingForMe = leaveRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && !formByRequest.has(r.id) && canDecide(r.employeeId));
+
+  // Forms of the people the user supervises (whatever the user's role).
+  const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
 
   const teamRequests = useMemo(() => {
     if (isHrOrUpper || !isDeptHead || !currentEmployee) return [];
@@ -150,7 +167,7 @@ export default function LeaveManagementPage() {
         title="Leave Management"
         subtitle="File leave requests and track approvals. Vacation and Sick Leave credits are split into Jan–Jun and Jul–Dec; other leave types are per year. Pending requests count against your balance."
         actions={
-          <button onClick={() => setShowFile(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+          <button onClick={() => (isRealAccount ? setShowApply(true) : setShowFile(true))} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
             <CalendarPlus size={16} /> File leave
           </button>
         }
@@ -161,6 +178,17 @@ export default function LeaveManagementPage() {
           <StatTile key={b.leaveType.id} label={b.leaveType.name} value={`${b.remaining}`} hint={isSemiannual(b.leaveType.id) ? `of ${b.credits} · ${b.period.label.slice(0, 7)}` : `of ${b.credits}`} compact />
         ))}
       </div>
+
+      {formsError && <div className="mb-4 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">{formsError}</div>}
+
+      <FormQueue
+        title={`Leave forms for your approval (${formsToSign.length})`}
+        forms={formsToSign}
+        requestById={requestById}
+        action="Review & sign"
+        onOpen={setViewing}
+      />
+      <FormQueue title={`Leave forms to receive (${formsToReceive.length})`} forms={formsToReceive} requestById={requestById} action="Review & receive" onOpen={setViewing} />
 
       {pendingForMe.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -193,9 +221,11 @@ export default function LeaveManagementPage() {
           <EmptyState icon={CalendarRange} title="No leave requests yet" description="Requests you file will appear here with their approval status." />
         ) : (
           <RequestsTable
+            onViewForm={setViewing}
             rows={myRequests.map((r) => ({
               id: r.id,
               request: r,
+              form: formByRequest.get(r.id),
               canUpload: true,
               primary: leaveTypeName(r.leaveTypeId),
               secondary: `${formatDate(r.startDate)} – ${formatDate(r.endDate)} (${r.days}d)`,
@@ -207,16 +237,47 @@ export default function LeaveManagementPage() {
         )}
       </div>
 
+      {teamRequests.length === 0 && teamForms.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+          <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">My team&rsquo;s leave forms</div>
+          <RequestsTable
+            showEmployee
+            onViewForm={setViewing}
+            rows={teamForms.flatMap((f) => {
+              const r = requestById.get(f.leaveRequestId);
+              return r
+                ? [
+                    {
+                      id: r.id,
+                      request: r,
+                      form: f,
+                      canUpload: false,
+                      employee: f.employeeName,
+                      primary: leaveTypeName(r.leaveTypeId),
+                      secondary: `${formatDate(r.startDate)} – ${formatDate(r.endDate)} (${r.days}d)`,
+                      reason: r.reason,
+                      status: r.status,
+                      decisionNote: r.decisionNote,
+                    },
+                  ]
+                : [];
+            })}
+          />
+        </div>
+      )}
+
       {teamRequests.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
           <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">My team&rsquo;s leave requests</div>
           <RequestsTable
             showEmployee
+            onViewForm={setViewing}
             rows={teamRequests.map((r) => {
               const emp = employees.find((e) => e.id === r.employeeId);
               return {
                 id: r.id,
                 request: r,
+                form: formByRequest.get(r.id),
                 canUpload: false,
                 employee: emp ? fullName(emp) : r.employeeId,
                 primary: leaveTypeName(r.leaveTypeId),
@@ -249,13 +310,15 @@ export default function LeaveManagementPage() {
           ) : (
             <RequestsTable
               showEmployee
+              onViewForm={setViewing}
               rows={allRequests.map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
                 return {
                   id: r.id,
                   request: r,
+                  form: formByRequest.get(r.id),
                   canUpload: false,
-                  employee: emp ? fullName(emp) : r.employeeId,
+                  employee: emp ? fullName(emp) : formByRequest.get(r.id)?.employeeName ?? r.employeeId,
                   primary: leaveTypeName(r.leaveTypeId),
                   secondary: `${formatDate(r.startDate)} – ${formatDate(r.endDate)} (${r.days}d)`,
                   reason: r.reason,
@@ -267,6 +330,9 @@ export default function LeaveManagementPage() {
           )}
         </div>
       )}
+
+      <LeaveApplicationModal open={showApply} onClose={() => setShowApply(false)} onFiled={reloadForms} />
+      {viewingForm && <LeaveFormModal key={viewingForm.leaveRequestId} form={viewingForm} request={requestById.get(viewingForm.leaveRequestId)} onClose={() => setViewing(null)} onChanged={reloadForms} />}
 
       <Modal open={showFile} onClose={closeFileModal} title="File a leave request">
         <div className="space-y-4">
@@ -358,12 +424,47 @@ export default function LeaveManagementPage() {
   );
 }
 
+// Forms waiting on the user (to approve, or to receive).
+function FormQueue({ title, forms, requestById, action, onOpen }: { title: string; forms: LeaveForm[]; requestById: Map<string, LeaveRequest>; action: string; onOpen: (id: string) => void }) {
+  if (!forms.length) return null;
+  return (
+    <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
+      <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">{title}</div>
+      <div className="space-y-2">
+        {forms.map((f) => {
+          const r = requestById.get(f.leaveRequestId);
+          return (
+            <div key={f.leaveRequestId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
+              <div>
+                <span className="font-medium text-[var(--text-primary)]">{f.employeeName}</span>
+                <span className="text-[var(--text-secondary)]">
+                  {" "}
+                  — {LEAVE_CATEGORIES.find((c) => c.id === f.category)?.label}
+                  {r ? `, ${formatDate(r.startDate)}–${formatDate(r.endDate)} (${r.days}d)` : ""}
+                </span>
+                <div className="mt-1">
+                  <FormProgress form={f} />
+                </div>
+              </div>
+              <button onClick={() => onOpen(f.leaveRequestId)} className="flex items-center gap-1 rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+                <FileText size={13} /> {action}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RequestsTable({
   rows,
   showEmployee = false,
+  onViewForm,
 }: {
-  rows: { id: string; request: LeaveRequest; canUpload: boolean; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
+  rows: { id: string; request: LeaveRequest; form?: LeaveForm; canUpload: boolean; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
+  onViewForm?: (id: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -388,8 +489,15 @@ function RequestsTable({
                 <div className="line-clamp-2">{r.reason}</div>
                 {r.decisionNote && <div className="mt-1 text-xs text-[var(--text-muted)]">Note: {r.decisionNote}</div>}
               </td>
-              <td className="px-3 py-2"><LeaveDocuments request={r.request} canUpload={r.canUpload} /></td>
-              <td className="px-3 py-2"><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge></td>
+              <td className="px-3 py-2">
+                {r.form && onViewForm && (
+                  <button onClick={() => onViewForm(r.id)} className="mb-1 flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                    <FileText size={12} /> Leave form
+                  </button>
+                )}
+                <LeaveDocuments request={r.request} canUpload={r.canUpload} onlineForm={!!r.form} />
+              </td>
+              <td className="px-3 py-2">{r.form ? <FormProgress form={r.form} /> : <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>}</td>
             </tr>
           ))}
         </tbody>
