@@ -73,7 +73,7 @@ function useMySignature() {
 
 // "Your signature" — upload once, used on every form you sign (a photo of
 // your signature on white paper; the background is removed automatically).
-function MySignature({ onChange }: { onChange?: (hasSignature: boolean) => void }) {
+export function MySignature({ onChange }: { onChange?: (hasSignature: boolean) => void }) {
   const { currentEmployee } = useHris();
   const { url, reload } = useMySignature();
   const input = useRef<HTMLInputElement>(null);
@@ -448,7 +448,7 @@ export function canHeadForm(form: LeaveForm, me: string | undefined, isHrManager
 
 // Render with key={form.leaveRequestId} so each form starts afresh.
 export function LeaveFormModal({ form, request, onClose, onChanged }: { form: LeaveForm; request: LeaveRequest | undefined; onClose: () => void; onChanged: () => void }) {
-  const { currentEmployee, currentUser } = useHris();
+  const { currentEmployee, currentUser, reloadRequests } = useHris();
   const me = currentEmployee?.id;
   const isHr = !!currentUser?.roles.includes("hr_admin");
   const [sigs, setSigs] = useState<Partial<Record<LeaveFormSigner, string>>>({});
@@ -484,6 +484,7 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
     try {
       await signLeaveForm(form.leaveRequestId, me, "head");
       await decideLeaveForm(form.leaveRequestId, decision, reason, headDays);
+      await reloadRequests();
       onChanged();
       loadSigs();
     } catch (err) {
@@ -500,6 +501,7 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
     try {
       await signLeaveForm(form.leaveRequestId, me, "hr");
       await receiveLeaveForm(form.leaveRequestId);
+      await reloadRequests();
       onChanged();
       loadSigs();
     } catch (err) {

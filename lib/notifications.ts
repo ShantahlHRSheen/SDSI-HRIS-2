@@ -79,9 +79,14 @@ export function buildNotifications(params: {
     );
 
   overtimeRequests
-    .filter((r) => r.status === "pending" && r.employeeId !== currentEmployee.id && canDecide(currentUser, currentEmployee.id, r.employeeId, employees))
+    .filter((r) => r.status === "pending" && r.employeeId !== currentEmployee.id && (canDecide(currentUser, currentEmployee.id, r.employeeId, employees) || !companyWide))
     .forEach((r) =>
-      items.push({ id: `ot-${r.id}`, text: `${empName(r.employeeId)} filed an overtime request (${r.hours}h) pending your approval.`, date: r.filedAt, tone: "warning" }),
+      items.push({
+        id: `ot-${r.id}`,
+        text: `${employees.some((e) => e.id === r.employeeId) ? empName(r.employeeId) : "A team member"} filed an overtime request (${r.hours}h) pending your approval.`,
+        date: r.filedAt,
+        tone: "warning",
+      }),
     );
 
   correctionRequests
