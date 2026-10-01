@@ -683,6 +683,18 @@ export async function deleteLeaveRequestRow(id: string, attachmentPaths: string[
   if (!data?.length) throw new Error("Only the HR Manager can delete leave requests (or it was already deleted).");
 }
 
+// HR Manager only (migrate_phase30_delete_overtime_requests.sql): removes the
+// form's signature files first (while the request still grants access to
+// them), then deletes the request; its online form goes with it.
+export async function deleteOvertimeRequestRow(id: string): Promise<void> {
+  const client = getSupabaseClient();
+  // Best effort: a leftover file is harmless.
+  await client.storage.from("leave-forms").remove(["applicant", "head", "hr"].map((n) => `ot/${id}/${n}.png`)).catch(() => {});
+  const { data, error } = await client.from("overtime_requests").delete().eq("id", id).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Only the HR Manager can delete overtime requests (or it was already deleted).");
+}
+
 function toLeaveAttachment(r: LeaveRequestAttachmentRow): LeaveAttachment {
   return {
     id: r.id,

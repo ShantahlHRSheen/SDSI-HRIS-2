@@ -10,6 +10,7 @@ import {
   decideCorrectionRequestRow,
   decideLeaveRequestRow,
   deleteLeaveRequestRow,
+  deleteOvertimeRequestRow,
   decideOvertimeRequestRow,
   deleteBranchRow,
   deleteDepartmentRow,
@@ -349,6 +350,8 @@ interface HrisContextShape {
   decideLeaveRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
   // HR Manager: deletes a leave request with its form and files. Returns an error message, or null.
   deleteLeaveRequest: (id: string) => Promise<string | null>;
+  // HR Manager: deletes an overtime request with its form. Returns an error message, or null.
+  deleteOvertimeRequest: (id: string) => Promise<string | null>;
 
   // The new request's id, or null if it couldn't be filed.
   fileOvertimeRequest: (input: Omit<OvertimeRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => Promise<string | null>;
@@ -1418,6 +1421,25 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, supabaseSession, state.leaveRequests, state.leaveAttachments, state.employees],
   );
 
+  const deleteOvertimeRequest: HrisContextShape["deleteOvertimeRequest"] = useCallback(
+    async (id) => {
+      const req = state.overtimeRequests.find((r) => r.id === id);
+      const who = req ? state.employees.find((e) => e.id === req.employeeId) : undefined;
+      const what = req ? `${who ? fullName(who) : req.employeeId}'s overtime request (${req.date}, ${req.hours}h)` : "an overtime request";
+      if (supabaseSession) {
+        try {
+          await deleteOvertimeRequestRow(id);
+        } catch (err) {
+          return err instanceof Error ? err.message : "Couldn't delete the overtime request.";
+        }
+      }
+      setState((prev) => ({ ...prev, overtimeRequests: prev.overtimeRequests.filter((r) => r.id !== id) }));
+      logAudit("Overtime", "delete", `Deleted ${what}`);
+      return null;
+    },
+    [logAudit, supabaseSession, state.overtimeRequests, state.employees],
+  );
+
   const fileOvertimeRequest: HrisContextShape["fileOvertimeRequest"] = useCallback(
     async (input) => {
       if (supabaseSession) {
@@ -1731,6 +1753,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     fileOvertimeRequest,
     reloadRequests,
     deleteLeaveRequest,
+    deleteOvertimeRequest,
     decideOvertimeRequest,
     fileCorrectionRequest,
     decideCorrectionRequest,
