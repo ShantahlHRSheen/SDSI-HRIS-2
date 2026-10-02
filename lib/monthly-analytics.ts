@@ -323,11 +323,14 @@ export function summarizeTax(facts: MonthlyEmployeeFact[]) {
   };
 }
 
+// Months with no attendance on file (before the first import, or the current
+// month before its first cut-off) are left out rather than drawn as 0%.
 export function attendanceTrendByMonth(facts: MonthlyEmployeeFact[], employees: Employee[], filters: AnalyticsFilters = {}) {
-  return getMonthsList().map((m) => {
+  return getMonthsList().flatMap((m) => {
     const monthFacts = filterFacts(facts, employees, { ...filters, monthKey: m.key });
+    if (monthFacts.length === 0) return [];
     const s = summarizeAttendance(monthFacts);
-    return { label: m.label, monthKey: m.key, value: s.attendanceRate, ...s };
+    return [{ label: m.label, monthKey: m.key, value: s.attendanceRate, ...s }];
   });
 }
 
