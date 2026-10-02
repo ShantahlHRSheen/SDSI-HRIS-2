@@ -185,6 +185,8 @@ export type AnnouncementRow = {
   expires_at: string | null;
   // Absent until supabase/migrate_phase13_announcement_photos.sql has run.
   images?: { path: string; name: string }[];
+  // Absent until supabase/migrate_phase32_announcement_files.sql has run.
+  files?: { path: string; name: string; size: number; type: string }[];
 };
 
 type ApprovableRequestRow = {

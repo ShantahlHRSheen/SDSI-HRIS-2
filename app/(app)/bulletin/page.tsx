@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { formatDate, fullName } from "@/lib/helpers";
 import { upcomingBirthdays } from "@/lib/dashboard-metrics";
 import { AnnouncementPhotoGrid, PhotoPicker } from "@/components/bulletin/AnnouncementPhotos";
+import { AnnouncementFileList, FilePicker } from "@/components/bulletin/AnnouncementFiles";
 import { PostInteractions, useBulletinInteractions } from "@/components/bulletin/PostInteractions";
 import type { AnnouncementCategory } from "@/lib/types";
 
@@ -35,6 +36,7 @@ export default function BulletinBoardPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ title: "", body: "", category: "announcement" as AnnouncementCategory });
   const [photos, setPhotos] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
 
@@ -69,6 +71,7 @@ export default function BulletinBoardPage() {
     setShowCreate(false);
     setForm({ title: "", body: "", category: "announcement" });
     setPhotos([]);
+    setFiles([]);
     setPostError(null);
   }
 
@@ -76,7 +79,7 @@ export default function BulletinBoardPage() {
     if (!form.title || !form.body || !currentUser) return;
     setPosting(true);
     setPostError(null);
-    const error = await addAnnouncement({ title: form.title, body: form.body, category: form.category, postedBy: currentUser.name, expiresAt: null }, photos);
+    const error = await addAnnouncement({ title: form.title, body: form.body, category: form.category, postedBy: currentUser.name, expiresAt: null }, photos, files);
     setPosting(false);
     if (error) return setPostError(`Couldn't post the announcement: ${error}`);
     closeCreate();
@@ -119,6 +122,7 @@ export default function BulletinBoardPage() {
                   </div>
                   <p className="text-sm whitespace-pre-line text-[var(--text-secondary)]">{a.body}</p>
                   <AnnouncementPhotoGrid images={a.images ?? []} />
+                  <AnnouncementFileList files={a.files ?? []} />
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
                     <span>Posted by {a.postedBy} · {formatDate(a.postedAt)}</span>
                     {canDelete && (
@@ -153,7 +157,7 @@ export default function BulletinBoardPage() {
 
       <Modal open={!!deleting} onClose={closeDelete} title="Delete this post?">
         <p className="text-sm text-[var(--text-secondary)]">
-          &ldquo;{deleting?.title}&rdquo; will be removed from the Bulletin Board for everyone, together with its photos, comments and reactions. This can&rsquo;t be undone.
+          &ldquo;{deleting?.title}&rdquo; will be removed from the Bulletin Board for everyone, together with its photos, files, comments and reactions. This can&rsquo;t be undone.
         </p>
         {deleteError && <div className="mt-2 text-xs text-[var(--status-critical)]">{deleteError}</div>}
         <div className="mt-4 flex justify-end gap-2">
@@ -181,11 +185,12 @@ export default function BulletinBoardPage() {
             <textarea value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} rows={4} className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm" />
           </div>
           {isRealAccount && <PhotoPicker files={photos} onChange={setPhotos} />}
+          {isRealAccount && <FilePicker files={files} onChange={setFiles} />}
           {postError && <div className="text-xs text-[var(--status-critical)]">{postError}</div>}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={closeCreate} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">Cancel</button>
             <button onClick={submit} disabled={posting || !form.title || !form.body} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
-              {posting ? (photos.length ? "Uploading photos…" : "Posting…") : "Post"}
+              {posting ? (photos.length || files.length ? "Uploading…" : "Posting…") : "Post"}
             </button>
           </div>
         </div>
