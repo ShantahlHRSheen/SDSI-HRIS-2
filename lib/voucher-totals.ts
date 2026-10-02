@@ -1,5 +1,6 @@
 import type { DepartmentVoucher, DepartmentVoucherLine } from "./supabase/department-vouchers";
 import type { Department, EmployeeDepartmentAllocation, PayrollPeriod } from "./types";
+import { filterValues, matchesFilter, type AnalyticsFilters } from "./monthly-analytics";
 
 // "MLM Department" → "MLM Voucher", "Accounting" → "Accounting Voucher".
 export function voucherTitle(d: Department): string {
@@ -56,15 +57,16 @@ export function voucherAmounts(
 // leaves them out; an employee filter keeps only lines linked to that person.
 export function filterVoucherAmounts(
   amounts: VoucherAmount[],
-  f: { monthKey?: string; year?: number; departmentId?: string; branchId?: string; employeeId?: string },
+  f: AnalyticsFilters,
 ): VoucherAmount[] {
-  if (f.branchId) return [];
+  if (filterValues(f.branchId).length) return [];
+  const employeeIds = filterValues(f.employeeId);
   return amounts.filter(
     (a) =>
-      (!f.monthKey || a.monthKey === f.monthKey) &&
-      (!f.year || Number(a.monthKey.slice(0, 4)) === f.year) &&
-      (!f.departmentId || a.departmentId === f.departmentId) &&
-      (!f.employeeId || a.employeeId === f.employeeId),
+      matchesFilter(a.monthKey, f.monthKey) &&
+      matchesFilter(Number(a.monthKey.slice(0, 4)), f.year) &&
+      matchesFilter(a.departmentId, f.departmentId) &&
+      (!employeeIds.length || (a.employeeId !== null && employeeIds.includes(a.employeeId))),
   );
 }
 

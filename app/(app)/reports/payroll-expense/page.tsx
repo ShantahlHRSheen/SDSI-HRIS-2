@@ -7,14 +7,15 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge } from "@/components/Badge";
 import { TrendChart } from "@/components/charts/TrendChart";
-import { ReportFilters, EMPTY_REPORT_FILTERS, type ReportFilterState } from "@/components/reports/ReportFilters";
+import { MultiSelect } from "@/components/reports/MultiSelect";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { EmptyState } from "@/components/EmptyState";
-import { departmentName, formatCurrencyCompact } from "@/lib/helpers";
+import { departmentName, formatCurrencyCompact, fullName } from "@/lib/helpers";
 import {
   FULL_ATTENDANCE_DAYS_PER_MONTH,
   FULL_ATTENDANCE_MONTH_KEY,
   fullAttendanceFacts,
+  type AnalyticsFilters,
   getMonthlyFacts,
   getMonthsList,
   groupByBranch,
@@ -30,6 +31,15 @@ import { filterFactsWithShares, groupByDivision, reportAllocations } from "@/lib
 import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
 import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
+interface MultiFilterState {
+  monthKeys: string[];
+  years: string[];
+  branchIds: string[];
+  departmentIds: string[];
+  employeeIds: string[];
+}
+const EMPTY_MULTI_FILTERS: MultiFilterState = { monthKeys: [], years: [], branchIds: [], departmentIds: [], employeeIds: [] };
+
 export default function PayrollExpenseReportPage() {
   const {
     employees,
@@ -43,7 +53,9 @@ export default function PayrollExpenseReportPage() {
     payrollPeriods,
     salaryAdjustments,
   } = useHris();
-  const [filters, setFilters] = useState<ReportFilterState>(EMPTY_REPORT_FILTERS);
+  // Each filter can take several choices (nothing ticked = all).
+  const [filters, setFilters] = useState<MultiFilterState>(EMPTY_MULTI_FILTERS);
+  const setFilter = (key: keyof MultiFilterState) => (next: string[]) => setFilters((f) => ({ ...f, [key]: next }));
   const [employeeSearch, setEmployeeSearch] = useState("");
   const { vouchers, lines: voucherLines } = useDepartmentVouchers();
   const allVoucherAmounts = useMemo(
@@ -60,19 +72,19 @@ export default function PayrollExpenseReportPage() {
   // "Full attendance" in the month filter: every active employee working 26
   // days a month with no absences, leaves, lates, OT or holidays, at today's
   // rates (lib/monthly-analytics.ts) — so the year filter doesn't apply.
-  const isFull = filters.monthKey === FULL_ATTENDANCE_MONTH_KEY;
+  const isFull = filters.monthKeys.includes(FULL_ATTENDANCE_MONTH_KEY);
   const fullFacts = useMemo(
     () => fullAttendanceFacts(employees, payrollLineOverrides, payrollPeriods, attendancePeriodRecords),
     [employees, payrollLineOverrides, payrollPeriods, attendancePeriodRecords],
   );
   const viewFacts = isFull ? fullFacts : facts;
 
-  const analyticsFilters = {
-    monthKey: filters.monthKey || undefined,
-    year: filters.year && !isFull ? Number(filters.year) : undefined,
-    branchId: filters.branchId || undefined,
-    departmentId: filters.departmentId || undefined,
-    employeeId: filters.employeeId || undefined,
+  const analyticsFilters: AnalyticsFilters = {
+    monthKey: filters.monthKeys,
+    year: isFull ? undefined : filters.years.map(Number),
+    branchId: filters.branchIds,
+    departmentId: filters.departmentIds,
+    employeeId: filters.employeeIds,
   };
   // Department shares for this report: explicit splits plus the Board
   // members counted under Business Units (see lib/payroll-divisions.ts).
@@ -121,7 +133,7 @@ export default function PayrollExpenseReportPage() {
     employees,
     departments,
     allocations,
-  ).filter((r) => !analyticsFilters.departmentId || r.departmentId === analyticsFilters.departmentId);
+  ).filter((r) => !filters.departmentIds.length || filters.departmentIds.includes(r.departmentId));
   const vouchersByDept = sumBy(filterVoucherAmounts(allVoucherAmounts, analyticsFilters), (a) => a.departmentId);
   const byDepartment = [
     ...payrollByDepartment,
@@ -270,15 +282,63 @@ export default function PayrollExpenseReportPage() {
         actions={<ExportBar onExportCsv={exportEmployeeCsv} label="Export all (CSV)" />}
       />
 
-      <ReportFilters
-        months={months}
-        branches={branches}
-        departments={departments}
-        employees={employees}
-        value={filters}
-        onChange={setFilters}
-        extraMonthOptions={[{ value: FULL_ATTENDANCE_MONTH_KEY, label: `Full attendance — ${FULL_ATTENDANCE_DAYS_PER_MONTH} days, no absences` }]}
-      />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <MultiSelect
+          className="w-full sm:w-56"
+          allLabel="All months"
+          noun="months"
+          options={[
+            ...months.map((m) => ({ value: m.key, label: m.label })),
+            { value: FULL_ATTENDANCE_MONTH_KEY, label: `Full attendance — ${FULL_ATTENDANCE_DAYS_PER_MONTH} days, no absences` },
+          ]}
+          exclusive={[FULL_ATTENDANCE_MONTH_KEY]}
+          value={filters.monthKeys}
+          onChange={setFilter("monthKeys")}
+        />
+        <MultiSelect
+          className="w-[calc(50%-4px)] sm:w-36"
+          allLabel="All years"
+          noun="years"
+          options={Array.from(new Set(months.map((m) => m.year)))
+            .sort()
+            .map((y) => ({ value: String(y), label: String(y) }))}
+          value={filters.years}
+          onChange={setFilter("years")}
+        />
+        <MultiSelect
+          className="w-[calc(50%-4px)] sm:w-44"
+          allLabel="All branches"
+          noun="branches"
+          options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          value={filters.branchIds}
+          onChange={setFilter("branchIds")}
+        />
+        <MultiSelect
+          className="w-full sm:w-52"
+          allLabel="All departments"
+          noun="departments"
+          options={departments.map((d) => ({ value: d.id, label: d.name }))}
+          value={filters.departmentIds}
+          onChange={setFilter("departmentIds")}
+        />
+        <MultiSelect
+          className="w-full sm:w-64"
+          allLabel="All employees"
+          noun="employees"
+          searchable
+          options={employees.map((e) => ({ value: e.id, label: fullName(e) }))}
+          value={filters.employeeIds}
+          onChange={setFilter("employeeIds")}
+        />
+        {Object.values(filters).some((v) => v.length > 0) && (
+          <button
+            onClick={() => setFilters(EMPTY_MULTI_FILTERS)}
+            className="rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {isFull && (
         <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-4 py-3 text-xs text-[var(--text-secondary)]">
@@ -298,7 +358,7 @@ export default function PayrollExpenseReportPage() {
         <StatTile label="Employer PhilHealth" value={formatCurrencyCompact(summary.employerPhilHealth)} />
         <StatTile label="Employees covered" value={summary.employeeCount.toString()} />
         <StatTile label="Payroll expense" value={formatCurrencyCompact(summary.totalEmployerExpense)} hint="employer payroll cost" />
-        <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint={analyticsFilters.branchId ? "not tracked by branch" : "department vouchers"} />
+        <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint={filters.branchIds.length ? "not tracked by branch" : "department vouchers"} />
         <StatTile label="Business Units" value={formatCurrencyCompact(divisionTotal("business_units"))} hint="MLM · Cosmetics · Darofy · Board" />
         <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Board staff" />
       </div>
