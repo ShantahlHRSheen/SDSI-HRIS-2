@@ -253,12 +253,24 @@ export function getMonthlyFacts(
   return facts;
 }
 
+// Each filter takes one value or several (any of them matches); empty or
+// missing means no filter.
+export type FilterValue<T> = T | T[] | undefined;
 export interface AnalyticsFilters {
-  monthKey?: string;
-  year?: number;
-  branchId?: string;
-  departmentId?: string;
-  employeeId?: string;
+  monthKey?: FilterValue<string>;
+  year?: FilterValue<number>;
+  branchId?: FilterValue<string>;
+  departmentId?: FilterValue<string>;
+  employeeId?: FilterValue<string>;
+}
+
+export function filterValues<T>(v: FilterValue<T>): T[] {
+  if (v === undefined || v === null || v === "") return [];
+  return Array.isArray(v) ? v : [v];
+}
+export function matchesFilter<T>(value: T, v: FilterValue<T>): boolean {
+  const list = filterValues(v);
+  return list.length === 0 || list.includes(value);
 }
 
 export function filterFacts(facts: MonthlyEmployeeFact[], employees: Employee[], filters: AnalyticsFilters) {
@@ -266,11 +278,11 @@ export function filterFacts(facts: MonthlyEmployeeFact[], employees: Employee[],
   return facts.filter((f) => {
     const emp = byId.get(f.employeeId);
     if (!emp) return false;
-    if (filters.monthKey && f.monthKey !== filters.monthKey) return false;
-    if (filters.year && Number(f.monthKey.split("-")[0]) !== filters.year) return false;
-    if (filters.branchId && emp.branchId !== filters.branchId) return false;
-    if (filters.departmentId && emp.departmentId !== filters.departmentId) return false;
-    if (filters.employeeId && emp.id !== filters.employeeId) return false;
+    if (!matchesFilter(f.monthKey, filters.monthKey)) return false;
+    if (!matchesFilter(Number(f.monthKey.split("-")[0]), filters.year)) return false;
+    if (!matchesFilter(emp.branchId, filters.branchId)) return false;
+    if (!matchesFilter(emp.departmentId, filters.departmentId)) return false;
+    if (!matchesFilter(emp.id, filters.employeeId)) return false;
     return true;
   });
 }

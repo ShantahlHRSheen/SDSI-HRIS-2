@@ -1,5 +1,5 @@
 import { departmentAllocationsForEmployee } from "./helpers";
-import { filterFacts, scaleFact, type AnalyticsFilters, type MonthlyEmployeeFact } from "./monthly-analytics";
+import { filterFacts, filterValues, scaleFact, type AnalyticsFilters, type MonthlyEmployeeFact } from "./monthly-analytics";
 import type { Department, Employee, EmployeeDepartmentAllocation, Position } from "./types";
 
 // Payroll-report grouping into Business Units vs Shared Services.
@@ -75,13 +75,20 @@ export function filterFactsWithShares(
 ): MonthlyEmployeeFact[] {
   const { departmentId, ...rest } = filters;
   const base = filterFacts(facts, employees, rest);
-  if (!departmentId) return base;
+  const departmentIds = filterValues(departmentId);
+  if (!departmentIds.length) return base;
   const byId = new Map(employees.map((e) => [e.id, e]));
   const out: MonthlyEmployeeFact[] = [];
   for (const f of base) {
     const emp = byId.get(f.employeeId);
-    const share = emp ? departmentAllocationsForEmployee(emp, allocations).find((a) => a.departmentId === departmentId) : undefined;
-    if (share) out.push(share.percent === 100 ? f : scaleFact(f, share.percent / 100));
+    // Their combined share in the chosen departments (e.g. 50% MLM + 50%
+    // Darofy with both chosen = all of them).
+    const percent = emp
+      ? departmentAllocationsForEmployee(emp, allocations)
+          .filter((a) => departmentIds.includes(a.departmentId))
+          .reduce((t, a) => t + a.percent, 0)
+      : 0;
+    if (percent > 0) out.push(percent >= 100 ? f : scaleFact(f, percent / 100));
   }
   return out;
 }
