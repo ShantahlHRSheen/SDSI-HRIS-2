@@ -36,6 +36,9 @@ import {
   uploadAnnouncementImages,
   removeAnnouncementImages,
   announcementImageUrls,
+  uploadAnnouncementFiles,
+  removeAnnouncementFiles,
+  announcementFileUrl,
   fetchLeaveAttachments,
   uploadLeaveAttachmentFile,
   leaveAttachmentDownloadUrl,
@@ -127,6 +130,7 @@ import type {
   GeneratedVoucher,
   Holiday,
   LeaveRequest,
+  AnnouncementFile,
   AnnouncementImage,
   LeaveAttachment,
   LeaveAttachmentKind,
@@ -288,7 +292,9 @@ interface HrisContextShape {
   setDisciplinaryStatus: (id: string, status: DisciplinaryRecord["status"]) => void;
 
   // Uploads any photos first. Resolves to an error message, or null on success.
-  addAnnouncement: (input: Omit<Announcement, "id" | "postedAt" | "images">, photos?: File[]) => Promise<string | null>;
+  addAnnouncement: (input: Omit<Announcement, "id" | "postedAt" | "images" | "files">, photos?: File[], files?: File[]) => Promise<string | null>;
+  // A 1-hour link to an attached file: opens it, or downloads it by name.
+  announcementFileUrl: (file: AnnouncementFile, download: boolean) => Promise<string>;
   announcementImageUrls: (images: AnnouncementImage[]) => Promise<Record<string, string>>;
   // Deletes the post with its photos, comments and reactions. Resolves to an error message, or null.
   removeAnnouncement: (id: string) => Promise<string | null>;
@@ -1098,22 +1104,29 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addAnnouncement: HrisContextShape["addAnnouncement"] = useCallback(
-    async (input, photos = []) => {
+    async (input, photos = [], files = []) => {
       if (supabaseSession) {
         let images: AnnouncementImage[] = [];
+        let attached: AnnouncementFile[] = [];
         try {
           images = await uploadAnnouncementImages(photos);
-          const entry = await insertAnnouncement({ ...input, images });
+          attached = await uploadAnnouncementFiles(files);
+          const entry = await insertAnnouncement({ ...input, images, files: attached });
           setState((prev) => ({ ...prev, announcements: [entry, ...prev.announcements] }));
-          logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}${images.length ? ` (${images.length} photo${images.length > 1 ? "s" : ""})` : ""}`);
+          const extras = [
+            images.length ? `${images.length} photo${images.length > 1 ? "s" : ""}` : "",
+            attached.length ? `${attached.length} file${attached.length > 1 ? "s" : ""}` : "",
+          ].filter(Boolean);
+          logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}${extras.length ? ` (${extras.join(", ")})` : ""}`);
           return null;
         } catch (err) {
           console.error("Failed to post announcement", err);
           await removeAnnouncementImages(images).catch(() => {});
+          await removeAnnouncementFiles(attached).catch(() => {});
           return err instanceof Error ? err.message : "Couldn't post the announcement.";
         }
       }
-      if (photos.length) return "Photos need a real sign-in (not the demo login).";
+      if (photos.length || files.length) return "Photos and files need a real sign-in (not the demo login).";
       const entry: Announcement = { ...input, id: nextId("an"), postedAt: TODAY };
       setState((prev) => ({ ...prev, announcements: [entry, ...prev.announcements] }));
       logAudit("Bulletin Board", "create", `Posted announcement: ${input.title}`);
@@ -1123,6 +1136,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   );
 
   const announcementImageUrlsFor: HrisContextShape["announcementImageUrls"] = useCallback((images) => announcementImageUrls(images), []);
+  const announcementFileUrlFor: HrisContextShape["announcementFileUrl"] = useCallback((file, download) => announcementFileUrl(file, download), []);
 
   const removeAnnouncement: HrisContextShape["removeAnnouncement"] = useCallback(
     async (id) => {
@@ -1137,6 +1151,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         }
         // The post is gone either way; a leftover photo file is only storage.
         await removeAnnouncementImages(post.images ?? []).catch((err) => console.warn("Couldn't remove post photos", err));
+        await removeAnnouncementFiles(post.files ?? []).catch((err) => console.warn("Couldn't remove post files", err));
       }
       setState((prev) => ({ ...prev, announcements: prev.announcements.filter((a) => a.id !== id) }));
       logAudit("Bulletin Board", "delete", `Deleted announcement: ${post.title}`);
@@ -1735,6 +1750,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     setDisciplinaryStatus,
     addAnnouncement,
     announcementImageUrls: announcementImageUrlsFor,
+    announcementFileUrl: announcementFileUrlFor,
     removeAnnouncement,
     addBranch: branchCrud.add,
     updateBranch: branchCrud.update,

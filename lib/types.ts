@@ -278,6 +278,15 @@ export interface AnnouncementImage {
   name: string;
 }
 
+// A document attached to an announcement (stored in the private
+// "announcement-files" bucket).
+export interface AnnouncementFile {
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
 export interface Announcement {
   id: string;
   title: string;
@@ -287,6 +296,7 @@ export interface Announcement {
   postedAt: string;
   expiresAt: string | null;
   images?: AnnouncementImage[];
+  files?: AnnouncementFile[];
 }
 
 export interface DemoUser {

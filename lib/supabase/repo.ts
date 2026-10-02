@@ -26,6 +26,7 @@ import type {
 } from "./types";
 import type {
   Announcement,
+  AnnouncementFile,
   AnnouncementImage,
   AttendanceCorrectionRequest,
   AttendancePeriodRecord,
@@ -549,6 +550,7 @@ function toAnnouncement(r: AnnouncementRow): Announcement {
     postedAt: r.posted_at,
     expiresAt: r.expires_at,
     images: r.images ?? [],
+    files: r.files ?? [],
   };
 }
 
@@ -566,6 +568,7 @@ export async function insertAnnouncement(input: Omit<Announcement, "id" | "poste
     // Only sent when there are photos, so text-only posts keep working
     // even before the photos migration has run.
     ...(input.images?.length ? { images: input.images } : {}),
+    ...(input.files?.length ? { files: input.files } : {}),
   };
   const { data, error } = await getSupabaseClient().from("announcements").insert(row).select().single();
   if (error) throw error;
@@ -614,6 +617,42 @@ export async function announcementImageUrls(images: AnnouncementImage[]): Promis
   const urls: Record<string, string> = {};
   for (const d of data) if (d.path && d.signedUrl) urls[d.path] = d.signedUrl;
   return urls;
+}
+
+export const ANNOUNCEMENT_FILES_BUCKET = "announcement-files";
+
+// Uploads all files, or none: if one fails, the ones already uploaded are
+// removed again.
+export async function uploadAnnouncementFiles(files: File[]): Promise<AnnouncementFile[]> {
+  const bucket = getSupabaseClient().storage.from(ANNOUNCEMENT_FILES_BUCKET);
+  const uploaded: AnnouncementFile[] = [];
+  try {
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
+      const { error } = await bucket.upload(path, file, { contentType: file.type || undefined });
+      if (error) throw error;
+      uploaded.push({ path, name: file.name, size: file.size, type: file.type });
+    }
+    return uploaded;
+  } catch (err) {
+    if (uploaded.length) await bucket.remove(uploaded.map((f) => f.path));
+    throw err;
+  }
+}
+
+export async function removeAnnouncementFiles(files: AnnouncementFile[]): Promise<void> {
+  if (files.length) await getSupabaseClient().storage.from(ANNOUNCEMENT_FILES_BUCKET).remove(files.map((f) => f.path));
+}
+
+// A short-lived (1 hour) link: opens the file, or downloads it under its
+// original name.
+export async function announcementFileUrl(file: AnnouncementFile, download: boolean): Promise<string> {
+  const { data, error } = await getSupabaseClient()
+    .storage.from(ANNOUNCEMENT_FILES_BUCKET)
+    .createSignedUrl(file.path, 3600, download ? { download: file.name } : undefined);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 // ---- Leave requests ---------------------------------------------------------------
