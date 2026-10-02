@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Cake, Megaphone, Plus, Trash2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
-import { Badge, type BadgeTone } from "@/components/Badge";
+import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDate, fullName } from "@/lib/helpers";
@@ -13,21 +13,7 @@ import { AnnouncementPhotoGrid, PhotoPicker } from "@/components/bulletin/Announ
 import { AnnouncementFileList, FilePicker } from "@/components/bulletin/AnnouncementFiles";
 import { PostInteractions, useBulletinInteractions } from "@/components/bulletin/PostInteractions";
 import type { AnnouncementCategory } from "@/lib/types";
-
-const CATEGORY_TONE: Record<AnnouncementCategory, BadgeTone> = {
-  announcement: "info",
-  holiday: "good",
-  event: "warning",
-  memo: "muted",
-  policy: "serious",
-};
-const CATEGORY_LABELS: Record<AnnouncementCategory, string> = {
-  announcement: "Announcement",
-  holiday: "Holiday",
-  event: "Event",
-  memo: "Memo",
-  policy: "Policy",
-};
+import { CATEGORY_LABELS, CATEGORY_TONE } from "@/components/bulletin/categories";
 
 export default function BulletinBoardPage() {
   const { announcements, employees, currentUser, addAnnouncement, removeAnnouncement, isRealAccount } = useHris();

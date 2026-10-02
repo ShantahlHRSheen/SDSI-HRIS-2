@@ -7,6 +7,7 @@ import { SidebarShell } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { PasswordForm } from "@/components/account/PasswordForm";
 import { SaveErrorToasts } from "@/components/SaveErrorToasts";
+import { NewAnnouncementPopup } from "@/components/bulletin/NewAnnouncementPopup";
 import { AlertTriangle } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -67,6 +68,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         <SaveErrorToasts />
       </div>
+      <NewAnnouncementPopup />
     </div>
   );
 }
