@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { AlarmClockOff, Cake, CalendarX2, Clock3, Info, UserMinus, UserPlus } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { TODAY } from "@/lib/mock-data";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge } from "@/components/Badge";
@@ -20,6 +21,7 @@ import {
 import {
   attendanceTrendByMonth,
   CURRENT_MONTH_KEY,
+  getMonthsList,
   filterFacts,
   getMonthlyFacts,
   groupByBranch,
@@ -92,16 +94,24 @@ export default function DashboardPage() {
   const hires = newHires(scoped);
   const resignations = recentResignations(scoped);
 
+  // "This month" = the latest month with payroll / attendance on file (the
+  // current month until its first cut-off is imported shows the one before).
+  const shownMonth = getMonthsList()
+    .filter((m) => m.key <= CURRENT_MONTH_KEY && facts.some((f) => f.monthKey === m.key))
+    .pop() ?? getMonthsList().find((m) => m.key === CURRENT_MONTH_KEY)!;
+  const SHOWN_MONTH_KEY = shownMonth.key;
+  const monthTag = SHOWN_MONTH_KEY === CURRENT_MONTH_KEY ? "this month" : shownMonth.label;
+
   const attendanceTrend = attendanceTrendByMonth(facts, employees, { branchId: branchFilter });
-  const currentAttendance = summarizeAttendance(filterFacts(facts, employees, { branchId: branchFilter, monthKey: CURRENT_MONTH_KEY }));
+  const currentAttendance = summarizeAttendance(filterFacts(facts, employees, { branchId: branchFilter, monthKey: SHOWN_MONTH_KEY }));
 
   const overtimeTrend = overtimeTrendByMonth(facts, employees, { branchId: branchFilter });
-  const currentOvertime = summarizeOvertime(filterFacts(facts, employees, { branchId: branchFilter, monthKey: CURRENT_MONTH_KEY }));
+  const currentOvertime = summarizeOvertime(filterFacts(facts, employees, { branchId: branchFilter, monthKey: SHOWN_MONTH_KEY }));
 
   const payrollTrend = payrollExpenseTrendByMonth(facts, employees, { branchId: branchFilter });
-  const currentPayroll = summarizePayroll(filterFacts(facts, employees, { branchId: branchFilter, monthKey: CURRENT_MONTH_KEY }));
+  const currentPayroll = summarizePayroll(filterFacts(facts, employees, { branchId: branchFilter, monthKey: SHOWN_MONTH_KEY }));
   const branchExpense = groupByBranch(
-    filterFacts(facts, employees, { monthKey: CURRENT_MONTH_KEY, branchId: branchFilter }),
+    filterFacts(facts, employees, { monthKey: SHOWN_MONTH_KEY, branchId: branchFilter }),
     employees,
     branches,
   )
@@ -112,7 +122,7 @@ export default function DashboardPage() {
     <div>
       <PageHeader
         title={variant === "team" ? `Team Dashboard — ${currentEmployee ? branchName(currentEmployee.branchId) : ""}` : "Executive Dashboard"}
-        subtitle={`As of ${formatDate("2026-07-13")} · Company-wide unless noted`}
+        subtitle={`As of ${formatDate(TODAY)} · Company-wide unless noted`}
       />
 
       {variant !== "payroll" && (
@@ -145,10 +155,10 @@ export default function DashboardPage() {
             <Link href="/reports/attendance" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <StatTile label="Present (this month)" value={currentAttendance.totalPresent.toLocaleString()} />
-            <StatTile label="Late (this month)" value={currentAttendance.totalLate.toLocaleString()} deltaTone={currentAttendance.totalLate > 40 ? "bad" : "neutral"} />
-            <StatTile label="Absent (this month)" value={currentAttendance.totalAbsent.toLocaleString()} deltaTone={currentAttendance.totalAbsent > 40 ? "bad" : "neutral"} />
-            <StatTile label="On leave (this month)" value={currentAttendance.totalLeave.toLocaleString()} />
+            <StatTile label={`Present (${monthTag})`} value={currentAttendance.totalPresent.toLocaleString()} />
+            <StatTile label={`Late (${monthTag})`} value={currentAttendance.totalLate.toLocaleString()} deltaTone={currentAttendance.totalLate > 40 ? "bad" : "neutral"} />
+            <StatTile label={`Absent (${monthTag})`} value={currentAttendance.totalAbsent.toLocaleString()} deltaTone={currentAttendance.totalAbsent > 40 ? "bad" : "neutral"} />
+            <StatTile label={`On leave (${monthTag})`} value={currentAttendance.totalLeave.toLocaleString()} />
             <StatTile label="Attendance rate" value={`${currentAttendance.attendanceRate}%`} />
           </div>
           <div className="mt-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -166,8 +176,8 @@ export default function DashboardPage() {
             <Link href="/reports/overtime" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile label="OT hours (this month)" value={currentOvertime.totalOtHours.toLocaleString()} />
-            <StatTile label="OT pay (this month)" value={formatCurrencyCompact(currentOvertime.totalOtPay)} />
+            <StatTile label={`OT hours (${monthTag})`} value={currentOvertime.totalOtHours.toLocaleString()} />
+            <StatTile label={`OT pay (${monthTag})`} value={formatCurrencyCompact(currentOvertime.totalOtPay)} />
             <StatTile label="Avg hrs / employee" value={active.length ? (currentOvertime.totalOtHours / active.length).toFixed(1) : "0"} />
             <StatTile label="Months tracked" value="12" hint="rolling window" />
           </div>
@@ -218,7 +228,7 @@ export default function DashboardPage() {
           <Link href="/reports/payroll-expense" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Total employer expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense)} hint="this month" />
+          <StatTile label="Total employer expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense)} hint={monthTag} />
           <StatTile label="Basic salary" value={formatCurrencyCompact(currentPayroll.basicSalary)} />
           <StatTile label="Employer SSS + HDMF + PhilHealth" value={formatCurrencyCompact(currentPayroll.employerSSS + currentPayroll.employerHDMF + currentPayroll.employerPhilHealth)} />
           <StatTile label="OT + Holiday + Leave pay" value={formatCurrencyCompact(currentPayroll.overtimePay + currentPayroll.holidayPay + currentPayroll.leavePay)} />
@@ -230,7 +240,7 @@ export default function DashboardPage() {
           </div>
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
             <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">
-              {variant === "team" ? "Team payroll expense (this month)" : "Payroll expense by branch (this month)"}
+              {variant === "team" ? `Team payroll expense (${monthTag})` : `Payroll expense by branch (${monthTag})`}
             </div>
             <HBarChart data={branchExpense} valueFormatter={(v) => formatCurrencyCompact(v)} />
           </div>
