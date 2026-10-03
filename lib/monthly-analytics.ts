@@ -262,6 +262,16 @@ export interface AnalyticsFilters {
   branchId?: FilterValue<string>;
   departmentId?: FilterValue<string>;
   employeeId?: FilterValue<string>;
+  // Employee.employmentStatus (regular, probationary, freelance, …).
+  employmentStatus?: FilterValue<string>;
+  // Values to leave out ("everyone except …"), applied after the above.
+  exclude?: ExcludeFilters;
+}
+export interface ExcludeFilters {
+  branchId?: string[];
+  departmentId?: string[];
+  employeeId?: string[];
+  employmentStatus?: string[];
 }
 
 export function filterValues<T>(v: FilterValue<T>): T[] {
@@ -283,6 +293,12 @@ export function filterFacts(facts: MonthlyEmployeeFact[], employees: Employee[],
     if (!matchesFilter(emp.branchId, filters.branchId)) return false;
     if (!matchesFilter(emp.departmentId, filters.departmentId)) return false;
     if (!matchesFilter(emp.id, filters.employeeId)) return false;
+    if (!matchesFilter<string>(emp.employmentStatus, filters.employmentStatus)) return false;
+    const ex = filters.exclude;
+    if (ex?.branchId?.includes(emp.branchId)) return false;
+    if (ex?.departmentId?.includes(emp.departmentId)) return false;
+    if (ex?.employeeId?.includes(emp.id)) return false;
+    if (ex?.employmentStatus?.includes(emp.employmentStatus)) return false;
     return true;
   });
 }
