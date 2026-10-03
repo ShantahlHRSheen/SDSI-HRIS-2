@@ -192,3 +192,10 @@ body {
   size: A4;
   margin: 0 0 14mm 0;
 }
+/* Off-screen pages drawn for "Download PDF" (components/pdf): documents
+   that sit in a bordered card on screen print flat on the page. */
+.pdf-render .bir-print-area {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}

@@ -7,6 +7,7 @@ import { Modal } from "@/components/Modal";
 import { formatDate } from "@/lib/helpers";
 import { ThirteenthMonthSlip } from "@/components/thirteenth-month/ThirteenthMonthSlip";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
+import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
 import { useVoucherSignatures, validSignoff } from "@/components/vouchers/VoucherSignatures";
 import { fetchReleasedThirteenthMonthSlips, fetchThirteenthMonthSignoffs, type ReleasedThirteenthMonthSlip } from "@/lib/supabase/thirteenth-month";
 import type { VoucherSignoff } from "@/lib/supabase/voucher-signoffs";
@@ -95,10 +96,15 @@ export function MyThirteenthMonthSlips() {
       <Modal open={!!open} onClose={() => setViewing(null)} title={open ? `13th month pay — ${open.year}` : ""} wide>
         {open && (
           <div>
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3 flex items-start justify-end gap-2">
               <button onClick={() => setPrinting(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
-                <Printer size={14} /> Print / Download PDF
+                <Printer size={14} /> Print
               </button>
+              <DownloadPdfButton filename={`13th-Month-Pay-${open.year}.pdf`}>
+                <PdfPage>
+                  <ThirteenthMonthSlip row={open.slip} signatures={signaturesFor(open)} />
+                </PdfPage>
+              </DownloadPdfButton>
             </div>
             <div className="overflow-x-auto rounded-lg bg-white p-3">
               <div className="min-w-[560px]">

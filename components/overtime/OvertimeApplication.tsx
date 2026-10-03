@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download } from "lucide-react";
+import { Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
@@ -22,6 +22,7 @@ import {
 import { MySignature } from "@/components/leave/LeaveApplication";
 import { OvertimeFormDocument, type OvertimeFormDocData } from "@/components/overtime/OvertimeFormDocument";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
+import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
 
 // Every overtime form the user may see (real accounts only).
 export function useOvertimeForms() {
@@ -357,9 +358,16 @@ export function OvertimeFormModal({ form, onClose, onChanged, onClarify }: { for
         <div className="flex flex-wrap items-center gap-2">
           <OtProgress form={form} />
           {otFinal(form) && (
-            <button onClick={() => setPrinting(true)} className="ml-auto flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
-              <Download size={14} /> Download (PDF)
-            </button>
+            <div className="ml-auto flex items-start gap-2">
+              <button onClick={() => setPrinting(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                <Printer size={14} /> Print
+              </button>
+              <DownloadPdfButton filename={`Overtime-Form-${form.employeeName.replace(/[^A-Za-z0-9]+/g, "-")}-${form.otDate}.pdf`}>
+                <PdfPage form>
+                  <OvertimeFormDocument form={form} signatures={sigs} />
+                </PdfPage>
+              </DownloadPdfButton>
+            </div>
           )}
           {canClarify && (
             <button onClick={onClarify} className="ml-auto rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, PenLine } from "lucide-react";
+import { PenLine, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
@@ -36,6 +36,7 @@ import {
 import { LeaveFormDocument, type LeaveFormDocData } from "@/components/leave/LeaveFormDocument";
 import { ATTACHMENT_ACCEPT, prepareUpload, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
+import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
 import type { LeaveRequest } from "@/lib/types";
 
 // ---- Data -------------------------------------------------------------------
@@ -518,9 +519,16 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
         <div className="flex flex-wrap items-center gap-2">
           <FormProgress form={form} />
           {stage === "received" && (
-            <button onClick={() => setPrinting(true)} className="ml-auto flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
-              <Download size={14} /> Download (PDF)
-            </button>
+            <div className="ml-auto flex items-start gap-2">
+              <button onClick={() => setPrinting(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                <Printer size={14} /> Print
+              </button>
+              <DownloadPdfButton filename={`Leave-Form-${form.employeeName.replace(/[^A-Za-z0-9]+/g, "-")}-${form.leaveRequestId.slice(0, 8)}.pdf`}>
+                <PdfPage form>
+                  <LeaveFormDocument form={doc} signatures={sigs} />
+                </PdfPage>
+              </DownloadPdfButton>
+            </div>
           )}
         </div>
         <div className="overflow-x-auto rounded-lg bg-white p-4">
