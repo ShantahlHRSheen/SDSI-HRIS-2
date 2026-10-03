@@ -7,6 +7,7 @@ import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { MyPayslipsView, PayslipPreviewModal } from "@/components/payroll/MyPayslipsView";
+import { AllVoucherSlips } from "@/components/payroll/AllVoucherSlips";
 import { PayslipDocument } from "@/components/payroll/PayslipDocument";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { computePayrollForPeriod, payrollLineToSummary, summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
@@ -287,6 +288,7 @@ function AdminView({
         )}
       </div>
 
+      <AllVoucherSlips />
       <PayslipPreviewModal preview={preview} onClose={() => setPreview(null)} />
       {printing && period && (
         <PrintStack onDone={stopPrinting}>
