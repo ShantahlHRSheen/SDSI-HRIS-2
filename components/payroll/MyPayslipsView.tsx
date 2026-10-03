@@ -6,7 +6,8 @@ import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { PayslipDocument } from "@/components/payroll/PayslipDocument";
 import { summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
-import { formatCurrencyCompact, formatDate } from "@/lib/helpers";
+import { formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
+import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 import { useHris } from "@/lib/store";
 import { MyThirteenthMonthSlips } from "@/components/thirteenth-month/MyThirteenthMonthSlips";
@@ -20,10 +21,15 @@ export function PayslipPreviewModal({ preview, onClose }: { preview: { employee:
     <Modal open={!!preview} onClose={onClose} title="Payslip preview" wide>
       {preview && (
         <div>
-          <div className="mb-3 flex justify-end gap-2 print:hidden">
+          <div className="mb-3 flex items-start justify-end gap-2 print:hidden">
             <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
-              <Printer size={14} /> Print / Download PDF
+              <Printer size={14} /> Print
             </button>
+            <DownloadPdfButton filename={`Payslip-${fullName(preview.employee).replace(/[^A-Za-z0-9]+/g, "-")}-${preview.period.start}-to-${preview.period.end}.pdf`}>
+              <PdfPage form>
+                <PayslipDocument employee={preview.employee} period={preview.period} line={preview.line} adjustments={salaryAdjustments} />
+              </PdfPage>
+            </DownloadPdfButton>
           </div>
           <PayslipDocument employee={preview.employee} period={preview.period} line={preview.line} adjustments={salaryAdjustments} />
         </div>
