@@ -145,6 +145,7 @@ export default function VouchersPage() {
             </option>
           ))}
         </select>
+        {period && <VoucherDateControl key={`${period.id}-${period.voucherDate ?? ""}`} period={period} canEdit={canManage} />}
         {period && loaded && !loadError && (
           <button
             onClick={() => setPrinting("all")}
@@ -325,6 +326,56 @@ export default function VouchersPage() {
 }
 
 type LineInput = { employeeId: string | null; payeeName: string; description: string; amount: number };
+
+// The date printed on this period's vouchers: the cut-off end date unless
+// changed here.
+function VoucherDateControl({ period, canEdit }: { period: PayrollPeriod; canEdit: boolean }) {
+  const { setPayrollPeriodVoucherDate } = useHris();
+  const [value, setValue] = useState(period.voucherDate ?? period.end);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const custom = !!period.voucherDate;
+
+  async function save(date: string | null) {
+    setBusy(true);
+    setError(null);
+    const err = await setPayrollPeriodVoucherDate(period.id, date && date !== period.end ? date : null);
+    setBusy(false);
+    if (err) {
+      setError(err);
+      setValue(period.voucherDate ?? period.end);
+    }
+  }
+
+  if (!canEdit) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm">
+      <label htmlFor="voucher-date" className="text-xs text-[var(--text-muted)]">
+        Voucher date
+      </label>
+      <input
+        id="voucher-date"
+        type="date"
+        value={value}
+        disabled={busy}
+        onChange={(e) => {
+          setValue(e.target.value);
+          if (e.target.value) save(e.target.value);
+        }}
+        className="rounded-md border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2 py-1 text-sm"
+      />
+      {custom ? (
+        <button onClick={() => save(null)} disabled={busy} className="text-xs text-[var(--series-1)] hover:underline disabled:opacity-50" title="Use the cut-off end date again">
+          Reset
+        </button>
+      ) : (
+        <span className="text-xs text-[var(--text-muted)]">(cut-off end date)</span>
+      )}
+      {busy && <span className="text-xs text-[var(--text-muted)]">Saving…</span>}
+      {error && <span className="text-xs text-[var(--status-critical)]">{error}</span>}
+    </div>
+  );
+}
 
 function matchEmployee(name: string, employees: Employee[]): string | null {
   const n = name.trim().toLowerCase();
@@ -584,7 +635,7 @@ function VoucherDoc({ department, period, lines, total, employees, signatures }:
   return (
     <VoucherSheet
       title={department.name}
-      date={period.end}
+      date={period.voucherDate || period.end}
       columns={[{ label: "NAME", width: "25%" }, { label: "POSITION", width: "25%" }, { label: "ALLOWANCE COVERAGE" }, { label: "Amount (PhP.)", width: "16%", align: "right" }]}
       rows={lines.map((l) => {
         const emp = l.employeeId ? byId.get(l.employeeId) : undefined;

@@ -368,7 +368,7 @@ export function SalaryAdjustmentVoucherDoc({
   return (
     <VoucherSheet
       title={SALARY_ADJUSTMENT_VOUCHER_TITLE}
-      date={period.end}
+      date={period.voucherDate || period.end}
       columns={[
         { label: "NAME", width: "24%" },
         { label: "ADJUSTMENT", width: "18%" },
