@@ -6,7 +6,7 @@ import type { PayrollLine } from "@/lib/payroll";
 import { componentKind, componentLabel, netEffect, type SalaryAdjustment } from "@/lib/salary-adjustments";
 
 // Signature block at the foot of every payslip.
-const PAYSLIP_SIGNATORIES = [
+export const PAYSLIP_SIGNATORIES = [
   { role: "Prepared by", name: "Sheena A. Evangelista", title: "HR Manager" },
   { role: "Checked by", name: "Wendie Halog", title: "Sr. Accounting Assistant" },
   { role: "Released by", name: "Joan Mariette Santarina", title: "Corporate Treasurer" },

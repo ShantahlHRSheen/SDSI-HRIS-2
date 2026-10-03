@@ -11,6 +11,7 @@ import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 import { useHris } from "@/lib/store";
 import { MyThirteenthMonthSlips } from "@/components/thirteenth-month/MyThirteenthMonthSlips";
+import { MyVoucherSlips } from "@/components/payroll/MyVoucherSlips";
 
 // An employee's own released payslips ("My Payslips") — used for every role,
 // including HR, payroll and upper management, who also see All Payslips.
@@ -102,6 +103,7 @@ export function MyPayslipsView({
           </div>
         </div>
       )}
+      <MyVoucherSlips />
       <MyThirteenthMonthSlips />
       <PayslipPreviewModal preview={preview} onClose={() => setPreview(null)} />
     </div>
