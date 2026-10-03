@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { BadgeCheck, Check, ChevronRight, Pencil, Plus, Printer, Receipt, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -47,6 +48,8 @@ export default function VouchersPage() {
   const signatures = useVoucherSignatures();
   const { signoffs, sign, signMany, withdraw } = useVoucherSignoffs(period?.id);
   const isHr = !!currentUser?.roles.includes("hr_admin");
+  // Those who see All Payslips, where each payee's voucher payslips are.
+  const canSeeVoucherSlips = !!currentUser?.roles.some((r) => ["hr_admin", "payroll_officer", "cfo", "upper_management"].includes(r));
   // Signatures printed on a voucher: Prepared by once uploaded; Checked by /
   // Released by only while that sign-off matches the voucher's total.
   const signaturesFor = (voucherKey: string, total: number): VoucherSignatureSet => {
@@ -155,6 +158,14 @@ export default function VouchersPage() {
           >
             <Printer size={15} /> Print all vouchers
           </button>
+        )}
+        {canSeeVoucherSlips && (
+          <Link
+            href="/modules/payslips#voucher-payslips"
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
+          >
+            <Receipt size={15} /> Voucher payslips
+          </Link>
         )}
         {isRealAccount &&
           signatureKindsFor(currentUser?.roles ?? []).map((kind) => (

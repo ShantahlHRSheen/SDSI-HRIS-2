@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer, Receipt } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
@@ -103,9 +103,15 @@ export function AllVoucherSlips() {
   const open = shown.find((s) => s.key === viewing) ?? null;
   const bulk = shown.slice(0, MAX_BULK);
 
+  // Opened from the Vouchers page's "Voucher payslips" link: scroll here
+  // once the vouchers have loaded (the section isn't there before).
+  useEffect(() => {
+    if (loaded && window.location.hash === "#voucher-payslips") document.getElementById("voucher-payslips")?.scrollIntoView({ behavior: "smooth" });
+  }, [loaded]);
+
   if (!loaded && !loadError) return null;
   return (
-    <div className="mt-6 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+    <div id="voucher-payslips" className="mt-6 scroll-mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="mr-auto flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
           <Receipt size={16} className="text-[var(--series-1)]" /> All Voucher Payslips
