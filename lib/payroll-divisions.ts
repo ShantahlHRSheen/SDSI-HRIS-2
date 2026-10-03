@@ -73,19 +73,20 @@ export function filterFactsWithShares(
   filters: AnalyticsFilters,
   allocations: EmployeeDepartmentAllocation[],
 ): MonthlyEmployeeFact[] {
-  const { departmentId, ...rest } = filters;
-  const base = filterFacts(facts, employees, rest);
+  const { departmentId, exclude, ...rest } = filters;
+  const excludedDepartments = exclude?.departmentId ?? [];
+  const base = filterFacts(facts, employees, { ...rest, exclude: { ...exclude, departmentId: undefined } });
   const departmentIds = filterValues(departmentId);
-  if (!departmentIds.length) return base;
+  if (!departmentIds.length && !excludedDepartments.length) return base;
   const byId = new Map(employees.map((e) => [e.id, e]));
   const out: MonthlyEmployeeFact[] = [];
   for (const f of base) {
     const emp = byId.get(f.employeeId);
-    // Their combined share in the chosen departments (e.g. 50% MLM + 50%
-    // Darofy with both chosen = all of them).
+    // Their combined share in the departments still in view (e.g. 50% MLM
+    // + 50% Darofy: both chosen = all of them; MLM removed = half).
     const percent = emp
       ? departmentAllocationsForEmployee(emp, allocations)
-          .filter((a) => departmentIds.includes(a.departmentId))
+          .filter((a) => (!departmentIds.length || departmentIds.includes(a.departmentId)) && !excludedDepartments.includes(a.departmentId))
           .reduce((t, a) => t + a.percent, 0)
       : 0;
     if (percent > 0) out.push(percent >= 100 ? f : scaleFact(f, percent / 100));

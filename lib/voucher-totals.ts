@@ -1,5 +1,5 @@
 import type { DepartmentVoucher, DepartmentVoucherLine } from "./supabase/department-vouchers";
-import type { Department, EmployeeDepartmentAllocation, PayrollPeriod } from "./types";
+import type { Department, Employee, EmployeeDepartmentAllocation, PayrollPeriod } from "./types";
 import { filterValues, matchesFilter, type AnalyticsFilters } from "./monthly-analytics";
 
 // "MLM Department" → "MLM Voucher", "Accounting" → "Accounting Voucher".
@@ -53,21 +53,34 @@ export function voucherAmounts(
   return out;
 }
 
-// The report's filters. Vouchers aren't tied to a branch, so a branch filter
-// leaves them out; an employee filter keeps only lines linked to that person.
-export function filterVoucherAmounts(
-  amounts: VoucherAmount[],
-  f: AnalyticsFilters,
-): VoucherAmount[] {
-  if (filterValues(f.branchId).length) return [];
+// Voucher payees not linked to an employee in the 201 file, as an
+// "employment type" in the report's filter.
+export const OTHER_PAYEE = "__other_payee__";
+
+// The report's filters. A voucher line linked to an employee follows that
+// employee's branch and employment type; lines for other payees have no
+// branch, so a "show only these branches" filter leaves them out.
+export function filterVoucherAmounts(amounts: VoucherAmount[], f: AnalyticsFilters, employees: Employee[] = []): VoucherAmount[] {
+  const byId = new Map(employees.map((e) => [e.id, e]));
+  const branchIds = filterValues(f.branchId);
   const employeeIds = filterValues(f.employeeId);
-  return amounts.filter(
-    (a) =>
-      matchesFilter(a.monthKey, f.monthKey) &&
-      matchesFilter(Number(a.monthKey.slice(0, 4)), f.year) &&
-      matchesFilter(a.departmentId, f.departmentId) &&
-      (!employeeIds.length || (a.employeeId !== null && employeeIds.includes(a.employeeId))),
-  );
+  const statuses = filterValues(f.employmentStatus);
+  const ex = f.exclude ?? {};
+  return amounts.filter((a) => {
+    const emp = a.employeeId ? byId.get(a.employeeId) : undefined;
+    const status = emp?.employmentStatus ?? OTHER_PAYEE;
+    if (!matchesFilter(a.monthKey, f.monthKey)) return false;
+    if (!matchesFilter(Number(a.monthKey.slice(0, 4)), f.year)) return false;
+    if (!matchesFilter(a.departmentId, f.departmentId)) return false;
+    if (ex.departmentId?.includes(a.departmentId)) return false;
+    if (branchIds.length && !(emp && branchIds.includes(emp.branchId))) return false;
+    if (emp && ex.branchId?.includes(emp.branchId)) return false;
+    if (employeeIds.length && !(a.employeeId && employeeIds.includes(a.employeeId))) return false;
+    if (a.employeeId && ex.employeeId?.includes(a.employeeId)) return false;
+    if (statuses.length && !statuses.includes(status)) return false;
+    if (ex.employmentStatus?.includes(status)) return false;
+    return true;
+  });
 }
 
 export function sumBy<K extends string>(amounts: VoucherAmount[], key: (a: VoucherAmount) => K): Map<K, number> {

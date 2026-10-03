@@ -7,14 +7,15 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge } from "@/components/Badge";
 import { TrendChart } from "@/components/charts/TrendChart";
-import { MultiSelect } from "@/components/reports/MultiSelect";
+import { MultiSelect, type FilterMode } from "@/components/reports/MultiSelect";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { EmptyState } from "@/components/EmptyState";
-import { departmentName, formatCurrencyCompact, fullName } from "@/lib/helpers";
+import { departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, fullName } from "@/lib/helpers";
 import {
   FULL_ATTENDANCE_DAYS_PER_MONTH,
   FULL_ATTENDANCE_MONTH_KEY,
   fullAttendanceFacts,
+  matchesFilter,
   type AnalyticsFilters,
   getMonthlyFacts,
   getMonthsList,
@@ -29,7 +30,7 @@ import {
 } from "@/lib/monthly-analytics";
 import { filterFactsWithShares, groupByDivision, reportAllocations } from "@/lib/payroll-divisions";
 import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
-import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
+import { OTHER_PAYEE, filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
 interface MultiFilterState {
   monthKeys: string[];
@@ -37,8 +38,22 @@ interface MultiFilterState {
   branchIds: string[];
   departmentIds: string[];
   employeeIds: string[];
+  employmentStatuses: string[];
 }
-const EMPTY_MULTI_FILTERS: MultiFilterState = { monthKeys: [], years: [], branchIds: [], departmentIds: [], employeeIds: [] };
+const EMPTY_MULTI_FILTERS: MultiFilterState = { monthKeys: [], years: [], branchIds: [], departmentIds: [], employeeIds: [], employmentStatuses: [] };
+// Filters that can either show only, or remove, the ticked choices.
+type ModalFilter = "branchIds" | "departmentIds" | "employeeIds" | "employmentStatuses";
+const INCLUDE_ALL: Record<ModalFilter, FilterMode> = { branchIds: "include", departmentIds: "include", employeeIds: "include", employmentStatuses: "include" };
+
+const EMPLOYMENT_TYPES: { value: string; label: string }[] = [
+  { value: "regular", label: "Regular" },
+  { value: "probationary", label: "Probationary" },
+  { value: "project_based", label: "Project-based" },
+  { value: "freelance", label: "Freelance" },
+  { value: "consultant", label: "Consultant" },
+  { value: "intern", label: "Intern" },
+  { value: OTHER_PAYEE, label: "Other voucher payees (not in the 201 file)" },
+];
 
 export default function PayrollExpenseReportPage() {
   const {
@@ -56,6 +71,10 @@ export default function PayrollExpenseReportPage() {
   // Each filter can take several choices (nothing ticked = all).
   const [filters, setFilters] = useState<MultiFilterState>(EMPTY_MULTI_FILTERS);
   const setFilter = (key: keyof MultiFilterState) => (next: string[]) => setFilters((f) => ({ ...f, [key]: next }));
+  const [modes, setModes] = useState(INCLUDE_ALL);
+  const setMode = (key: ModalFilter) => (mode: FilterMode) => setModes((m) => ({ ...m, [key]: mode }));
+  // The employee list shows current employees unless asked otherwise.
+  const [includeFormer, setIncludeFormer] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const { vouchers, lines: voucherLines } = useDepartmentVouchers();
   const allVoucherAmounts = useMemo(
@@ -82,10 +101,22 @@ export default function PayrollExpenseReportPage() {
   const analyticsFilters: AnalyticsFilters = {
     monthKey: filters.monthKeys,
     year: isFull ? undefined : filters.years.map(Number),
-    branchId: filters.branchIds,
-    departmentId: filters.departmentIds,
-    employeeId: filters.employeeIds,
+    branchId: modes.branchIds === "include" ? filters.branchIds : [],
+    departmentId: modes.departmentIds === "include" ? filters.departmentIds : [],
+    employeeId: modes.employeeIds === "include" ? filters.employeeIds : [],
+    employmentStatus: modes.employmentStatuses === "include" ? filters.employmentStatuses : [],
+    exclude: {
+      branchId: modes.branchIds === "exclude" ? filters.branchIds : [],
+      departmentId: modes.departmentIds === "exclude" ? filters.departmentIds : [],
+      employeeId: modes.employeeIds === "exclude" ? filters.employeeIds : [],
+      employmentStatus: modes.employmentStatuses === "exclude" ? filters.employmentStatuses : [],
+    },
   };
+  const includedDepts = analyticsFilters.departmentId as string[];
+  const excludedDepts = analyticsFilters.exclude?.departmentId ?? [];
+  // Everything except the department filters (the department table and the
+  // trend apply those through each person's department shares).
+  const exceptDepts: AnalyticsFilters = { ...analyticsFilters, departmentId: undefined, exclude: { ...analyticsFilters.exclude, departmentId: [] } };
   // Department shares for this report: explicit splits plus the Board
   // members counted under Business Units (see lib/payroll-divisions.ts).
   const allocations = useMemo(
@@ -109,14 +140,41 @@ export default function PayrollExpenseReportPage() {
   }, [employees, employeeDepartmentAllocations]);
   // Facts limited to the selected department's share (if any); later
   // filters below don't need the department again.
-  const deptFacts = filterFactsWithShares(facts, employees, { departmentId: analyticsFilters.departmentId }, allocations);
-  const trendFilters = { ...analyticsFilters, monthKey: undefined, departmentId: undefined };
+  const deptFacts = filterFactsWithShares(facts, employees, { departmentId: includedDepts, exclude: { departmentId: excludedDepts } }, allocations);
+  const trendFilters = { ...exceptDepts, monthKey: undefined };
 
   const filtered = filterFactsWithShares(viewFacts, employees, analyticsFilters, allocations);
   const summary = summarizePayroll(filtered);
   // Department vouchers (Vouchers page) count as payroll expense too.
-  const voucherTotal = filterVoucherAmounts(allVoucherAmounts, analyticsFilters).reduce((t, a) => t + a.amount, 0);
-  const trendVouchers = sumBy(filterVoucherAmounts(allVoucherAmounts, { ...trendFilters, departmentId: analyticsFilters.departmentId }), (a) => a.monthKey);
+  const voucherTotal = filterVoucherAmounts(allVoucherAmounts, analyticsFilters, employees).reduce((t, a) => t + a.amount, 0);
+  const trendVouchers = sumBy(filterVoucherAmounts(allVoucherAmounts, { ...analyticsFilters, monthKey: undefined }, employees), (a) => a.monthKey);
+
+  // What the branch / department / employee / employment-type filters take
+  // out of the month(s) shown: everything for those months vs what's left.
+  const anyScopeFilter = filters.branchIds.length + filters.departmentIds.length + filters.employeeIds.length + filters.employmentStatuses.length > 0;
+  const periodOnly: AnalyticsFilters = { monthKey: analyticsFilters.monthKey, year: analyticsFilters.year };
+  const everything = summarizePayroll(filterFactsWithShares(viewFacts, employees, periodOnly, allocations));
+  const everythingVouchers = filterVoucherAmounts(allVoucherAmounts, periodOnly, employees).reduce((t, a) => t + a.amount, 0);
+  const remainingTotal = summary.totalEmployerExpense + voucherTotal;
+  const removedTotal = everything.totalEmployerExpense + everythingVouchers - remainingTotal;
+
+  // Employee choices: current employees (unless former ones are asked for),
+  // narrowed to the branches / departments / employment types still in view;
+  // anyone already ticked stays listed.
+  const employeeOptions = employees
+    .filter(
+      (e) =>
+        filters.employeeIds.includes(e.id) ||
+        ((includeFormer || (e.status !== "resigned" && e.status !== "terminated")) &&
+          matchesFilter(e.branchId, analyticsFilters.branchId) &&
+          !analyticsFilters.exclude?.branchId?.includes(e.branchId) &&
+          (!includedDepts.length || departmentAllocationsForEmployee(e, allocations).some((a) => includedDepts.includes(a.departmentId))) &&
+          !departmentAllocationsForEmployee(e, allocations).every((a) => excludedDepts.includes(a.departmentId)) &&
+          matchesFilter<string>(e.employmentStatus, analyticsFilters.employmentStatus) &&
+          !analyticsFilters.exclude?.employmentStatus?.includes(e.employmentStatus)),
+    )
+    .sort((a, b) => fullName(a).localeCompare(fullName(b)))
+    .map((e) => ({ value: e.id, label: `${fullName(e)}${e.status === "resigned" || e.status === "terminated" ? ` (${e.status})` : ""}` }));
   const trend = payrollExpenseTrendByMonth(deptFacts, employees, trendFilters).map((m) => ({ ...m, value: m.value + (trendVouchers.get(m.monthKey) ?? 0) }));
   const historical = historicalPayrollAnalytics(deptFacts, employees, trendFilters, trendVouchers);
 
@@ -129,12 +187,12 @@ export default function PayrollExpenseReportPage() {
   const previousMonthLabel = isFull ? (latestActual?.label ?? "—") : (months[months.length - 2]?.label ?? "—");
 
   const payrollByDepartment = groupByDepartment(
-    filterFactsWithShares(viewFacts, employees, { ...analyticsFilters, departmentId: undefined }, allocations),
+    filterFactsWithShares(viewFacts, employees, exceptDepts, allocations),
     employees,
     departments,
     allocations,
-  ).filter((r) => !filters.departmentIds.length || filters.departmentIds.includes(r.departmentId));
-  const vouchersByDept = sumBy(filterVoucherAmounts(allVoucherAmounts, analyticsFilters), (a) => a.departmentId);
+  ).filter((r) => (!includedDepts.length || includedDepts.includes(r.departmentId)) && !excludedDepts.includes(r.departmentId));
+  const vouchersByDept = sumBy(filterVoucherAmounts(allVoucherAmounts, analyticsFilters, employees), (a) => a.departmentId);
   const byDepartment = [
     ...payrollByDepartment,
     // Departments with vouchers but no payroll lines in the selection.
@@ -312,6 +370,8 @@ export default function PayrollExpenseReportPage() {
           options={branches.map((b) => ({ value: b.id, label: b.name }))}
           value={filters.branchIds}
           onChange={setFilter("branchIds")}
+          mode={modes.branchIds}
+          onModeChange={setMode("branchIds")}
         />
         <MultiSelect
           className="w-full sm:w-52"
@@ -320,25 +380,66 @@ export default function PayrollExpenseReportPage() {
           options={departments.map((d) => ({ value: d.id, label: d.name }))}
           value={filters.departmentIds}
           onChange={setFilter("departmentIds")}
+          mode={modes.departmentIds}
+          onModeChange={setMode("departmentIds")}
+        />
+        <MultiSelect
+          className="w-full sm:w-52"
+          allLabel="All employment types"
+          noun="types"
+          options={EMPLOYMENT_TYPES}
+          value={filters.employmentStatuses}
+          onChange={setFilter("employmentStatuses")}
+          mode={modes.employmentStatuses}
+          onModeChange={setMode("employmentStatuses")}
         />
         <MultiSelect
           className="w-full sm:w-64"
           allLabel="All employees"
           noun="employees"
           searchable
-          options={employees.map((e) => ({ value: e.id, label: fullName(e) }))}
+          options={employeeOptions}
           value={filters.employeeIds}
           onChange={setFilter("employeeIds")}
+          mode={modes.employeeIds}
+          onModeChange={setMode("employeeIds")}
+          footer={
+            <label className="flex cursor-pointer items-center gap-2 text-[var(--text-secondary)]">
+              <input type="checkbox" checked={includeFormer} onChange={(e) => setIncludeFormer(e.target.checked)} />
+              Include resigned / terminated
+            </label>
+          }
         />
-        {Object.values(filters).some((v) => v.length > 0) && (
+        {(Object.values(filters).some((v) => v.length > 0) || Object.values(modes).some((m) => m === "exclude")) && (
           <button
-            onClick={() => setFilters(EMPTY_MULTI_FILTERS)}
+            onClick={() => {
+              setFilters(EMPTY_MULTI_FILTERS);
+              setModes(INCLUDE_ALL);
+            }}
             className="rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
           >
             Clear filters
           </button>
         )}
       </div>
+
+      {anyScopeFilter && (
+        <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-4 py-3 text-sm">
+          <span>
+            <span className="font-medium text-[var(--text-primary)]">Showing:</span>{" "}
+            <span className="text-[var(--text-secondary)]">
+              {summary.employeeCount} of {everything.employeeCount} employees · {formatCurrencyCompact(remainingTotal)}
+            </span>
+          </span>
+          <span>
+            <span className="font-medium text-[var(--status-critical)]">Left out by the filters:</span>{" "}
+            <span className="text-[var(--text-secondary)]">
+              {Math.max(0, everything.employeeCount - summary.employeeCount)} employees · {formatCurrencyCompact(removedTotal)}
+            </span>
+          </span>
+          <span className="w-full text-xs text-[var(--text-muted)]">Payroll + vouchers for the month(s) selected. A person split between departments counts in the employee count while any of their share remains.</span>
+        </div>
+      )}
 
       {isFull && (
         <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-4 py-3 text-xs text-[var(--text-secondary)]">
@@ -358,7 +459,7 @@ export default function PayrollExpenseReportPage() {
         <StatTile label="Employer PhilHealth" value={formatCurrencyCompact(summary.employerPhilHealth)} />
         <StatTile label="Employees covered" value={summary.employeeCount.toString()} />
         <StatTile label="Payroll expense" value={formatCurrencyCompact(summary.totalEmployerExpense)} hint="employer payroll cost" />
-        <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint={filters.branchIds.length ? "not tracked by branch" : "department vouchers"} />
+        <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint={filters.branchIds.length && modes.branchIds === "include" ? "payees linked to an employee only" : "department vouchers"} />
         <StatTile label="Business Units" value={formatCurrencyCompact(divisionTotal("business_units"))} hint="MLM · Cosmetics · Darofy · Board" />
         <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Board staff" />
       </div>
@@ -618,8 +719,9 @@ export default function PayrollExpenseReportPage() {
       </div>
 
       <div className="mt-4 text-xs text-[var(--text-muted)]">
-        Department vouchers count in the month their payroll period starts. They aren&rsquo;t tied to a branch, so they&rsquo;re left out when a branch is selected and don&rsquo;t
-        appear in the branch and per-employee tables; with an employee selected, only voucher lines linked to that employee count. Figures are computed from real attendance and
+        Department vouchers count in the month their payroll period starts. A voucher line linked to an employee follows that employee&rsquo;s branch and
+        employment type; payees not in the 201 file have no branch (a &ldquo;show only&rdquo; branch filter leaves them out) and count as &ldquo;Other voucher
+        payees&rdquo; under employment type. With employees chosen, only voucher lines linked to them count. Figures are computed from real attendance and
         payroll records — SSS / HDMF (Pag-IBIG) / PhilHealth contribution brackets change periodically and should be configured as versioned rate tables in System Administration to
         keep this current.
       </div>
