@@ -13,8 +13,8 @@ import { branchName, departmentName, formatCurrency, formatDate, fullName, posit
 import { fetchMyVoucherLines, type MyVoucherLine } from "@/lib/supabase/voucher-slips";
 import type { Employee } from "@/lib/types";
 
-// One payroll period's voucher payments to an employee (all departments).
-interface VoucherSlip {
+// One payroll period's voucher payments to a payee (all departments).
+export interface VoucherSlip {
   periodId: string;
   periodStart: string;
   periodEnd: string;
@@ -34,7 +34,8 @@ function groupSlips(lines: MyVoucherLine[]): VoucherSlip[] {
   return [...byPeriod.values()].sort((a, b) => a.periodStart.localeCompare(b.periodStart));
 }
 
-export function VoucherSlipDocument({ employee, slip }: { employee: Employee; slip: VoucherSlip }) {
+// `employee` is missing for a payee not in the 201 file — then only the name shows.
+export function VoucherSlipDocument({ employee, payeeName, slip }: { employee?: Employee; payeeName?: string; slip: VoucherSlip }) {
   return (
     <FormShell>
       <div className="payslip-compact">
@@ -50,10 +51,16 @@ export function VoucherSlipDocument({ employee, slip }: { employee: Employee; sl
         </div>
 
         <FormSection title="Payee Information">
-          <FormRow label="Employee ID" value={employee.employeeNumber} mono />
-          <FormRow label="Name" value={fullName(employee)} />
-          <FormRow label="Position" value={positionTitle(employee.positionId)} />
-          <FormRow label="Branch / Department" value={`${branchName(employee.branchId)} / ${departmentName(employee.departmentId)}`} />
+          {employee ? (
+            <>
+              <FormRow label="Employee ID" value={employee.employeeNumber} mono />
+              <FormRow label="Name" value={fullName(employee)} />
+              <FormRow label="Position" value={positionTitle(employee.positionId)} />
+              <FormRow label="Branch / Department" value={`${branchName(employee.branchId)} / ${departmentName(employee.departmentId)}`} />
+            </>
+          ) : (
+            <FormRow label="Name" value={payeeName ?? ""} />
+          )}
         </FormSection>
 
         <FormSection title="Voucher Payments">
