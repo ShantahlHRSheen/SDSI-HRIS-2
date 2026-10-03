@@ -93,6 +93,8 @@ export interface PayrollPeriod {
   // Regular working days in the cut-off (holidays aren't required); blank =
   // Monday to Saturday. The attendance rate is measured against it.
   requiredDays?: number | null;
+  // Date printed on the period's vouchers; blank = the cut-off end date.
+  voucherDate?: string | null;
 }
 
 export type EmploymentStatus =
