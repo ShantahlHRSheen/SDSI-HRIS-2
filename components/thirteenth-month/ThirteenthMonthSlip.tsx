@@ -1,3 +1,4 @@
+import { withShownNames } from "@/lib/demo-mode";
 import { MONTH_NAMES, type ThirteenthMonthSlipData } from "@/lib/thirteenth-month";
 import type { VoucherSignatureSet } from "@/components/vouchers/VoucherSheet";
 
@@ -16,11 +17,11 @@ const blankIfZero = (n: number) => (n ? money(n) : "");
 const days = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 const signedOn = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", year: "numeric", month: "short", day: "numeric" }).format(new Date(iso));
 
-export const THIRTEENTH_MONTH_SIGNATORIES = [
+export const THIRTEENTH_MONTH_SIGNATORIES = withShownNames([
   { role: "Prepared by:", name: "Sheena A. Evangelista", title: "HR Manager", key: "prepared" },
   { role: "Checked by:", name: "Wendie Halog", title: "Sr. Accounting Assistant", key: "checked" },
   { role: "Released by:", name: "Joan Mariette O. Santarina", title: "Corporate Treasurer", key: "released" },
-] as const;
+] as const);
 
 export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthMonthSlipData; signatures?: VoucherSignatureSet }) {
   const cell: React.CSSProperties = { border: line, padding: "1px 4px", fontSize: "8pt", height: "15px", verticalAlign: "bottom" };
