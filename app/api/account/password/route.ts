@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { getAdminClient, getCaller, MIN_PASSWORD_LENGTH } from "@/lib/server/supabase-admin";
+import { companyDatabase, companyFromRequest, getAdminClient, getCaller, MIN_PASSWORD_LENGTH } from "@/lib/server/supabase-admin";
 
 // POST { newPassword, currentPassword? } — the signed-in user changes their
 // own password. currentPassword is required unless the account is flagged
@@ -8,7 +8,7 @@ import { getAdminClient, getCaller, MIN_PASSWORD_LENGTH } from "@/lib/server/sup
 export async function POST(request: Request) {
   let admin;
   try {
-    admin = getAdminClient();
+    admin = getAdminClient(companyFromRequest(request));
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 500 });
   }
@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   if (!mustChange) {
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     // Verify the current password on a throwaway client so no session is kept.
-    const verifier = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    const db = companyDatabase(companyFromRequest(request));
+    const verifier = createClient(db.url, db.anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { error } = await verifier.auth.signInWithPassword({ email: caller.user.email ?? "", password: currentPassword });

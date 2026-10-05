@@ -1,5 +1,6 @@
 "use client";
 
+import { companyStorageKey } from "@/lib/companies";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useHris } from "./store";
 import type { PayrollPeriod } from "./types";
@@ -16,7 +17,7 @@ let memory: string | null = null; // used when localStorage is unavailable
 
 function read(): string | null {
   try {
-    return window.localStorage.getItem(KEY) ?? memory;
+    return window.localStorage.getItem(companyStorageKey(KEY)) ?? memory;
   } catch {
     return memory;
   }
@@ -46,7 +47,7 @@ export function useSelectedPayrollPeriod(): { period: PayrollPeriod | undefined;
   const setPeriodId = useCallback((id: string) => {
     memory = id;
     try {
-      window.localStorage.setItem(KEY, id);
+      window.localStorage.setItem(companyStorageKey(KEY), id);
     } catch {
       // private mode etc. — the in-memory value still works for this visit
     }

@@ -141,7 +141,7 @@ export async function buildDisciplineResponsePdf(input: ResponsePdfInput): Promi
   const { record } = input;
   const doc = await PDFDocument.create();
   doc.setTitle(`${DISCIPLINARY_LABELS[record.type]} - ${input.employeeName}`);
-  doc.setProducer("Shantahl HRIS");
+  doc.setProducer("LSM Group HRIS");
 
   const noticeIncluded = input.notice ? await appendPdf(doc, input.notice) : false;
 

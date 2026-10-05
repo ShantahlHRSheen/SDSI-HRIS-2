@@ -1,5 +1,6 @@
 "use client";
 
+import { currentCompany } from "@/lib/companies";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BookOpen, Download, ExternalLink, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -8,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { reportSaveError } from "@/lib/save-errors";
 import { fetchCompanyDocument, HANDBOOK_PATH, replaceCompanyDocument, type CompanyDocument } from "@/lib/supabase/company-documents";
 
-const DOWNLOAD_NAME = "SDSI Employee Handbook.pdf";
+const downloadName = () => `${currentCompany().shortName} Employee Handbook.pdf`;
 
 function formatSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -25,7 +26,7 @@ export default function HandbookPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
-    fetchCompanyDocument(HANDBOOK_PATH, DOWNLOAD_NAME).then(
+    fetchCompanyDocument(HANDBOOK_PATH, downloadName()).then(
       (d) => {
         setDoc(d);
         setLoadError(null);
@@ -66,7 +67,7 @@ export default function HandbookPage() {
   if (!isRealAccount) {
     return (
       <div>
-        <PageHeader title="Employee Handbook" subtitle="Shantahl Direct Sales Inc. company policies and guidelines." />
+        <PageHeader title="Employee Handbook" subtitle={`${currentCompany().name} company policies and guidelines.`} />
         <EmptyState icon={BookOpen} title="Not available in the demo" description="Sign in with your employee account to read the handbook." />
       </div>
     );
@@ -76,7 +77,7 @@ export default function HandbookPage() {
     <div>
       <PageHeader
         title="Employee Handbook"
-        subtitle="Shantahl Direct Sales Inc. company policies and guidelines. Please read it and keep it handy — ask HR if anything is unclear."
+        subtitle={`${currentCompany().name} company policies and guidelines. Please read it and keep it handy — ask HR if anything is unclear.`}
         actions={
           isHr && (
             <>
@@ -109,7 +110,7 @@ export default function HandbookPage() {
             </span>
           </div>
           {/* Phones generally can't show a PDF inside a page, so they get the buttons above. */}
-          <iframe src={doc.url} title="SDSI Employee Handbook" className="hidden h-[calc(100dvh-13rem)] min-h-[520px] w-full rounded-xl border border-[var(--border-hairline)] bg-white md:block" />
+          <iframe src={doc.url} title={`${currentCompany().shortName} Employee Handbook`} className="hidden h-[calc(100dvh-13rem)] min-h-[520px] w-full rounded-xl border border-[var(--border-hairline)] bg-white md:block" />
           <p className="mt-2 text-xs text-[var(--text-muted)] md:hidden">On a phone, tap &ldquo;Open full screen&rdquo; to read the handbook, or download it to keep a copy.</p>
         </>
       )}

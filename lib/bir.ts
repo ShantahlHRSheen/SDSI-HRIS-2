@@ -1,4 +1,5 @@
 import { IS_DEMO } from "./demo-mode";
+import { currentCompany } from "./companies";
 import type { Employee } from "./types";
 import { employeeHdmfNumber, employeePhilHealthNumber, employeeSssNumber, employeeTIN, fullName } from "./helpers";
 import {
@@ -15,7 +16,8 @@ import {
 // real values must come from the company's actual BIR Certificate of
 // Registration (BIR Form 2303) before these forms are used for anything but
 // a demo.
-// Demo builds (fictional data) print a sample company instead.
+// The signed-in company's details (lib/companies.ts); demo builds
+// (fictional data) print a sample company instead.
 export const COMPANY_INFO = IS_DEMO
   ? {
       name: "Sample Company, Inc.",
@@ -25,14 +27,7 @@ export const COMPANY_INFO = IS_DEMO
       email: "hr@example.com",
       rdoCode: "000 — Sample City",
     }
-  : {
-  name: "Shantahl Direct Sales Inc.",
-  tin: "000-123-456-000",
-  address: "109 Apo St., Mabini Homesite, Cabanatuan City, Nueva Ecija",
-  phone: "044-960-0126",
-  email: "shantahlhr@gmail.com",
-  rdoCode: "043 — Pasig City",
-};
+  : currentCompany().info;
 
 export function getAvailableTaxYears(): number[] {
   return Array.from(new Set(getMonthsList().map((m) => m.year))).sort((a, b) => b - a);

@@ -1,17 +1,14 @@
 import { FormAmountRow, FormFootnote, FormRow, FormSection, FormShell } from "@/components/bir/FormLayout";
 import { COMPANY_INFO } from "@/lib/bir";
 import { withShownNames } from "@/lib/demo-mode";
+import { currentCompany } from "@/lib/companies";
 import { branchName, departmentName, formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee, PayrollPeriod } from "@/lib/types";
 import type { PayrollLine } from "@/lib/payroll";
 import { componentKind, componentLabel, netEffect, type SalaryAdjustment } from "@/lib/salary-adjustments";
 
 // Signature block at the foot of every payslip.
-export const PAYSLIP_SIGNATORIES = withShownNames([
-  { role: "Prepared by", name: "Sheena A. Evangelista", title: "HR Manager" },
-  { role: "Checked by", name: "Wendie Halog", title: "Sr. Accounting Assistant" },
-  { role: "Released by", name: "Joan Mariette Santarina", title: "Corporate Treasurer" },
-]);
+export const PAYSLIP_SIGNATORIES = withShownNames(currentCompany().payslipSignatories);
 
 function DocHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -115,7 +112,7 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
         </div>
 
         <FormFootnote>
-          For verification: contact SDSI HR Department thru {COMPANY_INFO.email} or {COMPANY_INFO.phone}.
+          For verification: contact {currentCompany().shortName} HR Department thru {COMPANY_INFO.email} or {COMPANY_INFO.phone}.
         </FormFootnote>
       </div>
     </FormShell>

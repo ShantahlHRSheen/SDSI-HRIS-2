@@ -1,5 +1,7 @@
 import { amountInWords } from "@/lib/voucher-totals";
 import { withShownNames } from "@/lib/demo-mode";
+import { currentCompany } from "@/lib/companies";
+import { COMPANY_INFO } from "@/lib/bir";
 
 // The printed voucher, laid out like the company's voucher sheet: green
 // title bar, company / check-voucher / payee header, the payee table, the
@@ -10,15 +12,7 @@ const GREEN = "#38761d";
 const border = "1px solid #444";
 const exact = { WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as const;
 
-export const VOUCHER_SIGNATORIES: { role: string; name: string; title: string }[][] = [
-  [
-    { role: "Prepared by:", name: "SHEENA A. EVANGELISTA", title: "HR MANAGER" },
-    { role: "Checked by:", name: "WENDIE HALOG", title: "SR. ACCOUNTING ASSISTANT" },
-    { role: "Approved by:", name: "SHEILAH A. MAGDADARO", title: "VICE CHAIRPERSON" },
-    { role: "Approved by:", name: "JUNREY M. JAPITAN", title: "CEO" },
-  ],
-  [{ role: "Released by:", name: "JOAN MARIETTE O. SANTARINA", title: "CORPORATE TREASURER" }],
-].map((row) => withShownNames(row));
+export const VOUCHER_SIGNATORIES: { role: string; name: string; title: string }[][] = currentCompany().voucherSignatories.map((row) => withShownNames(row));
 
 const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const longDate = (d: string) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" }).format(new Date(`${d}T00:00:00Z`));
@@ -66,7 +60,7 @@ export function VoucherSheet({
         <tbody>
           <tr>
             <td style={{ padding: "4px 2px", fontWeight: 700, width: "25%" }}>Company Name:</td>
-            <td style={{ padding: "4px 2px", fontWeight: 700 }}>SHANTAHL DIRECT SALES INC.</td>
+            <td style={{ padding: "4px 2px", fontWeight: 700 }}>{COMPANY_INFO.name.toUpperCase()}</td>
             <td style={{ padding: "4px 2px", fontWeight: 700, width: "30%" }}>CHECK Voucher No:</td>
           </tr>
           <tr>

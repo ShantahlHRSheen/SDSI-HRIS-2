@@ -5,9 +5,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Shantahl HRIS",
-    short_name: "Shantahl HRIS",
-    description: "Shantahl Direct Sales Inc. Human Resource Information System",
+    name: "LSM Group of Companies HRIS",
+    short_name: "LSM Group HRIS",
+    description: "LSM Group of Companies Human Resource Information System",
     start_url: "/",
     scope: "/",
     display: "standalone",

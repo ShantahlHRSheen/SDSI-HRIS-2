@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./client";
+import { currentCompanyId } from "../companies";
 
 // Builds the full backup in the browser from app/api/admin/backup, piece by
 // piece, and hands it back as a downloadable file.
@@ -13,7 +14,7 @@ export interface BackupProgress {
 async function call<T>(token: string, body: unknown): Promise<T> {
   const res = await fetch("/api/admin/backup", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "x-company": currentCompanyId() },
     body: JSON.stringify(body),
   });
   const json = (await res.json().catch(() => ({}))) as T & { error?: string };
@@ -49,7 +50,7 @@ export async function buildFullBackup(createdBy: string, onProgress: (p: BackupP
     version: 1,
     createdAt: now.toISOString(),
     createdBy,
-    note: "Full copy of the Shantahl HRIS database (all tables). Uploaded files — ID photos/signatures, leave attachments, chat photos and the handbook PDF — are not included. CONFIDENTIAL: contains salaries, government ID numbers and personal data.",
+    note: "Full copy of the HRIS database (all tables). Uploaded files — ID photos/signatures, leave attachments, chat photos and the handbook PDF — are not included. CONFIDENTIAL: contains salaries, government ID numbers and personal data.",
     rowCount,
     tables: out,
   };

@@ -1,4 +1,5 @@
-import { getAdminClient, getCaller } from "@/lib/server/supabase-admin";
+import { companyDatabase, companyFromRequest, getAdminClient, getCaller } from "@/lib/server/supabase-admin";
+import type { CompanyId } from "@/lib/companies";
 
 // Full database backup for HR (hr_admin only), downloaded in pieces so it
 // works however large the data grows (a single response is size-limited):
@@ -16,9 +17,8 @@ const NAME = /^[a-z_][a-z0-9_]*$/;
 
 type Definition = { properties?: Record<string, { description?: string }> };
 
-async function listTables(): Promise<{ name: string; orderBy: string[] }[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+async function listTables(company: CompanyId): Promise<{ name: string; orderBy: string[] }[]> {
+  const { url, serviceKey: key } = companyDatabase(company);
   const res = await fetch(`${url}/rest/v1/`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" });
   if (!res.ok) throw new Error(`Couldn't list tables (${res.status}).`);
   const spec = (await res.json()) as { definitions?: Record<string, Definition> };
@@ -36,7 +36,7 @@ async function listTables(): Promise<{ name: string; orderBy: string[] }[]> {
 export async function POST(request: Request) {
   let admin;
   try {
-    admin = getAdminClient();
+    admin = getAdminClient(companyFromRequest(request));
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 500 });
   }
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   if (body.table === undefined) {
     try {
-      return Response.json({ tables: await listTables() });
+      return Response.json({ tables: await listTables(companyFromRequest(request)) });
     } catch (err) {
       return Response.json({ error: (err as Error).message }, { status: 500 });
     }

@@ -10,19 +10,24 @@ import type { Database } from "./types";
 // .env.local (see .env.local.example) — both are safe to expose client-side;
 // access control is enforced by the RLS policies in supabase/schema.sql, not
 // by keeping this key secret.
-let cached: SupabaseClient<Database> | null = null;
+import { currentCompany } from "../companies";
+
+// One client per company (each company has its own database); the app only
+// ever talks to the company chosen at sign-in (lib/companies.ts).
+const cached = new Map<string, SupabaseClient<Database>>();
 
 export function getSupabaseClient(): SupabaseClient<Database> {
-  if (cached) return cached;
+  const company = currentCompany();
+  const hit = cached.get(company.id);
+  if (hit) return hit;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = company.supabaseUrl;
+  const anonKey = company.supabaseAnonKey;
   if (!url || !anonKey) {
-    throw new Error(
-      "Supabase is not configured — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local."
-    );
+    throw new Error(`${company.name}'s database isn't connected yet — ask your admin to finish setup.`);
   }
 
-  cached = createClient<Database>(url, anonKey);
-  return cached;
+  const client = createClient<Database>(url, anonKey);
+  cached.set(company.id, client);
+  return client;
 }

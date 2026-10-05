@@ -1,3 +1,4 @@
+import { currentCompany } from "@/lib/companies";
 import type { OvertimeForm } from "@/lib/overtime-form";
 import type { LeaveFormSigner } from "@/lib/supabase/leave-forms";
 
@@ -43,10 +44,10 @@ export function OvertimeFormDocument({ form, signatures = {} }: { form: Overtime
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", background: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "2px solid #c2185b", paddingBottom: "4px", marginBottom: "8px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
-        <img src="/brand/shantahl-form-logo.png" alt="" style={{ height: "44px", width: "44px", objectFit: "contain" }} />
-        <div style={{ fontWeight: 700, fontSize: "11pt" }}>SHANTAHL DIRECT SALES, INC. (SDSI)</div>
+        <img src={currentCompany().formLogo} alt="" style={{ height: "44px", width: "44px", objectFit: "contain" }} />
+        <div style={{ fontWeight: 700, fontSize: "11pt" }}>{currentCompany().name.toUpperCase()} ({currentCompany().shortName.toUpperCase()})</div>
       </div>
-      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", margin: "2px 0 8px" }}>SDSI Overtime Authorization Form</div>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", margin: "2px 0 8px" }}>{currentCompany().shortName} Overtime Authorization Form</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "16px" }}>
         <p style={row}>

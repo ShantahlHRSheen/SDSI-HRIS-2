@@ -1,15 +1,37 @@
 import "server-only";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
+import { COMPANIES, isCompanyId, type CompanyId } from "@/lib/companies";
 
 // Server-only helpers for account management routes. The service-role key
 // bypasses Row Level Security, so every route must first identify the caller
 // from their own access token (getCaller) and check what they're allowed to do.
 
-export function getAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) throw new Error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured on the server.");
+// Each company has its own database (lib/companies.ts). The browser says
+// which one it is signed in to with the "x-company" header; the caller's
+// access token is then checked against that company's database, so a token
+// from one company is useless against another.
+export function companyFromRequest(request: Request): CompanyId {
+  const id = request.headers.get("x-company");
+  return isCompanyId(id) ? id : "sdsi";
+}
+
+// Server-only keys, one per company (never sent to the browser).
+function serviceRoleKey(id: CompanyId): string | undefined {
+  if (id === "lsmbiz") return process.env.SUPABASE_SERVICE_ROLE_KEY_LSMBIZ;
+  if (id === "daro") return process.env.SUPABASE_SERVICE_ROLE_KEY_DARO;
+  return process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
+export function companyDatabase(id: CompanyId): { url: string; anonKey: string; serviceKey: string } {
+  const c = COMPANIES[id];
+  const serviceKey = serviceRoleKey(id);
+  if (!c.supabaseUrl || !c.supabaseAnonKey || !serviceKey) throw new Error(`${c.name}'s database isn't configured on the server.`);
+  return { url: c.supabaseUrl, anonKey: c.supabaseAnonKey, serviceKey };
+}
+
+export function getAdminClient(id: CompanyId = "sdsi"): SupabaseClient {
+  const { url, serviceKey } = companyDatabase(id);
   return createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 

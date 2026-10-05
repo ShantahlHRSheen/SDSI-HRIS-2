@@ -1,3 +1,4 @@
+import { currentCompany } from "@/lib/companies";
 import { HEAD_DAY_FIELDS, LEAVE_CATEGORIES, defaultHeadDays, type LeaveForm } from "@/lib/leave-form";
 import type { LeaveFormSigner } from "@/lib/supabase/leave-forms";
 
@@ -43,8 +44,8 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", fontSize: "9.5pt", background: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "2px solid #c2185b", paddingBottom: "4px", marginBottom: "6px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
-        <img src="/brand/shantahl-form-logo.png" alt="" style={{ height: "48px", width: "48px", objectFit: "contain" }} />
-        <div style={{ fontWeight: 700, fontSize: "12pt" }}>SHANTAHL DIRECT SALES, INC. (SDSI)</div>
+        <img src={currentCompany().formLogo} alt="" style={{ height: "48px", width: "48px", objectFit: "contain" }} />
+        <div style={{ fontWeight: 700, fontSize: "12pt" }}>{currentCompany().name.toUpperCase()} ({currentCompany().shortName.toUpperCase()})</div>
       </div>
       <div style={{ textAlign: "center", fontWeight: 700, fontSize: "13pt", letterSpacing: "1px", margin: "2px 0 8px" }}>APPLICATION FOR LEAVE</div>
 
