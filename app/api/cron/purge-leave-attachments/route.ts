@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { COMPANY_ORDER } from "@/lib/companies";
+import { companyDatabase } from "@/lib/server/supabase-admin";
 
 // Daily cleanup (scheduled in vercel.json), 30 days after upload, to free
 // up space:
@@ -10,23 +12,35 @@ import { createClient } from "@supabase/supabase-js";
 //
 // Needs these environment variables on the server (Vercel > Settings >
 // Environment Variables), never exposed to the browser:
-//   SUPABASE_SERVICE_ROLE_KEY — storage deletes need the service role
+//   SUPABASE_SERVICE_ROLE_KEY (+ _LSMBIZ / _DARO) — storage deletes need the service role
 //   CRON_SECRET               — Vercel sends it as a Bearer token on cron calls
 const RETENTION_DAYS = 30;
 const BUCKET = "leave-attachments";
 const CHAT_BUCKET = "hr-chat-images";
 
+// Runs for every company whose database is set up (lib/companies.ts).
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    return Response.json({ error: "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured" }, { status: 500 });
+  const results: Record<string, unknown> = {};
+  let failed = false;
+  for (const id of COMPANY_ORDER) {
+    let db;
+    try {
+      db = companyDatabase(id);
+    } catch {
+      continue; // this company isn't connected yet
+    }
+    const r = await purgeCompany(db.url, db.serviceKey);
+    results[id] = r;
+    if (r.failures.length) failed = true;
   }
+  return Response.json(results, { status: failed ? 500 : 200 });
+}
 
+async function purgeCompany(url: string, serviceKey: string) {
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -36,7 +50,7 @@ export async function GET(request: Request) {
     .is("deleted_at", null)
     .lt("uploaded_at", cutoff)
     .limit(1000);
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return { cutoff, failures: [error.message] };
 
   let deleted = 0;
   const failures: string[] = [];
@@ -82,8 +96,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return Response.json(
-    { cutoff, expired: expired.length, deleted, chatPhotosDeleted: chatDeleted, failures },
-    { status: failures.length ? 500 : 200 },
-  );
+  return { cutoff, expired: expired.length, deleted, chatPhotosDeleted: chatDeleted, failures };
 }

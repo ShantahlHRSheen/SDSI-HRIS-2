@@ -1,4 +1,4 @@
-import { generateTemporaryPassword, getAdminClient, getCaller, isHrAdmin } from "@/lib/server/supabase-admin";
+import { companyFromRequest, generateTemporaryPassword, getAdminClient, getCaller, isHrAdmin } from "@/lib/server/supabase-admin";
 
 // POST { employeeId } — HR/system admins only. Issues a temporary password
 // for the employee's login (creating the login from their email on file if
@@ -8,7 +8,7 @@ import { generateTemporaryPassword, getAdminClient, getCaller, isHrAdmin } from 
 export async function POST(request: Request) {
   let admin;
   try {
-    admin = getAdminClient();
+    admin = getAdminClient(companyFromRequest(request));
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 500 });
   }

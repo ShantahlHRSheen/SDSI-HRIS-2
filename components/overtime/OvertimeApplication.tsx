@@ -1,5 +1,6 @@
 "use client";
 
+import { companyStorageKey } from "@/lib/companies";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -57,7 +58,7 @@ export function canHeadOt(form: OvertimeForm, me: string | undefined, isHrManage
 const SCHEDULE_KEY = "hris.otSchedule";
 const rememberedSchedule = () => {
   try {
-    return window.localStorage.getItem(SCHEDULE_KEY) ?? "";
+    return window.localStorage.getItem(companyStorageKey(SCHEDULE_KEY)) ?? "";
   } catch {
     return "";
   }
@@ -107,7 +108,7 @@ export function OvertimeApplicationModal({ open, returned, onClose, onDone }: { 
     setError(null);
     try {
       try {
-        window.localStorage.setItem(SCHEDULE_KEY, form.schedule.trim());
+        window.localStorage.setItem(companyStorageKey(SCHEDULE_KEY), form.schedule.trim());
       } catch {
         /* not remembered */
       }

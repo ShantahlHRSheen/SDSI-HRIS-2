@@ -1,6 +1,7 @@
 "use client";
 
 import { isSupabaseConfigured } from "@/lib/supabase/auth";
+import { currentCompany } from "@/lib/companies";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -15,16 +16,17 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const roles = currentUser?.roles ?? [];
   const isHr = roles.includes("hr_admin");
   const unread = useHrUnreadCount();
+  const company = currentCompany();
 
   const content = (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
           {/* eslint-disable-next-line @next/next/no-img-element -- tiny static brand icon */}
-          <img src="/brand/shantahl-icon.png" alt="" className="h-8 w-8 rounded-full" />
+          <img src={company.logo} alt="" className="h-8 w-8 rounded-full object-contain" />
           <div className="leading-tight">
-            <div className="text-sm font-semibold text-[var(--text-primary)]">Shantahl HRIS</div>
-            <div className="text-[11px] text-[var(--text-muted)]">{isSupabaseConfigured() ? "Shantahl Direct Sales Inc." : "Demo instance"}</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{isSupabaseConfigured() ? company.name : "Demo instance"}</div>
+            <div className="text-[11px] text-[var(--text-muted)]">LSM Group HRIS</div>
           </div>
         </Link>
         <button className="rounded-md p-1 text-[var(--text-muted)] md:hidden" onClick={onClose} aria-label="Close menu">

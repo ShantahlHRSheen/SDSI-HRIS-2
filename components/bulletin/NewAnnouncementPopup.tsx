@@ -1,5 +1,6 @@
 "use client";
 
+import { companyStorageKey } from "@/lib/companies";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Megaphone, X } from "lucide-react";
@@ -14,7 +15,7 @@ import { CATEGORY_LABELS, CATEGORY_TONE } from "@/components/bulletin/categories
 // app when someone opens it, until they close it. Closed posts are
 // remembered per person in this browser.
 const SHOW_FOR_MS = 24 * 60 * 60 * 1000;
-const storageKey = (who: string) => `hris.seenAnnouncements.${who}`;
+const storageKey = (who: string) => companyStorageKey(`hris.seenAnnouncements.${who}`);
 
 function readSeen(who: string): string[] {
   try {

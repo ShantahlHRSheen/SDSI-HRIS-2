@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./client";
+import { currentCompanyId, isCompanyReady } from "../companies";
 
 // Real per-employee auth, layered alongside (not replacing) the existing
 // demo click-to-select login in lib/store.tsx. Every function here is safe
@@ -8,8 +9,9 @@ import { getSupabaseClient } from "./client";
 // still runs entirely on localStorage) is unaffected until Supabase is
 // actually configured.
 
+// The chosen company's database is connected (lib/companies.ts).
 export function isSupabaseConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return isCompanyReady(currentCompanyId());
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<{ session: Session | null; error: string | null }> {

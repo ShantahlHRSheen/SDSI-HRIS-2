@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./client";
+import { currentCompanyId } from "../companies";
 
 // Browser-side calls to the account routes (app/api/account/password,
 // app/api/admin/employee-login). Each sends the signed-in user's access token
@@ -12,7 +13,7 @@ async function postWithSession<T>(path: string, body: unknown): Promise<T & { er
   try {
     const res = await fetch(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "x-company": currentCompanyId() },
       body: JSON.stringify(body),
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: string };

@@ -1,4 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- signed Supabase URLs and a small static logo; next/image adds nothing here */
+import { COMPANY_INFO } from "@/lib/bir";
+import { currentCompany } from "@/lib/companies";
 import { departmentName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
@@ -10,8 +12,8 @@ import type { Employee } from "@/lib/types";
 const GREEN = "#0a3326";
 const INK = "#111827";
 const MUTED = "#4b5563";
-export const ID_VERIFY_EMAIL = "shantahlhr@gmail.com";
-export const ID_VERIFY_PHONE = "044-960-0126";
+export const ID_VERIFY_EMAIL = COMPANY_INFO.email;
+export const ID_VERIFY_PHONE = COMPANY_INFO.phone;
 
 function cardName(e: Employee): string {
   const mi = e.middleName?.trim() ? ` ${e.middleName.trim().charAt(0)}.` : "";
@@ -61,7 +63,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
   return (
     <div style={cardStyle} aria-label="ID card front">
       <div style={{ background: GREEN, height: "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src="/brand/shantahl-logo.png" alt="Shantahl Direct Sales Inc." style={{ height: "10.5mm", width: "auto" }} />
+        <img src={currentCompany().idCardLogo} alt={COMPANY_INFO.name} style={{ height: "10.5mm", width: "auto" }} />
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "2.5mm 3mm 0" }}>
         <div style={{ width: "24mm", height: "32mm", border: `0.5mm solid ${GREEN}`, borderRadius: "1mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -111,7 +113,7 @@ export function IdCardBack({ employee }: { employee: Employee }) {
         <Field label="Contact No." value={employee.emergencyContactPhone} />
       </div>
       <div style={{ background: GREEN, color: "#ffffff", fontSize: "5pt", lineHeight: 1.35, padding: "1.5mm 3mm", textAlign: "center" }}>
-        For verification: contact SDSI HR Department thru {ID_VERIFY_EMAIL} or {ID_VERIFY_PHONE}.
+        For verification: contact {currentCompany().shortName} HR Department thru {ID_VERIFY_EMAIL} or {ID_VERIFY_PHONE}.
       </div>
     </div>
   );

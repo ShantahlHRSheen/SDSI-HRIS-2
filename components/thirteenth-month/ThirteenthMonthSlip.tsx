@@ -1,4 +1,6 @@
 import { withShownNames } from "@/lib/demo-mode";
+import { currentCompany } from "@/lib/companies";
+import { COMPANY_INFO } from "@/lib/bir";
 import { MONTH_NAMES, type ThirteenthMonthSlipData } from "@/lib/thirteenth-month";
 import type { VoucherSignatureSet } from "@/components/vouchers/VoucherSheet";
 
@@ -17,11 +19,10 @@ const blankIfZero = (n: number) => (n ? money(n) : "");
 const days = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 const signedOn = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", year: "numeric", month: "short", day: "numeric" }).format(new Date(iso));
 
-export const THIRTEENTH_MONTH_SIGNATORIES = withShownNames([
-  { role: "Prepared by:", name: "Sheena A. Evangelista", title: "HR Manager", key: "prepared" },
-  { role: "Checked by:", name: "Wendie Halog", title: "Sr. Accounting Assistant", key: "checked" },
-  { role: "Released by:", name: "Joan Mariette O. Santarina", title: "Corporate Treasurer", key: "released" },
-] as const);
+const SLIP_KEYS = ["prepared", "checked", "released"] as const;
+export const THIRTEENTH_MONTH_SIGNATORIES = withShownNames(
+  (currentCompany().thirteenthMonthSignatories ?? currentCompany().payslipSignatories).slice(0, 3).map((s, i) => ({ ...s, role: `${s.role}:`, key: SLIP_KEYS[i] })),
+);
 
 export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthMonthSlipData; signatures?: VoucherSignatureSet }) {
   const cell: React.CSSProperties = { border: line, padding: "1px 4px", fontSize: "8pt", height: "15px", verticalAlign: "bottom" };
@@ -40,7 +41,7 @@ export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthM
   return (
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", border: line, padding: "14px 0 18px", fontSize: "8pt" }}>
       <div style={{ textAlign: "center", fontSize: "9pt", lineHeight: 1.5, marginBottom: "8px" }}>
-        <div>SHANTAHL DIRECT SALES INC.</div>
+        <div>{COMPANY_INFO.name.toUpperCase()}</div>
         <div>13TH MONTH PAY AND LEAVE CREDITS</div>
       </div>
       <table style={{ borderCollapse: "collapse", margin: "0 0 2px 0", fontSize: "8pt" }}>

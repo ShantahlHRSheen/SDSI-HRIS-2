@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { fullName, nextEmployeeNumber, setReferenceData } from "./helpers";
 import { getSupabaseClient } from "./supabase/client";
 import { reportSaveError } from "./save-errors";
+import { companyStorageKey } from "./companies";
 import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   decideCorrectionRequestRow,
@@ -545,7 +546,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     // only after the server-rendered default state has painted, so the first
     // client render matches SSR and avoids a hydration mismatch.
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const raw = window.localStorage.getItem(companyStorageKey(STORAGE_KEY));
       if (raw) {
         const parsed = JSON.parse(raw) as PersistedState & { demoUsers?: DemoUser[]; __seedVersion?: number };
         if (parsed.__seedVersion === SEED_VERSION) {
@@ -565,7 +566,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, demoUsers, __seedVersion: SEED_VERSION }));
+      window.localStorage.setItem(companyStorageKey(STORAGE_KEY), JSON.stringify({ ...state, demoUsers, __seedVersion: SEED_VERSION }));
     } catch {
       // storage full / unavailable — demo continues in-memory only
     }

@@ -1,6 +1,8 @@
 "use client";
 
 import { shownName } from "@/lib/demo-mode";
+import { currentCompany } from "@/lib/companies";
+import { AutoOrgChart } from "@/components/org-chart/AutoOrgChart";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -530,6 +532,9 @@ function Overview() {
 }
 
 export default function OrgChartPage() {
+  // The chart below is Shantahl's; other companies get one drawn from their
+  // 201 files until theirs is designed.
+  if (currentCompany().id !== "sdsi") return <AutoOrgChart />;
   return (
     <div className="space-y-6">
       <Overview />

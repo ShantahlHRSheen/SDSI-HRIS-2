@@ -1,5 +1,6 @@
 "use client";
 
+import { currentCompany } from "@/lib/companies";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer, Receipt } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -84,7 +85,7 @@ export function VoucherSlipDocument({ employee, payeeName, slip }: { employee?: 
         </div>
 
         <FormFootnote>
-          Paid through the department voucher(s) for this pay period. For verification: contact SDSI HR Department thru {COMPANY_INFO.email} or {COMPANY_INFO.phone}.
+          Paid through the department voucher(s) for this pay period. For verification: contact {currentCompany().shortName} HR Department thru {COMPANY_INFO.email} or {COMPANY_INFO.phone}.
         </FormFootnote>
       </div>
     </FormShell>
