@@ -1,5 +1,6 @@
 "use client";
 
+import { shownName } from "@/lib/demo-mode";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -274,12 +275,13 @@ function IconBadge({ icon: Icon, size = "md", color = DARK }: { icon: LucideIcon
   );
 }
 
-function HeadBar({ name, title, icon = User, size = "md" }: { name: string; title?: string; icon?: LucideIcon; size?: "md" | "lg" }) {
+// `label`: a heading such as "Business Units" rather than a person.
+function HeadBar({ name, title, icon = User, size = "md", label = false }: { name: string; title?: string; icon?: LucideIcon; size?: "md" | "lg"; label?: boolean }) {
   return (
     <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 pb-3.5 text-white" style={barStyle}>
       <IconBadge icon={icon} size={size} />
       <div className="min-w-0 flex-1 text-center">
-        <div className={`font-bold tracking-wide uppercase ${size === "lg" ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}>{name}</div>
+        <div className={`font-bold tracking-wide uppercase ${size === "lg" ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}>{label ? name : shownName(name)}</div>
         {title && <div className="text-xs text-[#c7f0cf]">{title}</div>}
       </div>
     </div>
@@ -310,7 +312,7 @@ function PersonCard({ person, teamOf }: { person: Person; teamOf?: string }) {
       <span className="ml-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white" style={{ background: DARK }}>
         <User size={16} />
       </span>
-      <span className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-primary)]">{person.name}</span>
+      <span className="min-w-0 flex-1 text-sm font-semibold text-[var(--text-primary)]">{shownName(person.name)}</span>
       <span className="w-[42%] shrink-0 border-l border-[var(--border-hairline)] pl-3 text-xs text-[var(--text-secondary)]">
         {person.title}
         {person.freelancer && <span className="mt-0.5 block w-fit rounded-full border border-[var(--border-hairline)] px-1.5 text-[10px] text-[var(--text-muted)]">Freelancer</span>}
@@ -491,7 +493,7 @@ function Overview() {
         <div className="mt-1.5 text-xs tracking-[0.2em] text-[var(--text-muted)] uppercase">Organizational Structure</div>
       </div>
       <div className="mx-auto max-w-lg">
-        <HeadBar name="Board of Directors" icon={Users} size="lg" />
+        <HeadBar name="Board of Directors" icon={Users} size="lg" label />
         <Connector />
         <HeadBar name={BOARD.chairman.name} title={BOARD.chairman.title} size="lg" />
         <Connector />
@@ -500,7 +502,7 @@ function Overview() {
       </div>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div>
-          <HeadBar name="Business Units" icon={Settings} />
+          <HeadBar name="Business Units" icon={Settings} label />
           <div className="mt-3 space-y-2.5 border-l-2 pl-4" style={{ borderColor: BRIGHT }}>
             {BUSINESS_UNITS.map((u) => (
               <a key={u.id} href={`#${u.id}`} className="flex items-center gap-3 rounded-xl px-3 py-2 text-white transition-opacity hover:opacity-90" style={{ background: `linear-gradient(90deg, ${u.color}, ${u.color}cc)` }}>
@@ -511,7 +513,7 @@ function Overview() {
           </div>
         </div>
         <div>
-          <HeadBar name="Shared Services" icon={Users} />
+          <HeadBar name="Shared Services" icon={Users} label />
           <div className="mt-3 space-y-2.5 border-l-2 pl-4" style={{ borderColor: BRIGHT }}>
             {SHARED_SERVICES.map((u) => (
               <a key={u.id} href={`#${u.id}`} className="flex items-center gap-3 rounded-xl px-3 py-2 text-white transition-opacity hover:opacity-90" style={{ background: `linear-gradient(90deg, ${BRIGHT}, #3fb34f)` }}>

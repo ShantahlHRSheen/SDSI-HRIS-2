@@ -1,3 +1,4 @@
+import { IS_DEMO } from "./demo-mode";
 import type { Employee } from "./types";
 import { employeeHdmfNumber, employeePhilHealthNumber, employeeSssNumber, employeeTIN, fullName } from "./helpers";
 import {
@@ -14,7 +15,17 @@ import {
 // real values must come from the company's actual BIR Certificate of
 // Registration (BIR Form 2303) before these forms are used for anything but
 // a demo.
-export const COMPANY_INFO = {
+// Demo builds (fictional data) print a sample company instead.
+export const COMPANY_INFO = IS_DEMO
+  ? {
+      name: "Sample Company, Inc.",
+      tin: "000-000-000-000",
+      address: "123 Demo Avenue, Sample City",
+      phone: "(02) 8000-0000",
+      email: "hr@example.com",
+      rdoCode: "000 — Sample City",
+    }
+  : {
   name: "Shantahl Direct Sales Inc.",
   tin: "000-123-456-000",
   address: "109 Apo St., Mabini Homesite, Cabanatuan City, Nueva Ecija",

@@ -1,4 +1,5 @@
 import { amountInWords } from "@/lib/voucher-totals";
+import { withShownNames } from "@/lib/demo-mode";
 
 // The printed voucher, laid out like the company's voucher sheet: green
 // title bar, company / check-voucher / payee header, the payee table, the
@@ -17,7 +18,7 @@ export const VOUCHER_SIGNATORIES: { role: string; name: string; title: string }[
     { role: "Approved by:", name: "JUNREY M. JAPITAN", title: "CEO" },
   ],
   [{ role: "Released by:", name: "JOAN MARIETTE O. SANTARINA", title: "CORPORATE TREASURER" }],
-];
+].map((row) => withShownNames(row));
 
 const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const longDate = (d: string) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" }).format(new Date(`${d}T00:00:00Z`));
