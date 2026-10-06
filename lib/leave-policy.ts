@@ -1,4 +1,5 @@
 import type { LeaveRequest, LeaveType } from "./types";
+import { CALENDAR_DAY_LEAVE_TYPES } from "./helpers";
 
 // Leave credit rules:
 // - Vacation and Sick Leave: the yearly credits are split in two halves —
@@ -36,15 +37,17 @@ export function creditsPerPeriod(leaveType: LeaveType): number {
   return isSemiannual(leaveType.id) ? leaveType.defaultCredits / 2 : leaveType.defaultCredits;
 }
 
-// Weekdays of a request, split by credit period. A request's recorded
-// `days` (e.g. 0.5 for a half day) is spread over its weekdays evenly.
+// Weekdays of a request (every day for calendar-day leave such as
+// maternity), split by credit period. A request's recorded `days` (e.g. 0.5
+// for a half day) is spread over those days evenly.
 function daysByPeriod(leaveTypeId: string, startDate: string, endDate: string, days: number): Map<string, { period: CreditPeriod; days: number }> {
   const weekdays: string[] = [];
+  const calendarDays = CALENDAR_DAY_LEAVE_TYPES.has(leaveTypeId);
   const cursor = new Date(startDate + "T00:00:00Z");
   const end = new Date(endDate + "T00:00:00Z");
   while (cursor <= end) {
     const dow = cursor.getUTCDay();
-    if (dow !== 0 && dow !== 6) weekdays.push(cursor.toISOString().slice(0, 10));
+    if (calendarDays || (dow !== 0 && dow !== 6)) weekdays.push(cursor.toISOString().slice(0, 10));
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   const out = new Map<string, { period: CreditPeriod; days: number }>();

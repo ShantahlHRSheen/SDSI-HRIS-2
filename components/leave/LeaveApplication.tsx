@@ -5,7 +5,7 @@ import { PenLine, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
-import { businessDaysBetween } from "@/lib/helpers";
+import { leaveDaysBetween } from "@/lib/helpers";
 import { checkLeaveRequest, todayInManila } from "@/lib/leave-policy";
 import { prepareSignature } from "@/lib/id-images";
 import {
@@ -150,7 +150,8 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
 
   const category = LEAVE_CATEGORIES.find((c) => c.id === form.category)!;
   const leaveType = leaveTypes.find((t) => t.id === category.leaveTypeId);
-  const businessDays = form.startDate && form.endDate && form.endDate >= form.startDate ? businessDaysBetween(form.startDate, form.endDate) : 0;
+  // Working days, or calendar days for maternity leave.
+  const businessDays = form.startDate && form.endDate && form.endDate >= form.startDate ? leaveDaysBetween(category.leaveTypeId, form.startDate, form.endDate) : 0;
   const halfDayAllowed = businessDays === 1 && form.startDate === form.endDate;
   const days = halfDayAllowed && form.halfDay ? 0.5 : businessDays;
   const sick = isSickCategory(form.category);

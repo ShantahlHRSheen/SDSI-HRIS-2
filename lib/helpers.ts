@@ -183,6 +183,21 @@ export function businessDaysBetween(start: string, end: string): number {
   return count;
 }
 
+// Leave counted in calendar days — every day, weekends and holidays included
+// (maternity leave under RA 11210: 105 calendar days). Other leave types
+// count working days.
+export const CALENDAR_DAY_LEAVE_TYPES = new Set(["lt-ml"]);
+
+export function calendarDaysBetween(start: string, end: string): number {
+  const ms = new Date(end + "T00:00:00Z").getTime() - new Date(start + "T00:00:00Z").getTime();
+  return ms < 0 ? 0 : Math.round(ms / 86400000) + 1;
+}
+
+// A leave request's length for its leave type.
+export function leaveDaysBetween(leaveTypeId: string | undefined, start: string, end: string): number {
+  return leaveTypeId && CALENDAR_DAY_LEAVE_TYPES.has(leaveTypeId) ? calendarDaysBetween(start, end) : businessDaysBetween(start, end);
+}
+
 export function initialsOf(name: string): string {
   return name
     .split(" ")

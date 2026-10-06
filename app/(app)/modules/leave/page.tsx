@@ -8,7 +8,7 @@ import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
-import { businessDaysBetween, formatDate, fullName } from "@/lib/helpers";
+import { formatDate, fullName, leaveDaysBetween } from "@/lib/helpers";
 import { balanceFor, checkLeaveRequest, isSemiannual, todayInManila } from "@/lib/leave-policy";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_RETENTION_DAYS, KIND_LABEL, LeaveDocuments, prepareUpload, requiredKinds, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
 import { LeaveApplicationModal, LeaveFormModal, FormProgress, canHeadForm, useLeaveForms } from "@/components/leave/LeaveApplication";
@@ -108,7 +108,8 @@ export default function LeaveManagementPage() {
   const [files, setFiles] = useState<Partial<Record<LeaveAttachmentKind, File>>>({});
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const businessDays = form.startDate && form.endDate ? businessDaysBetween(form.startDate, form.endDate) : 0;
+  // Working days, or calendar days for maternity leave.
+  const businessDays = form.startDate && form.endDate ? leaveDaysBetween(form.leaveTypeId, form.startDate, form.endDate) : 0;
   // Half day only applies to a single-weekday request.
   const halfDayAllowed = businessDays === 1 && form.startDate === form.endDate;
   const computedDays = halfDayAllowed && form.halfDay ? 0.5 : businessDays;
