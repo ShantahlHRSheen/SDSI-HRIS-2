@@ -44,7 +44,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", fontSize: "9.5pt", background: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "2px solid #c2185b", paddingBottom: "4px", marginBottom: "6px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
-        <img src={currentCompany().formLogo} alt="" style={{ height: "48px", width: "48px", objectFit: "contain" }} />
+        <img src={currentCompany().formLogo} alt="" style={{ height: "48px", width: "auto", maxWidth: "150px", objectFit: "contain" }} />
         <div style={{ fontWeight: 700, fontSize: "12pt" }}>{currentCompany().name.toUpperCase()} ({currentCompany().shortName.toUpperCase()})</div>
       </div>
       <div style={{ textAlign: "center", fontWeight: 700, fontSize: "13pt", letterSpacing: "1px", margin: "2px 0 8px" }}>APPLICATION FOR LEAVE</div>
