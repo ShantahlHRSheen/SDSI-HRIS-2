@@ -230,9 +230,14 @@ export function computePayrollForPeriod(
     // SSS / SSS WISP / PhilHealth / Pag-IBIG are keyed to the employee's
     // full monthly Basis of Mandatories, but exactly half of the monthly
     // employee (and employer) share is deducted on every cutoff.
-    const sss = computeSss(basis);
-    const philHealth = computePhilHealth(basis);
-    const hdmf = computeHdmf(basis);
+    // Freelancers aren't employees for SSS / PhilHealth / Pag-IBIG: no
+    // mandatory contributions, employee or employer share (unless a share is
+    // entered on their payroll line).
+    const noMandatories = employee.employmentStatus === "freelance";
+    const none = { employee: 0, employer: 0 };
+    const sss = noMandatories ? { msc: 0, regularMsc: 0, wispMsc: 0, regular: none, wisp: none } : computeSss(basis);
+    const philHealth = noMandatories ? none : computePhilHealth(basis);
+    const hdmf = noMandatories ? none : computeHdmf(basis);
 
     const sssContributionAuto = Math.round((sss.regular.employee / 2) * 100) / 100;
     const sssWispAuto = Math.round((sss.wisp.employee / 2) * 100) / 100;
