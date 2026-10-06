@@ -63,7 +63,12 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
   return (
     <div style={cardStyle} aria-label="ID card front">
       <div style={{ background: GREEN, height: "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src={currentCompany().idCardLogo} alt={COMPANY_INFO.name} style={{ height: "10.5mm", width: "auto" }} />
+        <img
+          src={currentCompany().idCardLogo}
+          alt={COMPANY_INFO.name}
+          // Shantahl's logo is drawn for the green band; other companies' logos sit on a white tab.
+          style={currentCompany().id === "sdsi" ? { height: "10.5mm", width: "auto" } : { height: "9.5mm", width: "auto", maxWidth: "44mm", background: "#fff", padding: "0.6mm 1.5mm", borderRadius: "1mm" }}
+        />
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "2.5mm 3mm 0" }}>
         <div style={{ width: "24mm", height: "32mm", border: `0.5mm solid ${GREEN}`, borderRadius: "1mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
