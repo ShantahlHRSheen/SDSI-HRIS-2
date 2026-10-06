@@ -12,7 +12,7 @@ const GREEN = "#38761d";
 const border = "1px solid #444";
 const exact = { WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as const;
 
-export const VOUCHER_SIGNATORIES: { role: string; name: string; title: string }[][] = currentCompany().voucherSignatories.map((row) => withShownNames(row));
+export const VOUCHER_SIGNATORIES: { role: string; name: string; title: string; span?: number }[][] = currentCompany().voucherSignatories.map((row) => withShownNames(row));
 
 const money = (n: number) => n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const longDate = (d: string) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" }).format(new Date(`${d}T00:00:00Z`));
@@ -147,7 +147,7 @@ export function VoucherSignatories({ signatures = {} }: { signatures?: VoucherSi
       {VOUCHER_SIGNATORIES.map((row, r) => (
         <div key={r} style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginTop: r ? "18px" : 0 }}>
           {row.map((s, i) => (
-            <div key={`${s.name}-${i}`} style={row.length === 1 ? { gridColumn: "1 / span 2" } : undefined}>
+            <div key={`${s.name}-${i}`} style={row.length === 1 ? { gridColumn: "1 / span 2" } : s.span ? { gridColumn: `span ${s.span}` } : undefined}>
               <div style={{ fontStyle: "italic", fontSize: "9pt" }}>{s.role}</div>
               <div style={{ height: "34px", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
                 {slot(r, i)?.url && (
