@@ -7,7 +7,7 @@ import { useHris } from "@/lib/store";
 import { ROLE_LABELS } from "@/lib/types";
 import { Badge } from "@/components/Badge";
 import { isSupabaseConfigured } from "@/lib/supabase/auth";
-import { COMPANIES, COMPANY_ORDER, GROUP_NAME, chooseCompany, currentCompany, isCompanyReady } from "@/lib/companies";
+import { COMPANIES, COMPANY_ORDER, GROUP_NAME, chooseCompany, companyMissingSetup, currentCompany, isCompanyReady } from "@/lib/companies";
 
 export default function LoginPage() {
   const { ready, currentUser, login, loginWithSupabase, demoUsers } = useHris();
@@ -88,7 +88,13 @@ export default function LoginPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element -- small static brand logo */}
                   <img src={c.logo} alt="" width={96} height={96} className="h-14 w-14 rounded-full object-contain sm:h-20 sm:w-20" />
                   <span className="text-xs leading-tight font-medium text-[var(--text-primary)] sm:text-sm">{c.name}</span>
-                  {!available && <span className="text-[10px] text-[var(--text-muted)]">Coming soon</span>}
+                  {!available && (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Coming soon
+                      {/* Setup hint for whoever is connecting the company's database. */}
+                      {id !== "sdsi" && <span className="block opacity-80">Not set: {companyMissingSetup(id).join(", ")}</span>}
+                    </span>
+                  )}
                   {selected && <span className="text-[10px] font-medium text-[var(--series-1)]">Selected</span>}
                 </button>
               );

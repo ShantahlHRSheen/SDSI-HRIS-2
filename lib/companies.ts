@@ -135,6 +135,16 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
   },
 };
 
+// What a not-yet-connected company is missing (names only, never values),
+// shown on the sign-in page to help finish setup.
+export function companyMissingSetup(id: CompanyId): string[] {
+  const c = COMPANIES[id];
+  const missing: string[] = [];
+  if (!c.supabaseUrl) missing.push("database address (URL)");
+  if (!c.supabaseAnonKey) missing.push("access key (anon key)");
+  return missing;
+}
+
 export const COMPANY_ORDER: CompanyId[] = ["sdsi", "lsmbiz", "daro"];
 
 export function isCompanyId(v: unknown): v is CompanyId {
