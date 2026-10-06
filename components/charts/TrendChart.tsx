@@ -21,6 +21,15 @@ export function TrendChart({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const width = 520;
   const padding = 24;
+
+  // A company with no records yet (e.g. a newly set-up one) has nothing to plot.
+  if (!data.length) {
+    return (
+      <div className="flex items-center justify-center text-xs text-[var(--text-muted)]" style={{ height }}>
+        No data yet
+      </div>
+    );
+  }
   const max = Math.max(...data.map((d) => d.value));
   const min = Math.min(...data.map((d) => d.value));
   const range = max - min || 1;

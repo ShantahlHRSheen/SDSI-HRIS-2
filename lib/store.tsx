@@ -5,7 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { fullName, nextEmployeeNumber, setReferenceData } from "./helpers";
 import { getSupabaseClient } from "./supabase/client";
 import { reportSaveError } from "./save-errors";
-import { companyStorageKey } from "./companies";
+import { companyStorageKey, currentCompany } from "./companies";
 import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   decideCorrectionRequestRow,
@@ -594,6 +594,13 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured()) return null;
     return demoUsers.find((u) => u.id === state.currentUserId) ?? null;
   }, [supabaseEmployee, demoUsers, state.currentUserId, state.positions]);
+  // Admin-only accounts (see adminAccountNumbers in lib/companies.ts) stay in
+  // state so they can sign in, but are left out of the employee list every
+  // page reads.
+  const visibleEmployees = useMemo(() => {
+    const hidden = currentCompany().adminAccountNumbers;
+    return hidden?.length ? state.employees.filter((e) => !hidden.includes(e.employeeNumber)) : state.employees;
+  }, [state.employees]);
   const currentEmployee = useMemo(
     () => (currentUser ? state.employees.find((e) => e.id === currentUser.employeeId) ?? null : null),
     [currentUser, state.employees],
@@ -1725,7 +1732,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     login,
     loginWithSupabase,
     logout,
-    employees: state.employees,
+    employees: visibleEmployees,
     employeeDepartmentAllocations: state.employeeDepartmentAllocations,
     evaluations: state.evaluations,
     disciplinaryRecords: state.disciplinaryRecords,

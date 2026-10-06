@@ -39,6 +39,11 @@ export interface CompanyConfig {
   thirteenthMonthSignatories?: Signatory[];
   // Placeholder shown in the sign-in email box.
   emailHint: string;
+  // Employee numbers of admin-only accounts: people who manage this
+  // company's HRIS but don't work for it. They can sign in with their roles,
+  // but are left out of every employee list (directory, payroll, headcount,
+  // org chart, dropdowns).
+  adminAccountNumbers?: string[];
 }
 
 const TBA = { tin: "", address: "", phone: "", email: "", rdoCode: "" };
@@ -107,6 +112,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       [{ role: "Released by:", name: "", title: "TREASURY" }],
     ],
     emailHint: "you@company.com",
+    // Sheena Evangelista (LSM Group HR) manages LSMBiz's HRIS but isn't on its roster.
+    adminAccountNumbers: ["ADMIN-01"],
   },
   daro: {
     id: "daro",
