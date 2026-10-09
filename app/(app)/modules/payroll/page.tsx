@@ -14,6 +14,8 @@ import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/h
 import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, type PayrollLine } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { buildPayrollImportPreview, guessPeriodFromName, parsePayrollWorkbook, type ParsedPayrollWorkbook } from "@/lib/payroll-import";
+import { currentCompany } from "@/lib/companies";
+import { parseLsmbizPayrollWorkbook } from "@/lib/payroll-import-lsmbiz";
 import { PayrollImportModal } from "@/components/payroll/PayrollImportModal";
 import { MissingPeriodsBanner } from "@/components/payroll/MissingPeriodsBanner";
 import type { Employee, PayrollLineOverride, PayrollPeriodStatus } from "@/lib/types";
@@ -73,12 +75,15 @@ export default function PayrollProcessingPage() {
     if (!file) return;
     setImportError(null);
     try {
-      const sheets = await parsePayrollWorkbook(await file.arrayBuffer());
+      const buffer = await file.arrayBuffer();
+      const lsmbizFormat = currentCompany().payrollImportFormat === "lsmbiz";
+      const sheets = lsmbizFormat ? await parseLsmbizPayrollWorkbook(buffer, employees) : await parsePayrollWorkbook(buffer);
       // With several payroll sheets, start on the one matching the file name's
       // period (e.g. "May 16-30.xlsx" → the "MAY 30" sheet), else the last one.
       const fromFileName = guessPeriodFromName(file.name, payrollPeriods);
       const matching = fromFileName ? sheets.findIndex((s) => guessPeriodFromName(s.sheetName, payrollPeriods)?.id === fromFileName.id) : -1;
-      const sheetIndex = matching >= 0 ? matching : sheets.length - 1;
+      // LSMBiz: the first choice is the whole cut-off (all its sheets).
+      const sheetIndex = matching >= 0 ? matching : lsmbizFormat ? 0 : sheets.length - 1;
       const guessed = guessPeriodFromName(sheets[sheetIndex].sheetName, payrollPeriods) ?? fromFileName;
       setImportPeriodId(guessed?.id ?? period?.id ?? "");
       setImportFile({ name: file.name, sheets, sheetIndex });
