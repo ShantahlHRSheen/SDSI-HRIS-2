@@ -44,6 +44,9 @@ export interface CompanyConfig {
   // but are left out of every employee list (directory, payroll, headcount,
   // org chart, dropdowns).
   adminAccountNumbers?: string[];
+  // Layout of the payroll Excel this company uploads in Payroll Processing:
+  // the standard register (lib/payroll-import.ts) unless set.
+  payrollImportFormat?: "lsmbiz";
 }
 
 const TBA = { tin: "", address: "", phone: "", email: "", rdoCode: "" };
@@ -114,6 +117,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     emailHint: "you@company.com",
     // Sheena Evangelista (LSM Group HR) manages LSMBiz's HRIS but isn't on its roster.
     adminAccountNumbers: ["ADMIN-01"],
+    // LSM OP / LSM ADM / CEO sheets — see lib/payroll-import-lsmbiz.ts.
+    payrollImportFormat: "lsmbiz",
   },
   daro: {
     id: "daro",
