@@ -106,17 +106,23 @@ function sheetCaption(ws: ExcelJS.Worksheet, headerRow: number): string {
 }
 
 // Matches the file's "Last, First" (or "Last First", sometimes with Sr./Jr.)
-// to an employee, by name only — the file has no employee numbers.
+// to an employee, by name only — the file has no employee numbers. A married
+// employee may still be on the payroll under her maiden name, which is her
+// middle name in the 201 file ("Santiago, Noemi" = Noemi Santiago Berber);
+// that is tried only when the surname finds no one.
 function nameMatcher(employees: Employee[]) {
   const strip = (s: string) => normalizeName(s).replace(/\b(sr|jr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim();
   const byKey = new Map<string, Employee[]>();
-  const add = (key: string, e: Employee) => {
-    const list = byKey.get(key) ?? [];
-    if (!list.includes(e)) byKey.set(key, [...list, e]);
+  const byMaidenKey = new Map<string, Employee[]>();
+  const add = (map: Map<string, Employee[]>, key: string, e: Employee) => {
+    const list = map.get(key) ?? [];
+    if (!list.includes(e)) map.set(key, [...list, e]);
   };
   for (const e of employees) {
-    add(strip(`${e.lastName}, ${e.firstName}`), e);
-    add(strip(`${e.lastName}, ${e.firstName.split(" ")[0]}`), e);
+    for (const first of [e.firstName, e.firstName.split(" ")[0]]) {
+      add(byKey, strip(`${e.lastName}, ${first}`), e);
+      if (e.middleName) add(byMaidenKey, strip(`${e.middleName}, ${first}`), e);
+    }
   }
   const pick = (list: Employee[] | undefined) => {
     if (!list?.length) return undefined;
@@ -124,16 +130,17 @@ function nameMatcher(employees: Employee[]) {
     const active = list.filter((e) => e.status === "active");
     return active.length === 1 ? active[0] : undefined;
   };
-  return (raw: string): Employee | undefined => {
-    if (raw.includes(",")) return pick(byKey.get(strip(raw)));
+  const find = (map: Map<string, Employee[]>, raw: string): Employee | undefined => {
+    if (raw.includes(",")) return pick(map.get(strip(raw)));
     // No comma: "Gantalao Raymund" is last name first.
     const words = raw.trim().split(/\s+/);
     for (let i = 1; i < words.length; i++) {
-      const hit = pick(byKey.get(strip(`${words.slice(0, i).join(" ")}, ${words.slice(i).join(" ")}`)));
+      const hit = pick(map.get(strip(`${words.slice(0, i).join(" ")}, ${words.slice(i).join(" ")}`)));
       if (hit) return hit;
     }
-    return pick(byKey.get(strip(raw)));
+    return pick(map.get(strip(raw)));
   };
+  return (raw: string) => find(byKey, raw) ?? find(byMaidenKey, raw);
 }
 
 interface LsmbizSheet {
