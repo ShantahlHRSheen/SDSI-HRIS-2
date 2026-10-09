@@ -19,6 +19,8 @@ export interface Signatory {
   role: string;
   name: string;
   title: string;
+  // Voucher only: columns (of 4) this signatory takes, for a long name.
+  span?: number;
 }
 
 export interface CompanyConfig {
@@ -97,22 +99,33 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     logo: "/brand/lsmbiz.png",
     formLogo: "/brand/lsmbiz-wide.png",
     idCardLogo: "/brand/lsmbiz-wide.png",
-    info: { name: "LSMBiz Credit Corporation", ...TBA },
+    info: {
+      name: "LSMBiz Credit Corporation",
+      tin: "007-058-421-000",
+      address: "109 Apo St., Mabini Homesite, Cabanatuan City, Nueva Ecija",
+      phone: "0915 780 6252",
+      email: "lsmbizhrdept@gmail.com",
+      rdoCode: "",
+    },
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL_LSMBIZ,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_LSMBIZ,
-    // To be filled in once the company's signatories are confirmed.
+    // Signatories' job titles not given yet, so the title line stays blank.
     payslipSignatories: [
-      { role: "Prepared by", name: "", title: "HR" },
-      { role: "Checked by", name: "", title: "Accounting" },
-      { role: "Released by", name: "", title: "Treasury" },
+      { role: "Prepared by", name: "Maricar De Guzman / Noemi Berber", title: "" },
+      { role: "Checked by", name: "Merry Cris Layco", title: "" },
+      { role: "Released by", name: "Jonalyn Fulo", title: "" },
     ],
     voucherSignatories: [
       [
-        { role: "Prepared by:", name: "", title: "HR" },
-        { role: "Checked by:", name: "", title: "ACCOUNTING" },
-        { role: "Approved by:", name: "", title: "MANAGEMENT" },
+        { role: "Prepared by:", name: "MARICAR DE GUZMAN / NOEMI BERBER", title: "", span: 2 },
+        { role: "Checked by:", name: "MERRY CRIS LAYCO", title: "" },
       ],
-      [{ role: "Released by:", name: "", title: "TREASURY" }],
+      [{ role: "Released by:", name: "JONALYN FULO", title: "" }],
+    ],
+    thirteenthMonthSignatories: [
+      { role: "Prepared by", name: "Maricar De Guzman / Noemi Berber", title: "" },
+      { role: "Checked by", name: "Merry Cris Layco", title: "" },
+      { role: "Released by", name: "Jonalyn Fulo", title: "" },
     ],
     emailHint: "you@company.com",
     // Sheena Evangelista (LSM Group HR) manages LSMBiz's HRIS but isn't on its roster.
