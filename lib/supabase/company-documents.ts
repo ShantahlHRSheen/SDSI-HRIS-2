@@ -84,3 +84,62 @@ export async function removeSignature(kind: SignatureKind): Promise<void> {
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error("You can only remove your own signature.");
 }
+
+// Photos of the company's org chart (lib/companies.ts orgChartPhotos), shown
+// on the Org Chart page in name order. The bucket takes PNGs and PDFs only, so
+// photos are converted to PNG in the browser, scaled down to keep them small.
+const ORG_CHART_DIR = "org-chart";
+const ORG_CHART_MAX_SIDE = 2400;
+
+export interface OrgChartPhoto {
+  name: string;
+  url: string;
+}
+
+export async function fetchOrgChartPhotos(): Promise<OrgChartPhoto[]> {
+  const bucket = getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET);
+  const { data: files, error } = await bucket.list(ORG_CHART_DIR, { limit: 100, sortBy: { column: "name", order: "asc" } });
+  if (error) {
+    if (/not found/i.test(error.message)) return [];
+    throw error;
+  }
+  const names = (files ?? []).filter((f) => f.name.endsWith(".png")).map((f) => f.name);
+  if (!names.length) return [];
+  const { data, error: signErr } = await bucket.createSignedUrls(names.map((n) => `${ORG_CHART_DIR}/${n}`), 3600);
+  if (signErr) throw signErr;
+  return names.map((name, i) => ({ name, url: data[i]?.signedUrl ?? "" })).filter((p) => p.url);
+}
+
+async function toPng(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file).catch(() => {
+    throw new Error("Please choose a photo (JPG or PNG).");
+  });
+  const scale = Math.min(1, ORG_CHART_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Your browser couldn't read that photo.");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't convert that photo."))), "image/png"));
+}
+
+export async function uploadOrgChartPhoto(file: File): Promise<void> {
+  const png = await toPng(file);
+  if (png.size > COMPANY_DOC_MAX_BYTES) throw new Error("That photo is too large — please use a smaller one.");
+  const path = `${ORG_CHART_DIR}/${Date.now()}.png`;
+  const { error } = await getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET).upload(path, png, { contentType: "image/png", cacheControl: "300" });
+  if (error) {
+    if (/row-level security/i.test(error.message)) throw new Error("Only HR can upload the org chart.");
+    throw new Error(error.message);
+  }
+}
+
+export async function removeOrgChartPhoto(name: string): Promise<void> {
+  const { data, error } = await getSupabaseClient().storage.from(COMPANY_DOCS_BUCKET).remove([`${ORG_CHART_DIR}/${name}`]);
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Only HR can remove the org chart.");
+}

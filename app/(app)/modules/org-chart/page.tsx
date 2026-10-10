@@ -2,6 +2,7 @@
 
 import { shownName } from "@/lib/demo-mode";
 import { currentCompany } from "@/lib/companies";
+import { OrgChartPhotos } from "@/components/org-chart/OrgChartPhotos";
 import { AutoOrgChart } from "@/components/org-chart/AutoOrgChart";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -532,8 +533,9 @@ function Overview() {
 }
 
 export default function OrgChartPage() {
-  // The chart below is Shantahl's; other companies get one drawn from their
-  // 201 files until theirs is designed.
+  // The chart below is Shantahl's; other companies show photos of their own
+  // chart, or one drawn from their 201 files until theirs is designed.
+  if (currentCompany().orgChartPhotos) return <OrgChartPhotos />;
   if (currentCompany().id !== "sdsi") return <AutoOrgChart />;
   return (
     <div className="space-y-6">

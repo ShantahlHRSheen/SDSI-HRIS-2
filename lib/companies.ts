@@ -49,6 +49,9 @@ export interface CompanyConfig {
   // Layout of the payroll Excel this company uploads in Payroll Processing:
   // the standard register (lib/payroll-import.ts) unless set.
   payrollImportFormat?: "lsmbiz";
+  // Org Chart shows photos of the company's own chart that HR uploads,
+  // instead of one drawn from the 201 files.
+  orgChartPhotos?: boolean;
 }
 
 const TBA = { tin: "", address: "", phone: "", email: "", rdoCode: "" };
@@ -132,6 +135,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     adminAccountNumbers: ["ADMIN-01"],
     // LSM OP / LSM ADM / CEO sheets — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "lsmbiz",
+    orgChartPhotos: true,
   },
   daro: {
     id: "daro",
