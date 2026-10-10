@@ -44,37 +44,10 @@
 }
 
 /*
-  LSMBiz Credit Corp. uses black-and-blue instead. data-company is set on
+  LSMBiz Credit Corp. uses white-and-blue instead. data-company is set on
   <html> before first paint (see app/layout.tsx) only when LSMBiz is the
   chosen company, so the other companies keep the tokens above.
 */
-html[data-company="lsmbiz"] {
-  --surface-1: #0e1220;
-  --page-plane: #06080f;
-  --text-secondary: #b7c1d6;
-  --text-muted: #717d96;
-  --gridline: #161c2b;
-  --baseline: #262f46;
-  --border-hairline: rgba(120, 170, 255, 0.16);
-
-  --accent: #3b9cff;
-  --accent-strong: #6cb6ff;
-  --accent-soft: rgba(59, 156, 255, 0.12);
-  --accent-glow: rgba(59, 156, 255, 0.35);
-  --on-accent: #04142a;
-
-  --series-1: #3b9cff;
-  --series-4: #2fe6a6;
-
-  --seq-100: #0f2340;
-  --seq-250: #15365f;
-  --seq-400: #1c58a0;
-  --seq-450: #2f7fe0;
-  --seq-550: #6cb0ff;
-  --seq-700: #c3e0ff;
-}
-
-/* PREVIEW: white-and-blue */
 html[data-company="lsmbiz"] {
   --surface-1: #ffffff;
   --page-plane: #f2f6fc;
@@ -104,6 +77,7 @@ html[data-company="lsmbiz"] {
   --seq-550: #1a63d6;
   --seq-700: #0b3d91;
 }
+
 html[data-company="lsmbiz"] body {
   background-image:
     radial-gradient(ellipse 900px 420px at 10% -10%, rgba(26, 115, 240, 0.12), transparent 60%),
@@ -270,8 +244,6 @@ body {
   padding: 0;
 }
 
-/* PREVIEW: futuristic blue line under the top bar */
 html[data-company="lsmbiz"] header {
-  box-shadow: 0 1px 0 rgba(26, 115, 240, 0.08), 0 6px 24px -12px rgba(26, 115, 240, 0.35);
-  border-image: linear-gradient(90deg, #1a73f0, #06b6d4 50%, rgba(26, 115, 240, 0)) 1;
+  box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
 }
