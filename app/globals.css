@@ -74,10 +74,43 @@ html[data-company="lsmbiz"] {
   --seq-700: #c3e0ff;
 }
 
+/* PREVIEW: white-and-blue */
+html[data-company="lsmbiz"] {
+  --surface-1: #ffffff;
+  --page-plane: #f2f6fc;
+  --text-primary: #0b1a33;
+  --text-secondary: #3b4c6b;
+  --text-muted: #6b7a94;
+  --gridline: #e7edf6;
+  --baseline: #cdd8e8;
+  --border-hairline: rgba(30, 110, 230, 0.16);
+  --accent: #1a73f0;
+  --accent-strong: #0b5ed7;
+  --accent-soft: rgba(26, 115, 240, 0.09);
+  --accent-glow: rgba(26, 115, 240, 0.28);
+  --on-accent: #ffffff;
+  --series-1: #1a73f0;
+  --series-2: #06b6d4;
+  --series-3: #f59e0b;
+  --series-4: #10b981;
+  --status-good: #16a34a;
+  --status-warning: #d97706;
+  --status-serious: #e11d48;
+  --status-critical: #dc2626;
+  --seq-100: #e8f1ff;
+  --seq-250: #c5dcff;
+  --seq-400: #8bb8ff;
+  --seq-450: #4d90f5;
+  --seq-550: #1a63d6;
+  --seq-700: #0b3d91;
+}
 html[data-company="lsmbiz"] body {
   background-image:
-    radial-gradient(ellipse 900px 480px at 12% -8%, rgba(59, 156, 255, 0.12), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(99, 102, 241, 0.07), transparent 55%);
+    radial-gradient(ellipse 900px 420px at 10% -10%, rgba(26, 115, 240, 0.12), transparent 60%),
+    radial-gradient(ellipse 700px 460px at 100% 0%, rgba(6, 182, 212, 0.08), transparent 55%),
+    linear-gradient(rgba(26, 115, 240, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26, 115, 240, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
 }
 
 body {
@@ -235,4 +268,10 @@ body {
   border: 0;
   border-radius: 0;
   padding: 0;
+}
+
+/* PREVIEW: futuristic blue line under the top bar */
+html[data-company="lsmbiz"] header {
+  box-shadow: 0 1px 0 rgba(26, 115, 240, 0.08), 0 6px 24px -12px rgba(26, 115, 240, 0.35);
+  border-image: linear-gradient(90deg, #1a73f0, #06b6d4 50%, rgba(26, 115, 240, 0)) 1;
 }
