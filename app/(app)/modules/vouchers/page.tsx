@@ -123,6 +123,9 @@ export default function VouchersPage() {
   // "all", "adjustments", or one department voucher ("dept:<id>").
   const [printing, setPrinting] = useState<string | null>(null);
   const stopPrinting = useCallback(() => setPrinting(null), []);
+  // A separate voucher for some lines of a department's voucher (released
+  // on their own date): printed when `printing` is "selected".
+  const [selectedPrint, setSelectedPrint] = useState<{ departmentId: string; lineIds: string[]; date: string } | null>(null);
 
   const activeEmployees = useMemo(
     () => employees.filter((e) => e.status !== "resigned" && e.status !== "terminated").sort((a, b) => fullName(a).localeCompare(fullName(b))),
@@ -296,6 +299,10 @@ export default function VouchersPage() {
               canManage={canManage}
               employees={activeEmployees}
               onPrint={() => setPrinting(`dept:${open.id}`)}
+              onPrintSelected={(lineIds, date) => {
+                setSelectedPrint({ departmentId: open.id, lineIds, date });
+                setPrinting("selected");
+              }}
               onAdd={(l) => addLine(period, open.id, l)}
               onEdit={editLine}
               onRemove={removeLine}
@@ -318,6 +325,27 @@ export default function VouchersPage() {
                   />
                 </PrintPage>
               ))}
+              {printing === "selected" &&
+                selectedPrint &&
+                (() => {
+                  const d = shownDepts.find((x) => x.id === selectedPrint.departmentId);
+                  const chosen = (linesByDept.get(selectedPrint.departmentId) ?? []).filter((l) => selectedPrint.lineIds.includes(l.id));
+                  if (!d || !chosen.length) return null;
+                  return (
+                    <PrintPage>
+                      <VoucherDoc
+                        department={d}
+                        period={period}
+                        lines={chosen}
+                        total={Math.round(chosen.reduce((t, l) => t + l.amount, 0) * 100) / 100}
+                        employees={employees}
+                        // Checked / Released signatures carry over when the whole voucher was signed off.
+                        signatures={signaturesFor(`dept:${d.id}`, totalOf(d.id))}
+                        date={selectedPrint.date}
+                      />
+                    </PrintPage>
+                  );
+                })()}
               {(printing === "all" || printing === "adjustments") && periodAdjustments.length > 0 && (
                 <PrintPage>
                   <SalaryAdjustmentVoucherDoc
@@ -400,6 +428,7 @@ function VoucherEditor({
   canManage,
   employees,
   onPrint,
+  onPrintSelected,
   onAdd,
   onEdit,
   onRemove,
@@ -410,6 +439,8 @@ function VoucherEditor({
   canManage: boolean;
   employees: Employee[];
   onPrint: () => void;
+  // Print a separate voucher with only these lines, dated `date`.
+  onPrintSelected: (lineIds: string[], date: string) => void;
   onAdd: (l: LineInput) => Promise<boolean>;
   onEdit: (id: string, patch: Partial<LineInput>) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
@@ -420,6 +451,18 @@ function VoucherEditor({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const total = lines.reduce((s, l) => s + l.amount, 0);
   const listId = `payees-${department.id}`;
+  // Lines ticked for a separate voucher, and the date to print on it.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [pickedDate, setPickedDate] = useState(period.voucherDate || period.end);
+  const pickedLines = lines.filter((l) => picked.has(l.id));
+  const pickedTotal = Math.round(pickedLines.reduce((t, l) => t + l.amount, 0) * 100) / 100;
+  const togglePick = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const amountOk = (v: string) => v.trim() !== "" && Number.isFinite(Number(v)) && Number(v) >= 0;
 
   async function add(e: React.FormEvent) {
@@ -465,6 +508,33 @@ function VoucherEditor({
         </button>
       </div>
 
+      {lines.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-secondary)] print:hidden">
+          {pickedLines.length === 0 ? (
+            <span>Releasing some lines separately? Tick them below to print them as their own voucher with its own date.</span>
+          ) : (
+            <>
+              <span>
+                <span className="font-medium text-[var(--text-primary)]">{pickedLines.length} selected</span> · {peso(pickedTotal)}
+              </span>
+              <label className="flex items-center gap-1.5">
+                Voucher date
+                <input type="date" value={pickedDate} onChange={(e) => setPickedDate(e.target.value)} className="rounded-md border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2 py-1 text-xs" />
+              </label>
+              <button
+                onClick={() => onPrintSelected(pickedLines.map((l) => l.id), pickedDate || period.end)}
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]"
+              >
+                <Printer size={13} /> Print selected as a separate voucher
+              </button>
+              <button onClick={() => setPicked(new Set())} className="text-[var(--text-muted)] hover:underline">
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <datalist id={listId}>
         {employees.map((e) => (
           <option key={e.id} value={fullName(e)}>
@@ -477,6 +547,16 @@ function VoucherEditor({
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
+              {lines.length > 1 && (
+                <th className="w-8 px-2 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all lines"
+                    checked={picked.size > 0 && pickedLines.length === lines.length}
+                    onChange={(e) => setPicked(e.target.checked ? new Set(lines.map((l) => l.id)) : new Set())}
+                  />
+                </th>
+              )}
               <th className="w-8 px-2 py-2 font-medium">#</th>
               <th className="px-2 py-2 font-medium">Name</th>
               <th className="px-2 py-2 font-medium">Description</th>
@@ -488,6 +568,7 @@ function VoucherEditor({
             {lines.map((l, i) =>
               editing?.id === l.id ? (
                 <tr key={l.id} className="border-b border-[var(--gridline)]">
+                  {lines.length > 1 && <td className="px-2 py-1.5" />}
                   <td className="px-2 py-1.5 text-[var(--text-muted)]">{i + 1}</td>
                   <td className="px-2 py-1.5">
                     <input
@@ -529,7 +610,12 @@ function VoucherEditor({
                   </td>
                 </tr>
               ) : (
-                <tr key={l.id} className="border-b border-[var(--gridline)]">
+                <tr key={l.id} className={`border-b border-[var(--gridline)] ${picked.has(l.id) ? "bg-[var(--series-1)]/10" : ""}`}>
+                  {lines.length > 1 && (
+                    <td className="px-2 py-2">
+                      <input type="checkbox" aria-label={`Select ${l.payeeName}`} checked={picked.has(l.id)} onChange={() => togglePick(l.id)} />
+                    </td>
+                  )}
                   <td className="px-2 py-2 text-[var(--text-muted)]">{i + 1}</td>
                   <td className="px-2 py-2 text-[var(--text-primary)]">
                     {l.payeeName}
@@ -584,7 +670,7 @@ function VoucherEditor({
           </tbody>
           <tfoot>
             <tr className="font-semibold text-[var(--text-primary)]">
-              <td colSpan={3} className="px-2 py-2 text-right">
+              <td colSpan={lines.length > 1 ? 4 : 3} className="px-2 py-2 text-right">
                 Total
               </td>
               <td className="tabular px-2 py-2 text-right">{peso(total)}</td>
@@ -639,14 +725,15 @@ function VoucherEditor({
 }
 
 // The printed voucher (A4, black on white), shown only in the print stack.
-type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; employees: Employee[]; signatures: VoucherSignatureSet };
+// `date`: printed instead of the period's voucher date (a separate release).
+type VoucherDocProps = { department: Department; period: PayrollPeriod; lines: DepartmentVoucherLine[]; total: number; employees: Employee[]; signatures: VoucherSignatureSet; date?: string };
 
-function VoucherDoc({ department, period, lines, total, employees, signatures }: VoucherDocProps) {
+function VoucherDoc({ department, period, lines, total, employees, signatures, date }: VoucherDocProps) {
   const byId = new Map(employees.map((e) => [e.id, e]));
   return (
     <VoucherSheet
       title={department.name}
-      date={period.voucherDate || period.end}
+      date={date || period.voucherDate || period.end}
       columns={[{ label: "NAME", width: "25%" }, { label: "POSITION", width: "25%" }, { label: "ALLOWANCE COVERAGE" }, { label: "Amount (PhP.)", width: "16%", align: "right" }]}
       rows={lines.map((l) => {
         const emp = l.employeeId ? byId.get(l.employeeId) : undefined;
