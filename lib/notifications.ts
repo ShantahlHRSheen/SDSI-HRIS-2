@@ -31,7 +31,8 @@ const ELEVATED = ["hr_admin", "payroll_officer", "sr_accounting_assistant", "tre
 
 function canDecide(currentUser: DemoUser | null, currentEmployeeId: string | undefined, targetEmployeeId: string, employees: Employee[]): boolean {
   if (!currentUser || !currentEmployeeId) return false;
-  if (currentUser.roles.some((r) => ["hr_admin", "upper_management"].includes(r))) return true;
+  // Upper Management only decides on the people they supervise.
+  if (currentUser.roles.includes("hr_admin")) return true;
   const target = employees.find((e) => e.id === targetEmployeeId);
   return !!target && target.supervisorId === currentEmployeeId;
 }
