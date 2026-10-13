@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, FileEdit, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, FileEdit, FileText, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { formatDate, fullName } from "@/lib/helpers";
 import { TODAY } from "@/lib/mock-data";
 import type { RequestStatus } from "@/lib/types";
+import { CorrectionApplicationModal, CorrectionFormModal, CorrectionProgress, canHeadCorrection, useCorrectionForms } from "@/components/corrections/CorrectionApplication";
+import { correctionStage, timeLabel, type CorrectionForm } from "@/lib/correction-form";
 
 const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
   pending: "warning",
@@ -19,7 +21,18 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 };
 
 export default function AttendanceCorrectionsPage() {
-  const { employees, correctionRequests, currentUser, currentEmployee, fileCorrectionRequest, decideCorrectionRequest } = useHris();
+  const { employees, correctionRequests, currentUser, currentEmployee, fileCorrectionRequest, decideCorrectionRequest, isRealAccount } = useHris();
+  // The online Attendance Correction Form (real accounts): filed and signed
+  // by the employee, approved by their department head, received by HR.
+  const { forms, error: formsError, reload: reloadForms } = useCorrectionForms();
+  const formByRequest = useMemo(() => new Map(forms.map((f) => [f.correctionRequestId, f])), [forms]);
+  const [showApply, setShowApply] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const viewingForm = viewing ? formByRequest.get(viewing) : undefined;
+  const isHrManager = !!currentUser?.roles.includes("hr_admin");
+  const formsToSign = forms.filter((f) => canHeadCorrection(f, currentEmployee?.id, isHrManager));
+  const formsToReceive = isHrManager ? forms.filter((f) => correctionStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
+  const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -36,7 +49,8 @@ export default function AttendanceCorrectionsPage() {
   }
 
   const myRequests = correctionRequests.filter((r) => r.employeeId === currentEmployee?.id).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));
-  const pendingForMe = correctionRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && canDecide(r.employeeId));
+  // Requests filed without the online form (older ones) are still decided here directly.
+  const pendingForMe = correctionRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && !formByRequest.has(r.id) && canDecide(r.employeeId));
 
   const allRequests = correctionRequests
     .filter((r) => (statusFilter === "all" ? true : r.status === statusFilter))
@@ -62,7 +76,7 @@ export default function AttendanceCorrectionsPage() {
   }
 
   function periodLabel(timeIn: string | null, timeOut: string | null) {
-    return `${timeIn ?? "—"} – ${timeOut ?? "—"}`;
+    return `${timeLabel(timeIn) || "—"} – ${timeLabel(timeOut) || "—"}`;
   }
 
   return (
@@ -71,11 +85,16 @@ export default function AttendanceCorrectionsPage() {
         title="Attendance Corrections"
         subtitle="Request a correction for a missing punch, wrong time, or biometric failure."
         actions={
-          <button onClick={() => setShowFile(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+          <button onClick={() => (isRealAccount && !formsError ? setShowApply(true) : setShowFile(true))} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
             <FileEdit size={16} /> File correction
           </button>
         }
       />
+
+      {/* Until the database update is run the old request is filed instead; HR sees why. */}
+      {formsError && isHrManager && <div className="mb-4 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">{formsError}</div>}
+      <FormQueue title={`Correction forms for your approval (${formsToSign.length})`} forms={formsToSign} action="Review & sign" onOpen={(f) => setViewing(f.correctionRequestId)} />
+      <FormQueue title={`Correction forms to receive (${formsToReceive.length})`} forms={formsToReceive} action="Review & receive" onOpen={(f) => setViewing(f.correctionRequestId)} />
 
       {pendingForMe.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -107,10 +126,25 @@ export default function AttendanceCorrectionsPage() {
           <EmptyState icon={FileEdit} title="No correction requests yet" description="Requests you file will appear here with their approval status." />
         ) : (
           <RequestsTable
-            rows={myRequests.map((r) => ({ id: r.id, primary: periodLabel(r.requestedTimeIn, r.requestedTimeOut), secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote }))}
+            onViewForm={setViewing}
+            rows={myRequests.map((r) => ({ id: r.id, form: formByRequest.get(r.id), primary: periodLabel(r.requestedTimeIn, r.requestedTimeOut), secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote }))}
           />
         )}
       </div>
+
+      {!isHrOrUpper && teamForms.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+          <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">My team&rsquo;s correction forms</div>
+          <RequestsTable
+            showEmployee
+            onViewForm={setViewing}
+            rows={teamForms.map((f) => {
+              const r = correctionRequests.find((x) => x.id === f.correctionRequestId);
+              return { id: f.correctionRequestId, form: f, employee: f.employeeName, primary: periodLabel(f.timeIn, f.timeOut), secondary: formatDate(f.correctionDate), reason: f.reason, status: r?.status ?? "pending", decisionNote: r?.decisionNote ?? null };
+            })}
+          />
+        </div>
+      )}
 
       {isHrOrUpper && (
         <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -131,14 +165,18 @@ export default function AttendanceCorrectionsPage() {
           ) : (
             <RequestsTable
               showEmployee
+              onViewForm={setViewing}
               rows={allRequests.map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
-                return { id: r.id, employee: emp ? fullName(emp) : r.employeeId, primary: periodLabel(r.requestedTimeIn, r.requestedTimeOut), secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote };
+                return { id: r.id, form: formByRequest.get(r.id), employee: emp ? fullName(emp) : r.employeeId, primary: periodLabel(r.requestedTimeIn, r.requestedTimeOut), secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote };
               })}
             />
           )}
         </div>
       )}
+
+      {showApply && <CorrectionApplicationModal open onClose={() => setShowApply(false)} onDone={reloadForms} />}
+      {viewingForm && <CorrectionFormModal key={viewingForm.correctionRequestId} form={viewingForm} onClose={() => setViewing(null)} onChanged={reloadForms} />}
 
       <Modal open={showFile} onClose={() => setShowFile(false)} title="File an attendance correction">
         <div className="space-y-4">
@@ -192,12 +230,41 @@ export default function AttendanceCorrectionsPage() {
   );
 }
 
+// Forms waiting on the user (to approve or receive).
+function FormQueue({ title, forms, action, onOpen }: { title: string; forms: CorrectionForm[]; action: string; onOpen: (f: CorrectionForm) => void }) {
+  if (!forms.length) return null;
+  return (
+    <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
+      <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">{title}</div>
+      <div className="space-y-2">
+        {forms.map((f) => (
+          <div key={f.correctionRequestId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
+            <div>
+              <span className="font-medium text-[var(--text-primary)]">{f.employeeName}</span>
+              <span className="text-[var(--text-secondary)]">
+                {" "}
+                — {formatDate(f.correctionDate)}, {timeLabel(f.timeIn) || "—"} – {timeLabel(f.timeOut) || "—"}
+              </span>
+              <div className="line-clamp-1 text-xs text-[var(--text-muted)]">{f.reason}</div>
+            </div>
+            <button onClick={() => onOpen(f)} className="flex items-center gap-1 rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+              <FileText size={13} /> {action}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RequestsTable({
   rows,
   showEmployee = false,
+  onViewForm,
 }: {
-  rows: { id: string; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
+  rows: { id: string; form?: CorrectionForm; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
+  onViewForm?: (id: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -209,6 +276,7 @@ function RequestsTable({
             <th className="px-3 py-2 font-medium">Date</th>
             <th className="px-3 py-2 font-medium">Reason</th>
             <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Form</th>
           </tr>
         </thead>
         <tbody>
@@ -221,7 +289,16 @@ function RequestsTable({
                 <div className="line-clamp-2">{r.reason}</div>
                 {r.decisionNote && <div className="mt-1 text-xs text-[var(--text-muted)]">Note: {r.decisionNote}</div>}
               </td>
-              <td className="px-3 py-2"><Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge></td>
+              <td className="px-3 py-2">{r.form ? <CorrectionProgress form={r.form} /> : <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>}</td>
+              <td className="px-3 py-2">
+                {r.form && onViewForm ? (
+                  <button onClick={() => onViewForm(r.id)} className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                    <FileText size={12} /> Correction form
+                  </button>
+                ) : (
+                  <span className="text-xs text-[var(--text-muted)]">—</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

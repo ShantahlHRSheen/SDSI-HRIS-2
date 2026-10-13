@@ -369,7 +369,7 @@ interface HrisContextShape {
   reloadRequests: () => Promise<void>;
   decideOvertimeRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 
-  fileCorrectionRequest: (input: Omit<AttendanceCorrectionRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => void;
+  fileCorrectionRequest: (input: Omit<AttendanceCorrectionRequest, "id" | "status" | "filedAt" | "decidedBy" | "decidedAt" | "decisionNote">) => Promise<string | null>;
   decideCorrectionRequest: (id: string, decision: Extract<RequestStatus, "approved" | "rejected">, note?: string) => void;
 
   // Resolves to true once saved (false if saving failed; the error is shown as a toast).
@@ -1528,8 +1528,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   const reloadRequests: HrisContextShape["reloadRequests"] = useCallback(async () => {
     if (!supabaseSession) return;
     try {
-      const [leaveRequests, overtimeRequests] = await Promise.all([fetchLeaveRequests(), fetchOvertimeRequests()]);
-      setState((prev) => ({ ...prev, leaveRequests, overtimeRequests }));
+      const [leaveRequests, overtimeRequests, correctionRequests] = await Promise.all([fetchLeaveRequests(), fetchOvertimeRequests(), fetchCorrectionRequests()]);
+      setState((prev) => ({ ...prev, leaveRequests, overtimeRequests, correctionRequests }));
     } catch (err) {
       console.error("Couldn't refresh requests", err);
     }
@@ -1567,15 +1567,16 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           const entry = await insertCorrectionRequest(input);
           setState((prev) => ({ ...prev, correctionRequests: [entry, ...prev.correctionRequests] }));
           logAudit("Attendance Corrections", "file", `Filed attendance correction for ${input.date}`);
-          return;
+          return entry.id;
         } catch (err) {
           reportSaveError("Couldn't file correction request", err);
-          return;
+          return null;
         }
       }
       const entry: AttendanceCorrectionRequest = { ...input, id: nextId("ac"), status: "pending", filedAt: TODAY, decidedBy: null, decidedAt: null, decisionNote: null };
       setState((prev) => ({ ...prev, correctionRequests: [entry, ...prev.correctionRequests] }));
       logAudit("Attendance Corrections", "file", `Filed attendance correction for ${input.date}`);
+      return entry.id;
     },
     [logAudit, supabaseSession],
   );
