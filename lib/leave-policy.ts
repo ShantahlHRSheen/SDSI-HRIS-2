@@ -8,6 +8,11 @@ import { CALENDAR_DAY_LEAVE_TYPES } from "./helpers";
 // - Every other leave type: its yearly credits per calendar year.
 // Approved and pending requests both count as used, so the same days can't
 // be filed twice while waiting for approval.
+// - Vacation and Sick Leave with pay start after 1 year of service (from the
+//   date hired); before that the credits are 0 — file without pay.
+// - HR's leave credit adjustments (leave_credit_adjustments, e.g. balances
+//   brought in from the leave balance sheet) add to or take from a period's
+//   credits.
 
 const SEMIANNUAL_TYPES = new Set(["lt-vl", "lt-sl"]);
 const COUNTED_STATUSES = new Set(["approved", "pending"]);
@@ -77,9 +82,47 @@ export interface PeriodBalance {
   remaining: number;
 }
 
+// ---- Per-employee context (set by the store, like the reference data) ---------
+
+export interface LeaveCreditAdjustment {
+  employeeId: string;
+  leaveTypeId: string;
+  periodKey: string;
+  days: number;
+  note: string;
+}
+
+let hireDates = new Map<string, string | null>();
+let adjustments = new Map<string, number>();
+const adjKey = (employeeId: string, leaveTypeId: string, periodKey: string) => `${employeeId}|${leaveTypeId}|${periodKey}`;
+
+export function setLeaveCreditContext(data: { employees: { id: string; dateHired: string | null }[]; adjustments: LeaveCreditAdjustment[] }): void {
+  hireDates = new Map(data.employees.map((e) => [e.id, e.dateHired]));
+  adjustments = new Map(data.adjustments.map((a) => [adjKey(a.employeeId, a.leaveTypeId, a.periodKey), a.days]));
+}
+
+// The first day Vacation / Sick Leave with pay can be used (1 year after the
+// date hired), or null when it doesn't apply (other leave types, or no date
+// hired on file).
+export function paidLeaveEligibleFrom(employeeId: string, leaveTypeId: string): string | null {
+  const hired = hireDates.get(employeeId);
+  if (!isSemiannual(leaveTypeId) || !hired) return null;
+  const d = new Date(hired.slice(0, 10) + "T00:00:00Z");
+  d.setUTCFullYear(d.getUTCFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// An employee's credits for the period `onDate` falls in.
+export function creditsFor(employeeId: string, leaveType: LeaveType, onDate: string): number {
+  const from = paidLeaveEligibleFrom(employeeId, leaveType.id);
+  if (from && onDate < from) return 0;
+  const period = creditPeriodOf(leaveType.id, onDate);
+  return creditsPerPeriod(leaveType) + (adjustments.get(adjKey(employeeId, leaveType.id, period.key)) ?? 0);
+}
+
 export function balanceFor(requests: LeaveRequest[], employeeId: string, leaveType: LeaveType, onDate: string, excludeRequestId?: string): PeriodBalance {
   const period = creditPeriodOf(leaveType.id, onDate);
-  const credits = creditsPerPeriod(leaveType);
+  const credits = creditsFor(employeeId, leaveType, onDate);
   const used = usedInPeriod(requests, employeeId, leaveType.id, period.key, excludeRequestId);
   return { period, credits, used, remaining: Math.max(credits - used, 0) };
 }
@@ -90,8 +133,15 @@ export function checkLeaveRequest(
   requests: LeaveRequest[],
   input: { employeeId: string; leaveType: LeaveType; startDate: string; endDate: string; days: number },
 ): string | null {
-  const credits = creditsPerPeriod(input.leaveType);
+  const from = paidLeaveEligibleFrom(input.employeeId, input.leaveType.id);
+  if (from && input.startDate < from) {
+    const on = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" }).format(new Date(from + "T00:00:00Z"));
+    return `${input.leaveType.name} with pay starts after 1 year of service (on ${on}). File it as leave without pay.`;
+  }
   for (const { period, days } of daysByPeriod(input.leaveType.id, input.startDate, input.endDate, input.days).values()) {
+    // A date in the period on or after the start (credits differ only by period).
+    const periodStart = period.key.length === 4 ? `${period.key}-01-01` : `${period.key.slice(0, 4)}-${period.key.endsWith("H1") ? "01" : "07"}-01`;
+    const credits = creditsFor(input.employeeId, input.leaveType, input.startDate > periodStart ? input.startDate : periodStart);
     const remaining = Math.max(credits - usedInPeriod(requests, input.employeeId, input.leaveType.id, period.key), 0);
     if (days > remaining + 1e-9) {
       const fmt = (n: number) => String(Math.round(n * 100) / 100);

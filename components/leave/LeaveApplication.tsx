@@ -172,7 +172,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
   const creditError =
     currentEmployee && leaveType && days > 0 && !filedId
       ? unpaidDays > 0 && paidDays <= 0
-        ? `You have no ${leaveType.name} left — choose the "without Pay" option instead.`
+        ? (checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType, startDate: form.startDate, endDate: form.endDate, days }) ?? `You have no ${leaveType.name} left`).replace(/File (it|the extra days) as (Leave Without Pay|leave without pay)\./, "") + ` Choose the "without Pay" option instead.`
         : (checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType, startDate: form.startDate, endDate: form.endDate, days: paidDays }) ??
           (unpaidDays > 0 && lwopType ? checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType: lwopType, startDate: form.startDate, endDate: form.endDate, days: unpaidDays }) : null))
       : null;
