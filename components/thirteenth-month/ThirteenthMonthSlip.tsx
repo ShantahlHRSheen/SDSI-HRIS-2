@@ -24,7 +24,9 @@ export const THIRTEENTH_MONTH_SIGNATORIES = withShownNames(
   (currentCompany().thirteenthMonthSignatories ?? currentCompany().payslipSignatories).slice(0, 3).map((s, i) => ({ ...s, role: `${s.role}:`, key: SLIP_KEYS[i] })),
 );
 
-export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthMonthSlipData; signatures?: VoucherSignatureSet }) {
+// `estimateAsOf`: an employee's estimate for the year so far (My Payslips) —
+// only the 13th month part, marked as an estimate, with no signatures.
+export function ThirteenthMonthSlip({ row, signatures = {}, estimateAsOf }: { row: ThirteenthMonthSlipData; signatures?: VoucherSignatureSet; estimateAsOf?: string }) {
   const cell: React.CSSProperties = { border: line, padding: "1px 4px", fontSize: "8pt", height: "15px", verticalAlign: "bottom" };
   const num: React.CSSProperties = { ...cell, textAlign: "right" };
   const bar = (text: string) => (
@@ -42,7 +44,8 @@ export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthM
     <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", border: line, padding: "14px 0 18px", fontSize: "8pt" }}>
       <div style={{ textAlign: "center", fontSize: "9pt", lineHeight: 1.5, marginBottom: "8px" }}>
         <div>{COMPANY_INFO.name.toUpperCase()}</div>
-        <div>13TH MONTH PAY AND LEAVE CREDITS</div>
+        <div>{estimateAsOf ? "ESTIMATED 13TH MONTH PAY" : "13TH MONTH PAY AND LEAVE CREDITS"}</div>
+        {estimateAsOf && <div style={{ fontSize: "8pt" }}>From released payslips up to {estimateAsOf}</div>}
       </div>
       <table style={{ borderCollapse: "collapse", margin: "0 0 2px 0", fontSize: "8pt" }}>
         <tbody>
@@ -94,6 +97,8 @@ export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthM
             <td style={cell} colSpan={4} />
             <td style={{ ...num, ...exact, background: LIGHT_GREEN }}>{money(row.thirteenthMonth)}</td>
           </tr>
+          {!estimateAsOf && (
+            <>
           {bar("SERVICE INCENTIVE LEAVE CREDITS (+)")}
           <tr>
             <td style={{ ...cell, textAlign: "center" }} colSpan={3}>
@@ -153,9 +158,18 @@ export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthM
               {money(row.total)}
             </td>
           </tr>
+            </>
+          )}
         </tbody>
       </table>
 
+      {estimateAsOf ? (
+        <div style={{ ...exact, margin: "14px 10px 0", padding: "6px 8px", border: "1px dashed #b45309", background: "#fffbeb", color: "#78350f", fontSize: "8pt", lineHeight: 1.5, textAlign: "center" }}>
+          <b>ESTIMATE ONLY — NOT AN OFFICIAL SLIP.</b> Based on the payslips released so far this year; it grows with each payslip. The final 13th month pay, with leave
+          credits and any deductions, is on the official slip released by HR.
+        </div>
+      ) : (
+      <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", marginTop: "22px", textAlign: "center", fontSize: "8pt", breakInside: "avoid" }}>
         {THIRTEENTH_MONTH_SIGNATORIES.map((s) => {
           const sig = slot(s.key);
@@ -184,6 +198,8 @@ export function ThirteenthMonthSlip({ row, signatures = {} }: { row: ThirteenthM
           Date:<span style={{ display: "inline-block", width: "190px", borderBottom: "1px solid #111", marginLeft: "2px" }} />
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
