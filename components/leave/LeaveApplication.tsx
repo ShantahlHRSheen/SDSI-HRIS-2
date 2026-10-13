@@ -180,7 +180,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
   const missing = !form.applicationDate
     ? "Enter the date of application."
     : days <= 0
-      ? "Choose the inclusive dates (weekdays)."
+      ? "Choose the inclusive dates (Monday to Saturday)."
       : sick && !form.sickPlace
         ? "For sick leave, choose In Hospital or Out Patient."
         : sick && form.sickPlace === "hospital" && !form.sickDetails.trim()

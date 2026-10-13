@@ -70,7 +70,7 @@ export function emptyEntry(year: number, employeeId: string): ThirteenthMonthEnt
   return { year, employeeId, designation: null, months: {}, vlDays: null, dailyRate: null, lastSalary: 0, sss: 0, philhealth: 0, hdmf: 0 };
 }
 
-// Weekday VL request days per half of `year` (0 = Jan–Jun, 1 = Jul–Dec).
+// Working-day (Mon–Sat) VL request days per half of `year` (0 = Jan–Jun, 1 = Jul–Dec).
 function vlRequestDays(requests: LeaveRequest[], employeeId: string, year: number): [number, number] {
   const out: [number, number] = [0, 0];
   for (const r of requests) {
@@ -80,7 +80,7 @@ function vlRequestDays(requests: LeaveRequest[], employeeId: string, year: numbe
     const end = new Date(r.endDate + "T00:00:00Z");
     while (cur <= end) {
       const dow = cur.getUTCDay();
-      if (dow !== 0 && dow !== 6) days.push(cur.toISOString().slice(0, 10));
+      if (dow !== 0) days.push(cur.toISOString().slice(0, 10));
       cur.setUTCDate(cur.getUTCDate() + 1);
     }
     if (!days.length) continue;
