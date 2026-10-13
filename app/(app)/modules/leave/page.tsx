@@ -61,13 +61,13 @@ export default function LeaveManagementPage() {
     reloadForms();
   }
 
-  // HR/upper management decide on everyone; a Dept Head decides on the
-  // employees they supervise.
+  // The employee's own supervisor decides (Upper Management included — they
+  // see everyone's requests but only decide on their own people); HR on anyone.
   function canDecide(employeeId: string): boolean {
     if (!currentEmployee) return false;
-    if (isHrOrUpper) return true;
+    if (isHrManager) return true;
     const target = employees.find((e) => e.id === employeeId);
-    return isDeptHead && !!target && target.supervisorId === currentEmployee.id;
+    return !!target && target.supervisorId === currentEmployee.id;
   }
 
   // Remaining credits for the current period (half-year for VL/SL, year for

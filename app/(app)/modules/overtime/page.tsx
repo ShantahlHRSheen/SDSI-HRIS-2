@@ -57,9 +57,11 @@ export default function OvertimePage() {
 
   const isHrOrUpper = currentUser?.roles.some((r) => ["hr_admin", "upper_management"].includes(r));
 
+  // The employee's own supervisor decides (Upper Management included — they
+  // see everyone's requests but only decide on their own people); HR on anyone.
   function canDecide(employeeId: string): boolean {
     if (!currentEmployee) return false;
-    if (isHrOrUpper) return true;
+    if (currentUser?.roles.includes("hr_admin")) return true;
     const target = employees.find((e) => e.id === employeeId);
     return !!target && target.supervisorId === currentEmployee.id;
   }
