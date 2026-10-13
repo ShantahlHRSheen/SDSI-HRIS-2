@@ -50,3 +50,42 @@ export async function idMediaUrls(paths: (string | null | undefined)[]): Promise
   for (const d of data) if (d.path && d.signedUrl) urls[d.path] = d.signedUrl;
   return urls;
 }
+
+// supabase/migrate_phase38_my_personal_info.sql — the signed-in employee's
+// own Personal Information (201 file).
+export interface MyPersonalInfo {
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  nickname: string;
+  gender: "Male" | "Female";
+  birthdate: string;
+  civilStatus: string;
+  nationality: string;
+  address: string;
+  contactNumber: string;
+  email: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+}
+
+export async function saveMyPersonalInfo(info: MyPersonalInfo): Promise<void> {
+  const { error } = await rpc("set_my_personal_info", {
+    info: {
+      first_name: info.firstName,
+      last_name: info.lastName,
+      middle_name: info.middleName,
+      nickname: info.nickname,
+      gender: info.gender,
+      birthdate: info.birthdate,
+      civil_status: info.civilStatus,
+      nationality: info.nationality,
+      address: info.address,
+      contact_number: info.contactNumber,
+      email: info.email,
+      emergency_contact_name: info.emergencyContactName,
+      emergency_contact_phone: info.emergencyContactPhone,
+    },
+  });
+  if (error) throw new Error(/set_my_personal_info/.test(error.message) ? "Editing your personal information isn't set up yet — ask HR to run the latest database update." : error.message);
+}
