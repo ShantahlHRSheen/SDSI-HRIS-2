@@ -177,7 +177,8 @@ export function businessDaysBetween(start: string, end: string): number {
   const cursor = new Date(startDate);
   while (cursor <= endDate) {
     const dow = cursor.getUTCDay();
-    if (dow !== 0 && dow !== 6) count += 1;
+    // Monday to Saturday are working days; only Sunday is off.
+    if (dow !== 0) count += 1;
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return count;
