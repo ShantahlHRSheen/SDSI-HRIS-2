@@ -104,7 +104,7 @@ export function HandbookAckDocument({ ack, signatures = {}, page }: { ack: Handb
         I, <Blank value={ack.employeeName} width={240} />, an employee of {co.name} (&ldquo;{co.shortName}&rdquo; or the &ldquo;Company&rdquo;), acknowledge and declare the following:
       </p>
       <div style={h2}>Acknowledgments</div>
-      <ol style={{ margin: 0, paddingLeft: "22px" }}>{items1}</ol>
+      <ol style={{ margin: 0, paddingLeft: "22px", listStyleType: "decimal" }}>{items1}</ol>
     </div>
   );
 
@@ -116,7 +116,7 @@ export function HandbookAckDocument({ ack, signatures = {}, page }: { ack: Handb
   );
   const pageTwo = (
     <div>
-      <ol start={7} style={{ margin: 0, paddingLeft: "22px" }}>
+      <ol start={7} style={{ margin: 0, paddingLeft: "22px", listStyleType: "decimal" }}>
         {items2}
       </ol>
       <div style={h2}>Employee Information and Signature</div>
