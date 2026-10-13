@@ -9,7 +9,7 @@ import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDate, fullName, leaveDaysBetween } from "@/lib/helpers";
-import { balanceFor, checkLeaveRequest, isSemiannual, todayInManila } from "@/lib/leave-policy";
+import { balanceFor, checkLeaveRequest, isSemiannual, paidLeaveEligibleFrom, todayInManila } from "@/lib/leave-policy";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_RETENTION_DAYS, KIND_LABEL, LeaveDocuments, prepareUpload, requiredKinds, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
 import { LeaveApplicationModal, LeaveFormModal, FormProgress, canHeadForm, useLeaveForms } from "@/components/leave/LeaveApplication";
 import { LEAVE_CATEGORIES, formStage, type LeaveForm } from "@/lib/leave-form";
@@ -23,7 +23,7 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 };
 
 export default function LeaveManagementPage() {
-  const { employees, leaveTypes, leaveRequests, currentUser, currentEmployee, fileLeaveRequest, decideLeaveRequest, canAttachLeaveFiles, uploadLeaveAttachment, isRealAccount, deleteLeaveRequest } = useHris();
+  const { employees, leaveTypes, leaveRequests, currentUser, currentEmployee, fileLeaveRequest, decideLeaveRequest, canAttachLeaveFiles, uploadLeaveAttachment, isRealAccount, deleteLeaveRequest, leaveCreditAdjustments } = useHris();
   // The online Application for Leave (real accounts): filed by the employee,
   // approved by their department head, received by HR.
   const { forms, error: formsError, reload: reloadForms } = useLeaveForms();
@@ -76,8 +76,10 @@ export default function LeaveManagementPage() {
   // the rest), counting approved and pending requests.
   const balances = useMemo(() => {
     if (!currentEmployee) return [];
-    return leaveTypes.map((lt) => ({ leaveType: lt, ...balanceFor(leaveRequests, currentEmployee.id, lt, today) }));
-  }, [leaveTypes, leaveRequests, currentEmployee, today]);
+    return leaveTypes.map((lt) => ({ leaveType: lt, eligibleFrom: paidLeaveEligibleFrom(currentEmployee.id, lt.id), ...balanceFor(leaveRequests, currentEmployee.id, lt, today) }));
+    // The credit context (date hired, HR's adjustments) is set by the store from these.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaveTypes, leaveRequests, currentEmployee, today, employees, leaveCreditAdjustments]);
 
   const myRequests = useMemo(
     () => leaveRequests.filter((r) => r.employeeId === currentEmployee?.id).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1)),
@@ -193,7 +195,15 @@ export default function LeaveManagementPage() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {balances.map((b) => (
-          <StatTile key={b.leaveType.id} label={b.leaveType.name} value={`${b.remaining}`} hint={isSemiannual(b.leaveType.id) ? `of ${b.credits} · ${b.period.label.slice(0, 7)}` : `of ${b.credits}`} compact />
+          <StatTile key={b.leaveType.id} label={b.leaveType.name} value={`${b.remaining}`} hint={
+              b.eligibleFrom && today < b.eligibleFrom
+                ? `With pay from ${formatDate(b.eligibleFrom)} (1 year of service)`
+                : isSemiannual(b.leaveType.id)
+                  ? `of ${b.credits} · ${b.period.label.slice(0, 7)}`
+                  : `of ${b.credits}`
+            }
+            compact
+          />
         ))}
       </div>
 

@@ -3,6 +3,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { fullName, nextEmployeeNumber, setReferenceData } from "./helpers";
+import { setLeaveCreditContext, type LeaveCreditAdjustment } from "./leave-policy";
+import { fetchLeaveCreditAdjustments } from "./supabase/leave-credits";
 import { getSupabaseClient } from "./supabase/client";
 import { reportSaveError } from "./save-errors";
 import { companyStorageKey, currentCompany } from "./companies";
@@ -241,6 +243,8 @@ interface HrisContextShape {
   // salaryAdjustmentsError is set when they can't be loaded (e.g. the
   // phase 19 migration hasn't run yet).
   salaryAdjustments: SalaryAdjustment[];
+  // HR's leave credit adjustments (balances from the leave sheet).
+  leaveCreditAdjustments: LeaveCreditAdjustment[];
   salaryAdjustmentsError: string | null;
   addSalaryAdjustment: (input: SalaryAdjustmentInput) => Promise<boolean>;
   updateSalaryAdjustment: (id: string, patch: Partial<Omit<SalaryAdjustmentInput, "periodId">>) => Promise<boolean>;
@@ -514,6 +518,20 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
         if (active) setDataLoadedFor(supabaseSession.user.id);
       }
     })();
+    return () => {
+      active = false;
+    };
+  }, [supabaseSession]);
+
+  // Leave credit adjustments: loaded on their own, like the salary adjustments.
+  const [leaveCreditAdjustments, setLeaveCreditAdjustments] = useState<LeaveCreditAdjustment[]>([]);
+  useEffect(() => {
+    if (!supabaseSession) return;
+    let active = true;
+    fetchLeaveCreditAdjustments().then(
+      (list) => active && setLeaveCreditAdjustments(list),
+      (err) => console.warn("Couldn't load leave credit adjustments", err),
+    );
     return () => {
       active = false;
     };
@@ -1677,6 +1695,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
   // the lists actually loaded, before anything below renders with them.
   setReferenceData({ branches: state.branches, departments: state.departments, positions: state.positions });
   setSalaryAdjustments(salaryAdjustments);
+  // Leave balances: the 1-year rule (date hired) and HR's adjustments.
+  setLeaveCreditContext({ employees: state.employees, adjustments: leaveCreditAdjustments });
 
   const addSalaryAdjustment: HrisContextShape["addSalaryAdjustment"] = useCallback(
     async (input) => {
@@ -1748,6 +1768,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     payrollPeriods: state.payrollPeriods,
     generatedBirForms: state.generatedBirForms,
     salaryAdjustments,
+    leaveCreditAdjustments,
     salaryAdjustmentsError,
     addSalaryAdjustment,
     updateSalaryAdjustment,
