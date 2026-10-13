@@ -114,7 +114,8 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "10px", alignItems: "end" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ borderBottom: "1px solid #111", paddingBottom: "2px", fontWeight: 700 }}>
-            {dates} ({num(form.days)} day{form.days === 1 ? "" : "s"})
+            {dates} ({num(form.days)} day{form.days === 1 ? "" : "s"}
+            {form.unpaidDays ? `: ${num(form.days - form.unpaidDays)} with pay, ${num(form.unpaidDays)} without pay` : ""})
           </div>
           <div style={{ fontSize: "8.5pt" }}>(Inclusive Dates)</div>
         </div>

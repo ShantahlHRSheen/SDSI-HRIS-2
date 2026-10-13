@@ -26,6 +26,11 @@ export const LEAVE_CATEGORIES: { id: LeaveCategory; label: string; leaveTypeId: 
   { id: "bereavement_without_pay", label: "Bereavement without Pay", leaveTypeId: "lt-lwop" },
 ];
 
+// The categories paid from leave credits. When the credits run short, the
+// rest of the days are filed as Leave Without Pay on the same form
+// (supabase/migrate_phase37_leave_form_unpaid_days.sql).
+export const PAID_CATEGORIES: LeaveCategory[] = ["vacation_with_pay", "sick_with_pay", "bereavement_with_pay"];
+
 export const isSickCategory = (c: LeaveCategory) => c === "sick_with_pay" || c === "sick_without_pay";
 export const isVacationCategory = (c: LeaveCategory) => c === "vacation_with_pay" || c === "vacation_without_pay" || c === "absent_without_pay";
 
@@ -61,8 +66,9 @@ export const HEAD_DAY_FIELDS = [
 export type HeadDayField = (typeof HEAD_DAY_FIELDS)[number]["id"];
 export type HeadDays = Partial<Record<HeadDayField, number>>;
 
-// What the head's part starts with: the days applied for, under their kind.
-export function defaultHeadDays(category: LeaveCategory, days: number): HeadDays {
+// What the head's part starts with: the days applied for, under their kind
+// (and the days without pay, if the credits ran short).
+export function defaultHeadDays(category: LeaveCategory, days: number, unpaidDays = 0): HeadDays {
   const field: Record<LeaveCategory, HeadDayField> = {
     vacation_with_pay: "vlWithPay",
     vacation_without_pay: "vlWithoutPay",
@@ -73,7 +79,11 @@ export function defaultHeadDays(category: LeaveCategory, days: number): HeadDays
     bereavement_without_pay: "absentWithoutPay",
     absent_without_pay: "absentWithoutPay",
   };
-  return { [field[category]]: days };
+  const unpaidField: Partial<Record<LeaveCategory, HeadDayField>> = { vacation_with_pay: "vlWithoutPay", sick_with_pay: "slWithoutPay", bereavement_with_pay: "absentWithoutPay" };
+  const out: HeadDays = { [field[category]]: days };
+  const u = unpaidField[category];
+  if (unpaidDays > 0 && u) out[u] = unpaidDays;
+  return out;
 }
 
 export interface LeaveForm {
@@ -85,6 +95,9 @@ export interface LeaveForm {
   sickDetails: string;
   reason: string;
   credits: LeaveCredits;
+  // Days without pay filed with this form (a linked Leave Without Pay request).
+  unpaidRequestId: string | null;
+  unpaidDays: number | null;
   employeeName: string;
   designation: string;
   branch: string;
