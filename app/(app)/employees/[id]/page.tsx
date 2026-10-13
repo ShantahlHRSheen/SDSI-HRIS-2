@@ -12,6 +12,7 @@ import { DISCIPLINARY_LABELS } from "@/lib/types";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
 import { EmployeeLoginButton } from "@/components/employees/EmployeeLoginButton";
 import { EmergencyContactModal, NicknameModal } from "@/components/employees/EmergencyContactModal";
+import { MyPersonalInfoModal } from "@/components/employees/MyPersonalInfoModal";
 
 export default function EmployeeProfilePage() {
   const params = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ export default function EmployeeProfilePage() {
   const [editing, setEditing] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
+  const [editingMine, setEditingMine] = useState(false);
   const canEdit = currentUser?.roles.includes("hr_admin");
 
   if (!employee) {
@@ -106,9 +108,19 @@ export default function EmployeeProfilePage() {
 
       {editingContact && <EmergencyContactModal employee={employee} open onClose={() => setEditingContact(false)} />}
       {editingNickname && <NicknameModal employee={employee} onClose={() => setEditingNickname(false)} />}
+      {editingMine && <MyPersonalInfoModal employee={employee} onClose={() => setEditingMine(false)} />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Section title="Personal Information">
+        <Section
+          title="Personal Information"
+          action={
+            employee.id === currentEmployee?.id ? (
+              <button onClick={() => setEditingMine(true)} className="flex items-center gap-1 rounded-md border border-[var(--border-hairline)] px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                <Pencil size={12} /> Edit my information
+              </button>
+            ) : undefined
+          }
+        >
           <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
             <span className="shrink-0 text-[var(--text-muted)]">Nickname</span>
             <span className="flex min-w-0 items-center gap-2">
@@ -225,10 +237,13 @@ export default function EmployeeProfilePage() {
   );
 }
 
-function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+function Section({ title, note, action, children }: { title: string; note?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-      <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">{title}</div>
+      <div className="mb-3 flex items-center justify-between gap-2 text-sm font-medium text-[var(--text-primary)]">
+        {title}
+        {action}
+      </div>
       {note && <div className="mb-2 text-xs text-[var(--text-muted)]">{note}</div>}
       <div className="divide-y divide-[var(--gridline)]">{children}</div>
     </div>
