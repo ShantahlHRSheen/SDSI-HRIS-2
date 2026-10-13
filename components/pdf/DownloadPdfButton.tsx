@@ -14,9 +14,14 @@ const A4_H_PX = 1123; // 297 mm
 const A4_W_PT = 595.28;
 const A4_H_PT = 841.89;
 
-async function buildPdf(pages: HTMLElement[]): Promise<Blob> {
+async function buildPdf(pages: HTMLElement[], prepend?: () => Promise<ArrayBuffer>): Promise<Blob> {
   const [{ toPng }, { PDFDocument }] = await Promise.all([import("html-to-image"), import("pdf-lib")]);
   const pdf = await PDFDocument.create();
+  // An existing PDF to put first (e.g. the handbook before its signed acknowledgment).
+  if (prepend) {
+    const src = await PDFDocument.load(await prepend(), { ignoreEncryption: true });
+    for (const p of await pdf.copyPages(src, src.getPageIndices())) pdf.addPage(p);
+  }
   for (const el of pages) {
     const dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: "#ffffff", cacheBust: true });
     const png = await pdf.embedPng(dataUrl);
@@ -82,14 +87,26 @@ export function PdfPage({ children, form = false }: { children: React.ReactNode;
   );
 }
 
-export function DownloadPdfButton({ filename, children, label = "Download PDF", className }: { filename: string; children: React.ReactNode; label?: string; className?: string }) {
+export function DownloadPdfButton({
+  filename,
+  children,
+  label = "Download PDF",
+  className,
+  prependPdf,
+}: {
+  filename: string;
+  children: React.ReactNode;
+  label?: string;
+  className?: string;
+  prependPdf?: () => Promise<ArrayBuffer>;
+}) {
   const [state, setState] = useState<"idle" | "working" | "done" | "error">("idle");
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
 
   async function onReady(pages: HTMLElement[]) {
     try {
-      const blob = await buildPdf(pages);
+      const blob = await buildPdf(pages, prependPdf);
       setUrl(saveBlob(blob, filename));
       setState("done");
     } catch (err) {

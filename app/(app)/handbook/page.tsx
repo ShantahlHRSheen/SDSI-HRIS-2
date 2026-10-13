@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { reportSaveError } from "@/lib/save-errors";
 import { fetchCompanyDocument, HANDBOOK_PATH, replaceCompanyDocument, type CompanyDocument } from "@/lib/supabase/company-documents";
+import { fetchHandbookInfo, recordHandbookDownload, type HandbookInfo } from "@/lib/supabase/handbook-acks";
+import { HandbookAckList, HandbookInfoEditor, MyHandbookAck, useHandbookAcks } from "@/components/handbook/HandbookAcknowledgment";
 
 const downloadName = () => `${currentCompany().shortName} Employee Handbook.pdf`;
 
@@ -17,8 +19,35 @@ function formatSize(bytes: number | null): string {
 }
 
 export default function HandbookPage() {
-  const { currentUser, isRealAccount } = useHris();
+  const { currentUser, currentEmployee, isRealAccount } = useHris();
   const isHr = !!currentUser?.roles.includes("hr_admin");
+  // HR and upper management see everyone's acknowledgment forms.
+  const seesAll = isHr || !!currentUser?.roles.includes("upper_management");
+  const [info, setInfo] = useState<HandbookInfo | null>(null);
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const loadInfo = useCallback(() => {
+    fetchHandbookInfo().then(
+      (i) => {
+        setInfo(i);
+        setInfoError(null);
+      },
+      (e: Error) => setInfoError(e.message),
+    );
+  }, []);
+  const { acks, downloads, error: ackError, reload: reloadAcks } = useHandbookAcks(isRealAccount);
+  useEffect(() => {
+    if (isRealAccount) loadInfo();
+  }, [isRealAccount, loadInfo]);
+  const reloadAll = useCallback(() => {
+    loadInfo();
+    reloadAcks();
+  }, [loadInfo, reloadAcks]);
+  // Opening or downloading the handbook is recorded (the "Date of HRIS
+  // access / download" on the acknowledgment form).
+  const recordDownload = useCallback(() => {
+    if (!currentEmployee) return;
+    recordHandbookDownload(currentEmployee.id).then(reloadAcks, () => {});
+  }, [currentEmployee, reloadAcks]);
   const [doc, setDoc] = useState<CompanyDocument | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -99,19 +128,28 @@ export default function HandbookPage() {
       {doc && (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+            <a href={doc.url} target="_blank" rel="noreferrer" onClick={recordDownload} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
               <ExternalLink size={16} /> Open full screen
             </a>
-            <a href={doc.downloadUrl} className={button}>
+            <a href={doc.downloadUrl} onClick={recordDownload} className={button}>
               <Download size={16} /> Download PDF
             </a>
             <span className="text-xs text-[var(--text-muted)]">
               {[updated && `Updated ${updated}`, formatSize(doc.sizeBytes)].filter(Boolean).join(" · ")}
             </span>
           </div>
+          {/* Only HR sees set-up problems (e.g. before the database update is run). */}
+          {isHr && (infoError || ackError) && <div className="mb-3 text-sm text-[var(--status-critical)]">{infoError || ackError}</div>}
+          {info && isHr && (
+            <div className="mb-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-3">
+              <HandbookInfoEditor key={`${info.version}|${info.effectiveDate}`} info={info} onSaved={reloadAll} />
+            </div>
+          )}
+          {info && !infoError && !ackError && <MyHandbookAck info={info} acks={acks} downloads={downloads} doc={doc} onChanged={reloadAll} />}
           {/* Phones generally can't show a PDF inside a page, so they get the buttons above. */}
           <iframe src={doc.url} title={`${currentCompany().shortName} Employee Handbook`} className="hidden h-[calc(100dvh-13rem)] min-h-[520px] w-full rounded-xl border border-[var(--border-hairline)] bg-white md:block" />
           <p className="mt-2 text-xs text-[var(--text-muted)] md:hidden">On a phone, tap &ldquo;Open full screen&rdquo; to read the handbook, or download it to keep a copy.</p>
+          {info && seesAll && !ackError && <HandbookAckList info={info} acks={acks} downloads={downloads} doc={doc} onChanged={reloadAll} />}
         </>
       )}
     </div>
