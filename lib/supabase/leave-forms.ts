@@ -31,6 +31,8 @@ const toForm = (r: Row): LeaveForm => ({
   sickDetails: String(r.sick_details ?? ""),
   reason: String(r.reason ?? ""),
   credits: (r.credits as LeaveCredits) ?? { asOf: "", vl: 0, sl: 0, lessVl: 0, lessSl: 0 },
+  unpaidRequestId: (r.unpaid_request_id as string | null) ?? null,
+  unpaidDays: r.unpaid_days === null || r.unpaid_days === undefined ? null : Number(r.unpaid_days),
   employeeName: String(r.employee_name ?? ""),
   designation: String(r.designation ?? ""),
   branch: String(r.branch ?? ""),
@@ -128,8 +130,11 @@ export async function submitLeaveForm(input: {
   sickDetails: string;
   reason: string;
   credits: LeaveCredits;
+  unpaidRequestId?: string | null;
 }): Promise<void> {
   const { error } = await client().from("leave_forms").insert({
+    // Only sent when there are days without pay (phase 37).
+    ...(input.unpaidRequestId ? { unpaid_request_id: input.unpaidRequestId } : {}),
     leave_request_id: input.leaveRequestId,
     employee_id: input.employeeId,
     application_date: input.applicationDate,
@@ -142,6 +147,12 @@ export async function submitLeaveForm(input: {
   // Already submitted (a retry after a dropped connection): nothing to do.
   if (error && /duplicate key|already exists/i.test(error.message)) return;
   if (error) throw new Error(/row-level security/i.test(error.message) ? "Couldn't submit the form — sign it first." : friendly(error.message));
+}
+
+// Whether paid + without-pay days on one form are set up (phase 37).
+export async function unpaidDaysSupported(): Promise<boolean> {
+  const { error } = await client().from("leave_forms").select("unpaid_request_id").range(0, 0);
+  return !error;
 }
 
 // Whether the form for this request was already submitted.

@@ -27,7 +27,8 @@ export default function LeaveManagementPage() {
   // The online Application for Leave (real accounts): filed by the employee,
   // approved by their department head, received by HR.
   const { forms, error: formsError, reload: reloadForms } = useLeaveForms();
-  const formByRequest = useMemo(() => new Map(forms.map((f) => [f.leaveRequestId, f])), [forms]);
+  // A form's request — and its linked days without pay, if any.
+  const formByRequest = useMemo(() => new Map(forms.flatMap((f) => [[f.leaveRequestId, f] as const, ...(f.unpaidRequestId ? [[f.unpaidRequestId, f] as const] : [])])), [forms]);
   const [showApply, setShowApply] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const viewingForm = viewing ? formByRequest.get(viewing) : undefined;
@@ -54,7 +55,8 @@ export default function LeaveManagementPage() {
     if (!deleting) return;
     setDeleteBusy(true);
     setDeleteError(null);
-    const err = await deleteLeaveRequest(deleting.id);
+    // Days without pay go with their form: delete the form's own request (which removes both).
+    const err = await deleteLeaveRequest(formByRequest.get(deleting.id)?.leaveRequestId ?? deleting.id);
     setDeleteBusy(false);
     if (err) return setDeleteError(err);
     setDeleting(null);

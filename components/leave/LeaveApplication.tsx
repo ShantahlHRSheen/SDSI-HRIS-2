@@ -6,11 +6,12 @@ import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { leaveDaysBetween } from "@/lib/helpers";
-import { checkLeaveRequest, todayInManila } from "@/lib/leave-policy";
+import { balanceFor, checkLeaveRequest, todayInManila } from "@/lib/leave-policy";
 import { prepareSignature } from "@/lib/id-images";
 import {
   HEAD_DAY_FIELDS,
   LEAVE_CATEGORIES,
+  PAID_CATEGORIES,
   defaultHeadDays,
   formProgress,
   formStage,
@@ -31,6 +32,7 @@ import {
   saveMySignature,
   signLeaveForm,
   submitLeaveForm,
+  unpaidDaysSupported,
   type LeaveFormSigner,
 } from "@/lib/supabase/leave-forms";
 import { LeaveFormDocument, type LeaveFormDocData } from "@/components/leave/LeaveFormDocument";
@@ -133,9 +135,12 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
   const today = useMemo(() => todayInManila(), []);
   const [details, setDetails] = useState<{ designation: string; branch: string; department: string; departmentHead: string } | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  // Paid + without-pay days on one form need the phase 37 database update.
+  const [canSplit, setCanSplit] = useState(false);
   useEffect(() => {
     if (!open) return;
     fetchMyLeaveFormDetails().then(setDetails, (e: Error) => setDetailsError(e.message));
+    unpaidDaysSupported().then(setCanSplit, () => setCanSplit(false));
   }, [open]);
 
   const blank = { applicationDate: today, category: "vacation_with_pay" as LeaveCategory, sickPlace: null as "hospital" | "out_patient" | null, sickDetails: "", reason: "", startDate: today, endDate: today, halfDay: false };
@@ -146,19 +151,30 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
   const [error, setError] = useState<string | null>(null);
   // A request already filed whose form didn't go through — retried without filing again.
   const [filedId, setFiledId] = useState<string | null>(null);
+  const [filedUnpaidId, setFiledUnpaidId] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
 
   const category = LEAVE_CATEGORIES.find((c) => c.id === form.category)!;
   const leaveType = leaveTypes.find((t) => t.id === category.leaveTypeId);
   // Working days, or calendar days for maternity leave.
   const businessDays = form.startDate && form.endDate && form.endDate >= form.startDate ? leaveDaysBetween(category.leaveTypeId, form.startDate, form.endDate) : 0;
-  const halfDayAllowed = businessDays === 1 && form.startDate === form.endDate;
-  const days = halfDayAllowed && form.halfDay ? 0.5 : businessDays;
+  // A single day can be a half day; on a longer leave, the last day can be.
+  const halfDayAllowed = businessDays >= 1 && category.leaveTypeId !== "lt-ml";
+  const days = halfDayAllowed && form.halfDay ? businessDays - 0.5 : businessDays;
   const sick = isSickCategory(form.category);
-  const credits = currentEmployee ? leaveCredits(leaveRequests, currentEmployee.id, leaveTypes, form.category, form.startDate, days, form.applicationDate || today, filedId ?? undefined) : null;
+  // Paid leave beyond the remaining credits: the rest is without pay, on the same form.
+  const lwopType = leaveTypes.find((t) => t.id === "lt-lwop");
+  const paidLeft =
+    currentEmployee && leaveType && PAID_CATEGORIES.includes(form.category) ? balanceFor(leaveRequests, currentEmployee.id, leaveType, form.startDate || today, filedId ?? undefined).remaining : null;
+  const unpaidDays = canSplit && lwopType && paidLeft !== null && days > paidLeft ? Math.round((days - Math.floor(paidLeft * 2) / 2) * 100) / 100 : 0;
+  const paidDays = Math.round((days - unpaidDays) * 100) / 100;
+  const credits = currentEmployee ? leaveCredits(leaveRequests, currentEmployee.id, leaveTypes, form.category, form.startDate, paidDays, form.applicationDate || today, filedId ?? undefined) : null;
   const creditError =
     currentEmployee && leaveType && days > 0 && !filedId
-      ? checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType, startDate: form.startDate, endDate: form.endDate, days })
+      ? unpaidDays > 0 && paidDays <= 0
+        ? `You have no ${leaveType.name} left — choose the "without Pay" option instead.`
+        : (checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType, startDate: form.startDate, endDate: form.endDate, days: paidDays }) ??
+          (unpaidDays > 0 && lwopType ? checkLeaveRequest(leaveRequests, { employeeId: currentEmployee.id, leaveType: lwopType, startDate: form.startDate, endDate: form.endDate, days: unpaidDays }) : null))
       : null;
   const reasonNeeded = !sick;
   const missing = !form.applicationDate
@@ -180,6 +196,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
     setMedical(null);
     setError(null);
     setFiledId(null);
+    setFiledUnpaidId(null);
     setPreview(false);
     onClose();
   }
@@ -192,9 +209,17 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
       let id = filedId;
       if (!id) {
         const reasonText = form.reason.trim() || `${category.label}${sick && form.sickPlace ? ` (${form.sickPlace === "hospital" ? `In Hospital: ${form.sickDetails.trim()}` : "Out Patient"})` : ""}`;
-        id = await fileLeaveRequest({ employeeId: currentEmployee.id, leaveTypeId: category.leaveTypeId, startDate: form.startDate, endDate: form.endDate, days, reason: reasonText });
+        id = await fileLeaveRequest({ employeeId: currentEmployee.id, leaveTypeId: category.leaveTypeId, startDate: form.startDate, endDate: form.endDate, days: paidDays, reason: reasonText });
         if (!id) throw new Error("Couldn't file the leave request — please try again.");
         setFiledId(id);
+      }
+      // The days without pay: a Leave Without Pay request for the same dates, linked to the form.
+      let unpaidId = filedUnpaidId;
+      if (unpaidDays > 0 && !unpaidId) {
+        const reasonText = `${form.reason.trim() || category.label} (without pay — leave credits used up)`;
+        unpaidId = await fileLeaveRequest({ employeeId: currentEmployee.id, leaveTypeId: "lt-lwop", startDate: form.startDate, endDate: form.endDate, days: unpaidDays, reason: reasonText });
+        if (!unpaidId) throw new Error("Couldn't file the days without pay — please try again.");
+        setFiledUnpaidId(unpaidId);
       }
       // A retry after a dropped connection may find the form already in.
       const done = filedId ? await leaveFormExists(id) : false;
@@ -208,6 +233,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
         sickDetails: sick && form.sickPlace === "hospital" ? form.sickDetails : "",
         reason: form.reason,
         credits,
+        unpaidRequestId: unpaidId,
       });
       if (medical) {
         const err = await uploadLeaveAttachment({ leaveRequestId: id, employeeId: currentEmployee.id, kind: "medical_certificate", file: await prepareUpload(medical) });
@@ -238,6 +264,8 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
           sickDetails: form.sickDetails,
           reason: form.reason,
           credits,
+          unpaidRequestId: null,
+          unpaidDays: unpaidDays || null,
           employeeName: `${currentEmployee.firstName} ${currentEmployee.lastName}`,
           designation: details?.designation ?? "",
           branch: details?.branch ?? "",
@@ -375,10 +403,19 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
               </span>
               {halfDayAllowed && (
                 <label className="flex items-center gap-1.5">
-                  <input type="checkbox" checked={form.halfDay} onChange={(e) => setForm((f) => ({ ...f, halfDay: e.target.checked }))} /> Half day
+                  <input type="checkbox" checked={form.halfDay} onChange={(e) => setForm((f) => ({ ...f, halfDay: e.target.checked }))} /> {businessDays === 1 ? "Half day" : "Last day is a half day"}
                 </label>
               )}
             </div>
+            {unpaidDays > 0 && paidDays > 0 && leaveType && (
+              <div className="mt-2 rounded-lg border border-[var(--status-warning)]/50 px-3 py-2 text-xs text-[var(--text-primary)]">
+                You have {paidLeft} day{paidLeft === 1 ? "" : "s"} of {leaveType.name} left, so this application is{" "}
+                <span className="font-semibold">
+                  {paidDays} day{paidDays === 1 ? "" : "s"} with pay + {unpaidDays} day{unpaidDays === 1 ? "" : "s"} without pay
+                </span>
+                . Both are on this form and are approved together.
+              </div>
+            )}
             {creditError && <div className="mt-1 text-xs text-[var(--status-critical)]">{creditError}</div>}
           </div>
 
@@ -462,7 +499,7 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
 
   const [decision, setDecision] = useState<"approved" | "disapproved" | null>(null);
   const [reason, setReason] = useState("");
-  const [headDays, setHeadDays] = useState<HeadDays>(() => (request ? defaultHeadDays(form.category, request.days) : {}));
+  const [headDays, setHeadDays] = useState<HeadDays>(() => (request ? defaultHeadDays(form.category, request.days, form.unpaidDays ?? 0) : {}));
   const [hasSignature, setHasSignature] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -475,7 +512,8 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
     ...form,
     startDate: request?.startDate ?? "",
     endDate: request?.endDate ?? "",
-    days: request?.days ?? 0,
+    // With the days without pay filed on the same form.
+    days: (request?.days ?? 0) + (form.unpaidDays ?? 0),
     headDays: stage === "waiting_head" ? headDays : form.headDays,
   };
 
