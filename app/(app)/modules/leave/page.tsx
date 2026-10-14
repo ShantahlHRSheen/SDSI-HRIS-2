@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarPlus, CalendarRange, Check, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { EncodedBox, usePayrollEncoded } from "@/lib/supabase/payroll-encoded";
 import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
@@ -38,6 +39,9 @@ export default function LeaveManagementPage() {
   const [rejectNote, setRejectNote] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>("all");
   const [search, setSearch] = useState("");
+  // "Encoded in payroll" ticks (HR / payroll), shown beside each name in "All requests".
+  const encoded = usePayrollEncoded("leave");
+  const [encodedFilter, setEncodedFilter] = useState<"all" | "no" | "yes">("all");
 
   const isHrOrUpper = currentUser?.roles.some((r) => ["hr_admin", "upper_management"].includes(r));
   const today = useMemo(() => todayInManila(), []);
@@ -332,6 +336,13 @@ export default function LeaveManagementPage() {
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
+              {encoded.ready && (
+                <select value={encodedFilter} onChange={(e) => setEncodedFilter(e.target.value as typeof encodedFilter)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-xs" aria-label="Encoded in payroll">
+                  <option value="all">Payroll: all</option>
+                  <option value="no">Not yet encoded</option>
+                  <option value="yes">Encoded in payroll</option>
+                </select>
+              )}
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" className="w-48 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-xs" />
             </div>
           </div>
@@ -342,7 +353,8 @@ export default function LeaveManagementPage() {
               showEmployee
               onViewForm={setViewing}
               onDelete={isHrManager ? (r) => (setDeleteError(null), setDeleting(r)) : undefined}
-              rows={allRequests.map((r) => {
+              encoded={encoded}
+              rows={allRequests.filter((r) => encodedFilter === "all" || encoded.marks.has(r.id) === (encodedFilter === "yes")).map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
                 return {
                   id: r.id,
@@ -518,11 +530,13 @@ function FormQueue({ title, forms, requestById, action, onOpen }: { title: strin
 function RequestsTable({
   rows,
   showEmployee = false,
+  encoded,
   onViewForm,
   onDelete,
 }: {
   rows: { id: string; request: LeaveRequest; form?: LeaveForm; canUpload: boolean; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
+  encoded?: ReturnType<typeof usePayrollEncoded>;
   onViewForm?: (id: string) => void;
   onDelete?: (request: LeaveRequest) => void;
 }) {
@@ -531,7 +545,7 @@ function RequestsTable({
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
-            {showEmployee && <th className="px-3 py-2 font-medium">Employee</th>}
+            {showEmployee && <th className="px-3 py-2 font-medium">{encoded?.ready ? "Encoded · Employee" : "Employee"}</th>}
             <th className="px-3 py-2 font-medium">Type</th>
             <th className="px-3 py-2 font-medium">Period</th>
             <th className="px-3 py-2 font-medium">Reason</th>
@@ -543,7 +557,14 @@ function RequestsTable({
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className="border-b border-[var(--gridline)] last:border-0">
-              {showEmployee && <td className="px-3 py-2 text-[var(--text-primary)]">{r.employee}</td>}
+              {showEmployee && (
+                <td className="px-3 py-2 text-[var(--text-primary)]">
+                  <span className="flex items-center gap-2">
+                    {encoded?.ready && <EncodedBox id={r.id} marks={encoded.marks} canTick={encoded.canTick} onToggle={encoded.toggle} />}
+                    {r.employee}
+                  </span>
+                </td>
+              )}
               <td className="px-3 py-2 text-[var(--text-primary)]">{r.primary}</td>
               <td className="px-3 py-2 text-[var(--text-secondary)]">{r.secondary}</td>
               <td className="max-w-xs px-3 py-2 text-[var(--text-secondary)]">
