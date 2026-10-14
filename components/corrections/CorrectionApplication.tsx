@@ -22,6 +22,8 @@ import { MySignature } from "@/components/leave/LeaveApplication";
 import { CorrectionFormDocument, type CorrectionFormDocData } from "@/components/corrections/CorrectionFormDocument";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
+import { BranchDecision } from "@/components/forms/BranchApproval";
+import { NO_BRANCH, canBranch } from "@/lib/branch-approval";
 
 // Every attendance correction form the user may see (real accounts only).
 export function useCorrectionForms() {
@@ -139,6 +141,7 @@ export function CorrectionApplicationModal({ open, onClose, onDone }: { open: bo
         headSignedAt: null,
         receivedName: null,
         receivedAt: null,
+        ...NO_BRANCH,
       }
     : null;
 
@@ -331,6 +334,8 @@ export function CorrectionFormModal({ form, onClose, onChanged }: { form: Correc
             <CorrectionFormDocument form={form} signatures={sigs} />
           </div>
         </div>
+
+        {canBranch(form, me) && <BranchDecision kind="corr" requestId={id} onDone={async () => { await reloadRequests(); onChanged(); loadSigs(); }} />}
 
         {canHead && (
           <div className="space-y-3 rounded-lg border border-[var(--border-hairline)] p-3">

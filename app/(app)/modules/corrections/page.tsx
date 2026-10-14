@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, FileEdit, FileText, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
@@ -30,9 +31,10 @@ export default function AttendanceCorrectionsPage() {
   const [viewing, setViewing] = useState<string | null>(null);
   const viewingForm = viewing ? formByRequest.get(viewing) : undefined;
   const isHrManager = !!currentUser?.roles.includes("hr_admin");
-  const formsToSign = forms.filter((f) => canHeadCorrection(f, currentEmployee?.id, isHrManager));
+  // To sign as branch approver or as department head.
+  const formsToSign = forms.filter((f) => canBranch(f, currentEmployee?.id) || canHeadCorrection(f, currentEmployee?.id, isHrManager));
   const formsToReceive = isHrManager ? forms.filter((f) => correctionStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
-  const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
+  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");

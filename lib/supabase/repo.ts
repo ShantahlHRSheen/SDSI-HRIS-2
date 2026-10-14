@@ -81,7 +81,13 @@ async function selectAll<T>(page: (from: number, to: number) => PromiseLike<{ da
 // ---- Branches ---------------------------------------------------------------
 
 function toBranch(r: BranchRow): Branch {
-  return { id: r.id, name: r.name, code: r.code, address: r.address };
+  return { id: r.id, name: r.name, code: r.code, address: r.address, approverId: r.approver_id };
+}
+
+// approverId → approver_id (only when given, so it works before phase 40 too).
+function toBranchRow(b: Partial<Omit<Branch, "id">>): Partial<Omit<BranchRow, "id">> {
+  const { approverId, ...rest } = b;
+  return approverId === undefined ? rest : { ...rest, approver_id: approverId || null };
 }
 
 export async function fetchBranches(): Promise<Branch[]> {
@@ -89,12 +95,12 @@ export async function fetchBranches(): Promise<Branch[]> {
   return data.map(toBranch);
 }
 export async function insertBranch(input: Omit<Branch, "id">): Promise<Branch> {
-  const { data, error } = await getSupabaseClient().from("branches").insert(input).select().single();
+  const { data, error } = await getSupabaseClient().from("branches").insert(toBranchRow(input) as Omit<BranchRow, "id">).select().single();
   if (error) throw error;
   return toBranch(data);
 }
 export async function updateBranchRow(id: string, patch: Partial<Omit<Branch, "id">>): Promise<Branch> {
-  const { data, error } = await getSupabaseClient().from("branches").update(patch).eq("id", id).select().single();
+  const { data, error } = await getSupabaseClient().from("branches").update(toBranchRow(patch)).eq("id", id).select().single();
   if (error) throw error;
   return toBranch(data);
 }

@@ -31,6 +31,7 @@ export type BranchRow = {
   name: string;
   code: string;
   address: string;
+  approver_id?: string | null;
 };
 
 export type DepartmentRow = {

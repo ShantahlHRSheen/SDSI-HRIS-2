@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./client";
+import { branchFromRow } from "../branch-approval";
 import type { CorrectionForm, CorrectionType } from "../correction-form";
 import { placeMySignature, signatureUrlsIn, type LeaveFormSigner } from "./leave-forms";
 
@@ -39,6 +40,7 @@ const toForm = (r: Row): CorrectionForm => ({
   departmentHeadId: (r.department_head_id as string | null) ?? null,
   departmentHead: String(r.department_head ?? ""),
   submittedAt: String(r.submitted_at ?? ""),
+  ...branchFromRow(r),
   headDecision: (r.head_decision as CorrectionForm["headDecision"]) ?? null,
   headReason: (r.head_reason as string | null) ?? null,
   headSignedName: (r.head_signed_name as string | null) ?? null,

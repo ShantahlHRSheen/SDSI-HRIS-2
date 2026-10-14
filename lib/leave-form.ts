@@ -1,5 +1,6 @@
 import type { LeaveRequest, LeaveType } from "./types";
 import { balanceFor } from "./leave-policy";
+import { branchDisapproved, waitingBranch, type BranchApproval } from "./branch-approval";
 
 // The company's "APPLICATION FOR LEAVE" form, filled in online
 // (supabase/migrate_phase27_leave_forms.sql).
@@ -86,7 +87,7 @@ export function defaultHeadDays(category: LeaveCategory, days: number, unpaidDay
   return out;
 }
 
-export interface LeaveForm {
+export interface LeaveForm extends BranchApproval {
   leaveRequestId: string;
   employeeId: string;
   applicationDate: string;
@@ -116,14 +117,21 @@ export interface LeaveForm {
   receivedAt: string | null;
 }
 
-export type LeaveFormStage = "waiting_head" | "waiting_hr" | "received";
+export type LeaveFormStage = "waiting_branch" | "branch_disapproved" | "waiting_head" | "waiting_hr" | "received";
 
 export function formStage(f: LeaveForm): LeaveFormStage {
+  if (waitingBranch(f)) return "waiting_branch";
+  if (branchDisapproved(f)) return "branch_disapproved";
   return f.receivedAt ? "received" : f.headDecision ? "waiting_hr" : "waiting_head";
 }
 
+// Nothing more to sign: can be printed / downloaded.
+export const formFinal = (f: LeaveForm) => ["received", "branch_disapproved"].includes(formStage(f));
+
 // The progress shown to the employee.
 export function formProgress(f: LeaveForm): { label: string; tone: "warning" | "good" | "critical" | "info" } {
+  if (waitingBranch(f)) return { label: `Waiting for branch approval (${f.branchApprover})`, tone: "warning" };
+  if (branchDisapproved(f)) return { label: "Disapproved by the branch approver", tone: "critical" };
   const decision = f.headDecision === "approved" ? "Approved" : "Disapproved";
   if (f.receivedAt) return { label: `${decision} · Received by HR`, tone: f.headDecision === "approved" ? "good" : "critical" };
   if (f.headDecision) return { label: `${decision} by Department Head · Waiting for HR`, tone: f.headDecision === "approved" ? "info" : "critical" };

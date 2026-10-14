@@ -24,6 +24,8 @@ import { MySignature } from "@/components/leave/LeaveApplication";
 import { OvertimeFormDocument, type OvertimeFormDocData } from "@/components/overtime/OvertimeFormDocument";
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
+import { BranchDecision } from "@/components/forms/BranchApproval";
+import { NO_BRANCH, canBranch } from "@/lib/branch-approval";
 
 // Every overtime form the user may see (real accounts only).
 export function useOvertimeForms() {
@@ -163,6 +165,7 @@ export function OvertimeApplicationModal({ open, returned, onClose, onDone }: { 
         hrReason: null,
         hrSignedName: null,
         hrSignedAt: null,
+        ...NO_BRANCH,
       }
     : null;
 
@@ -382,6 +385,8 @@ export function OvertimeFormModal({ form, onClose, onChanged, onClarify }: { for
           </div>
         </div>
         {otFinal(form) && <div className="text-xs text-[var(--text-muted)]">Download opens the print window — choose &ldquo;Save as PDF&rdquo; to keep a copy.</div>}
+
+        {canBranch(form, me) && <BranchDecision kind="ot" requestId={id} onDone={async () => { await reloadRequests(); onChanged(); loadSigs(); }} />}
 
         {canHead && (
           <div className="space-y-3 rounded-lg border border-[var(--border-hairline)] p-3">

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, Clock, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
@@ -31,10 +32,11 @@ export default function OvertimePage() {
   const [viewing, setViewing] = useState<string | null>(null);
   const viewingForm = viewing ? formByRequest.get(viewing) : undefined;
   const isHrManager = !!currentUser?.roles.includes("hr_admin");
-  const formsToSign = forms.filter((f) => canHeadOt(f, currentEmployee?.id, isHrManager));
+  // To sign as branch approver or as department head.
+  const formsToSign = forms.filter((f) => canBranch(f, currentEmployee?.id) || canHeadOt(f, currentEmployee?.id, isHrManager));
   const formsToVerify = isHrManager ? forms.filter((f) => otStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
   const toClarify = forms.filter((f) => f.employeeId === currentEmployee?.id && otStage(f) === "returned");
-  const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
+  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
   // HR Manager: delete an overtime request (with its form).
   const [deleting, setDeleting] = useState<OvertimeRequest | null>(null);

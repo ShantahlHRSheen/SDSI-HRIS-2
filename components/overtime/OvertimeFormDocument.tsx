@@ -1,4 +1,5 @@
 import { currentCompany } from "@/lib/companies";
+import { BranchApprovalBlock } from "@/components/forms/BranchApproval";
 import type { OvertimeForm } from "@/lib/overtime-form";
 import type { LeaveFormSigner } from "@/lib/supabase/leave-forms";
 
@@ -90,6 +91,7 @@ export function OvertimeFormDocument({ form, signatures = {} }: { form: Overtime
       <p style={{ ...row, whiteSpace: "pre-wrap", paddingLeft: "12px" }}>{form.reason}</p>
       <Signature url={signatures.applicant} name={form.employeeName} caption="Employee’s signature over printed name" date={form.submittedAt} />
 
+      <BranchApprovalBlock form={form} signature={signatures.branch} />
       {rule}
       {section("Department Head’s Approval")}
       <p style={row}>
