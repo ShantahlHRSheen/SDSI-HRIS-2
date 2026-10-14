@@ -26,6 +26,9 @@ export interface Branch {
   name: string;
   code: string;
   address: string;
+  // Approves the branch's leave / overtime / correction forms before the
+  // department head (supabase/migrate_phase40_branch_approver.sql).
+  approverId?: string | null;
 }
 
 export type Division = "shared_services" | "business_units";

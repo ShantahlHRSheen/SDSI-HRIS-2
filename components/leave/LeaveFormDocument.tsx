@@ -1,4 +1,5 @@
 import { currentCompany } from "@/lib/companies";
+import { BranchApprovalBlock } from "@/components/forms/BranchApproval";
 import { HEAD_DAY_FIELDS, LEAVE_CATEGORIES, defaultHeadDays, type LeaveForm } from "@/lib/leave-form";
 import type { LeaveFormSigner } from "@/lib/supabase/leave-forms";
 
@@ -159,6 +160,8 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
           </tr>
         </tbody>
       </table>
+
+      <BranchApprovalBlock form={form} signature={signatures.branch} />
 
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "12px", breakInside: "avoid" }}>
         <tbody>

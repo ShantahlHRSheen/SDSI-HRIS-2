@@ -13,6 +13,7 @@ import {
   LEAVE_CATEGORIES,
   PAID_CATEGORIES,
   defaultHeadDays,
+  formFinal,
   formProgress,
   formStage,
   isSickCategory,
@@ -40,6 +41,8 @@ import { ATTACHMENT_ACCEPT, prepareUpload, validateUpload, withFileType } from "
 import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { DownloadPdfButton, PdfPage } from "@/components/pdf/DownloadPdfButton";
 import type { LeaveRequest } from "@/lib/types";
+import { BranchDecision } from "@/components/forms/BranchApproval";
+import { NO_BRANCH, canBranch } from "@/lib/branch-approval";
 
 // ---- Data -------------------------------------------------------------------
 
@@ -282,6 +285,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
           receivedBy: null,
           receivedName: null,
           receivedAt: null,
+          ...NO_BRANCH,
           startDate: form.startDate,
           endDate: form.endDate,
           days,
@@ -557,7 +561,7 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <FormProgress form={form} />
-          {stage === "received" && (
+          {formFinal(form) && (
             <div className="ml-auto flex items-start gap-2">
               <button onClick={() => setPrinting(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
                 <Printer size={14} /> Print
@@ -575,7 +579,9 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
             <LeaveFormDocument form={doc} signatures={sigs} />
           </div>
         </div>
-        {stage === "received" && <div className="text-xs text-[var(--text-muted)]">Download opens the print window — choose &ldquo;Save as PDF&rdquo; to keep a copy.</div>}
+        {formFinal(form) && <div className="text-xs text-[var(--text-muted)]">Download opens the print window — choose &ldquo;Save as PDF&rdquo; to keep a copy.</div>}
+
+        {canBranch(form, me) && <BranchDecision kind="leave" requestId={id} onDone={async () => { await reloadRequests(); onChanged(); loadSigs(); }} />}
 
         {canHead && (
           <div className="space-y-3 rounded-lg border border-[var(--border-hairline)] p-3">

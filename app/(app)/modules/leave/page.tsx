@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarPlus, CalendarRange, Check, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
 import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
@@ -43,7 +44,8 @@ export default function LeaveManagementPage() {
 
   const isDeptHead = !!currentUser?.roles.includes("dept_head");
   const isHrManager = !!currentUser?.roles.includes("hr_admin");
-  const formsToSign = forms.filter((f) => canHeadForm(f, currentEmployee?.id, isHrManager));
+  // To sign as branch approver or as department head.
+  const formsToSign = forms.filter((f) => canBranch(f, currentEmployee?.id) || canHeadForm(f, currentEmployee?.id, isHrManager));
   const formsToReceive = isHrManager ? forms.filter((f) => formStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
   const requestById = useMemo(() => new Map(leaveRequests.map((r) => [r.id, r])), [leaveRequests]);
 
@@ -90,7 +92,7 @@ export default function LeaveManagementPage() {
   const pendingForMe = leaveRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && !formByRequest.has(r.id) && canDecide(r.employeeId));
 
   // Forms of the people the user supervises (whatever the user's role).
-  const teamForms = forms.filter((f) => f.departmentHeadId === currentEmployee?.id && f.employeeId !== currentEmployee?.id);
+  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
 
   const teamRequests = useMemo(() => {
     if (isHrOrUpper || !isDeptHead || !currentEmployee) return [];

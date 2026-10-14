@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./client";
+import { branchFromRow } from "../branch-approval";
 import type { HeadDays, LeaveCategory, LeaveCredits, LeaveForm } from "../leave-form";
 
 // supabase/migrate_phase27_leave_forms.sql. The typed client doesn't know
@@ -31,6 +32,7 @@ const toForm = (r: Row): LeaveForm => ({
   sickDetails: String(r.sick_details ?? ""),
   reason: String(r.reason ?? ""),
   credits: (r.credits as LeaveCredits) ?? { asOf: "", vl: 0, sl: 0, lessVl: 0, lessSl: 0 },
+  ...branchFromRow(r),
   unpaidRequestId: (r.unpaid_request_id as string | null) ?? null,
   unpaidDays: r.unpaid_days === null || r.unpaid_days === undefined ? null : Number(r.unpaid_days),
   employeeName: String(r.employee_name ?? ""),
@@ -92,7 +94,7 @@ export async function saveMySignature(employeeId: string, png: Blob): Promise<vo
 
 // ---- Signing a form ------------------------------------------------------------
 
-export type LeaveFormSigner = "applicant" | "head" | "hr";
+export type LeaveFormSigner = "applicant" | "branch" | "head" | "hr";
 
 // Puts a copy of the user's saved signature at `path` (a form's signature)
 // in the same bucket.
@@ -114,7 +116,7 @@ export async function signatureUrlsIn(folder: string): Promise<Partial<Record<Le
   const out: Partial<Record<LeaveFormSigner, string>> = {};
   for (const f of list ?? []) {
     const as = f.name.replace(/\.png$/, "") as LeaveFormSigner;
-    if (!["applicant", "head", "hr"].includes(as)) continue;
+    if (!["applicant", "branch", "head", "hr"].includes(as)) continue;
     const { data } = await bucket().createSignedUrl(`${folder}/${f.name}`, 3600);
     if (data?.signedUrl) out[as] = `${data.signedUrl}&v=${encodeURIComponent(f.updated_at ?? "")}`;
   }

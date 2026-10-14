@@ -12,7 +12,9 @@ export const CORRECTION_TYPES: { id: CorrectionType; label: string }[] = [
   { id: "other", label: "Other" },
 ];
 
-export interface CorrectionForm {
+import { branchDisapproved, waitingBranch, type BranchApproval } from "./branch-approval";
+
+export interface CorrectionForm extends BranchApproval {
   correctionRequestId: string;
   employeeId: string;
   correctionDate: string;
@@ -35,9 +37,11 @@ export interface CorrectionForm {
   receivedAt: string | null;
 }
 
-export type CorrectionFormStage = "waiting_head" | "waiting_hr" | "received";
+export type CorrectionFormStage = "waiting_branch" | "branch_disapproved" | "waiting_head" | "waiting_hr" | "received";
 
 export function correctionStage(f: CorrectionForm): CorrectionFormStage {
+  if (waitingBranch(f)) return "waiting_branch";
+  if (branchDisapproved(f)) return "branch_disapproved";
   if (!f.headDecision) return "waiting_head";
   return f.receivedAt ? "received" : "waiting_hr";
 }
@@ -45,6 +49,10 @@ export function correctionStage(f: CorrectionForm): CorrectionFormStage {
 export function correctionProgress(f: CorrectionForm): { label: string; tone: "warning" | "good" | "critical" | "info" } {
   const decided = f.headDecision === "approved" ? "Approved" : "Disapproved";
   switch (correctionStage(f)) {
+    case "waiting_branch":
+      return { label: `Waiting for branch approval (${f.branchApprover})`, tone: "warning" };
+    case "branch_disapproved":
+      return { label: "Disapproved by the branch approver", tone: "critical" };
     case "waiting_head":
       return { label: "Waiting for Department Head approval", tone: "warning" };
     case "waiting_hr":

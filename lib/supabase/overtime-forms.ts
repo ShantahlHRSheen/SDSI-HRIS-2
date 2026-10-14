@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./client";
+import { branchFromRow } from "../branch-approval";
 import type { OvertimeForm } from "../overtime-form";
 import { placeMySignature, signatureUrlsIn, type LeaveFormSigner } from "./leave-forms";
 
@@ -40,6 +41,7 @@ const toForm = (r: Row): OvertimeForm => ({
   departmentHead: String(r.department_head ?? ""),
   submittedAt: String(r.submitted_at ?? ""),
   resubmissions: Number(r.resubmissions ?? 0),
+  ...branchFromRow(r),
   headDecision: (r.head_decision as OvertimeForm["headDecision"]) ?? null,
   headHours: num(r.head_hours),
   headReason: (r.head_reason as string | null) ?? null,

@@ -1,7 +1,9 @@
 // The company's "SDSI Overtime Authorization Form", filled in online
 // (supabase/migrate_phase28_overtime_forms.sql).
 
-export interface OvertimeForm {
+import { branchDisapproved, waitingBranch, type BranchApproval } from "./branch-approval";
+
+export interface OvertimeForm extends BranchApproval {
   overtimeRequestId: string;
   employeeId: string;
   schedule: string;
@@ -28,9 +30,11 @@ export interface OvertimeForm {
   hrSignedAt: string | null;
 }
 
-export type OvertimeFormStage = "waiting_head" | "head_disapproved" | "waiting_hr" | "returned" | "verified" | "hr_disapproved";
+export type OvertimeFormStage = "waiting_branch" | "branch_disapproved" | "waiting_head" | "head_disapproved" | "waiting_hr" | "returned" | "verified" | "hr_disapproved";
 
 export function otStage(f: OvertimeForm): OvertimeFormStage {
+  if (waitingBranch(f)) return "waiting_branch";
+  if (branchDisapproved(f)) return "branch_disapproved";
   if (f.headDecision === "disapproved") return "head_disapproved";
   if (!f.headDecision) return "waiting_head";
   if (!f.hrDecision) return "waiting_hr";
@@ -38,12 +42,16 @@ export function otStage(f: OvertimeForm): OvertimeFormStage {
 }
 
 // Finished (nothing more to sign): can be downloaded.
-export const otFinal = (f: OvertimeForm) => ["head_disapproved", "verified", "hr_disapproved"].includes(otStage(f));
+export const otFinal = (f: OvertimeForm) => ["branch_disapproved", "head_disapproved", "verified", "hr_disapproved"].includes(otStage(f));
 
 const hrs = (n: number | null) => `${n ?? 0}h`;
 
 export function otProgress(f: OvertimeForm): { label: string; tone: "warning" | "good" | "critical" | "info" | "serious" } {
   switch (otStage(f)) {
+    case "waiting_branch":
+      return { label: `${f.resubmissions ? "Resubmitted · " : ""}Waiting for branch approval (${f.branchApprover})`, tone: "warning" };
+    case "branch_disapproved":
+      return { label: "Disapproved by the branch approver", tone: "critical" };
     case "waiting_head":
       return { label: f.resubmissions ? "Resubmitted · Waiting for Department Head approval" : "Waiting for Department Head approval", tone: "warning" };
     case "head_disapproved":
