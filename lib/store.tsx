@@ -590,10 +590,16 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state, demoUsers, ready]);
 
+  // Matched by the sign-in account (employees.user_id), not the email: an
+  // employee can change the email in their 201 file without changing the
+  // one they sign in with. The email is only a fallback.
   const supabaseEmployee = useMemo(() => {
-    const email = supabaseSession?.user.email;
-    if (!email) return null;
-    return state.employees.find((e) => e.email?.toLowerCase() === email.toLowerCase()) ?? null;
+    const user = supabaseSession?.user;
+    if (!user) return null;
+    const byAccount = state.employees.find((e) => e.authUserId === user.id);
+    if (byAccount) return byAccount;
+    const email = user.email?.toLowerCase();
+    return email ? (state.employees.find((e) => !e.authUserId && e.email?.toLowerCase() === email) ?? null) : null;
   }, [supabaseSession, state.employees]);
 
   const currentUser = useMemo<DemoUser | null>(() => {

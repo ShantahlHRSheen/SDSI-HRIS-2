@@ -122,6 +122,9 @@ export interface Employee {
   employeeNumber: string;
   // Read-only: whether the employee has a sign-in account (employees.user_id).
   hasLogin?: boolean;
+  // Read-only: the sign-in account (employees.user_id) — how the signed-in
+  // user is matched to their employee record.
+  authUserId?: string | null;
   // ID card photo / signature (storage paths in the "employee-id-media" bucket).
   idPhotoPath?: string | null;
   idSignaturePath?: string | null;
