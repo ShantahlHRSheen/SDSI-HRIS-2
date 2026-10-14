@@ -293,6 +293,7 @@ function toEmployee(r: EmployeeRow): Employee {
     id: r.id,
     employeeNumber: r.employee_number,
     hasLogin: !!r.user_id,
+    authUserId: r.user_id ?? null,
     idPhotoPath: r.id_photo_path ?? null,
     idSignaturePath: r.id_signature_path ?? null,
     firstName: r.first_name,
