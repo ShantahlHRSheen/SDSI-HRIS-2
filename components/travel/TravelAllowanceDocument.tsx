@@ -1,0 +1,116 @@
+import { currentCompany } from "@/lib/companies";
+import type { TravelAllowance } from "@/lib/travel-allowance";
+import type { LeaveFormSigner } from "@/lib/supabase/leave-forms";
+
+// The printed / on-screen "Travel Allowance Request", in the same style as
+// the overtime form. Plain inline styles so it prints the same everywhere.
+
+const exact = { WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" } as const;
+const longDate = (d: string) => (d ? new Intl.DateTimeFormat("en-US", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(new Date(`${d.slice(0, 10)}T00:00:00Z`)) : "");
+const signedOn = (iso: string | null) => (iso ? new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }).format(new Date(iso)) : "");
+const peso = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function Box({ on }: { on: boolean }) {
+  return <span style={{ fontSize: "11pt", marginRight: "6px" }}>{on ? "☑" : "☐"}</span>;
+}
+
+function Signature({ url, name, caption, date }: { url?: string; name: string | null; caption: string; date?: string | null }) {
+  return (
+    <div style={{ width: "290px", margin: "2px auto 0", textAlign: "center", breakInside: "avoid" }}>
+      <div style={{ height: "40px", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        {url && (
+          // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL from Supabase Storage
+          <img src={url} alt="Signature" style={{ maxHeight: "48px", maxWidth: "170px", marginBottom: "-14px", ...exact }} />
+        )}
+      </div>
+      <div style={{ borderBottom: "1px solid #111", fontWeight: 700, textTransform: "uppercase", minHeight: "16px" }}>{name ?? ""}</div>
+      <div style={{ fontSize: "8.5pt", fontWeight: 700 }}>{caption}</div>
+      {date && <div style={{ fontSize: "8pt", color: "#444" }}>{signedOn(date)}</div>}
+    </div>
+  );
+}
+
+export type TravelAllowanceDocData = Omit<TravelAllowance, "submittedAt"> & { submittedAt: string | null };
+
+export function TravelAllowanceDocument({ form, signatures = {} }: { form: TravelAllowanceDocData; signatures?: Partial<Record<LeaveFormSigner, string>> }) {
+  const row: React.CSSProperties = { margin: "0 0 5px", fontSize: "10pt" };
+  const label: React.CSSProperties = { fontWeight: 700 };
+  const rule = <hr style={{ border: 0, borderTop: "1px solid #999", margin: "8px 0 6px" }} />;
+  const section = (t: string) => <div style={{ textAlign: "center", fontWeight: 700, fontSize: "10.5pt", margin: "0 0 6px" }}>{t}</div>;
+  const headDone = !!form.headDecision;
+  const received = !!form.receivedAt;
+
+  return (
+    <div style={{ fontFamily: "Arial, Helvetica, sans-serif", color: "#111", background: "#fff" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", borderBottom: "2px solid #c2185b", paddingBottom: "4px", marginBottom: "8px" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
+        <img src={currentCompany().formLogo} alt="" style={{ height: "44px", width: "auto", maxWidth: "140px", objectFit: "contain" }} />
+        <div style={{ fontWeight: 700, fontSize: "11pt" }}>
+          {currentCompany().name.toUpperCase()} ({currentCompany().shortName.toUpperCase()})
+        </div>
+      </div>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", margin: "2px 0 8px" }}>Travel Allowance Request</div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "16px" }}>
+        <p style={row}>
+          <span style={label}>Requested by:</span> {form.employeeName}
+        </p>
+        <p style={row}>
+          <span style={label}>Position:</span> {form.position}
+        </p>
+        <p style={row}>
+          <span style={label}>Department:</span> {form.department}
+        </p>
+        <p style={row}>
+          <span style={label}>Branch:</span> {form.branch}
+        </p>
+      </div>
+
+      {rule}
+      {section("Travel Details")}
+      <p style={row}>
+        <span style={label}>Name of driver:</span> {form.driverName}
+      </p>
+      <p style={row}>
+        <span style={label}>Date:</span> {longDate(form.travelDate)}
+      </p>
+      <p style={row}>
+        <span style={label}>Destination:</span> {form.destination}
+      </p>
+      <p style={{ ...row, marginTop: "6px" }}>
+        <Box on={form.withAllowance} />
+        <span style={label}>With allowance</span> ({peso(500)})
+        <span style={{ marginLeft: "28px" }} />
+        <Box on={!form.withAllowance} />
+        <span style={label}>Without allowance</span>
+      </p>
+      <p style={row}>
+        <span style={label}>Amount:</span> {peso(form.withAllowance ? 500 : 0)}
+      </p>
+      <Signature url={signatures.applicant} name={form.employeeName} caption="Requested by (signature over printed name)" date={form.submittedAt} />
+
+      {rule}
+      {section("Approval")}
+      <p style={row}>
+        <Box on={form.headDecision === "approved"} />
+        <span style={label}>Approved</span>
+      </p>
+      <p style={row}>
+        <Box on={form.headDecision === "disapproved"} />
+        <span style={label}>Disapproved</span>
+        <span style={{ ...label, marginLeft: "24px" }}>Reason:</span> {form.headDecision === "disapproved" ? form.headReason : ""}
+      </p>
+      <Signature url={headDone ? signatures.head : undefined} name={form.headSignedName ?? (form.approverName || null)} caption="Approved by (signature over printed name)" date={form.headSignedAt} />
+
+      {rule}
+      <div style={{ breakInside: "avoid" }}>
+        {section("HR Department’s Receipt")}
+        <p style={row}>
+          <Box on={received} />
+          <span style={label}>Received</span>
+        </p>
+        <Signature url={received ? signatures.hr : undefined} name={form.receivedName} caption="HR Manager (signature over printed name)" date={form.receivedAt} />
+      </div>
+    </div>
+  );
+}

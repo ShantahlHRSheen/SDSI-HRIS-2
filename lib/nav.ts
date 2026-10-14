@@ -37,6 +37,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Leave Management", href: "/modules/leave", roles: ALL_ROLES, built: true },
       { label: "Overtime", href: "/modules/overtime", roles: ALL_ROLES, built: true },
       { label: "Attendance Corrections", href: "/modules/corrections", roles: ALL_ROLES, built: true },
+      { label: "Travel Allowance", href: "/modules/travel", roles: ALL_ROLES, built: true },
       { label: "Performance Evaluations", href: "/evaluations", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "My Notices", href: "/my-notices", roles: ALL_ROLES, built: true },
