@@ -134,9 +134,8 @@ export default function HandbookPage() {
             <a href={doc.downloadUrl} onClick={recordDownload} className={button}>
               <Download size={16} /> Download PDF
             </a>
-            <span className="text-xs text-[var(--text-muted)]">
-              {[updated && `Updated ${updated}`, formatSize(doc.sizeBytes)].filter(Boolean).join(" · ")}
-            </span>
+            {/* Only HR sees when the handbook was last replaced. */}
+            {isHr && <span className="text-xs text-[var(--text-muted)]">{[updated && `Updated ${updated}`, formatSize(doc.sizeBytes)].filter(Boolean).join(" · ")}</span>}
           </div>
           {/* Only HR sees set-up problems (e.g. before the database update is run). */}
           {isHr && (infoError || ackError) && <div className="mb-3 text-sm text-[var(--status-critical)]">{infoError || ackError}</div>}
