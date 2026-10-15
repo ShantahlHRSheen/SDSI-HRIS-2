@@ -300,7 +300,7 @@ export default function PayrollProcessingPage() {
   // The totals row, shown under the header and again at the bottom.
   const totalRow = (border: string) => (
     <tr className={`${border} border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]`}>
-      <td className="px-3 py-2">Total</td>
+      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2">Total</td>
       <td className="px-3 py-2"></td>
       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.ratePerDay)}</td>
       <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.basicPay)}</td>
@@ -458,11 +458,11 @@ export default function PayrollProcessingPage() {
                 description="Import this period's payroll file with Import Excel, or import/enter attendance in the Attendance module — payroll is computed from it."
               />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-[75vh] overflow-auto">
                 <table className="w-full min-w-[2400px] text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-20 bg-[var(--surface-1)] shadow-[inset_0_-1px_0_var(--border-hairline)]">
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
-                      <th className="px-3 py-2 font-medium">Employee</th>
+                      <th className="sticky left-0 z-30 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2 font-medium">Employee</th>
                       <th className="px-3 py-2 font-medium">Type</th>
                       <th className="px-3 py-2 font-medium">Rate/Day</th>
                       <th className="px-3 py-2 font-medium">Basic</th>
@@ -499,7 +499,7 @@ export default function PayrollProcessingPage() {
                       const emp = byId.get(l.employeeId);
                       return (
                         <tr key={l.employeeId} className="border-b border-[var(--gridline)] last:border-0">
-                          <td className="px-3 py-2 text-[var(--text-primary)]">
+                          <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2 text-[var(--text-primary)]">
                             {emp ? fullName(emp) : l.employeeId}
                             {l.salaryAdjustmentNet !== 0 && (
                               <span title="Includes a salary adjustment (see Vouchers → Salary adjustments)" className="ml-1.5 inline-block rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
