@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarPlus, CalendarRange, Check, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useMarkWorkforceSeen } from "@/components/workforce/WorkforceBadges";
 import { EncodedBox, usePayrollEncoded } from "@/lib/supabase/payroll-encoded";
 import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
@@ -29,6 +30,7 @@ export default function LeaveManagementPage() {
   // The online Application for Leave (real accounts): filed by the employee,
   // approved by their department head, received by HR.
   const { forms, error: formsError, reload: reloadForms } = useLeaveForms();
+  useMarkWorkforceSeen("leave");
   // A form's request — and its linked days without pay, if any.
   const formByRequest = useMemo(() => new Map(forms.flatMap((f) => [[f.leaveRequestId, f] as const, ...(f.unpaidRequestId ? [[f.unpaidRequestId, f] as const] : [])])), [forms]);
   const [showApply, setShowApply] = useState(false);

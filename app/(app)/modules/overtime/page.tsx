@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, Clock, FileText, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useMarkWorkforceSeen } from "@/components/workforce/WorkforceBadges";
 import { EncodedBox, usePayrollEncoded } from "@/lib/supabase/payroll-encoded";
 import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
@@ -27,6 +28,7 @@ export default function OvertimePage() {
   // The online Overtime Authorization Form (real accounts): filed by the
   // employee, approved by their department head, verified by HR.
   const { forms, error: formsError, reload: reloadForms } = useOvertimeForms();
+  useMarkWorkforceSeen("ot");
   const formByRequest = useMemo(() => new Map(forms.map((f) => [f.overtimeRequestId, f])), [forms]);
   const [showApply, setShowApply] = useState(false);
   const [clarifying, setClarifying] = useState<OvertimeForm | null>(null);

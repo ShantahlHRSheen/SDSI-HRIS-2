@@ -9,6 +9,7 @@ import { NAV_SECTIONS } from "@/lib/nav";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
 import { useHrUnreadCount } from "./messages/HrChat";
+import { useWorkforceBadges } from "./workforce/WorkforceBadges";
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
   const { currentUser } = useHris();
@@ -16,6 +17,8 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const roles = currentUser?.roles ?? [];
   const isHr = roles.includes("hr_admin");
   const unread = useHrUnreadCount();
+  // New requests to act on / updates on one's own, per Workforce page.
+  const workforce = useWorkforceBadges();
   const company = currentCompany();
 
   const content = (
@@ -60,6 +63,9 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                       {!item.built && <Badge tone="muted">Preview</Badge>}
                       {item.href === "/messages" && unread > 0 && (
                         <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${unread} unread`}>{unread}</span>
+                      )}
+                      {(workforce[item.href] ?? 0) > 0 && (
+                        <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${workforce[item.href]} new`}>{workforce[item.href]}</span>
                       )}
                     </Link>
                   );

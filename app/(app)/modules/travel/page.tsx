@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Car, FileText, Trash2 } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useMarkWorkforceSeen } from "@/components/workforce/WorkforceBadges";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
@@ -15,6 +16,7 @@ import { canApproveTravel, deleteTravelAllowance, travelStage, type TravelAllowa
 export default function TravelAllowancePage() {
   const { currentUser, currentEmployee, isRealAccount } = useHris();
   const { items, error, reload } = useTravelAllowances();
+  useMarkWorkforceSeen("travel");
   const me = currentEmployee?.id;
   const isHr = !!currentUser?.roles.includes("hr_admin");
   const seesAll = !!currentUser?.roles.some((r) => ["hr_admin", "upper_management", "payroll_officer", "cfo", "treasurer", "sr_accounting_assistant", "sys_admin"].includes(r));
