@@ -297,6 +297,41 @@ export default function PayrollProcessingPage() {
     downloadCsv(`payroll-${period.id}.csv`, csv);
   }
 
+  // The totals row, shown under the header and again at the bottom.
+  const totalRow = (border: string) => (
+    <tr className={`${border} border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]`}>
+      <td className="px-3 py-2">Total</td>
+      <td className="px-3 py-2"></td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.ratePerDay)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.basicPay)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.latesUndertime)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.undertimeDeduction)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.holidayPay)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.vlPay)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.slPay)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.otPay)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netAllowances)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.grossSalary)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssContribution)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssWisp)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.philHealthContribution)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfContribution)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.withholdingTax)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.cashAdvance)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmBizLoan)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmCoopLoan)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.shortages)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssLoan)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfLoan)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfMp2Savings)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentDeduct)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentAdd)}</td>
+      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netPay)}</td>
+      <td className="px-3 py-2"></td>
+      <td className="px-3 py-2"></td>
+    </tr>
+  );
+
   return (
     <div>
       <PageHeader
@@ -457,6 +492,7 @@ export default function PayrollProcessingPage() {
                       <th className="px-3 py-2 font-medium">Payslip</th>
                       <th className="px-3 py-2 font-medium"></th>
                     </tr>
+                    {totalRow("border-b-2")}
                   </thead>
                   <tbody>
                     {sortedLines.map((l) => {
@@ -516,37 +552,7 @@ export default function PayrollProcessingPage() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]">
-                      <td className="px-3 py-2">Total</td>
-                      <td className="px-3 py-2"></td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.ratePerDay)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.basicPay)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.latesUndertime)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.undertimeDeduction)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.holidayPay)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.vlPay)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.slPay)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.otPay)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netAllowances)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.grossSalary)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssContribution)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssWisp)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.philHealthContribution)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfContribution)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.withholdingTax)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.cashAdvance)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmBizLoan)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmCoopLoan)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.shortages)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssLoan)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfLoan)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfMp2Savings)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentDeduct)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentAdd)}</td>
-                      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netPay)}</td>
-                      <td className="px-3 py-2"></td>
-                      <td className="px-3 py-2"></td>
-                    </tr>
+                    {totalRow("border-t-2")}
                   </tfoot>
                 </table>
               </div>
