@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, FileEdit, FileText, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { useMarkWorkforceSeen } from "@/components/workforce/WorkforceBadges";
 import { EncodedBox, usePayrollEncoded } from "@/lib/supabase/payroll-encoded";
 import { canBranch } from "@/lib/branch-approval";
 import { PageHeader } from "@/components/PageHeader";
@@ -27,6 +28,7 @@ export default function AttendanceCorrectionsPage() {
   // The online Attendance Correction Form (real accounts): filed and signed
   // by the employee, approved by their department head, received by HR.
   const { forms, error: formsError, reload: reloadForms } = useCorrectionForms();
+  useMarkWorkforceSeen("corr");
   const formByRequest = useMemo(() => new Map(forms.map((f) => [f.correctionRequestId, f])), [forms]);
   const [showApply, setShowApply] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
