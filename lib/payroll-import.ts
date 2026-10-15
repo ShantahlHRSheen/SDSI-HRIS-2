@@ -202,8 +202,12 @@ export function buildPayrollImportPreview(
   const seen = new Set<string>();
 
   for (const row of parsed.rows) {
-    const byNum = byNumber.get(row.employeeNumber.toUpperCase());
-    const employee = byNum ?? findByName(row.rawName);
+    const numMatch = byNumber.get(row.employeeNumber.toUpperCase());
+    const nameMatch = findByName(row.rawName);
+    // A typo'd number can belong to someone else: when the name clearly
+    // points to a different employee, trust the name.
+    const byNum = numMatch && (!nameMatch || nameMatch.id === numMatch.id) ? numMatch : undefined;
+    const employee = byNum ?? nameMatch ?? numMatch;
     if (!employee) {
       unmatched.push(row);
       continue;
