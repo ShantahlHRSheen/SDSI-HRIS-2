@@ -46,31 +46,31 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
 
         <FormSection title="Earnings">
           <FormAmountRow label="Basic Pay" value={line.basicPay} />
-          {line.latesUndertime > 0 && <FormAmountRow label="Late Deduction" value={-line.latesUndertime} />}
-          {line.undertimeDeduction > 0 && <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction} />}
+          <FormAmountRow label="Late Deduction" value={-line.latesUndertime || 0} />
+          <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction || 0} />
           <FormAmountRow label="Net Allowances" value={line.netAllowances} />
           <FormAmountRow label="Overtime Pay" value={line.otPay} />
           <FormAmountRow label="Holiday Pay" value={line.holidayPay} />
           <FormAmountRow label="Sick Leave Pay" value={line.slPay} />
           <FormAmountRow label="Vacation Leave Pay" value={line.vlPay} />
-          {line.adjustmentAdd > 0 && <FormAmountRow label="Adjustment (Add)" value={line.adjustmentAdd} />}
+          <FormAmountRow label="Adjustment (Add)" value={line.adjustmentAdd} />
           <FormAmountRow label="Gross Pay" value={line.grossSalary + line.adjustmentAdd} bold />
         </FormSection>
 
         <FormSection title="Deductions">
-          {line.cashAdvance > 0 && <FormAmountRow label="Cash Advance" value={line.cashAdvance} />}
-          {line.lsmBizLoan > 0 && <FormAmountRow label="LSM Biz Loan" value={line.lsmBizLoan} />}
-          {line.lsmCoopLoan > 0 && <FormAmountRow label="LSM Coop Loan" value={line.lsmCoopLoan} />}
-          {line.shortages > 0 && <FormAmountRow label="Shortage Deduction" value={line.shortages} />}
+          <FormAmountRow label="Cash Advance" value={line.cashAdvance} />
+          <FormAmountRow label="LSM Biz Loan" value={line.lsmBizLoan} />
+          <FormAmountRow label="LSM Coop Loan" value={line.lsmCoopLoan} />
+          <FormAmountRow label="Shortage Deduction" value={line.shortages} />
           <FormAmountRow label="SSS Contribution" value={line.sssContribution} />
           <FormAmountRow label="SSS WISP" value={line.sssWisp} />
-          {line.sssLoan > 0 && <FormAmountRow label="SSS Loan" value={line.sssLoan} />}
+          <FormAmountRow label="SSS Loan" value={line.sssLoan} />
           <FormAmountRow label="PhilHealth Contribution" value={line.philHealthContribution} />
           <FormAmountRow label="Pag-IBIG (HDMF) Contribution" value={line.hdmfContribution} />
-          {line.hdmfLoan > 0 && <FormAmountRow label="Pag-IBIG (HDMF) Loan" value={line.hdmfLoan} />}
-          {line.hdmfMp2Savings > 0 && <FormAmountRow label="Pag-IBIG (HDMF) MP2 Savings" value={line.hdmfMp2Savings} />}
+          <FormAmountRow label="Pag-IBIG (HDMF) Loan" value={line.hdmfLoan} />
+          <FormAmountRow label="Pag-IBIG (HDMF) MP2 Savings" value={line.hdmfMp2Savings} />
           <FormAmountRow label="Withholding Tax" value={line.withholdingTax} />
-          {line.adjustmentDeduct > 0 && <FormAmountRow label="Adjustment (Deduct)" value={line.adjustmentDeduct} />}
+          <FormAmountRow label="Adjustment (Deduct)" value={line.adjustmentDeduct} />
           <FormAmountRow label="Total Deductions" value={line.totalDeductionsOtherThanMandatories + line.totalMandatories + line.adjustmentDeduct} bold />
         </FormSection>
 
