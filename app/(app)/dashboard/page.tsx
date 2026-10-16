@@ -34,6 +34,8 @@ import {
 import { buildAbsenteeismRows, buildTardinessRows, flaggedAbsenteeism, flaggedTardiness, TARDINESS_THRESHOLD, ABSENTEEISM_THRESHOLD } from "@/lib/tardiness-absenteeism";
 import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
+import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
+import { filterVoucherAmounts, sumBy, voucherAmounts } from "@/lib/voucher-totals";
 
 const STATUS_COLORS: Record<string, string> = {
   regular: "var(--series-1)",
@@ -62,7 +64,7 @@ function variantFor(roles: string[]): "full" | "payroll" | "team" | "personal" {
 }
 
 export default function DashboardPage() {
-  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments } = useHris();
+  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, employeeDepartmentAllocations } = useHris();
   const roles = currentUser?.roles ?? [];
   const variant = variantFor(roles);
 
@@ -77,6 +79,14 @@ export default function DashboardPage() {
   const facts = useMemo(
     () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
     [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
+  );
+
+  // Department vouchers (Vouchers page) count as payroll expense too, as in
+  // the full Payroll Expense Report.
+  const { vouchers, lines: voucherLines } = useDepartmentVouchers();
+  const allVoucherAmounts = useMemo(
+    () => voucherAmounts(vouchers, voucherLines, payrollPeriods, employeeDepartmentAllocations),
+    [vouchers, voucherLines, payrollPeriods, employeeDepartmentAllocations],
   );
 
   // Tardiness/absenteeism flags computed directly from every imported period
@@ -110,15 +120,29 @@ export default function DashboardPage() {
   const overtimeTrend = overtimeTrendByMonth(facts, employees, { branchId: branchFilter });
   const currentOvertime = summarizeOvertime(filterFacts(facts, employees, { branchId: branchFilter, monthKey: SHOWN_MONTH_KEY }));
 
-  const payrollTrend = payrollExpenseTrendByMonth(facts, employees, { branchId: branchFilter });
+  // A branch filter keeps only voucher lines for employees of that branch.
+  const scopedVouchers = filterVoucherAmounts(allVoucherAmounts, { branchId: branchFilter }, employees);
+  const vouchersByMonth = sumBy(scopedVouchers, (a) => a.monthKey);
+  const monthVouchers = scopedVouchers.filter((a) => a.monthKey === SHOWN_MONTH_KEY);
+  const voucherTotal = vouchersByMonth.get(SHOWN_MONTH_KEY) ?? 0;
+  const payrollTrend = payrollExpenseTrendByMonth(facts, employees, { branchId: branchFilter }).map((m) => ({ ...m, value: m.value + (vouchersByMonth.get(m.monthKey) ?? 0) }));
   const currentPayroll = summarizePayroll(filterFacts(facts, employees, { branchId: branchFilter, monthKey: SHOWN_MONTH_KEY }));
-  const branchExpense = groupByBranch(
-    filterFacts(facts, employees, { monthKey: SHOWN_MONTH_KEY, branchId: branchFilter }),
-    employees,
-    branches,
-  )
-    .map((row) => ({ label: row.label, value: row.payroll.totalEmployerExpense }))
-    .sort((a, b) => b.value - a.value);
+  // Voucher lines follow the payee's branch; payees outside the 201 file have none.
+  const employeeBranch = new Map(employees.map((e) => [e.id, e.branchId]));
+  const vouchersByBranch = sumBy(monthVouchers, (a) => (a.employeeId && employeeBranch.get(a.employeeId)) || "");
+  const branchExpense = [
+    ...groupByBranch(filterFacts(facts, employees, { monthKey: SHOWN_MONTH_KEY, branchId: branchFilter }), employees, branches).map((row) => ({
+      label: row.label,
+      value: row.payroll.totalEmployerExpense + (vouchersByBranch.get(row.branchId) ?? 0),
+      branchId: row.branchId,
+    })),
+  ];
+  // Vouchers for a branch with no payroll lines this month, and other payees.
+  for (const [branchId, amount] of vouchersByBranch) {
+    if (branchExpense.some((r) => r.branchId === branchId)) continue;
+    branchExpense.push({ label: branchId ? branchName(branchId) : "Other voucher payees", value: amount, branchId });
+  }
+  branchExpense.sort((a, b) => b.value - a.value);
 
   return (
     <div>
@@ -229,15 +253,16 @@ export default function DashboardPage() {
           <h2 className="text-base font-semibold text-[var(--text-primary)]">Monthly Employer Payroll Expense</h2>
           <Link href="/reports/payroll-expense" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Total employer expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense)} hint={monthTag} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatTile label="Total payroll expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense + voucherTotal)} hint={`${monthTag} · payroll + vouchers`} />
           <StatTile label="Basic salary" value={formatCurrencyCompact(currentPayroll.basicSalary)} />
           <StatTile label="Employer SSS + HDMF + PhilHealth" value={formatCurrencyCompact(currentPayroll.employerSSS + currentPayroll.employerHDMF + currentPayroll.employerPhilHealth)} />
           <StatTile label="OT + Holiday + Leave pay" value={formatCurrencyCompact(currentPayroll.overtimePay + currentPayroll.holidayPay + currentPayroll.leavePay)} />
+          <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint="department vouchers" />
         </div>
         <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend — last 12 months</div>
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend (incl. vouchers) — last 12 months</div>
             <TrendChart data={payrollTrend} color="var(--series-1)" valueFormatter={(v) => formatCurrencyCompact(v)} />
           </div>
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -250,8 +275,8 @@ export default function DashboardPage() {
         <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-[var(--gridline)]/30 p-2 text-xs text-[var(--text-secondary)]">
           <Info size={14} className="mt-0.5 shrink-0" />
           <span>
-            Employer expense = Basic Salary + Allowances + Overtime Pay + Holiday Pay + Leave Pay + Employer SSS + Employer
-            HDMF (Pag-IBIG) + Employer PhilHealth. Contribution percentages are illustrative placeholders — configure
+            Payroll expense = Basic Salary + Allowances + Overtime Pay + Holiday Pay + Leave Pay + Employer SSS + Employer
+            HDMF (Pag-IBIG) + Employer PhilHealth, plus the department vouchers. Contribution percentages are illustrative placeholders — configure
             verified, versioned rate tables in System Administration before relying on this for actual payroll.
           </span>
         </div>
