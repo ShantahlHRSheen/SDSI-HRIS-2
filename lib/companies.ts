@@ -164,6 +164,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Sheena Evangelista (LSM Group HR) manages Daro's HRIS but isn't on its
     // roster — see supabase/daro-first-admin.sql.
     adminAccountNumbers: ["ADMIN-01"],
+    // HR uploads photos of Daro's own org chart, like LSMBiz.
+    orgChartPhotos: true,
   },
 };
 

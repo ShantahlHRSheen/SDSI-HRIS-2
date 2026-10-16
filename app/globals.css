@@ -44,11 +44,12 @@
 }
 
 /*
-  LSMBiz Credit Corp. uses white-and-blue instead. data-company is set on
-  <html> before first paint (see app/layout.tsx) only when LSMBiz is the
-  chosen company, so the other companies keep the tokens above.
+  LSMBiz Credit Corp. and Daro Lending Corp. use white-and-blue instead.
+  data-company is set on <html> before first paint (see app/layout.tsx) only
+  when one of them is the chosen company, so Shantahl keeps the tokens above.
 */
-html[data-company="lsmbiz"] {
+html[data-company="lsmbiz"],
+html[data-company="daro"] {
   --surface-1: #ffffff;
   --page-plane: #f2f6fc;
   --text-primary: #0b1a33;
@@ -78,7 +79,8 @@ html[data-company="lsmbiz"] {
   --seq-700: #0b3d91;
 }
 
-html[data-company="lsmbiz"] body {
+html[data-company="lsmbiz"] body,
+html[data-company="daro"] body {
   background-image:
     radial-gradient(ellipse 900px 420px at 10% -10%, rgba(26, 115, 240, 0.12), transparent 60%),
     radial-gradient(ellipse 700px 460px at 100% 0%, rgba(6, 182, 212, 0.08), transparent 55%),
@@ -244,6 +246,7 @@ body {
   padding: 0;
 }
 
-html[data-company="lsmbiz"] header {
+html[data-company="lsmbiz"] header,
+html[data-company="daro"] header {
   box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
 }

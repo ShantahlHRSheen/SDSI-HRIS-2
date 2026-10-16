@@ -23,11 +23,12 @@ export default function RootLayout({
     // data-company is added by the script below, before React loads.
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
-        {/* LSMBiz's blue colors (app/globals.css) from the first paint, so the
-            page doesn't flash green first. The key matches lib/companies.ts. */}
+        {/* LSMBiz's and Daro's own colors (app/globals.css) from the first
+            paint, so the page doesn't flash green first. The key matches
+            lib/companies.ts. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem("lsm-hris.company")==="lsmbiz")document.documentElement.dataset.company="lsmbiz"}catch(e){}`,
+            __html: `try{var c=localStorage.getItem("lsm-hris.company");if(c==="lsmbiz"||c==="daro")document.documentElement.dataset.company=c}catch(e){}`,
           }}
         />
       </head>
