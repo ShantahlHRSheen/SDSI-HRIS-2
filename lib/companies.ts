@@ -161,6 +161,9 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       [{ role: "Released by:", name: "", title: "TREASURY" }],
     ],
     emailHint: "you@company.com",
+    // Sheena Evangelista (LSM Group HR) manages Daro's HRIS but isn't on its
+    // roster — see supabase/daro-first-admin.sql.
+    adminAccountNumbers: ["ADMIN-01"],
   },
 };
 

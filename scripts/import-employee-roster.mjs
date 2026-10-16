@@ -79,6 +79,12 @@ const ROLES = new Set(["employee", "dept_head", "hr_admin", "payroll_officer", "
 
 function str(v) {
   if (v === null || v === undefined) return null;
+  // Emails typed as links come back as rich text / hyperlink cells.
+  if (typeof v === "object" && !(v instanceof Date)) {
+    if (v.richText) v = v.richText.map((t) => t.text).join("");
+    else if (v.text !== undefined) return str(v.text);
+    else if (v.result !== undefined) v = v.result;
+  }
   const s = String(v).trim();
   return s === "" ? null : s;
 }
