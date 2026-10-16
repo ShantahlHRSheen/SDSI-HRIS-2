@@ -33,6 +33,9 @@ export interface CompanyConfig {
   idCardLogo: string;
   // Band / photo-frame color on the employee ID; dark green unless set.
   idCardColor?: string;
+  // "gradient": the ID's bands fade from deep navy to bright blue, with a
+  // ringed photo and the ID number on a badge (components/id-card/IdCard.tsx).
+  idCardStyle?: "gradient";
   info: { name: string; tin: string; address: string; phone: string; email: string; rdoCode: string };
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -147,6 +150,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     formLogo: "/brand/daro-wide.png",
     idCardLogo: "/brand/daro-wide.png",
     idCardColor: "#1e3a8a",
+    idCardStyle: "gradient",
     info: { name: "Daro Lending Corporation", ...TBA },
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL_DARO,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_DARO,
