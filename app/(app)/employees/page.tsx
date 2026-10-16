@@ -9,6 +9,7 @@ import { StatTile } from "@/components/StatTile";
 import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { EmployeeEditModal } from "@/components/employees/EmployeeEditModal";
+import { BulkLoginButton } from "@/components/employees/BulkLoginButton";
 import { branchName, departmentAllocationsForEmployee, departmentName, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
@@ -46,7 +47,7 @@ function matchesStatus(e: Employee, filter: StatusFilter): boolean {
 }
 
 export default function EmployeeDirectoryPage() {
-  const { employees: allEmployees, employeeDepartmentAllocations, currentEmployee, branches, departments, currentUser, addEmployee } = useHris();
+  const { employees: allEmployees, employeeDepartmentAllocations, currentEmployee, branches, departments, currentUser, addEmployee, isRealAccount } = useHris();
   const employees = useMemo(
     () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations),
     [allEmployees, currentUser, currentEmployee, employeeDepartmentAllocations],
@@ -85,9 +86,12 @@ export default function EmployeeDirectoryPage() {
         subtitle={`${activeEmployees.length} active employees and ${activeFreelancerCount} active freelancers across ${branches.length} branches.`}
         actions={
           canEdit && (
-            <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
-              <Plus size={16} /> Add employee
-            </button>
+            <div className="flex items-center gap-2">
+              {isRealAccount && <BulkLoginButton employees={allEmployees} />}
+              <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+                <Plus size={16} /> Add employee
+              </button>
+            </div>
           )
         }
       />
