@@ -73,6 +73,10 @@ export interface ParsedPayrollWorkbook {
   rows: ParsedPayrollRow[];
 }
 
+// Amounts are paid in whole centavos: a cell holding e.g. 629.835 is rounded
+// half away from zero (like Excel's ROUND) so totals match to the centavo.
+const toCentavos = (n: number) => Math.sign(n) * (Math.round(Math.abs(n) * 100 + 1e-6) / 100);
+
 // Every sheet that looks like a payroll register, in workbook order. A
 // workbook often holds several cut-offs (e.g. "MAY 15" and "MAY 30"), so
 // the caller picks which one to import — never silently the first.
@@ -104,7 +108,7 @@ export async function parsePayrollWorkbook(buffer: ArrayBuffer): Promise<ParsedP
       const row = ws.getRow(r);
       const employeeNumber = String(cellScalar(row, cols.employee!) ?? "").trim();
       if (!employeeNumber) continue;
-      const num = (k: ColumnKey) => (cols[k] === undefined ? 0 : toNumber(cellScalar(row, cols[k]!)));
+      const num = (k: ColumnKey) => (cols[k] === undefined ? 0 : toCentavos(toNumber(cellScalar(row, cols[k]!))));
       const values = {} as ParsedPayrollRow["values"];
       for (const k of Object.keys(COLUMNS) as ColumnKey[]) {
         if (k !== "employee" && k !== "payrollType") values[k] = num(k);
