@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./client";
-import { currentCompanyId, isCompanyReady } from "../companies";
+import { currentCompany, currentCompanyId, isCompanyReady } from "../companies";
 
 // Real per-employee auth, layered alongside (not replacing) the existing
 // demo click-to-select login in lib/store.tsx. Every function here is safe
@@ -21,9 +21,29 @@ export async function signInWithPassword(email: string, password: string): Promi
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // A few people use their sign-in from another company's HRIS here
+    // (lib/companies.ts linkedSignIn): if that password is right there, it's
+    // saved here too, and the sign-in is tried once more.
+    if (error && currentCompany().linkedSignIn && (await adoptLinkedPassword(email, password))) {
+      const retry = await supabase.auth.signInWithPassword({ email, password });
+      return { session: retry.data.session, error: retry.error?.message ?? null };
+    }
     return { session: data.session, error: error?.message ?? null };
   } catch {
     return { session: null, error: "Couldn't reach the login server. Check your connection and try again." };
+  }
+}
+
+async function adoptLinkedPassword(email: string, password: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/linked-sign-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-company": currentCompanyId() },
+      body: JSON.stringify({ email, password }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
