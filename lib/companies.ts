@@ -154,23 +154,27 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     info: { name: "Daro Lending Corporation", ...TBA },
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL_DARO,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_DARO,
+    // Payroll is prepared by HR (Jam Karen Ducusin), checked by Accounting
+    // (Richard Tejadillo Jr.) and approved by Maricris Barlinan (ADMIN-02).
+    // Who releases it isn't set yet.
     payslipSignatories: [
-      { role: "Prepared by", name: "", title: "HR" },
-      { role: "Checked by", name: "", title: "Accounting" },
-      { role: "Released by", name: "", title: "Treasury" },
+      { role: "Prepared by", name: "Jam Karen E. Ducusin", title: "HR / Admin" },
+      { role: "Checked by", name: "Richard Tejadillo Jr.", title: "Accounting" },
+      { role: "Approved by", name: "Maricris Barlinan", title: "" },
     ],
     voucherSignatories: [
       [
-        { role: "Prepared by:", name: "", title: "HR" },
-        { role: "Checked by:", name: "", title: "ACCOUNTING" },
-        { role: "Approved by:", name: "", title: "MANAGEMENT" },
+        { role: "Prepared by:", name: "JAM KAREN E. DUCUSIN", title: "HR / ADMIN" },
+        { role: "Checked by:", name: "RICHARD TEJADILLO JR.", title: "ACCOUNTING" },
+        { role: "Approved by:", name: "MARICRIS BARLINAN", title: "" },
       ],
       [{ role: "Released by:", name: "", title: "TREASURY" }],
     ],
     emailHint: "you@company.com",
-    // Sheena Evangelista (LSM Group HR) manages Daro's HRIS but isn't on its
-    // roster — see supabase/daro-first-admin.sql.
-    adminAccountNumbers: ["ADMIN-01"],
+    // Admin-only accounts, not on Daro's roster: Sheena Evangelista (LSM
+    // Group HR, see supabase/daro-first-admin.sql) and Maricris Barlinan
+    // (approves payroll; supabase/daro-payroll-signatories.sql).
+    adminAccountNumbers: ["ADMIN-01", "ADMIN-02"],
     // HR uploads photos of Daro's own org chart, like LSMBiz.
     orgChartPhotos: true,
   },
