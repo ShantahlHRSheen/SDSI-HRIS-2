@@ -36,6 +36,8 @@ export interface CompanyConfig {
   // "gradient": the ID's bands fade from deep navy to bright blue, with a
   // ringed photo and the ID number on a badge (components/id-card/IdCard.tsx).
   idCardStyle?: "gradient" | "modern";
+  // Colours of the "modern" ID: band gradient deep → mid, and the lining.
+  idCardTheme?: { deep: string; mid: string; line: string };
   info: { name: string; tin: string; address: string; phone: string; email: string; rdoCode: string };
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -114,6 +116,9 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     logo: "/brand/lsmbiz.png",
     formLogo: "/brand/lsmbiz-wide.png",
     idCardLogo: "/brand/lsmbiz-wide.png",
+    idCardStyle: "modern",
+    // Green of the logo, with its dark red as the lining.
+    idCardTheme: { deep: "#0d4a1c", mid: "#1f8a35", line: "#7a1010" },
     info: {
       name: "LSMBiz Credit Corporation",
       tin: "007-058-421-000",
@@ -157,7 +162,9 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     formLogo: "/brand/daro-wide.png",
     idCardLogo: "/brand/daro-wide.png",
     idCardColor: "#1e3a8a",
-    idCardStyle: "gradient",
+    idCardStyle: "modern",
+    // Navy to blue, from the logo, with dark navy lining.
+    idCardTheme: { deep: "#0c2389", mid: "#1d4ed8", line: "#081657" },
     info: { name: "Daro Lending Corporation", ...TBA },
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL_DARO,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_DARO,

@@ -4,18 +4,24 @@ import { currentCompany } from "@/lib/companies";
 import { departmentName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 
-// The "modern" ID style (lib/companies.ts idCardStyle): green gradient bands
+// The "modern" ID style (lib/companies.ts idCardStyle): gradient bands
 // with a dot pattern and angled edges, a dark green accent line, and a back
 // with the emergency contact, return-to address and terms of use. Same CR80
 // size and print rules as IdCard.tsx; angles are clip-paths so several cards
 // can share a page without clashing SVG ids.
 
-const DEEP = "#0a3326";
-const GREEN = "#12604a";
-const LINE = "#04201a";
+// Each company's colours (lib/companies.ts idCardTheme); SDSI's dark green
+// by default. deep → mid is the band gradient, line the accent lining.
+const SDSI_THEME = { deep: "#0a3326", mid: "#12604a", line: "#04201a" };
+const theme = () => currentCompany().idCardTheme ?? SDSI_THEME;
 const INK = "#111827";
 const MUTED = "#4b5563";
-const BAND = `radial-gradient(rgba(255,255,255,0.10) 0.2mm, transparent 0.25mm) 0 0 / 2mm 2mm, linear-gradient(135deg, ${DEEP}, ${GREEN})`;
+// "#12604a", 0.1 → "rgba(18,96,74,0.1)"
+function tint(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+const bandBackground = () => `radial-gradient(rgba(255,255,255,0.10) 0.2mm, transparent 0.25mm) 0 0 / 2mm 2mm, linear-gradient(135deg, ${theme().deep}, ${theme().mid})`;
 
 const cardStyle: React.CSSProperties = {
   width: "54mm",
@@ -34,7 +40,7 @@ const cardStyle: React.CSSProperties = {
   WebkitPrintColorAdjust: "exact",
 };
 
-// An angled band: the accent line shows as a sliver of LINE below/above it.
+// An angled band: the lining shows as a thin sliver below/above it.
 // `edge` is where the slanted edge is (bottom of a header, top of a footer);
 // `low` and `high` are that edge's two ends as % of the band's height.
 function Band({ height, edge, children }: { height: string; edge: "bottom" | "top"; children?: React.ReactNode }) {
@@ -42,8 +48,8 @@ function Band({ height, edge, children }: { height: string; edge: "bottom" | "to
   const band = edge === "bottom" ? "polygon(0 0, 100% 0, 100% calc(82% - 0.55mm), 0 calc(100% - 0.55mm))" : "polygon(0 calc(22% + 0.55mm), 100% 0.55mm, 100% 100%, 0 100%)";
   return (
     <div style={{ position: "relative", height, flexShrink: 0 }}>
-      <div style={{ position: "absolute", inset: 0, background: LINE, clipPath: line }} />
-      <div style={{ position: "absolute", inset: 0, background: BAND, clipPath: band }} />
+      <div style={{ position: "absolute", inset: 0, background: theme().line, clipPath: line }} />
+      <div style={{ position: "absolute", inset: 0, background: bandBackground(), clipPath: band }} />
       {/* soft light facet in the top-right corner */}
       {edge === "bottom" && <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.06)", clipPath: "polygon(60% 0, 100% 0, 100% 45%)" }} />}
       <div style={{ position: "relative", height: "100%" }}>{children}</div>
@@ -70,13 +76,18 @@ export function ModernIdCardFront({ employee, photoUrl, signatureUrl, expiry }: 
           <img
             src={currentCompany().idCardLogo}
             alt={COMPANY_INFO.name}
-            // The logo has its own green background: fade its edges into the band.
-            style={{ height: "9.2mm", width: "auto", maskImage: "radial-gradient(ellipse 60% 75% at 50% 50%, #000 60%, transparent 100%)", WebkitMaskImage: "radial-gradient(ellipse 60% 75% at 50% 50%, #000 60%, transparent 100%)" }}
+            style={
+              currentCompany().id === "sdsi"
+                ? // Shantahl's logo has its own green background: fade its edges into the band.
+                  { height: "9.2mm", width: "auto", maskImage: "radial-gradient(ellipse 60% 75% at 50% 50%, #000 60%, transparent 100%)", WebkitMaskImage: "radial-gradient(ellipse 60% 75% at 50% 50%, #000 60%, transparent 100%)" }
+                : // Other logos are on white: show them on a white tab.
+                  { height: "8.4mm", width: "auto", maxWidth: "40mm", background: "#ffffff", padding: "0.4mm 1.6mm", borderRadius: "1.4mm", boxShadow: "0 0.4mm 1.2mm rgba(0,0,0,0.25)" }
+            }
           />
         </div>
       </Band>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "0 3mm" }}>
-        <div style={{ width: "22.4mm", height: "28mm", marginTop: "-9.6mm", position: "relative", borderRadius: "2.4mm", padding: "0.6mm", background: `linear-gradient(135deg, ${LINE}, ${GREEN})`, boxShadow: "0 1.2mm 2.8mm rgba(10,51,38,0.35)", flexShrink: 0 }}>
+        <div style={{ width: "22.4mm", height: "28mm", marginTop: "-9.6mm", position: "relative", borderRadius: "2.4mm", padding: "0.6mm", background: `linear-gradient(135deg, ${theme().line}, ${theme().mid})`, boxShadow: `0 1.2mm 2.8mm ${tint(theme().deep, 0.35)}`, flexShrink: 0 }}>
           <div style={{ width: "100%", height: "100%", borderRadius: "1.8mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {photoUrl ? (
               <img src={photoUrl} alt="Employee photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -86,9 +97,9 @@ export function ModernIdCardFront({ employee, photoUrl, signatureUrl, expiry }: 
           </div>
         </div>
         <div style={{ marginTop: "2mm", fontSize: "8.4pt", fontWeight: 800, textAlign: "center", lineHeight: 1.15, letterSpacing: "0.1mm" }}>{cardName(employee)}</div>
-        <div style={{ fontSize: "6.6pt", fontWeight: 700, color: GREEN, textAlign: "center", marginTop: "0.5mm" }}>{positionTitle(employee.positionId)}</div>
+        <div style={{ fontSize: "6.6pt", fontWeight: 700, color: theme().mid, textAlign: "center", marginTop: "0.5mm" }}>{positionTitle(employee.positionId)}</div>
         <div style={{ fontSize: "5.8pt", color: MUTED, textAlign: "center" }}>{departmentName(employee.departmentId)}</div>
-        <div style={{ marginTop: "1.4mm", display: "inline-flex", gap: "1.2mm", alignItems: "center", borderRadius: "4mm", padding: "0.6mm 2.6mm", background: `linear-gradient(135deg, ${DEEP}, ${GREEN})`, color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.2mm" }}>
+        <div style={{ marginTop: "1.4mm", display: "inline-flex", gap: "1.2mm", alignItems: "center", borderRadius: "4mm", padding: "0.6mm 2.6mm", background: `linear-gradient(135deg, ${theme().deep}, ${theme().mid})`, color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.2mm" }}>
           <span style={{ opacity: 0.7, fontWeight: 400 }}>ID NO.</span> {employee.employeeNumber}
         </div>
         <div style={{ marginTop: "auto", marginBottom: "1mm", width: "36mm", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -110,7 +121,7 @@ export function ModernIdCardFront({ employee, photoUrl, signatureUrl, expiry }: 
 
 function Icon({ d }: { d: React.ReactNode }) {
   return (
-    <span style={{ width: "4.4mm", height: "4.4mm", borderRadius: "1.4mm", background: `linear-gradient(135deg, ${GREEN}, ${DEEP})`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0.4mm 1mm rgba(10,51,38,0.35)", flexShrink: 0 }}>
+    <span style={{ width: "4.4mm", height: "4.4mm", borderRadius: "1.4mm", background: `linear-gradient(135deg, ${theme().mid}, ${theme().deep})`, display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0.4mm 1mm ${tint(theme().deep, 0.35)}`, flexShrink: 0 }}>
       <svg viewBox="0 0 24 24" style={{ width: "2.6mm", height: "2.6mm" }} fill="none" stroke="#ffffff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         {d}
       </svg>
@@ -122,7 +133,7 @@ function Heading({ icon, children }: { icon: React.ReactNode; children: React.Re
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "1.4mm", marginBottom: "1mm" }}>
       <Icon d={icon} />
-      <span style={{ fontSize: "5.1pt", fontWeight: 800, letterSpacing: "0.32mm", textTransform: "uppercase", color: DEEP }}>{children}</span>
+      <span style={{ fontSize: "5.1pt", fontWeight: 800, letterSpacing: "0.32mm", textTransform: "uppercase", color: theme().deep }}>{children}</span>
     </div>
   );
 }
@@ -156,13 +167,15 @@ export function ModernIdCardBack({ employee }: { employee: Employee }) {
         </div>
       </Band>
       <div style={{ flex: 1, padding: "0.2mm 2.8mm 0", display: "flex", flexDirection: "column" }}>
-        <div style={{ borderRadius: "2mm", padding: "1.8mm 2mm", background: "linear-gradient(135deg, rgba(18,96,74,0.10), rgba(4,32,26,0.05))", border: "0.2mm solid rgba(18,96,74,0.18)" }}>
+        <div style={{ borderRadius: "2mm", padding: "1.8mm 2mm", background: `linear-gradient(135deg, ${tint(theme().mid, 0.1)}, ${tint(theme().line, 0.05)})`, border: `0.2mm solid ${tint(theme().mid, 0.18)}` }}>
           <Heading icon={PHONE}>In case of emergency</Heading>
           <div style={{ fontWeight: 800, fontSize: "7.1pt" }}>{employee.emergencyContactName?.trim() || "—"}</div>
-          <div style={{ fontWeight: 800, fontSize: "8.5pt", color: GREEN, letterSpacing: "0.1mm" }}>{employee.emergencyContactPhone?.trim() || "—"}</div>
-          <div style={{ ...text, fontSize: "4.8pt", marginTop: "0.4mm" }}>
-            If unreachable, call {company.shortName} HR: <b>{COMPANY_INFO.phone}</b>
-          </div>
+          <div style={{ fontWeight: 800, fontSize: "8.5pt", color: theme().mid, letterSpacing: "0.1mm" }}>{employee.emergencyContactPhone?.trim() || "—"}</div>
+          {COMPANY_INFO.phone && (
+            <div style={{ ...text, fontSize: "4.8pt", marginTop: "0.4mm" }}>
+              If unreachable, call {company.shortName} HR: <b>{COMPANY_INFO.phone}</b>
+            </div>
+          )}
         </div>
         <div style={{ marginTop: "2mm", paddingLeft: "0.4mm" }}>
           <Heading icon={PIN}>If found, please return to</Heading>
@@ -175,8 +188,8 @@ export function ModernIdCardBack({ employee }: { employee: Employee }) {
             This card is company property and is non-transferable. It must be worn visibly on company premises and surrendered upon separation from the company. Report loss to HR immediately.
           </div>
         </div>
-        <div style={{ marginTop: "1.8mm", display: "flex", gap: "1.2mm", alignItems: "flex-start", borderRadius: "1.6mm", padding: "1.2mm 1.6mm", background: "#ffffff", border: "0.2mm dashed rgba(18,96,74,0.35)", fontSize: "4.3pt", color: MUTED, lineHeight: 1.35 }}>
-          <svg viewBox="0 0 24 24" style={{ width: "2.4mm", height: "2.4mm", flexShrink: 0 }} fill="none" stroke={GREEN} strokeWidth={2}>
+        <div style={{ marginTop: "1.8mm", display: "flex", gap: "1.2mm", alignItems: "flex-start", borderRadius: "1.6mm", padding: "1.2mm 1.6mm", background: "#ffffff", border: `0.2mm dashed ${tint(theme().mid, 0.35)}`, fontSize: "4.3pt", color: MUTED, lineHeight: 1.35 }}>
+          <svg viewBox="0 0 24 24" style={{ width: "2.4mm", height: "2.4mm", flexShrink: 0 }} fill="none" stroke={theme().mid} strokeWidth={2}>
             <rect x="4" y="11" width="16" height="10" rx="2" />
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
@@ -187,9 +200,7 @@ export function ModernIdCardBack({ employee }: { employee: Employee }) {
         <div style={{ color: "#ffffff", fontSize: "4.4pt", fontWeight: 700, textAlign: "center", padding: "3.2mm 2mm 0", lineHeight: 1.35 }}>
           To verify this ID, contact {company.shortName} HR Department
           <br />
-          <span style={{ fontWeight: 400, opacity: 0.9 }}>
-            {COMPANY_INFO.email} · {COMPANY_INFO.phone}
-          </span>
+          <span style={{ fontWeight: 400, opacity: 0.9 }}>{[COMPANY_INFO.email, COMPANY_INFO.phone].filter(Boolean).join(" · ")}</span>
         </div>
       </Band>
     </div>
