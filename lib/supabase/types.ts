@@ -243,6 +243,9 @@ export type HrMessageRow = {
   body: string;
   image_path: string | null;
   image_removed_at: string | null;
+  file_path?: string | null;
+  file_name?: string | null;
+  file_removed_at?: string | null;
   created_at: string;
   read_at: string | null;
 };
