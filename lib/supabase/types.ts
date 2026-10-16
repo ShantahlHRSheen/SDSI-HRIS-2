@@ -95,6 +95,8 @@ export type EmployeeRow = {
   email: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  id_return_name?: string | null;
+  id_return_address?: string | null;
   sss_number: string | null;
   philhealth_number: string | null;
   hdmf_number: string | null;

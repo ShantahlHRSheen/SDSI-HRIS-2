@@ -309,6 +309,8 @@ function toEmployee(r: EmployeeRow): Employee {
     email: r.email,
     emergencyContactName: r.emergency_contact_name,
     emergencyContactPhone: r.emergency_contact_phone,
+    idReturnName: r.id_return_name ?? null,
+    idReturnAddress: r.id_return_address ?? null,
     sssNumber: r.sss_number,
     philHealthNumber: r.philhealth_number,
     hdmfNumber: r.hdmf_number,
