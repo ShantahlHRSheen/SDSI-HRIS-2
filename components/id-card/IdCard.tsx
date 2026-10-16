@@ -10,6 +10,7 @@ import type { Employee } from "@/lib/types";
 // the same on any screen.
 
 const GREEN = "#0a3326";
+const bandColor = () => currentCompany().idCardColor ?? GREEN;
 const INK = "#111827";
 const MUTED = "#4b5563";
 export const ID_VERIFY_EMAIL = COMPANY_INFO.email;
@@ -56,13 +57,13 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: "5.2pt", fontWeight: 700, color: GREEN, letterSpacing: "0.3mm", margin: "1.6mm 0 0.8mm", textTransform: "uppercase" }}>{children}</div>;
+  return <div style={{ fontSize: "5.2pt", fontWeight: 700, color: bandColor(), letterSpacing: "0.3mm", margin: "1.6mm 0 0.8mm", textTransform: "uppercase" }}>{children}</div>;
 }
 
 export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { employee: Employee; photoUrl?: string; signatureUrl?: string; expiry: string }) {
   return (
     <div style={cardStyle} aria-label="ID card front">
-      <div style={{ background: GREEN, height: "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: bandColor(), height: "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img
           src={currentCompany().idCardLogo}
           alt={COMPANY_INFO.name}
@@ -71,7 +72,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
         />
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "2.5mm 3mm 0" }}>
-        <div style={{ width: "24mm", height: "32mm", border: `0.5mm solid ${GREEN}`, borderRadius: "1mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "24mm", height: "32mm", border: `0.5mm solid ${bandColor()}`, borderRadius: "1mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {photoUrl ? (
             <img src={photoUrl} alt="Employee photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
@@ -79,7 +80,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
           )}
         </div>
         <div style={{ marginTop: "2mm", fontSize: "8pt", fontWeight: 800, textAlign: "center", lineHeight: 1.15 }}>{cardName(employee)}</div>
-        <div style={{ fontSize: "6.2pt", fontWeight: 600, color: GREEN, textAlign: "center", marginTop: "0.6mm" }}>{positionTitle(employee.positionId)}</div>
+        <div style={{ fontSize: "6.2pt", fontWeight: 600, color: bandColor(), textAlign: "center", marginTop: "0.6mm" }}>{positionTitle(employee.positionId)}</div>
         <div style={{ fontSize: "5.6pt", color: MUTED, textAlign: "center" }}>{departmentName(employee.departmentId)}</div>
         <div style={{ fontSize: "6.4pt", fontWeight: 700, marginTop: "1.2mm" }}>ID No. {employee.employeeNumber}</div>
         <div style={{ marginTop: "auto", marginBottom: "1.2mm", width: "34mm", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -89,7 +90,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
           <div style={{ borderTop: `0.2mm solid ${INK}`, width: "100%", textAlign: "center", fontSize: "4.8pt", color: MUTED, paddingTop: "0.3mm" }}>Employee&rsquo;s signature</div>
         </div>
       </div>
-      <div style={{ background: GREEN, color: "#ffffff", fontSize: "5pt", padding: "1.2mm 2.5mm", display: "flex", justifyContent: "space-between", gap: "1mm" }}>
+      <div style={{ background: bandColor(), color: "#ffffff", fontSize: "5pt", padding: "1.2mm 2.5mm", display: "flex", justifyContent: "space-between", gap: "1mm" }}>
         <span>Issued: {longDate(employee.dateHired)}</span>
         <span>Valid until: {longDate(expiry)}</span>
       </div>
@@ -100,7 +101,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
 export function IdCardBack({ employee }: { employee: Employee }) {
   return (
     <div style={cardStyle} aria-label="ID card back">
-      <div style={{ background: GREEN, color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.4mm", padding: "1.6mm 3mm", textAlign: "center" }}>
+      <div style={{ background: bandColor(), color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.4mm", padding: "1.6mm 3mm", textAlign: "center" }}>
         EMPLOYEE INFORMATION
       </div>
       <div style={{ flex: 1, padding: "1.2mm 3mm 0" }}>
@@ -117,7 +118,7 @@ export function IdCardBack({ employee }: { employee: Employee }) {
         <Field label="Contact person" value={employee.emergencyContactName} />
         <Field label="Contact No." value={employee.emergencyContactPhone} />
       </div>
-      <div style={{ background: GREEN, color: "#ffffff", fontSize: "5pt", lineHeight: 1.35, padding: "1.5mm 3mm", textAlign: "center" }}>
+      <div style={{ background: bandColor(), color: "#ffffff", fontSize: "5pt", lineHeight: 1.35, padding: "1.5mm 3mm", textAlign: "center" }}>
         For verification: contact {currentCompany().shortName} HR Department thru {ID_VERIFY_EMAIL} or {ID_VERIFY_PHONE}.
       </div>
     </div>

@@ -31,6 +31,8 @@ export interface CompanyConfig {
   logo: string;
   formLogo: string;
   idCardLogo: string;
+  // Band / photo-frame color on the employee ID; dark green unless set.
+  idCardColor?: string;
   info: { name: string; tin: string; address: string; phone: string; email: string; rdoCode: string };
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -144,6 +146,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     logo: "/brand/daro.png",
     formLogo: "/brand/daro-wide.png",
     idCardLogo: "/brand/daro-wide.png",
+    idCardColor: "#1e3a8a",
     info: { name: "Daro Lending Corporation", ...TBA },
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL_DARO,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY_DARO,
