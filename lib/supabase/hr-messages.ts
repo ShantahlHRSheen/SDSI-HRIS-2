@@ -14,6 +14,10 @@ export interface HrMessage {
   imagePath: string | null;
   // Set once the daily cleanup has deleted the photo (30 days after sending).
   imageRemoved: boolean;
+  // A document sent in the chat (supabase/migrate_phase45_hr_chat_files.sql).
+  filePath: string | null;
+  fileName: string | null;
+  fileRemoved: boolean;
   createdAt: string;
   readAt: string | null;
 }
@@ -21,6 +25,10 @@ export interface HrMessage {
 export const HR_MESSAGE_MAX = 2000;
 export const HR_CHAT_BUCKET = "hr-chat-images";
 export const HR_CHAT_PHOTO_DAYS = 30;
+export const HR_CHAT_FILE_BUCKET = "hr-chat-files";
+export const HR_CHAT_FILE_MAX_BYTES = 10 * 1024 * 1024;
+// Documents that can be sent (photos go through the photo button instead).
+export const HR_CHAT_FILE_TYPES = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".zip"];
 
 type Row = {
   id: string;
@@ -30,6 +38,9 @@ type Row = {
   body: string;
   image_path?: string | null;
   image_removed_at?: string | null;
+  file_path?: string | null;
+  file_name?: string | null;
+  file_removed_at?: string | null;
   created_at: string;
   read_at: string | null;
 };
@@ -42,6 +53,9 @@ const toMessage = (r: Row): HrMessage => ({
   body: r.body,
   imagePath: r.image_path ?? null,
   imageRemoved: !!r.image_removed_at,
+  filePath: r.file_path ?? null,
+  fileName: r.file_name ?? null,
+  fileRemoved: !!r.file_removed_at,
   createdAt: r.created_at,
   readAt: r.read_at,
 });
@@ -60,10 +74,19 @@ export async function fetchHrInboxMessages(): Promise<HrMessage[]> {
   return (data as Row[]).map(toMessage);
 }
 
-// Sends text and/or a photo (already shrunk by prepareChatPhoto). The photo
-// goes in the conversation's folder; if the message then fails, the orphaned
-// file is cleaned up by the daily job with the other expired photos.
-export async function sendHrMessage(employeeId: string, body: string, photo?: Blob | null): Promise<HrMessage> {
+// Why a file can't be sent, or null if it can.
+export function hrChatFileProblem(file: File): string | null {
+  const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
+  if (!HR_CHAT_FILE_TYPES.includes(ext)) return `That type of file can't be sent. Allowed: ${HR_CHAT_FILE_TYPES.join(", ")}.`;
+  if (file.size > HR_CHAT_FILE_MAX_BYTES) return "That file is over 10 MB.";
+  if (file.size === 0) return "That file is empty.";
+  return null;
+}
+
+// Sends text, a photo (already shrunk by prepareChatPhoto) and/or a file.
+// Uploads go in the conversation's folder; if the message then fails, the
+// orphaned upload is cleaned up by the daily job with the other expired ones.
+export async function sendHrMessage(employeeId: string, body: string, photo?: Blob | null, file?: File | null): Promise<HrMessage> {
   const client = getSupabaseClient();
   let imagePath: string | null = null;
   if (photo) {
@@ -71,9 +94,18 @@ export async function sendHrMessage(employeeId: string, body: string, photo?: Bl
     const { error: upErr } = await client.storage.from(HR_CHAT_BUCKET).upload(imagePath, photo, { contentType: "image/jpeg" });
     if (upErr) throw upErr;
   }
+  let filePath: string | null = null;
+  if (file) {
+    const problem = hrChatFileProblem(file);
+    if (problem) throw new Error(problem);
+    const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    filePath = `${employeeId}/${crypto.randomUUID()}${ext}`;
+    const { error: upErr } = await client.storage.from(HR_CHAT_FILE_BUCKET).upload(filePath, file, { contentType: file.type || "application/octet-stream" });
+    if (upErr) throw new Error(/bucket not found/i.test(upErr.message) ? "Sending files isn't set up yet — ask HR to run the latest database update." : upErr.message);
+  }
   const { data, error } = await client
     .from("hr_messages")
-    .insert({ employee_id: employeeId, body: body.trim(), ...(imagePath ? { image_path: imagePath } : {}) })
+    .insert({ employee_id: employeeId, body: body.trim(), ...(imagePath ? { image_path: imagePath } : {}), ...(filePath ? { file_path: filePath, file_name: file!.name } : {}) })
     .select()
     .single();
   if (error) throw error;
@@ -88,6 +120,14 @@ export async function hrChatPhotoUrls(paths: string[]): Promise<Record<string, s
   const urls: Record<string, string> = {};
   for (const d of data) if (d.path && d.signedUrl) urls[d.path] = d.signedUrl;
   return urls;
+}
+
+// A short-lived link that downloads a chat file under its original name
+// (never opened in the browser).
+export async function hrChatFileDownloadUrl(path: string, fileName: string): Promise<string> {
+  const { data, error } = await getSupabaseClient().storage.from(HR_CHAT_FILE_BUCKET).createSignedUrl(path, 300, { download: fileName });
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export async function markHrThreadRead(employeeId: string): Promise<void> {

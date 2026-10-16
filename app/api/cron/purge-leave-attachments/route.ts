@@ -9,6 +9,7 @@ import { companyDatabase } from "@/lib/server/supabase-admin";
 //     the file was removed.
 //   * photos sent in Chat with HR. The message stays, with image_removed_at
 //     set, so the chat shows "Photo removed".
+//   * files sent in Chat with HR, the same way (file_removed_at).
 //
 // Needs these environment variables on the server (Vercel > Settings >
 // Environment Variables), never exposed to the browser:
@@ -17,6 +18,7 @@ import { companyDatabase } from "@/lib/server/supabase-admin";
 const RETENTION_DAYS = 30;
 const BUCKET = "leave-attachments";
 const CHAT_BUCKET = "hr-chat-images";
+const CHAT_FILE_BUCKET = "hr-chat-files";
 
 // Runs for every company whose database is set up (lib/companies.ts).
 export async function GET(request: Request) {
@@ -96,5 +98,32 @@ async function purgeCompany(url: string, serviceKey: string) {
     }
   }
 
-  return { cutoff, expired: expired.length, deleted, chatPhotosDeleted: chatDeleted, failures };
+  // Chat files, the same way. Skipped until the chat-files migration runs.
+  let chatFilesDeleted = 0;
+  const { data: filePaths, error: fileErr } = await (supabase as unknown as {
+    rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: string[] | null; error: { message: string } | null }>;
+  }).rpc("hr_chat_expired_files", { older_than: cutoff });
+  if (fileErr) {
+    if (!/hr_chat_expired_files/.test(fileErr.message)) failures.push(fileErr.message);
+  } else {
+    const paths = filePaths ?? [];
+    for (let i = 0; i < paths.length; i += 100) {
+      const batch = paths.slice(i, i + 100);
+      const { error: rmErr } = await supabase.storage.from(CHAT_FILE_BUCKET).remove(batch);
+      if (rmErr) {
+        failures.push(rmErr.message);
+        continue;
+      }
+      const { error: markErr } = await (supabase as unknown as {
+        from: (t: string) => { update: (v: Record<string, unknown>) => { in: (c: string, v: string[]) => PromiseLike<{ error: { message: string } | null }> } };
+      })
+        .from("hr_messages")
+        .update({ file_path: null, file_removed_at: new Date().toISOString() })
+        .in("file_path", batch);
+      if (markErr) failures.push(markErr.message);
+      else chatFilesDeleted += batch.length;
+    }
+  }
+
+  return { cutoff, expired: expired.length, deleted, chatPhotosDeleted: chatDeleted, chatFilesDeleted, failures };
 }

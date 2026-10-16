@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ImagePlus, MessageCircle, Search, Send, Smile, SmilePlus, X } from "lucide-react";
+import { ArrowLeft, FileText, ImagePlus, MessageCircle, Paperclip, Search, Send, Smile, SmilePlus, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
 import { fullName } from "@/lib/helpers";
@@ -11,9 +11,12 @@ import {
   fetchHrInboxMessages,
   fetchHrReactions,
   fetchHrThread,
+  HR_CHAT_FILE_TYPES,
   HR_CHAT_PHOTO_DAYS,
   HR_REACTIONS,
   HR_MESSAGE_MAX,
+  hrChatFileDownloadUrl,
+  hrChatFileProblem,
   hrChatPhotoUrls,
   markHrThreadRead,
   sendHrMessage,
@@ -53,6 +56,19 @@ function timeLabel(iso: string): string {
 function isEmojiOnly(text: string): boolean {
   const t = text.trim();
   return !!t && [...t].length <= 12 && /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D|\s)+$/u.test(t);
+}
+
+function fileSize(bytes: number): string {
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+// Downloads a chat file under its own name (a fresh 5-minute link each time).
+async function downloadChatFile(path: string, name: string) {
+  try {
+    window.location.href = await hrChatFileDownloadUrl(path, name);
+  } catch (err) {
+    reportSaveError("Couldn't download the file", err);
+  }
 }
 
 function usePolling(fn: () => void, ms: number) {
@@ -100,6 +116,8 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
   const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const docInput = useRef<HTMLInputElement>(null);
+  const [doc, setDoc] = useState<File | null>(null);
   const [photoUrls, setPhotoUrls] = useState<{
     urls: Record<string, string>;
     at: number;
@@ -170,6 +188,15 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
     }
   }
 
+  function pickDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const problem = hrChatFileProblem(file);
+    setPhotoError(problem);
+    setDoc(problem ? null : file);
+  }
+
   function insertEmoji(emoji: string) {
     const el = textarea.current;
     const start = el?.selectionStart ?? draft.length;
@@ -204,10 +231,11 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
   async function send() {
     const body = draft.trim();
     const sentPhoto = photo;
-    if ((!body && !sentPhoto) || sending || preparing) return;
+    const sentDoc = doc;
+    if ((!body && !sentPhoto && !sentDoc) || sending || preparing) return;
     setSending(true);
     try {
-      const m = await sendHrMessage(employeeId, body, sentPhoto?.blob);
+      const m = await sendHrMessage(employeeId, body, sentPhoto?.blob, sentDoc);
       setMessages((prev) => [...(prev ?? []), m]);
       // Clear only what was sent — keep anything typed or attached meanwhile.
       setDraft((cur) => {
@@ -215,6 +243,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
         return rest.startsWith(body) ? rest.slice(body.length).trimStart() : cur;
       });
       setPhoto((cur) => (cur === sentPhoto ? null : cur));
+      setDoc((cur) => (cur === sentDoc ? null : cur));
       onSent?.();
     } catch (err) {
       reportSaveError("Couldn't send the message", err);
@@ -258,6 +287,25 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                     className={`mb-1 w-fit rounded-xl border border-dashed border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-muted)] italic ${mine ? "ml-auto" : ""}`}
                   >
                     Photo removed — photos are kept for {HR_CHAT_PHOTO_DAYS} days
+                  </div>
+                )}
+                {m.filePath && (
+                  <button
+                    type="button"
+                    onClick={() => downloadChatFile(m.filePath!, m.fileName ?? "file")}
+                    className={`mb-1 flex w-fit max-w-full items-center gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--gridline)]/40 ${mine ? "ml-auto" : ""}`}
+                    title="Download"
+                  >
+                    <FileText size={18} className="shrink-0 text-[var(--series-1)]" />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{m.fileName ?? "File"}</span>
+                    <span className="shrink-0 text-xs text-[var(--text-muted)]">Download</span>
+                  </button>
+                )}
+                {m.fileRemoved && (
+                  <div
+                    className={`mb-1 w-fit rounded-xl border border-dashed border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-muted)] italic ${mine ? "ml-auto" : ""}`}
+                  >
+                    File removed — files are kept for {HR_CHAT_PHOTO_DAYS} days
                   </div>
                 )}
                 {m.body &&
@@ -343,7 +391,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
         }}
         className="border-t border-[var(--border-hairline)] p-2 sm:p-3"
       >
-        {(photo || preparing || photoError) && (
+        {(photo || doc || preparing || photoError) && (
           <div className="mb-2 flex items-center gap-2">
             {preparing && <span className="text-xs text-[var(--text-muted)]">Preparing photo…</span>}
             {photo && (
@@ -355,6 +403,16 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                   className="absolute -top-2 -right-2 rounded-full bg-[var(--surface-1)] p-0.5 text-[var(--text-secondary)] shadow"
                   aria-label="Remove photo"
                 >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {doc && (
+              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-[var(--border-hairline)] px-2.5 py-1.5 text-sm text-[var(--text-primary)]">
+                <FileText size={16} className="shrink-0 text-[var(--series-1)]" />
+                <span className="min-w-0 truncate">{doc.name}</span>
+                <span className="shrink-0 text-xs text-[var(--text-muted)]">{fileSize(doc.size)}</span>
+                <button type="button" onClick={() => setDoc(null)} className="shrink-0 rounded-full p-0.5 text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50" aria-label="Remove file">
                   <X size={14} />
                 </button>
               </div>
@@ -373,6 +431,17 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
             title="Add a photo"
           >
             <ImagePlus size={18} />
+          </button>
+          <input ref={docInput} type="file" accept={HR_CHAT_FILE_TYPES.join(",")} className="hidden" onChange={pickDoc} />
+          <button
+            type="button"
+            onClick={() => docInput.current?.click()}
+            disabled={sending || preparing}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+            aria-label="Attach a file"
+            title="Attach a file (Excel, Word, PDF…)"
+          >
+            <Paperclip size={18} />
           </button>
           <div className="relative shrink-0">
             <button
@@ -404,14 +473,14 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
           />
           <button
             type="submit"
-            disabled={(!draft.trim() && !photo) || sending || preparing}
+            disabled={(!draft.trim() && !photo && !doc) || sending || preparing}
             className="flex h-10 items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40"
             aria-label="Send"
           >
             <Send size={16} /> <span className="hidden sm:inline">{sending ? "Sending…" : "Send"}</span>
           </button>
         </div>
-        <div className="mt-1 px-1 text-[11px] text-[var(--text-muted)]">Photos are deleted automatically after {HR_CHAT_PHOTO_DAYS} days.</div>
+        <div className="mt-1 px-1 text-[11px] text-[var(--text-muted)]">Photos and files (up to 10 MB) are deleted automatically after {HR_CHAT_PHOTO_DAYS} days.</div>
       </form>
     </div>
   );
@@ -509,7 +578,7 @@ export function HrInbox() {
                 </div>
                 <div className="truncate text-xs text-[var(--text-secondary)]">
                   {c.last.fromHr ? "You: " : ""}
-                  {c.last.body || (c.last.imagePath || c.last.imageRemoved ? "📷 Photo" : "")}
+                  {c.last.body || (c.last.imagePath || c.last.imageRemoved ? "📷 Photo" : c.last.filePath || c.last.fileRemoved ? `📎 ${c.last.fileName ?? "File"}` : "")}
                 </div>
               </div>
               {c.unread > 0 && <span className="mt-0.5 rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white">{c.unread}</span>}
