@@ -54,6 +54,11 @@ export interface CompanyConfig {
   // Layout of the payroll Excel this company uploads in Payroll Processing:
   // the standard register (lib/payroll-import.ts) unless set.
   payrollImportFormat?: "lsmbiz";
+  // People who sign in here with the same email and password as in another
+  // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
+  // match here, it's checked against `from`'s database and, if right, saved
+  // here too. Listed by employee number in this company.
+  linkedSignIn?: { from: CompanyId; employeeNumbers: string[] };
   // Org Chart shows photos of the company's own chart that HR uploads,
   // instead of one drawn from the 201 files.
   orgChartPhotos?: boolean;
@@ -175,6 +180,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Group HR, see supabase/daro-first-admin.sql) and Maricris Barlinan
     // (approves payroll; supabase/daro-payroll-signatories.sql).
     adminAccountNumbers: ["ADMIN-01", "ADMIN-02"],
+    // Lowel and Sheilah Magdadaro and Maricris Barlinan use their Shantahl sign-in.
+    linkedSignIn: { from: "sdsi", employeeNumbers: ["EMP-0001", "EMP-0002", "ADMIN-02"] },
     // HR uploads photos of Daro's own org chart, like LSMBiz.
     orgChartPhotos: true,
   },
