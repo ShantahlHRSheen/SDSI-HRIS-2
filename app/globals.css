@@ -44,11 +44,12 @@
 }
 
 /*
-  LSMBiz Credit Corp. uses white-and-blue instead. data-company is set on
-  <html> before first paint (see app/layout.tsx) only when LSMBiz is the
-  chosen company, so the other companies keep the tokens above.
+  LSMBiz Credit Corp. and Daro Lending Corp. use white-and-blue instead.
+  data-company is set on <html> before first paint (see app/layout.tsx) only
+  when one of them is the chosen company, so Shantahl keeps the tokens above.
 */
-html[data-company="lsmbiz"] {
+html[data-company="lsmbiz"],
+html[data-company="daro"] {
   --surface-1: #ffffff;
   --page-plane: #f2f6fc;
   --text-primary: #0b1a33;
@@ -78,50 +79,13 @@ html[data-company="lsmbiz"] {
   --seq-700: #0b3d91;
 }
 
-html[data-company="lsmbiz"] body {
+html[data-company="lsmbiz"] body,
+html[data-company="daro"] body {
   background-image:
     radial-gradient(ellipse 900px 420px at 10% -10%, rgba(26, 115, 240, 0.12), transparent 60%),
     radial-gradient(ellipse 700px 460px at 100% 0%, rgba(6, 182, 212, 0.08), transparent 55%),
     linear-gradient(rgba(26, 115, 240, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(26, 115, 240, 0.035) 1px, transparent 1px);
-  background-size: auto, auto, 32px 32px, 32px 32px;
-}
-
-/*
-  Daro Lending Corp.: futuristic black-and-blue. Near-black navy surfaces,
-  electric blue accent with a cyan edge, and a faint blueprint grid behind
-  the page. Same data-company switch as LSMBiz.
-*/
-html[data-company="daro"] {
-  --surface-1: #0a1020;
-  --page-plane: #03060d;
-  --text-secondary: #b3c2dd;
-  --text-muted: #6d7d9b;
-  --gridline: #131c31;
-  --baseline: #22304e;
-  --border-hairline: rgba(80, 160, 255, 0.18);
-  --accent: #3d8bff;
-  --accent-strong: #7ab3ff;
-  --accent-soft: rgba(61, 139, 255, 0.14);
-  --accent-glow: rgba(61, 139, 255, 0.5);
-  --on-accent: #020a1c;
-  --series-1: #3d8bff;
-  --series-2: #22d3ee;
-  --series-4: #34d399;
-  --seq-100: #0c1a33;
-  --seq-250: #12305c;
-  --seq-400: #1a4f9c;
-  --seq-450: #2f78e8;
-  --seq-550: #6aa8ff;
-  --seq-700: #c2dcff;
-}
-
-html[data-company="daro"] body {
-  background-image:
-    radial-gradient(ellipse 900px 480px at 12% -8%, rgba(61, 139, 255, 0.18), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(34, 211, 238, 0.09), transparent 55%),
-    linear-gradient(rgba(80, 160, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(80, 160, 255, 0.04) 1px, transparent 1px);
   background-size: auto, auto, 32px 32px, 32px 32px;
 }
 
@@ -282,10 +246,7 @@ body {
   padding: 0;
 }
 
-html[data-company="lsmbiz"] header {
-  box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
-}
-
+html[data-company="lsmbiz"] header,
 html[data-company="daro"] header {
-  box-shadow: 0 1px 0 rgba(80, 160, 255, 0.22), 0 8px 28px -12px rgba(61, 139, 255, 0.55);
+  box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
 }
