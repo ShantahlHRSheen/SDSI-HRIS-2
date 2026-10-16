@@ -11,6 +11,14 @@ import type { Employee } from "@/lib/types";
 
 const GREEN = "#0a3326";
 const bandColor = () => currentCompany().idCardColor ?? GREEN;
+
+// The "gradient" style (lib/companies.ts idCardStyle): deep navy to bright blue.
+const NAVY = "#0c2389";
+const BLUE = "#1d4ed8";
+const isGradient = () => currentCompany().idCardStyle === "gradient";
+const accentColor = () => (isGradient() ? BLUE : bandColor());
+const headerBand = () => (isGradient() ? `linear-gradient(135deg, ${NAVY} 0%, ${BLUE} 60%, #38bdf8 130%)` : bandColor());
+const footerBand = () => (isGradient() ? `linear-gradient(90deg, ${NAVY}, ${BLUE})` : bandColor());
 const INK = "#111827";
 const MUTED = "#4b5563";
 export const ID_VERIFY_EMAIL = COMPANY_INFO.email;
@@ -57,32 +65,32 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: "5.2pt", fontWeight: 700, color: bandColor(), letterSpacing: "0.3mm", margin: "1.6mm 0 0.8mm", textTransform: "uppercase" }}>{children}</div>;
+  return <div style={{ fontSize: "5.2pt", fontWeight: 700, color: accentColor(), letterSpacing: "0.3mm", margin: "1.6mm 0 0.8mm", textTransform: "uppercase" }}>{children}</div>;
 }
 
 export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { employee: Employee; photoUrl?: string; signatureUrl?: string; expiry: string }) {
   return (
     <div style={cardStyle} aria-label="ID card front">
-      <div style={{ background: bandColor(), height: "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: headerBand(), height: isGradient() ? "15mm" : "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <img
           src={currentCompany().idCardLogo}
           alt={COMPANY_INFO.name}
           // Shantahl's logo is drawn for the green band; other companies' logos sit on a white tab.
-          style={currentCompany().id === "sdsi" ? { height: "10.5mm", width: "auto" } : { height: "9.5mm", width: "auto", maxWidth: "44mm", background: "#fff", padding: "0.6mm 1.5mm", borderRadius: "1mm" }}
+          style={currentCompany().id === "sdsi" ? { height: "10.5mm", width: "auto" } : { height: "9.5mm", width: "auto", maxWidth: "44mm", background: "#fff", padding: "0.6mm 1.5mm", borderRadius: isGradient() ? "1.2mm" : "1mm", boxShadow: isGradient() ? "0 0.4mm 1.2mm rgba(0, 0, 0, 0.25)" : undefined }}
         />
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "2.5mm 3mm 0" }}>
-        <div style={{ width: "24mm", height: "32mm", border: `0.5mm solid ${bandColor()}`, borderRadius: "1mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "2.5mm 3mm 0", background: isGradient() ? "linear-gradient(#eff5ff, #ffffff 45%)" : undefined }}>
+        <div style={{ width: "24mm", height: "32mm", border: isGradient() ? "0.6mm solid #ffffff" : `0.5mm solid ${bandColor()}`, boxShadow: isGradient() ? `0 0 0 0.5mm ${BLUE}` : undefined, borderRadius: "1mm", overflow: "hidden", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {photoUrl ? (
             <img src={photoUrl} alt="Employee photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <span style={{ fontSize: "5pt", color: MUTED, textAlign: "center", padding: "2mm" }}>No photo yet</span>
           )}
         </div>
-        <div style={{ marginTop: "2mm", fontSize: "8pt", fontWeight: 800, textAlign: "center", lineHeight: 1.15 }}>{cardName(employee)}</div>
-        <div style={{ fontSize: "6.2pt", fontWeight: 600, color: bandColor(), textAlign: "center", marginTop: "0.6mm" }}>{positionTitle(employee.positionId)}</div>
+        <div style={{ marginTop: "2mm", fontSize: "8pt", fontWeight: 800, textAlign: "center", lineHeight: 1.15, color: isGradient() ? NAVY : undefined }}>{cardName(employee)}</div>
+        <div style={{ fontSize: "6.2pt", fontWeight: 600, color: accentColor(), textAlign: "center", marginTop: "0.6mm" }}>{positionTitle(employee.positionId)}</div>
         <div style={{ fontSize: "5.6pt", color: MUTED, textAlign: "center" }}>{departmentName(employee.departmentId)}</div>
-        <div style={{ fontSize: "6.4pt", fontWeight: 700, marginTop: "1.2mm" }}>ID No. {employee.employeeNumber}</div>
+        <div style={{ fontSize: "6.4pt", fontWeight: 700, marginTop: "1.2mm", ...(isGradient() && { background: "#e0eaff", color: NAVY, padding: "0.5mm 2mm", borderRadius: "3mm" }) }}>ID No. {employee.employeeNumber}</div>
         <div style={{ marginTop: "auto", marginBottom: "1.2mm", width: "34mm", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ height: "7.5mm", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
             {signatureUrl && <img src={signatureUrl} alt="Employee signature" style={{ maxHeight: "7.5mm", maxWidth: "34mm" }} />}
@@ -90,7 +98,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
           <div style={{ borderTop: `0.2mm solid ${INK}`, width: "100%", textAlign: "center", fontSize: "4.8pt", color: MUTED, paddingTop: "0.3mm" }}>Employee&rsquo;s signature</div>
         </div>
       </div>
-      <div style={{ background: bandColor(), color: "#ffffff", fontSize: "5pt", padding: "1.2mm 2.5mm", display: "flex", justifyContent: "space-between", gap: "1mm" }}>
+      <div style={{ background: footerBand(), color: "#ffffff", fontSize: "5pt", padding: "1.2mm 2.5mm", display: "flex", justifyContent: "space-between", gap: "1mm" }}>
         <span>Issued: {longDate(employee.dateHired)}</span>
         <span>Valid until: {longDate(expiry)}</span>
       </div>
@@ -101,7 +109,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
 export function IdCardBack({ employee }: { employee: Employee }) {
   return (
     <div style={cardStyle} aria-label="ID card back">
-      <div style={{ background: bandColor(), color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.4mm", padding: "1.6mm 3mm", textAlign: "center" }}>
+      <div style={{ background: isGradient() ? `linear-gradient(135deg, ${NAVY}, ${BLUE})` : bandColor(), color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.4mm", padding: isGradient() ? "1.8mm 3mm" : "1.6mm 3mm", textAlign: "center" }}>
         EMPLOYEE INFORMATION
       </div>
       <div style={{ flex: 1, padding: "1.2mm 3mm 0" }}>
@@ -118,7 +126,7 @@ export function IdCardBack({ employee }: { employee: Employee }) {
         <Field label="Contact person" value={employee.emergencyContactName} />
         <Field label="Contact No." value={employee.emergencyContactPhone} />
       </div>
-      <div style={{ background: bandColor(), color: "#ffffff", fontSize: "5pt", lineHeight: 1.35, padding: "1.5mm 3mm", textAlign: "center" }}>
+      <div style={{ background: footerBand(), color: "#ffffff", fontSize: "5pt", lineHeight: 1.35, padding: "1.5mm 3mm", textAlign: "center" }}>
         For verification: contact {currentCompany().shortName} HR Department thru {ID_VERIFY_EMAIL} or {ID_VERIFY_PHONE}.
       </div>
     </div>
