@@ -8,7 +8,7 @@ import type { Employee, EmployeeLifecycleStatus, EmploymentStatus } from "@/lib/
 
 type EmployeeFormData = Omit<Employee, "id" | "employeeNumber">;
 
-const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["regular", "probationary", "project_based", "freelance", "consultant", "intern", "unassigned"];
+const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["regular", "probationary", "trainee", "project_based", "freelance", "consultant", "intern", "unassigned"];
 const LIFECYCLE_STATUSES: EmployeeLifecycleStatus[] = ["active", "on_leave", "resigned", "terminated"];
 
 function defaultForm(employee: Employee | null, branchId: string, departmentId: string, positionId: string): EmployeeFormData {
