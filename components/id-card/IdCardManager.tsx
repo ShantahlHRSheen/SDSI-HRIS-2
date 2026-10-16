@@ -5,7 +5,9 @@ import { Camera, PenLine, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
 import { prepareIdPhoto, prepareSignature } from "@/lib/id-images";
-import { idMediaUrls, replaceIdMedia, saveEmergencyContact, type IdMediaKind } from "@/lib/supabase/id-card";
+import { idMediaUrls, replaceIdMedia, saveEmergencyContact, saveIdReturnTo, type IdMediaKind } from "@/lib/supabase/id-card";
+import { currentCompany } from "@/lib/companies";
+import { COMPANY_INFO } from "@/lib/bir";
 import { todayInManila } from "@/lib/leave-policy";
 import type { Employee } from "@/lib/types";
 import { IdCardBack, IdCardFront, idExpiryDate } from "./IdCard";
@@ -23,6 +25,10 @@ export function IdCardManager({ employee }: { employee: Employee }) {
   const [contact, setContact] = useState({ name: employee.emergencyContactName ?? "", phone: employee.emergencyContactPhone ?? "" });
   const [savingContact, setSavingContact] = useState(false);
   const [contactSaved, setContactSaved] = useState(false);
+  const [returnTo, setReturnTo] = useState({ name: employee.idReturnName ?? "", address: employee.idReturnAddress ?? "" });
+  const [savingReturn, setSavingReturn] = useState(false);
+  const [returnSaved, setReturnSaved] = useState(false);
+  const modern = currentCompany().idCardStyle === "modern";
   const expiry = idExpiryDate(todayInManila());
 
   useEffect(() => {
@@ -79,17 +85,33 @@ export function IdCardManager({ employee }: { employee: Employee }) {
     }
   }
 
+  async function saveReturn(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingReturn(true);
+    setReturnSaved(false);
+    try {
+      await saveIdReturnTo(employee.id, returnTo.name, returnTo.address);
+      patchEmployeeLocal(employee.id, { idReturnName: returnTo.name.trim() || null, idReturnAddress: returnTo.address.trim() || null });
+      setReturnSaved(true);
+    } catch (err) {
+      reportSaveError("Couldn't save the return-to address", err);
+    } finally {
+      setSavingReturn(false);
+    }
+  }
+
+  // The modern back doesn't print the address, birthday or government numbers.
   const missing = [
     !employee.idPhotoPath && "photo",
     !employee.idSignaturePath && "signature",
     !employee.emergencyContactName?.trim() && "emergency contact",
     !employee.dateHired && "date hired (HR)",
-    !employee.birthdate && "date of birth (HR)",
-    !employee.address?.trim() && "address (HR)",
-    !employee.sssNumber && "SSS (HR)",
-    !employee.philHealthNumber && "PhilHealth (HR)",
-    !employee.hdmfNumber && "Pag-IBIG (HR)",
-    !employee.tin && "TIN (HR)",
+    !modern && !employee.birthdate && "date of birth (HR)",
+    !modern && !employee.address?.trim() && "address (HR)",
+    !modern && !employee.sssNumber && "SSS (HR)",
+    !modern && !employee.philHealthNumber && "PhilHealth (HR)",
+    !modern && !employee.hdmfNumber && "Pag-IBIG (HR)",
+    !modern && !employee.tin && "TIN (HR)",
   ].filter(Boolean) as string[];
 
   const photoUrl = employee.idPhotoPath ? urls[employee.idPhotoPath] : undefined;
@@ -167,8 +189,33 @@ export function IdCardManager({ employee }: { employee: Employee }) {
           </form>
         )}
 
+        {isRealAccount && modern && (
+          <form onSubmit={saveReturn} className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="text-sm font-medium text-[var(--text-primary)]">If found, please return to</div>
+            <div className="mb-3 text-xs text-[var(--text-muted)]">Leave both blank to show the company: {currentCompany().name}, {COMPANY_INFO.address}.</div>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Name</label>
+                <input value={returnTo.name} onChange={(e) => { setReturnTo((r) => ({ ...r, name: e.target.value })); setReturnSaved(false); }} maxLength={120} placeholder={currentCompany().name} className={input} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Address</label>
+                <input value={returnTo.address} onChange={(e) => { setReturnTo((r) => ({ ...r, address: e.target.value })); setReturnSaved(false); }} maxLength={300} placeholder={COMPANY_INFO.address} className={input} />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <button type="submit" disabled={savingReturn} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
+                {savingReturn ? "Saving…" : "Save"}
+              </button>
+              {returnSaved && <span className="text-xs text-[var(--status-good)]">Saved</span>}
+            </div>
+          </form>
+        )}
+
         <div className="text-xs text-[var(--text-muted)]">
-          Name, position, department, ID number, dates, address, contact number, birthday and government numbers come from the employee record — ask HR to correct anything wrong there.
+          {modern
+            ? "Name, position, department, ID number and dates come from the employee record — ask HR to correct anything wrong there."
+            : "Name, position, department, ID number, dates, address, contact number, birthday and government numbers come from the employee record — ask HR to correct anything wrong there."}
         </div>
       </div>
     </div>

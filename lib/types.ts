@@ -145,6 +145,9 @@ export interface Employee {
   email: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  // "If found, please return to" on the ID card; empty = the company.
+  idReturnName?: string | null;
+  idReturnAddress?: string | null;
 
   // Real government-mandated IDs, entered by HR once known. Null/absent
   // means not on file yet — see employeeGovIds() in lib/bir.ts, which falls

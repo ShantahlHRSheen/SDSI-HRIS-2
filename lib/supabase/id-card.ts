@@ -34,6 +34,12 @@ export async function saveEmergencyContact(employeeId: string, name: string, pho
   if (error) throw new Error(error.message);
 }
 
+// supabase/migrate_phase44_id_return_to.sql — own ID card, or HR.
+export async function saveIdReturnTo(employeeId: string, name: string, address: string): Promise<void> {
+  const { error } = await rpc("set_employee_id_return", { emp_id: employeeId, return_name: name, return_address: address });
+  if (error) throw new Error(/set_employee_id_return/.test(error.message) ? "This isn't set up yet — ask HR to run the latest database update." : error.message);
+}
+
 // supabase/migrate_phase22_employee_nickname.sql — own nickname, or HR.
 export async function saveNickname(employeeId: string, nickname: string): Promise<void> {
   const { error } = await rpc("set_employee_nickname", { emp_id: employeeId, nick: nickname });

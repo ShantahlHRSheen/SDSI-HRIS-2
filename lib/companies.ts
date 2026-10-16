@@ -35,7 +35,7 @@ export interface CompanyConfig {
   idCardColor?: string;
   // "gradient": the ID's bands fade from deep navy to bright blue, with a
   // ringed photo and the ID number on a badge (components/id-card/IdCard.tsx).
-  idCardStyle?: "gradient";
+  idCardStyle?: "gradient" | "modern";
   info: { name: string; tin: string; address: string; phone: string; email: string; rdoCode: string };
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -74,6 +74,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     logo: "/brand/shantahl-circle.png",
     formLogo: "/brand/shantahl-form-logo.png",
     idCardLogo: "/brand/shantahl-logo.png",
+    // Green gradient bands, emergency contact + return-to on the back.
+    idCardStyle: "modern",
     info: {
       name: "Shantahl Direct Sales Inc.",
       tin: "000-123-456-000",

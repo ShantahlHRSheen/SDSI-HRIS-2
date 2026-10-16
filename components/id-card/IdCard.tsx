@@ -3,6 +3,7 @@ import { COMPANY_INFO } from "@/lib/bir";
 import { currentCompany } from "@/lib/companies";
 import { departmentName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
+import { ModernIdCardBack, ModernIdCardFront } from "./ModernIdCard";
 
 // The company ID card, front and back, at true CR80 size (54 × 85.6 mm,
 // portrait). Drawn from the employee record every time — nothing about the
@@ -69,6 +70,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { employee: Employee; photoUrl?: string; signatureUrl?: string; expiry: string }) {
+  if (currentCompany().idCardStyle === "modern") return <ModernIdCardFront employee={employee} photoUrl={photoUrl} signatureUrl={signatureUrl} expiry={expiry} />;
   return (
     <div style={cardStyle} aria-label="ID card front">
       <div style={{ background: headerBand(), height: isGradient() ? "15mm" : "13mm", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -107,6 +109,7 @@ export function IdCardFront({ employee, photoUrl, signatureUrl, expiry }: { empl
 }
 
 export function IdCardBack({ employee }: { employee: Employee }) {
+  if (currentCompany().idCardStyle === "modern") return <ModernIdCardBack employee={employee} />;
   return (
     <div style={cardStyle} aria-label="ID card back">
       <div style={{ background: isGradient() ? `linear-gradient(135deg, ${NAVY}, ${BLUE})` : bandColor(), color: "#ffffff", fontSize: "6pt", fontWeight: 700, letterSpacing: "0.4mm", padding: isGradient() ? "1.8mm 3mm" : "1.6mm 3mm", textAlign: "center" }}>
