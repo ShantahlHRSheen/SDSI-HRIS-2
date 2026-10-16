@@ -57,7 +57,7 @@ create type payroll_period_status as enum ('open', 'locked', 'closed');
 create type employment_status as enum (
   -- 'unassigned' is a placeholder for a historical/resigned employee
   -- imported without this on file — never used for anyone active.
-  'regular', 'probationary', 'project_based', 'freelance', 'consultant', 'intern', 'unassigned'
+  'regular', 'probationary', 'trainee', 'project_based', 'freelance', 'consultant', 'intern', 'unassigned'
 );
 create type employee_lifecycle_status as enum ('active', 'on_leave', 'resigned', 'terminated');
 create type payroll_type as enum ('daily', 'monthly', 'unassigned');

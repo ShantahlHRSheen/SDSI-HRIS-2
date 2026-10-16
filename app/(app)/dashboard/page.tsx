@@ -38,6 +38,7 @@ import type { Employee } from "@/lib/types";
 const STATUS_COLORS: Record<string, string> = {
   regular: "var(--series-1)",
   probationary: "var(--series-3)",
+  trainee: "var(--series-4)",
   project_based: "var(--series-2)",
   freelance: "var(--series-7)",
   consultant: "var(--series-5)",
@@ -46,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   regular: "Regular",
   probationary: "Probationary",
+  trainee: "Trainee",
   project_based: "Project-based",
   freelance: "Freelance",
   consultant: "Consultant",

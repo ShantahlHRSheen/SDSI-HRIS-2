@@ -48,6 +48,7 @@ const INCLUDE_ALL: Record<ModalFilter, FilterMode> = { branchIds: "include", dep
 const EMPLOYMENT_TYPES: { value: string; label: string }[] = [
   { value: "regular", label: "Regular" },
   { value: "probationary", label: "Probationary" },
+  { value: "trainee", label: "Trainee" },
   { value: "project_based", label: "Project-based" },
   { value: "freelance", label: "Freelance" },
   { value: "consultant", label: "Consultant" },

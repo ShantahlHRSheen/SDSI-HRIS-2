@@ -103,6 +103,7 @@ export interface PayrollPeriod {
 export type EmploymentStatus =
   | "regular"
   | "probationary"
+  | "trainee"
   | "project_based"
   | "freelance"
   | "consultant"

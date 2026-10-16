@@ -8,7 +8,7 @@ export function activeEmployees(employees: Employee[]): Employee[] {
 
 export function employmentStatusCounts(employees: Employee[]): Record<EmploymentStatus, number> {
   const base: Record<EmploymentStatus, number> = {
-    regular: 0, probationary: 0, project_based: 0, freelance: 0, consultant: 0, intern: 0, unassigned: 0,
+    regular: 0, probationary: 0, trainee: 0, project_based: 0, freelance: 0, consultant: 0, intern: 0, unassigned: 0,
   };
   activeEmployees(employees).forEach((e) => {
     base[e.employmentStatus] += 1;

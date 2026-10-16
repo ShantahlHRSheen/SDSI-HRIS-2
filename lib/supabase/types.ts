@@ -104,7 +104,7 @@ export type EmployeeRow = {
   position_id: string;
   supervisor_id: string | null;
   job_performance_evaluator_id: string | null;
-  employment_status: "regular" | "probationary" | "project_based" | "freelance" | "consultant" | "intern" | "unassigned";
+  employment_status: "regular" | "probationary" | "trainee" | "project_based" | "freelance" | "consultant" | "intern" | "unassigned";
   date_hired: string | null;
   date_regularized: string | null;
   contract_start: string | null;

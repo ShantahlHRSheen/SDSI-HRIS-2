@@ -72,7 +72,7 @@ const COLS = {
 
 const GENDERS = { MALE: "Male", FEMALE: "Female" };
 const CIVIL_STATUSES = { SINGLE: "Single", MARRIED: "Married", WIDOWED: "Widowed", SEPARATED: "Separated" };
-const EMPLOYMENT_STATUSES = new Set(["regular", "probationary", "project_based", "freelance", "consultant", "intern"]);
+const EMPLOYMENT_STATUSES = new Set(["regular", "probationary", "trainee", "project_based", "freelance", "consultant", "intern"]);
 const LIFECYCLE_STATUSES = new Set(["active", "on_leave", "resigned", "terminated"]);
 const PAYROLL_TYPES = new Set(["daily", "monthly"]);
 const ROLES = new Set(["employee", "dept_head", "hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management", "sys_admin"]);
