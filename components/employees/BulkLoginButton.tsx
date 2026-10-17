@@ -6,6 +6,8 @@ import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { fullName } from "@/lib/helpers";
 import { issueEmployeeLogin } from "@/lib/supabase/account";
+import { currentCompany } from "@/lib/companies";
+import { loginSheetBlob } from "@/lib/login-sheet";
 import type { Employee } from "@/lib/types";
 
 // HR-only: create logins for every active employee who doesn't have one yet,
@@ -58,27 +60,33 @@ export function BulkLoginButton({ employees }: { employees: Employee[] }) {
 
   const created = (results ?? []).filter((r) => r.password);
 
-  function asText(sep: string, quote: (s: string) => string) {
-    const lines = [["Employee No.", "Name", "Email", "Temporary password"].map(quote).join(sep)];
-    for (const r of created) lines.push([r.employee.employeeNumber, fullName(r.employee), r.email ?? "", r.password ?? ""].map(quote).join(sep));
+  function asText() {
+    const lines = [["Employee No.", "Name", "Email", "Temporary password"].join("\t")];
+    for (const r of created) lines.push([r.employee.employeeNumber, fullName(r.employee), r.email ?? "", r.password ?? ""].join("\t"));
     return lines.join("\n");
   }
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(asText("\t", (s) => s));
+      await navigator.clipboard.writeText(asText());
       setCopied(true);
     } catch {
       // Clipboard blocked — the list is still on screen and downloadable.
     }
   }
 
-  function download() {
-    const csv = asText(",", (s) => `"${s.replace(/"/g, '""')}"`);
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  async function download() {
+    const company = currentCompany();
+    const blob = await loginSheetBlob(
+      created.map((r) => ({ employee: r.employee, email: r.email ?? "", password: r.password ?? "" })),
+      company.name,
+      window.location.origin,
+      company.idCardColor ?? "#0a3326",
+    );
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "employee-logins.csv";
+    a.download = `${company.shortName} employee logins.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -127,7 +135,7 @@ export function BulkLoginButton({ employees }: { employees: Employee[] }) {
                   <Copy size={14} /> {copied ? "Copied" : "Copy list"}
                 </button>
                 <button onClick={download} disabled={!created.length} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40">
-                  <Download size={14} /> Download (Excel / CSV)
+                  <Download size={14} /> Download Excel
                 </button>
                 <button onClick={close} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">Done</button>
               </div>
