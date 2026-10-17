@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import Link from "next/link";
 import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
-import { payrollColumns, payrollLabel, payrollLeadColumn } from "@/lib/payroll-layout";
+import { payrollByBranch, payrollColumns, payrollLabel, payrollLeadColumn } from "@/lib/payroll-layout";
 import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, type PayrollLine } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { buildPayrollImportPreview, guessPeriodFromName, parsePayrollWorkbook, type ParsedPayrollWorkbook } from "@/lib/payroll-import";
@@ -79,7 +79,10 @@ export default function PayrollProcessingPage() {
       const buffer = await file.arrayBuffer();
       const format = currentCompany().payrollImportFormat;
       const lsmbizFormat = format !== undefined;
-      const sheets = format ? await parseLsmbizPayrollWorkbook(buffer, employees, format) : await parsePayrollWorkbook(buffer);
+      const parsed = format ? await parseLsmbizPayrollWorkbook(buffer, employees, format) : await parsePayrollWorkbook(buffer);
+      // Daro uploads the whole workbook at once — all branches (the first
+      // choice), with no single-sheet options.
+      const sheets = payrollByBranch() ? parsed.slice(0, 1) : parsed;
       // With several payroll sheets, start on the one matching the file name's
       // period (e.g. "May 16-30.xlsx" → the "MAY 30" sheet), else the last one.
       const fromFileName = guessPeriodFromName(file.name, payrollPeriods);
@@ -130,7 +133,18 @@ export default function PayrollProcessingPage() {
   // Columns follow the company's own payroll sheet (lib/payroll-layout.ts).
   const columns = useMemo(() => payrollColumns(sortedLines), [sortedLines]);
   const leadColumn = payrollLeadColumn();
-  const columnTotals = useMemo(() => columns.map((c) => sortedLines.reduce((sum, l) => sum + c.value(l), 0)), [columns, sortedLines]);
+  const sumColumns = (ls: PayrollLine[]) => columns.map((c) => ls.reduce((sum, l) => sum + c.value(l), 0));
+  const columnTotals = sumColumns(sortedLines);
+  // Daro: one section per branch (by name), each with a subtotal.
+  const branchGroups = useMemo(() => {
+    if (!payrollByBranch()) return [{ branchId: "", lines: sortedLines }];
+    const groups = new Map<string, PayrollLine[]>();
+    for (const l of sortedLines) {
+      const id = byId.get(l.employeeId)?.branchId ?? "";
+      groups.set(id, [...(groups.get(id) ?? []), l]);
+    }
+    return [...groups].map(([branchId, ls]) => ({ branchId, lines: ls })).sort((a, b) => branchName(a.branchId).localeCompare(branchName(b.branchId)));
+  }, [sortedLines, byId]);
 
   const existingSlips = period ? new Map(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => [p.employeeId, p])) : new Map<string, (typeof generatedPayslips)[number]>();
 
@@ -177,7 +191,7 @@ export default function PayrollProcessingPage() {
       // The company's own layout: the same columns as on screen.
       const custom = toCsv(
         ["Employee", "Branch", "Position", ...columns.map((c) => c.label)],
-        sortedLines.map((l) => {
+        branchGroups.flatMap((g) => g.lines).map((l) => {
           const emp = byId.get(l.employeeId);
           return [emp ? fullName(emp) : l.employeeId, emp ? branchName(emp.branchId) : "", emp ? positionTitle(emp.positionId) : "", ...columns.map((c) => c.value(l))];
         }),
@@ -256,13 +270,13 @@ export default function PayrollProcessingPage() {
   }
 
   // The totals row, shown under the header and again at the bottom.
-  const totalRow = (border: string) => (
-    <tr className={`${border} border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]`}>
-      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2">Total</td>
+  const totalRow = (border: string, totals = columnTotals, label = "Total", subtotal = false) => (
+    <tr className={`${border} border-[var(--border-hairline)] font-semibold ${subtotal ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}`}>
+      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2">{label}</td>
       <td className="px-3 py-2"></td>
       {columns.map((c, i) => (
         <td key={c.key} className="tabular whitespace-nowrap px-3 py-2">
-          {c.style === "count" ? columnTotals[i] : formatCurrencyCompact(columnTotals[i])}
+          {c.style === "count" ? totals[i] : formatCurrencyCompact(totals[i])}
         </td>
       ))}
       <td className="px-3 py-2"></td>
@@ -412,8 +426,16 @@ export default function PayrollProcessingPage() {
                     </tr>
                     {totalRow("border-b-2")}
                   </thead>
-                  <tbody>
-                    {sortedLines.map((l) => {
+                  {branchGroups.map((group) => (
+                  <tbody key={group.branchId || "all"}>
+                    {payrollByBranch() && (
+                      <tr className="border-b border-[var(--border-hairline)] bg-[var(--accent-soft)]">
+                        <td colSpan={columns.length + 4} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">
+                          <span className="sticky left-3">{group.branchId ? branchName(group.branchId) : "No branch"} · {group.lines.length} {group.lines.length === 1 ? "employee" : "employees"}</span>
+                        </td>
+                      </tr>
+                    )}
+                    {group.lines.map((l) => {
                       const emp = byId.get(l.employeeId);
                       return (
                         <tr key={l.employeeId} className="border-b border-[var(--gridline)] last:border-0">
@@ -453,7 +475,9 @@ export default function PayrollProcessingPage() {
                         </tr>
                       );
                     })}
+                    {payrollByBranch() && totalRow("border-b-2", sumColumns(group.lines), `${group.branchId ? branchName(group.branchId) : "No branch"} subtotal`, true)}
                   </tbody>
+                  ))}
                   <tfoot>
                     {totalRow("border-t-2")}
                   </tfoot>

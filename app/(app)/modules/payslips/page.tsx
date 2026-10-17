@@ -119,8 +119,10 @@ function AdminView({
     ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
     setPicked({ periodId: period?.id, ids: next });
   };
-  const [printing, setPrinting] = useState(false);
-  const stopPrinting = useCallback(() => setPrinting(false), []);
+  // What's being printed: the ticked employees, or everyone shown (e.g. a
+  // whole branch, picked with the Branch filter).
+  const [printing, setPrinting] = useState<"selected" | "shown" | null>(null);
+  const stopPrinting = useCallback(() => setPrinting(null), []);
 
   const filtered = lines
     .map((l) => employees.find((e) => e.id === l.employeeId))
@@ -132,6 +134,10 @@ function AdminView({
   // Ticked employees, A–Z by surname.
   const printList = filtered.filter((e) => selected.has(e.id) && lineByEmployee.has(e.id)).sort((a, b) => fullName(a).localeCompare(fullName(b)));
   const allShownPicked = filtered.length > 0 && filtered.every((e) => selected.has(e.id));
+  // Everyone shown, grouped by branch, then A–Z.
+  const shownPrintList = filtered
+    .filter((e) => lineByEmployee.has(e.id))
+    .sort((a, b) => branchName(a.branchId).localeCompare(branchName(b.branchId)) || fullName(a).localeCompare(fullName(b)));
 
   const generatedForPeriod = new Set(generatedPayslips.filter((p) => p.periodId === period?.id).map((p) => p.employeeId));
   const history = generatedPayslips.slice().sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : -1));
@@ -176,7 +182,15 @@ function AdminView({
         actions={
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setPrinting(true)}
+              onClick={() => setPrinting("shown")}
+              disabled={!shownPrintList.length}
+              title="Print the payslips of everyone shown — choose a branch in the Branch filter to print that branch only. One per page."
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+            >
+              <Printer size={16} /> {branchId ? `Print all — ${branchName(branchId)}` : "Print all shown"} ({shownPrintList.length})
+            </button>
+            <button
+              onClick={() => setPrinting("selected")}
               disabled={!printList.length}
               title="Tick employees in the list, then print all their payslips at once — one per page."
               className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
@@ -292,7 +306,7 @@ function AdminView({
       <PayslipPreviewModal preview={preview} onClose={() => setPreview(null)} />
       {printing && period && (
         <PrintStack onDone={stopPrinting}>
-          {printList.map((emp) => (
+          {(printing === "shown" ? shownPrintList : printList).map((emp) => (
             <PrintPage key={emp.id} form>
               <PayslipDocument employee={emp} period={period} line={lineByEmployee.get(emp.id)!} adjustments={salaryAdjustments} />
             </PrintPage>

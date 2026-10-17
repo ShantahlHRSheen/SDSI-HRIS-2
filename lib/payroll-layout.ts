@@ -80,6 +80,12 @@ const DARO: PayrollColumn[] = [
   col("netPay", "Net Pay", "strong"),
 ];
 
+// Daro: one upload for every branch, and the register split into branch
+// sections, each with its own subtotal, like its payroll workbook.
+export function payrollByBranch(): boolean {
+  return currentCompany().payrollLayout === "daro";
+}
+
 // The first column after the employee's name.
 export function payrollLeadColumn(): "type" | "position" {
   return currentCompany().payrollLayout === "daro" ? "position" : "type";
