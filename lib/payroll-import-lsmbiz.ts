@@ -13,7 +13,14 @@ import type { Employee } from "./types";
 // the same figures the standard payroll import reads (lib/payroll-import.ts),
 // so the rest of the import (preview, saving, every module that reads
 // payroll) works unchanged. Columns are found by header text, not position.
+//
+// Daro Lending Corp. uses the same workbook, one sheet per branch
+// ("BULACAN", "CABANATUAN", "HO-TARLAC"), with a few columns of its own:
+// "CBU- COOP" and "LSM COOP Loan" as two deductions, and an "Allowance" paid
+// on top of Gross Salary (Net Pay = Net Pay - Cash + Allowance).
 // ---------------------------------------------------------------------------
+
+export type PayrollWorkbookFormat = "lsmbiz" | "daro";
 
 type Field =
   | "name"
@@ -30,6 +37,7 @@ type Field =
   | "caBalance"
   | "lsmbizLoan"
   | "cbuCoop"
+  | "lsmCoopLoan"
   | "others"
   | "tax"
   | "uniform"
@@ -51,9 +59,12 @@ const HEADERS: Record<string, Field> = {
   "no. of days": "days",
   "basic salary": "basic",
   "late/ abs.": "late",
+  lates: "late",
   "adj. on allowances": "adjAllowance",
   "ot/adj on allowances": "adjAllowance",
+  "addtl.": "adjAllowance",
   holiday: "holiday",
+  "holiday pay": "holiday",
   "vl/sl": "vlsl",
   // Rice / uniform / laundry / medical columns are per-day rates; this is
   // their total for the period.
@@ -67,13 +78,17 @@ const HEADERS: Record<string, Field> = {
   "lsmbiz coop loan": "lsmbizLoan",
   "lsmbiz loan (10%)": "lsmbizLoan",
   "cbu-coop": "cbuCoop",
+  "cbu- coop": "cbuCoop",
+  "lsm coop loan": "lsmCoopLoan",
   others: "others",
   bir: "tax",
   uniform: "uniform",
+  "uniform/ id lace": "uniform",
   "sss - ee": "sss",
   "sss - ee + mpf": "sss",
   "sss loan + sss calamity loan": "sssLoan",
   "sss loan": "sssLoan",
+  "sss loan + calamity loan": "sssLoan",
   hdmf: "hdmf",
   "hdmf loan": "hdmfLoan",
   "phic - ee": "philHealth",
@@ -83,6 +98,7 @@ const HEADERS: Record<string, Field> = {
   "net pay - cash": "netCash",
   // LSM ADM: Net Pay - Cash plus ALLOWANCE, what the payslip pays.
   net: "net",
+  "net pay": "net",
 };
 const REQUIRED: Field[] = ["name", "basic", "gross", "netCash"];
 
@@ -140,7 +156,40 @@ function nameMatcher(employees: Employee[]) {
     }
     return pick(map.get(strip(raw)));
   };
-  return (raw: string) => find(byKey, raw) ?? find(byMaidenKey, raw);
+  // Last resort, for a typo in the file ("Gayla, Reymart" for Raymart,
+  // "Tejadillano" for Tejadillo): same first name and a surname at most two
+  // letters off, or the other way round — only when exactly one employee
+  // fits. These are flagged in the import preview for HR to check.
+  const similar = (raw: string): Employee | undefined => {
+    if (!raw.includes(",")) return undefined;
+    const [last, first] = raw.split(",").map((s) => strip(s));
+    if (!last || !first) return undefined;
+    const hits = employees.filter((e) => {
+      const eLast = strip(e.lastName);
+      const eFirsts = [strip(e.firstName), strip(e.firstName.split(" ")[0])];
+      const firstSame = eFirsts.includes(first);
+      const firstClose = eFirsts.some((f) => editDistance(f, first) <= 2);
+      return (firstSame && editDistance(eLast, last) <= 2) || (eLast === last && firstClose);
+    });
+    return pick(hits);
+  };
+  return (raw: string): { employee?: Employee; similar: boolean } => {
+    const exact = find(byKey, raw) ?? find(byMaidenKey, raw);
+    if (exact) return { employee: exact, similar: false };
+    const close = similar(raw);
+    return { employee: close, similar: !!close };
+  };
+}
+
+function editDistance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
 }
 
 interface LsmbizSheet {
@@ -149,7 +198,7 @@ interface LsmbizSheet {
   rows: ParsedPayrollRow[];
 }
 
-function readSheet(ws: ExcelJS.Worksheet, findEmployee: (raw: string) => Employee | undefined): LsmbizSheet | null {
+function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMatcher>, format: PayrollWorkbookFormat): LsmbizSheet | null {
   let headerRow: number | null = null;
   const cols: Partial<Record<Field, number>> = {};
   for (let r = 1; r <= Math.min(10, ws.rowCount) && headerRow === null; r++) {
@@ -180,13 +229,17 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: (raw: string) => Employe
     // (negative = added). Negative Balance covers a shortfall when deductions
     // exceed earnings, so it's added back.
     const otherIncome = n("otherIncome");
-    const allowances = n("deMinimis") + n("allowance");
+    // Daro pays its "Allowance" on top of Gross Salary, so it's kept out of
+    // gross (which then matches the sheet) and added like an adjustment.
+    const paidOnTop = format === "daro" ? n("allowance") : 0;
+    const allowances = n("deMinimis") + n("allowance") - paidOnTop;
     const grossSalary = n("basic") - n("late") + n("adjAllowance") + n("holiday") + n("vlsl") + allowances;
-    const employee = findEmployee(rawName);
+    const { employee, similar } = findEmployee(rawName);
     rows.push({
       rowNumber: r,
       employeeNumber: employee?.employeeNumber ?? "",
       rawName,
+      similarName: similar || undefined,
       values: {
         daysWorking: n("days"),
         workedHoliday: 0,
@@ -207,14 +260,16 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: (raw: string) => Employe
         hdmf: n("hdmf"),
         withholdingTax: n("tax"),
         cashAdvance: n("cashAdvance") + n("caBalance"),
-        lsmBizLoan: n("lsmbizLoan"),
-        lsmCoopLoan: n("cbuCoop"),
+        // Daro: CBU-COOP in the LSM Biz slot, LSM COOP Loan in the LSM Coop
+        // slot (lib/payroll-labels.ts names them for Daro).
+        lsmBizLoan: format === "daro" ? n("cbuCoop") : n("lsmbizLoan"),
+        lsmCoopLoan: format === "daro" ? n("lsmCoopLoan") : n("cbuCoop") + n("lsmCoopLoan"),
         shortages: n("shortages"),
         sssLoan: n("sssLoan"),
         hdmfLoan: n("hdmfLoan"),
         hdmfMp2: 0,
         adjustmentDeduct: n("others") + n("uniform") + Math.max(otherIncome, 0),
-        adjustmentAdd: n("negativeBalance") + Math.max(-otherIncome, 0),
+        adjustmentAdd: n("negativeBalance") + Math.max(-otherIncome, 0) + paidOnTop,
         totalDeduction: 0,
         netPay: cols.net !== undefined && n("net") ? n("net") : n("netCash"),
       },
@@ -226,17 +281,17 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: (raw: string) => Employe
 // The workbook's payroll sheets as import choices: first the whole cut-off
 // (every visible payroll sheet except estimates such as "MAX CA"), then each
 // sheet on its own.
-export async function parseLsmbizPayrollWorkbook(buffer: ArrayBuffer, employees: Employee[]): Promise<ParsedPayrollWorkbook[]> {
+export async function parseLsmbizPayrollWorkbook(buffer: ArrayBuffer, employees: Employee[], format: PayrollWorkbookFormat = "lsmbiz"): Promise<ParsedPayrollWorkbook[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
   const findEmployee = nameMatcher(employees);
 
   const sheets = wb.worksheets
     .filter((ws) => ws.state === "visible")
-    .map((ws) => readSheet(ws, findEmployee))
+    .map((ws) => readSheet(ws, findEmployee, format))
     .filter((s): s is LsmbizSheet => s !== null && s.rows.length > 0);
   if (!sheets.length) {
-    throw new Error('No LSMBiz payroll sheet found — expected a header row with "Employee", "Basic Salary", "Gross Salary" and "Net Pay - Cash" columns.');
+    throw new Error('No payroll sheet found — expected a header row with "Employee", "Basic Salary", "Gross Salary" and "Net Pay - Cash" columns.');
   }
 
   const label = (s: LsmbizSheet) => (s.caption ? `${s.name} · ${s.caption}` : s.name);

@@ -73,6 +73,10 @@ export function cellScalar(row: ExcelJS.Row, col: number): string | number | nul
   if (raw === undefined || raw === null) return null;
   if (typeof raw === "string" || typeof raw === "number") return raw;
   if (raw instanceof Date) return raw.toISOString().slice(0, 10);
+  // Text typed in more than one font ("Cervaña" with the ñ in another font)
+  // is stored as rich text; a hyperlink keeps its text separately.
+  if (typeof raw === "object" && "richText" in raw) return raw.richText.map((t) => t.text).join("");
+  if (typeof raw === "object" && "text" in raw && typeof raw.text === "string") return raw.text;
   return null;
 }
 

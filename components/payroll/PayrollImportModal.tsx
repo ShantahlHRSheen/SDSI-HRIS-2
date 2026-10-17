@@ -44,6 +44,7 @@ export function PayrollImportModal({
 }) {
   const target = payrollPeriods.find((p) => p.id === targetPeriodId);
   const byName = preview.matched.filter((m) => m.matchedByName);
+  const similarNames = preview.matched.filter((m) => m.parsed.similarName);
 
   return (
     <Modal open onClose={onCancel} title="Review payroll import" wide>
@@ -143,6 +144,19 @@ export function PayrollImportModal({
                 </li>
               ))}
             </ul>
+          </Notice>
+        )}
+
+        {similarNames.length > 0 && (
+          <Notice tone="warning" title={`Matched to a similarly spelled name — please check (${similarNames.length})`}>
+            <ul className="space-y-0.5">
+              {similarNames.map((m) => (
+                <li key={m.employee.id}>
+                  &ldquo;{m.parsed.rawName}&rdquo; → {m.employee.employeeNumber} {fullName(m.employee)}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-1.5 text-[var(--text-muted)]">If one is wrong, cancel and fix the name in the file or the employee&rsquo;s 201 record.</div>
           </Notice>
         )}
 
