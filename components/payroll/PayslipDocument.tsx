@@ -2,6 +2,7 @@ import { FormAmountRow, FormFootnote, FormRow, FormSection, FormShell } from "@/
 import { COMPANY_INFO } from "@/lib/bir";
 import { withShownNames } from "@/lib/demo-mode";
 import { currentCompany } from "@/lib/companies";
+import { payrollLabel } from "@/lib/payroll-layout";
 import { branchName, departmentName, formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee, PayrollPeriod } from "@/lib/types";
 import type { PayrollLine } from "@/lib/payroll";
@@ -46,21 +47,21 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
 
         <FormSection title="Earnings">
           <FormAmountRow label="Basic Pay" value={line.basicPay} />
-          <FormAmountRow label="Late Deduction" value={-line.latesUndertime || 0} />
+          <FormAmountRow label={payrollLabel("latesUndertime", "Late Deduction")} value={-line.latesUndertime || 0} />
           <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction || 0} />
-          <FormAmountRow label="Net Allowances" value={line.netAllowances} />
-          <FormAmountRow label="Overtime Pay" value={line.otPay} />
+          <FormAmountRow label={payrollLabel("netAllowances", "Net Allowances")} value={line.netAllowances} />
+          <FormAmountRow label={payrollLabel("otPay", "Overtime Pay")} value={line.otPay} />
           <FormAmountRow label="Holiday Pay" value={line.holidayPay} />
           <FormAmountRow label="Sick Leave Pay" value={line.slPay} />
-          <FormAmountRow label="Vacation Leave Pay" value={line.vlPay} />
-          <FormAmountRow label="Adjustment (Add)" value={line.adjustmentAdd} />
+          <FormAmountRow label={payrollLabel("vlPay", "Vacation Leave Pay")} value={line.vlPay} />
+          <FormAmountRow label={payrollLabel("adjustmentAdd", "Adjustment (Add)")} value={line.adjustmentAdd} />
           <FormAmountRow label="Gross Pay" value={line.grossSalary + line.adjustmentAdd} bold />
         </FormSection>
 
         <FormSection title="Deductions">
           <FormAmountRow label="Cash Advance" value={line.cashAdvance} />
-          <FormAmountRow label="LSM Biz Loan" value={line.lsmBizLoan} />
-          <FormAmountRow label="LSM Coop Loan" value={line.lsmCoopLoan} />
+          <FormAmountRow label={payrollLabel("lsmBizLoan", "LSM Biz Loan")} value={line.lsmBizLoan} />
+          <FormAmountRow label={payrollLabel("lsmCoopLoan", "LSM Coop Loan")} value={line.lsmCoopLoan} />
           <FormAmountRow label="Shortage Deduction" value={line.shortages} />
           <FormAmountRow label="SSS Contribution" value={line.sssContribution} />
           <FormAmountRow label="SSS WISP" value={line.sssWisp} />
@@ -70,7 +71,7 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
           <FormAmountRow label="Pag-IBIG (HDMF) Loan" value={line.hdmfLoan} />
           <FormAmountRow label="Pag-IBIG (HDMF) MP2 Savings" value={line.hdmfMp2Savings} />
           <FormAmountRow label="Withholding Tax" value={line.withholdingTax} />
-          <FormAmountRow label="Adjustment (Deduct)" value={line.adjustmentDeduct} />
+          <FormAmountRow label={payrollLabel("adjustmentDeduct", "Adjustment (Deduct)")} value={line.adjustmentDeduct} />
           <FormAmountRow label="Total Deductions" value={line.totalDeductionsOtherThanMandatories + line.totalMandatories + line.adjustmentDeduct} bold />
         </FormSection>
 

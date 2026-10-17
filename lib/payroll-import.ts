@@ -65,6 +65,9 @@ export interface ParsedPayrollRow {
   rowNumber: number;
   employeeNumber: string;
   rawName: string;
+  // Matched to an employee whose name is spelled slightly differently
+  // (lib/payroll-import-lsmbiz.ts) — shown in the preview for HR to check.
+  similarName?: boolean;
   values: Record<Exclude<ColumnKey, "employee" | "payrollType">, number>;
 }
 

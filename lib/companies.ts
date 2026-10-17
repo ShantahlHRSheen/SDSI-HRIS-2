@@ -55,7 +55,10 @@ export interface CompanyConfig {
   adminAccountNumbers?: string[];
   // Layout of the payroll Excel this company uploads in Payroll Processing:
   // the standard register (lib/payroll-import.ts) unless set.
-  payrollImportFormat?: "lsmbiz";
+  payrollImportFormat?: "lsmbiz" | "daro";
+  // Payroll Processing's columns, column names and payslip labels follow
+  // this company's own payroll sheet (lib/payroll-layout.ts); standard if unset.
+  payrollLayout?: "daro";
   // People who sign in here with the same email and password as in another
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
   // match here, it's checked against `from`'s database and, if right, saved
@@ -192,6 +195,10 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Lowel and Sheilah Magdadaro and Maricris Barlinan use their Shantahl sign-in.
     linkedSignIn: { from: "sdsi", employeeNumbers: ["EMP-0001", "EMP-0002", "ADMIN-02"] },
     // HR uploads photos of Daro's own org chart, like LSMBiz.
+    // One sheet per branch (BULACAN, CABANATUAN, HO-TARLAC) in the LSMBiz
+    // workbook layout, with Daro's own columns — see lib/payroll-import-lsmbiz.ts.
+    payrollImportFormat: "daro",
+    payrollLayout: "daro",
     orgChartPhotos: true,
   },
 };

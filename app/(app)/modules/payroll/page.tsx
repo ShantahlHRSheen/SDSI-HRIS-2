@@ -10,7 +10,8 @@ import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import Link from "next/link";
-import { branchName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
+import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
+import { payrollColumns, payrollLabel, payrollLeadColumn } from "@/lib/payroll-layout";
 import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, type PayrollLine } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { buildPayrollImportPreview, guessPeriodFromName, parsePayrollWorkbook, type ParsedPayrollWorkbook } from "@/lib/payroll-import";
@@ -76,13 +77,14 @@ export default function PayrollProcessingPage() {
     setImportError(null);
     try {
       const buffer = await file.arrayBuffer();
-      const lsmbizFormat = currentCompany().payrollImportFormat === "lsmbiz";
-      const sheets = lsmbizFormat ? await parseLsmbizPayrollWorkbook(buffer, employees) : await parsePayrollWorkbook(buffer);
+      const format = currentCompany().payrollImportFormat;
+      const lsmbizFormat = format !== undefined;
+      const sheets = format ? await parseLsmbizPayrollWorkbook(buffer, employees, format) : await parsePayrollWorkbook(buffer);
       // With several payroll sheets, start on the one matching the file name's
       // period (e.g. "May 16-30.xlsx" → the "MAY 30" sheet), else the last one.
       const fromFileName = guessPeriodFromName(file.name, payrollPeriods);
       const matching = fromFileName ? sheets.findIndex((s) => guessPeriodFromName(s.sheetName, payrollPeriods)?.id === fromFileName.id) : -1;
-      // LSMBiz: the first choice is the whole cut-off (all its sheets).
+      // LSMBiz / Daro: the first choice is the whole cut-off (all its sheets).
       const sheetIndex = matching >= 0 ? matching : lsmbizFormat ? 0 : sheets.length - 1;
       const guessed = guessPeriodFromName(sheets[sheetIndex].sheetName, payrollPeriods) ?? fromFileName;
       setImportPeriodId(guessed?.id ?? period?.id ?? "");
@@ -125,66 +127,10 @@ export default function PayrollProcessingPage() {
     [lines, byId],
   );
 
-  const totals = useMemo(
-    () =>
-      sortedLines.reduce(
-        (t, l) => ({
-          ratePerDay: t.ratePerDay + l.ratePerDay,
-          basicPay: t.basicPay + l.basicPay,
-          latesUndertime: t.latesUndertime + l.latesUndertime,
-          undertimeDeduction: t.undertimeDeduction + l.undertimeDeduction,
-          holidayPay: t.holidayPay + l.holidayPay,
-          vlPay: t.vlPay + l.vlPay,
-          slPay: t.slPay + l.slPay,
-          otPay: t.otPay + l.otPay,
-          netAllowances: t.netAllowances + l.netAllowances,
-          grossSalary: t.grossSalary + l.grossSalary,
-          sssContribution: t.sssContribution + l.sssContribution,
-          sssWisp: t.sssWisp + l.sssWisp,
-          philHealthContribution: t.philHealthContribution + l.philHealthContribution,
-          hdmfContribution: t.hdmfContribution + l.hdmfContribution,
-          withholdingTax: t.withholdingTax + l.withholdingTax,
-          cashAdvance: t.cashAdvance + l.cashAdvance,
-          lsmBizLoan: t.lsmBizLoan + l.lsmBizLoan,
-          lsmCoopLoan: t.lsmCoopLoan + l.lsmCoopLoan,
-          shortages: t.shortages + l.shortages,
-          sssLoan: t.sssLoan + l.sssLoan,
-          hdmfLoan: t.hdmfLoan + l.hdmfLoan,
-          hdmfMp2Savings: t.hdmfMp2Savings + l.hdmfMp2Savings,
-          adjustmentDeduct: t.adjustmentDeduct + l.adjustmentDeduct,
-          adjustmentAdd: t.adjustmentAdd + l.adjustmentAdd,
-          netPay: t.netPay + l.netPay,
-        }),
-        {
-          ratePerDay: 0,
-          basicPay: 0,
-          latesUndertime: 0,
-          undertimeDeduction: 0,
-          holidayPay: 0,
-          vlPay: 0,
-          slPay: 0,
-          otPay: 0,
-          netAllowances: 0,
-          grossSalary: 0,
-          sssContribution: 0,
-          sssWisp: 0,
-          philHealthContribution: 0,
-          hdmfContribution: 0,
-          withholdingTax: 0,
-          cashAdvance: 0,
-          lsmBizLoan: 0,
-          lsmCoopLoan: 0,
-          shortages: 0,
-          sssLoan: 0,
-          hdmfLoan: 0,
-          hdmfMp2Savings: 0,
-          adjustmentDeduct: 0,
-          adjustmentAdd: 0,
-          netPay: 0,
-        },
-      ),
-    [sortedLines],
-  );
+  // Columns follow the company's own payroll sheet (lib/payroll-layout.ts).
+  const columns = useMemo(() => payrollColumns(sortedLines), [sortedLines]);
+  const leadColumn = payrollLeadColumn();
+  const columnTotals = useMemo(() => columns.map((c) => sortedLines.reduce((sum, l) => sum + c.value(l), 0)), [columns, sortedLines]);
 
   const existingSlips = period ? new Map(generatedPayslips.filter((p) => p.periodId === period.id).map((p) => [p.employeeId, p])) : new Map<string, (typeof generatedPayslips)[number]>();
 
@@ -227,6 +173,18 @@ export default function PayrollProcessingPage() {
 
   function exportCsv() {
     if (!period) return;
+    if (leadColumn === "position") {
+      // The company's own layout: the same columns as on screen.
+      const custom = toCsv(
+        ["Employee", "Branch", "Position", ...columns.map((c) => c.label)],
+        sortedLines.map((l) => {
+          const emp = byId.get(l.employeeId);
+          return [emp ? fullName(emp) : l.employeeId, emp ? branchName(emp.branchId) : "", emp ? positionTitle(emp.positionId) : "", ...columns.map((c) => c.value(l))];
+        }),
+      );
+      downloadCsv(`payroll-${period.id}.csv`, custom);
+      return;
+    }
     const csv = toCsv(
       [
         "Employee",
@@ -302,31 +260,11 @@ export default function PayrollProcessingPage() {
     <tr className={`${border} border-[var(--border-hairline)] font-semibold text-[var(--text-primary)]`}>
       <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2">Total</td>
       <td className="px-3 py-2"></td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.ratePerDay)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.basicPay)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.latesUndertime)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.undertimeDeduction)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.holidayPay)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.vlPay)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.slPay)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.otPay)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netAllowances)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.grossSalary)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssContribution)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssWisp)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.philHealthContribution)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfContribution)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.withholdingTax)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.cashAdvance)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmBizLoan)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.lsmCoopLoan)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.shortages)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.sssLoan)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfLoan)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.hdmfMp2Savings)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentDeduct)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.adjustmentAdd)}</td>
-      <td className="tabular px-3 py-2">{formatCurrencyCompact(totals.netPay)}</td>
+      {columns.map((c, i) => (
+        <td key={c.key} className="tabular whitespace-nowrap px-3 py-2">
+          {c.style === "count" ? columnTotals[i] : formatCurrencyCompact(columnTotals[i])}
+        </td>
+      ))}
       <td className="px-3 py-2"></td>
       <td className="px-3 py-2"></td>
     </tr>
@@ -463,32 +401,12 @@ export default function PayrollProcessingPage() {
                   <thead className="sticky top-0 z-20 bg-[var(--surface-1)] shadow-[inset_0_-1px_0_var(--border-hairline)]">
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="sticky left-0 z-30 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2 font-medium">Employee</th>
-                      <th className="px-3 py-2 font-medium">Type</th>
-                      <th className="px-3 py-2 font-medium">Rate/Day</th>
-                      <th className="px-3 py-2 font-medium">Basic</th>
-                      <th className="px-3 py-2 font-medium">Late</th>
-                      <th className="px-3 py-2 font-medium">Undertime</th>
-                      <th className="px-3 py-2 font-medium">Holiday</th>
-                      <th className="px-3 py-2 font-medium">VL</th>
-                      <th className="px-3 py-2 font-medium">SL</th>
-                      <th className="px-3 py-2 font-medium">OT</th>
-                      <th className="px-3 py-2 font-medium">Allowances</th>
-                      <th className="px-3 py-2 font-medium">Gross</th>
-                      <th className="px-3 py-2 font-medium">SSS</th>
-                      <th className="px-3 py-2 font-medium">WISP</th>
-                      <th className="px-3 py-2 font-medium">PhilHealth</th>
-                      <th className="px-3 py-2 font-medium">HDMF</th>
-                      <th className="px-3 py-2 font-medium">WHT</th>
-                      <th className="px-3 py-2 font-medium">Cash Adv.</th>
-                      <th className="px-3 py-2 font-medium">LSM Biz</th>
-                      <th className="px-3 py-2 font-medium">LSM Coop</th>
-                      <th className="px-3 py-2 font-medium">Shortage</th>
-                      <th className="px-3 py-2 font-medium">SSS Loan</th>
-                      <th className="px-3 py-2 font-medium">Pag-IBIG Loan</th>
-                      <th className="px-3 py-2 font-medium">Pag-IBIG MP2</th>
-                      <th className="px-3 py-2 font-medium">Adj. (deduction)</th>
-                      <th className="px-3 py-2 font-medium">Adj. (additional)</th>
-                      <th className="px-3 py-2 font-medium">Net pay</th>
+                      <th className="px-3 py-2 font-medium">{leadColumn === "position" ? "Position" : "Type"}</th>
+                      {columns.map((c) => (
+                        <th key={c.key} className="whitespace-nowrap px-3 py-2 font-medium">
+                          {c.label}
+                        </th>
+                      ))}
                       <th className="px-3 py-2 font-medium">Payslip</th>
                       <th className="px-3 py-2 font-medium"></th>
                     </tr>
@@ -507,32 +425,17 @@ export default function PayrollProcessingPage() {
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{l.payrollType === "daily" ? "Daily-rate" : "Fixed-rate"}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.ratePerDay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.basicPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.latesUndertime ? `-${formatCurrencyCompact(l.latesUndertime)}` : "—"}</td>
-                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.undertimeDeduction ? `-${formatCurrencyCompact(l.undertimeDeduction)}` : "—"}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.holidayPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.vlPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.slPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.otPay)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.netAllowances)}</td>
-                          <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.grossSalary)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssContribution)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssWisp)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.philHealthContribution)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfContribution)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.withholdingTax)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.cashAdvance)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.lsmBizLoan)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.lsmCoopLoan)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.shortages)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.sssLoan)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfLoan)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(l.hdmfMp2Savings)}</td>
-                          <td className="tabular px-3 py-2 text-[var(--status-critical)]">{l.adjustmentDeduct ? `-${formatCurrencyCompact(l.adjustmentDeduct)}` : "—"}</td>
-                          <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{l.adjustmentAdd ? formatCurrencyCompact(l.adjustmentAdd) : "—"}</td>
-                          <td className="tabular px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(l.netPay)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-xs text-[var(--text-secondary)]">
+                            {leadColumn === "position" ? (emp ? positionTitle(emp.positionId) : "") : l.payrollType === "daily" ? "Daily-rate" : "Fixed-rate"}
+                          </td>
+                          {columns.map((c) => {
+                            const v = c.value(l);
+                            if (c.style === "deduct") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--status-critical)]">{v ? `-${formatCurrencyCompact(v)}` : "—"}</td>;
+                            if (c.style === "strong") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(v)}</td>;
+                            if (c.style === "count") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{v}</td>;
+                            if (c.style === "dash") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{v ? formatCurrencyCompact(v) : "—"}</td>;
+                            return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(v)}</td>;
+                          })}
                           <td className="px-3 py-2">
                             {(() => {
                               const slip = existingSlips.get(l.employeeId);
@@ -767,12 +670,12 @@ function PayrollLineEditModal({
         <FieldSection title="Earnings (auto-computed from the above — override if needed)">
           <div className="grid grid-cols-2 gap-3">
             <OverrideField label="Basic pay" auto={line?.basicPayAuto ?? 0} value={form.basicPayOverride} onChange={(v) => setOverride("basicPayOverride", v)} />
-            <OverrideField label="Late deduction" auto={line?.latesUndertimeAuto ?? 0} value={form.latesUndertimeOverride} onChange={(v) => setOverride("latesUndertimeOverride", v)} />
+            <OverrideField label={payrollLabel("latesUndertime", "Late deduction")} auto={line?.latesUndertimeAuto ?? 0} value={form.latesUndertimeOverride} onChange={(v) => setOverride("latesUndertimeOverride", v)} />
             <OverrideField label="Undertime deduction" auto={line?.undertimeDeductionAuto ?? 0} value={form.undertimeDeductionOverride} onChange={(v) => setOverride("undertimeDeductionOverride", v)} />
             <OverrideField label="Holiday pay" auto={line?.holidayPayAuto ?? 0} value={form.holidayPayOverride} onChange={(v) => setOverride("holidayPayOverride", v)} />
-            <OverrideField label="VL pay" auto={line?.vlPayAuto ?? 0} value={form.vlPayOverride} onChange={(v) => setOverride("vlPayOverride", v)} />
+            <OverrideField label={payrollLabel("vlPay", "VL pay")} auto={line?.vlPayAuto ?? 0} value={form.vlPayOverride} onChange={(v) => setOverride("vlPayOverride", v)} />
             <OverrideField label="SL pay" auto={line?.slPayAuto ?? 0} value={form.slPayOverride} onChange={(v) => setOverride("slPayOverride", v)} />
-            <OverrideField label="OT pay" auto={line?.otPayAuto ?? 0} value={form.otPayOverride} onChange={(v) => setOverride("otPayOverride", v)} />
+            <OverrideField label={payrollLabel("otPay", "OT pay")} auto={line?.otPayAuto ?? 0} value={form.otPayOverride} onChange={(v) => setOverride("otPayOverride", v)} />
             <OverrideField label="Daily allowance" auto={line?.dailyAllowanceAuto ?? 0} value={form.dailyAllowanceOverride} onChange={(v) => setOverride("dailyAllowanceOverride", v)} />
           </div>
         </FieldSection>
@@ -789,8 +692,8 @@ function PayrollLineEditModal({
         <FieldSection title="Loans / cash advance / shortages">
           <div className="grid grid-cols-2 gap-3">
             <NumberField label="Cash advance" value={form.cashAdvance} onChange={(v) => setNum("cashAdvance", v)} />
-            <NumberField label="LSM Biz Loan" value={form.lsmBizLoan} onChange={(v) => setNum("lsmBizLoan", v)} />
-            <NumberField label="LSM Coop Loan" value={form.lsmCoopLoan} onChange={(v) => setNum("lsmCoopLoan", v)} />
+            <NumberField label={payrollLabel("lsmBizLoan", "LSM Biz Loan")} value={form.lsmBizLoan} onChange={(v) => setNum("lsmBizLoan", v)} />
+            <NumberField label={payrollLabel("lsmCoopLoan", "LSM Coop Loan")} value={form.lsmCoopLoan} onChange={(v) => setNum("lsmCoopLoan", v)} />
             <NumberField label="Shortage deduction" value={form.shortages} onChange={(v) => setNum("shortages", v)} />
             <NumberField label="SSS loan" value={form.sssLoan} onChange={(v) => setNum("sssLoan", v)} />
             <NumberField label="Pag-IBIG (HDMF) loan" value={form.hdmfLoan} onChange={(v) => setNum("hdmfLoan", v)} />
@@ -835,8 +738,8 @@ function PayrollLineEditModal({
 
         <FieldSection title="Adjustments">
           <div className="grid grid-cols-2 gap-3">
-            <NumberField label="Adjustment (add)" value={form.adjustmentAdd} onChange={(v) => setNum("adjustmentAdd", v)} />
-            <NumberField label="Adjustment (deduct)" value={form.adjustmentDeduct} onChange={(v) => setNum("adjustmentDeduct", v)} />
+            <NumberField label={payrollLabel("adjustmentAdd", "Adjustment (add)")} value={form.adjustmentAdd} onChange={(v) => setNum("adjustmentAdd", v)} />
+            <NumberField label={payrollLabel("adjustmentDeduct", "Adjustment (deduct)")} value={form.adjustmentDeduct} onChange={(v) => setNum("adjustmentDeduct", v)} />
           </div>
         </FieldSection>
 
