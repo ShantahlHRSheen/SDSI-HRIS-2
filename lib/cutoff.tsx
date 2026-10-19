@@ -44,9 +44,9 @@ export function CutoffSelect({ value, onChange, cutoffs }: { value: string; onCh
 // Heading row shown above the first request of each cut-off.
 export function CutoffHeaderRow({ label, count, colSpan }: { label: string; count: number; colSpan: number }) {
   return (
-    <tr className="border-b border-[var(--border-hairline)] bg-[var(--gridline)]/30">
-      <td colSpan={colSpan} className="px-3 py-1.5 text-xs font-semibold tracking-wide text-[var(--text-primary)]">
-        Cut-off: {label} <span className="font-normal text-[var(--text-muted)]">· {count} request{count === 1 ? "" : "s"}</span>
+    <tr className="border-y-2 border-[var(--series-1)]/60 bg-[var(--series-1)]/15">
+      <td colSpan={colSpan} className="border-l-4 border-[var(--series-1)] px-3 py-2 text-xs font-bold tracking-wide text-[var(--series-1)]">
+        Cut-off: {label} <span className="font-normal opacity-80">· {count} request{count === 1 ? "" : "s"}</span>
       </td>
     </tr>
   );
