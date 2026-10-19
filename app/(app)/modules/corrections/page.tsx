@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { CutoffHeaderRow, CutoffSelect, cutoffOf, cutoffsIn } from "@/lib/cutoff";
 import { Check, FileEdit, FileText, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { useMarkWorkforceSeen } from "@/components/workforce/WorkforceBadges";
@@ -42,6 +43,8 @@ export default function AttendanceCorrectionsPage() {
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>("all");
+  // "All requests" are grouped by payroll cut-off (and can show just one).
+  const [cutoffFilter, setCutoffFilter] = useState("all");
   const [search, setSearch] = useState("");
   // "Encoded in payroll" ticks (HR / payroll), shown beside each name in "All requests".
   const encoded = usePayrollEncoded("corr");
@@ -68,7 +71,8 @@ export default function AttendanceCorrectionsPage() {
       const emp = employees.find((e) => e.id === r.employeeId);
       return emp ? fullName(emp).toLowerCase().includes(search.toLowerCase()) : true;
     })
-    .sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));
+    .filter((r) => cutoffFilter === "all" || cutoffOf(r.date).key === cutoffFilter)
+    .sort((a, b) => cutoffOf(b.date).key.localeCompare(cutoffOf(a.date).key) || (a.filedAt < b.filedAt ? 1 : -1));
 
   const [form, setForm] = useState({ date: TODAY, requestedTimeIn: "08:00", requestedTimeOut: "17:00", reason: "" });
 
@@ -161,6 +165,7 @@ export default function AttendanceCorrectionsPage() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm font-medium text-[var(--text-primary)]">All correction requests</div>
             <div className="flex flex-wrap items-center gap-2">
+              <CutoffSelect value={cutoffFilter} onChange={setCutoffFilter} cutoffs={cutoffsIn(correctionRequests.map((r) => r.date))} />
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-xs">
                 <option value="all">All statuses</option>
                 <option value="pending">Pending</option>
@@ -186,7 +191,7 @@ export default function AttendanceCorrectionsPage() {
               encoded={encoded}
               rows={allRequests.filter((r) => encodedFilter === "all" || encoded.marks.has(r.id) === (encodedFilter === "yes")).map((r) => {
                 const emp = employees.find((e) => e.id === r.employeeId);
-                return { id: r.id, form: formByRequest.get(r.id), employee: emp ? fullName(emp) : r.employeeId, primary: periodLabel(r.requestedTimeIn, r.requestedTimeOut), secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote };
+                return { id: r.id, cutoff: cutoffOf(r.date).label, form: formByRequest.get(r.id), employee: emp ? fullName(emp) : r.employeeId, primary: periodLabel(r.requestedTimeIn, r.requestedTimeOut), secondary: formatDate(r.date), reason: r.reason, status: r.status, decisionNote: r.decisionNote };
               })}
             />
           )}
@@ -281,7 +286,7 @@ function RequestsTable({
   encoded,
   onViewForm,
 }: {
-  rows: { id: string; form?: CorrectionForm; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
+  rows: { id: string; cutoff?: string; form?: CorrectionForm; employee?: string; primary: string; secondary: string; reason: string; status: RequestStatus; decisionNote: string | null }[];
   showEmployee?: boolean;
   encoded?: ReturnType<typeof usePayrollEncoded>;
   onViewForm?: (id: string) => void;
@@ -300,8 +305,10 @@ function RequestsTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-b border-[var(--gridline)] last:border-0">
+          {rows.map((r, i) => (
+            <Fragment key={r.id}>
+              {r.cutoff && r.cutoff !== rows[i - 1]?.cutoff && <CutoffHeaderRow label={r.cutoff} count={rows.filter((x) => x.cutoff === r.cutoff).length} colSpan={(showEmployee ? 1 : 0) + 5} />}
+              <tr className="border-b border-[var(--gridline)] last:border-0">
               {showEmployee && (
                 <td className="px-3 py-2 text-[var(--text-primary)]">
                   <span className="flex items-center gap-2">
@@ -326,7 +333,8 @@ function RequestsTable({
                   <span className="text-xs text-[var(--text-muted)]">—</span>
                 )}
               </td>
-            </tr>
+              </tr>
+            </Fragment>
           ))}
         </tbody>
       </table>
