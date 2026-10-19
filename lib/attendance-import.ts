@@ -299,7 +299,8 @@ export async function parseAttendanceWorkbook(buffer: ArrayBuffer): Promise<Pars
 // --- Reconciliation against the system roster -------------------------------
 
 export function normalizeName(name: string): string {
-  let n = name.trim().toLowerCase().replace(/\s+/g, " ").replace(/\./g, "");
+  // Accents ignored, so "CANAS" in a payroll file matches "Cañas" in the 201 file.
+  let n = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ").replace(/\./g, "");
   if (n.includes(",")) {
     const [last, first] = n.split(",").map((s) => s.trim());
     n = `${first} ${last}`;
