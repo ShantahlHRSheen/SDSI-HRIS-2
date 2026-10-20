@@ -278,9 +278,18 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
   return { name: ws.name, caption: sheetCaption(ws, headerRow), rows };
 }
 
+// The cut-off a sheet's caption names ("Payroll, JANUARY 16-31, 2026" ->
+// "january 16"), so sheets of different cut-offs aren't merged; "" if none.
+function captionCutOff(caption: string): string {
+  const m = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(caption);
+  return m ? `${m[1].toLowerCase()} ${Number(m[2])}` : "";
+}
+
 // The workbook's payroll sheets as import choices: first the whole cut-off
 // (every visible payroll sheet except estimates such as "MAX CA"), then each
-// sheet on its own.
+// sheet on its own. A workbook holding several cut-offs (LSMBiz's January
+// file: one sheet per cut-off) gets a combined choice only for sheets that
+// share a cut-off.
 export async function parseLsmbizPayrollWorkbook(buffer: ArrayBuffer, employees: Employee[], format: PayrollWorkbookFormat = "lsmbiz"): Promise<ParsedPayrollWorkbook[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
@@ -297,11 +306,14 @@ export async function parseLsmbizPayrollWorkbook(buffer: ArrayBuffer, employees:
   const label = (s: LsmbizSheet) => (s.caption ? `${s.name} · ${s.caption}` : s.name);
   const choices: ParsedPayrollWorkbook[] = sheets.map((s) => ({ sheetName: label(s), rows: s.rows }));
   const main = sheets.filter((s) => !/\best\b|estimate/i.test(s.caption));
-  if (main.length > 1) {
-    const caption = main.find((s) => s.caption)?.caption ?? "";
+  const cutOffs = [...new Set(main.map((s) => captionCutOff(s.caption)).filter(Boolean))];
+  const groups = cutOffs.length > 1 ? cutOffs.map((c) => main.filter((s) => captionCutOff(s.caption) === c)) : [main];
+  for (const group of groups.reverse()) {
+    if (group.length < 2) continue;
+    const caption = group.find((s) => s.caption)?.caption ?? "";
     choices.unshift({
-      sheetName: `${main.map((s) => s.name).join(" + ")}${caption ? ` · ${caption}` : ""}`,
-      rows: main.flatMap((s) => s.rows),
+      sheetName: `${group.map((s) => s.name).join(" + ")}${caption ? ` · ${caption}` : ""}`,
+      rows: group.flatMap((s) => s.rows),
     });
   }
   return choices;
