@@ -156,10 +156,12 @@ function nameMatcher(employees: Employee[]) {
     }
     return pick(map.get(strip(raw)));
   };
+  const sortedWords = (s: string) => s.split(" ").sort().join(" ");
   // Last resort, for a typo in the file ("Gayla, Reymart" for Raymart,
   // "Tejadillano" for Tejadillo): same first name and a surname at most two
-  // letters off, or the other way round — only when exactly one employee
-  // fits. These are flagged in the import preview for HR to check.
+  // letters off, or the other way round, or the same names with the first
+  // names in another order — only when exactly one employee fits. These
+  // are flagged in the import preview for HR to check.
   const similar = (raw: string): Employee | undefined => {
     if (!raw.includes(",")) return undefined;
     const [last, first] = raw.split(",").map((s) => strip(s));
@@ -169,7 +171,9 @@ function nameMatcher(employees: Employee[]) {
       const eFirsts = [strip(e.firstName), strip(e.firstName.split(" ")[0])];
       const firstSame = eFirsts.includes(first);
       const firstClose = eFirsts.some((f) => editDistance(f, first) <= 2);
-      return (firstSame && editDistance(eLast, last) <= 2) || (eLast === last && firstClose);
+      // First names in another order: "Tan, Vincent Carl" = Carl Vincent Tan.
+      const firstReordered = sortedWords(strip(e.firstName)) === sortedWords(first);
+      return (firstSame && editDistance(eLast, last) <= 2) || (eLast === last && (firstClose || firstReordered));
     });
     return pick(hits);
   };
