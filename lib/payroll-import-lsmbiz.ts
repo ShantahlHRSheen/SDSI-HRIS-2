@@ -215,16 +215,33 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
   if (headerRow === null) return null;
 
   const rows: ParsedPayrollRow[] = [];
+  const hasFigures = (row: ExcelJS.Row) =>
+    (Object.keys(cols) as Field[]).some((f) => f !== "name" && toNumber(cellScalar(row, cols[f]!)) !== 0);
+  // Whether the next named row below `r` is another employee not yet read
+  // (has a Basic Salary and isn't a repeat, such as an estimate table).
+  const employeeFollows = (r: number) => {
+    for (let k = r + 1; k <= ws.rowCount; k++) {
+      const next = ws.getRow(k);
+      const name = String(cellScalar(next, cols.name!) ?? "").trim();
+      if (!name) continue;
+      return toNumber(cellScalar(next, cols.basic!)) !== 0 && !rows.some((x) => x.rawName === name);
+    }
+    return false;
+  };
   for (let r = headerRow + 1; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const rawName = String(cellScalar(row, cols.name!) ?? "").trim();
-    // The employee list ends at the totals row (no name, or "TOTALS").
+    const n = (f: Field) => (cols[f] === undefined ? 0 : toNumber(cellScalar(row, cols[f]!)));
+    // The list ends at the totals row: "TOTALS", or a row with no name but
+    // figures — unless more employees follow it (a subtotal between
+    // branches). Rows with no name and no figures (gaps between branches)
+    // are skipped, as are named rows with no figures.
+    if (/^totals?$/i.test(rawName)) break;
     if (!rawName) {
-      if (rows.length) break;
+      if (rows.length && hasFigures(row) && !employeeFollows(r)) break;
       continue;
     }
-    if (/^totals?$/i.test(rawName)) break;
-    const n = (f: Field) => (cols[f] === undefined ? 0 : toNumber(cellScalar(row, cols[f]!)));
+    if (!hasFigures(row)) continue;
     // Other Income is a rounding figure the sheet subtracts from net pay
     // (negative = added). Negative Balance covers a shortfall when deductions
     // exceed earnings, so it's added back.
@@ -281,7 +298,7 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
 // The cut-off a sheet's caption names ("Payroll, JANUARY 16-31, 2026" ->
 // "january 16"), so sheets of different cut-offs aren't merged; "" if none.
 function captionCutOff(caption: string): string {
-  const m = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(caption);
+  const m = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(caption.replace(/[_-]+/g, " "));
   return m ? `${m[1].toLowerCase()} ${Number(m[2])}` : "";
 }
 
@@ -306,8 +323,10 @@ export async function parseLsmbizPayrollWorkbook(buffer: ArrayBuffer, employees:
   const label = (s: LsmbizSheet) => (s.caption ? `${s.name} · ${s.caption}` : s.name);
   const choices: ParsedPayrollWorkbook[] = sheets.map((s) => ({ sheetName: label(s), rows: s.rows }));
   const main = sheets.filter((s) => !/\best\b|estimate/i.test(s.caption));
-  const cutOffs = [...new Set(main.map((s) => captionCutOff(s.caption)).filter(Boolean))];
-  const groups = cutOffs.length > 1 ? cutOffs.map((c) => main.filter((s) => captionCutOff(s.caption) === c)) : [main];
+  // A sheet without a caption is placed by its own name ("FEBRUARY 16 - 28").
+  const cutOff = (s: LsmbizSheet) => captionCutOff(s.caption) || captionCutOff(s.name);
+  const cutOffs = [...new Set(main.map(cutOff).filter(Boolean))];
+  const groups = cutOffs.length > 1 ? cutOffs.map((c) => main.filter((s) => cutOff(s) === c)) : [main];
   for (const group of groups.reverse()) {
     if (group.length < 2) continue;
     const caption = group.find((s) => s.caption)?.caption ?? "";
