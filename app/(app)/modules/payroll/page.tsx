@@ -700,13 +700,13 @@ function PayrollLineEditModal({
             <OverrideField label={payrollLabel("vlPay", "VL pay")} auto={line?.vlPayAuto ?? 0} value={form.vlPayOverride} onChange={(v) => setOverride("vlPayOverride", v)} />
             <OverrideField label="SL pay" auto={line?.slPayAuto ?? 0} value={form.slPayOverride} onChange={(v) => setOverride("slPayOverride", v)} />
             <OverrideField label={payrollLabel("otPay", "OT pay")} auto={line?.otPayAuto ?? 0} value={form.otPayOverride} onChange={(v) => setOverride("otPayOverride", v)} />
-            <OverrideField label="Daily allowance" auto={line?.dailyAllowanceAuto ?? 0} value={form.dailyAllowanceOverride} onChange={(v) => setOverride("dailyAllowanceOverride", v)} />
+            <OverrideField label={payrollLabel("dailyAllowance", "Daily allowance")} auto={line?.dailyAllowanceAuto ?? 0} value={form.dailyAllowanceOverride} onChange={(v) => setOverride("dailyAllowanceOverride", v)} />
           </div>
         </FieldSection>
 
         <FieldSection title="Other allowances">
           <div className="grid grid-cols-2 gap-3">
-            <NumberField label="Travel allowance" value={form.travelAllowance} onChange={(v) => setNum("travelAllowance", v)} />
+            <NumberField label={payrollLabel("travelAllowance", "Travel allowance")} value={form.travelAllowance} onChange={(v) => setNum("travelAllowance", v)} />
             <NumberField label="Laundry allowance" value={form.laundryAllowance} onChange={(v) => setNum("laundryAllowance", v)} />
             <NumberField label="Medical cash allowance" value={form.medicalCashAllowance} onChange={(v) => setNum("medicalCashAllowance", v)} />
             <NumberField label="Supervisor allowance" value={form.supervisorAllowance} onChange={(v) => setNum("supervisorAllowance", v)} />

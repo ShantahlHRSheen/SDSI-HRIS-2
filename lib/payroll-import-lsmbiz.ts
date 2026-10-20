@@ -31,6 +31,8 @@ type Field =
   | "holiday"
   | "vlsl"
   | "deMinimis"
+  | "laundryRate"
+  | "medicalRate"
   | "allowance"
   | "gross"
   | "cashAdvance"
@@ -69,6 +71,8 @@ const HEADERS: Record<string, Field> = {
   // Rice / uniform / laundry / medical columns are per-day rates; this is
   // their total for the period.
   "de minimis benefits for the period": "deMinimis",
+  "laundry allowance": "laundryRate",
+  "medical cash allowance": "medicalRate",
   // LSM ADM: the ALLOWANCES sheet's net allowances, paid with the payslip.
   allowance: "allowance",
   "gross salary": "gross",
@@ -255,12 +259,23 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
     const paidOnTop = format === "daro" ? n("allowance") : 0;
     const allowances = n("deMinimis") + n("allowance") - paidOnTop;
     const grossSalary = n("basic") - n("late") + n("adjAllowance") + n("holiday") + n("vlsl") + allowances;
+    // LSMBiz: laundry and medical cash broken out of De Minimis (per-day
+    // rate × days; rice and uniform stay the daily allowance), and the
+    // ALLOWANCE column as travel & other allowances.
+    const round2 = (x: number) => Math.round(x * 100) / 100;
+    const laundry = round2(n("laundryRate") * n("days"));
+    const medicalCash = round2(n("medicalRate") * n("days"));
+    const splitDeMinimis = laundry + medicalCash <= n("deMinimis") + 0.005;
     const { employee, similar } = findEmployee(rawName);
     rows.push({
       rowNumber: r,
       employeeNumber: employee?.employeeNumber ?? "",
       rawName,
       similarName: similar || undefined,
+      allowances:
+        format === "lsmbiz"
+          ? { travel: n("allowance"), laundry: splitDeMinimis ? laundry : 0, medicalCash: splitDeMinimis ? medicalCash : 0, supervisor: 0 }
+          : undefined,
       values: {
         daysWorking: n("days"),
         workedHoliday: 0,

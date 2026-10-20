@@ -69,6 +69,9 @@ export interface ParsedPayrollRow {
   // (lib/payroll-import-lsmbiz.ts) — shown in the preview for HR to check.
   similarName?: boolean;
   values: Record<Exclude<ColumnKey, "employee" | "payrollType">, number>;
+  // Part of netAllowances the file breaks out (LSMBiz); the rest stays the
+  // daily allowance.
+  allowances?: { travel: number; laundry: number; medicalCash: number; supervisor: number };
 }
 
 export interface ParsedPayrollWorkbook {
@@ -229,6 +232,7 @@ export function buildPayrollImportPreview(
     if (problem) inconsistent.push({ parsed: row, reason: problem });
 
     const v = row.values;
+    const split = row.allowances;
     const existing = attendanceByEmp.get(employee.id);
     // Day counts come from the file; minutes and daily late/absence detail
     // (from an attendance-tracker import) are kept for the tardiness reports.
@@ -265,12 +269,12 @@ export function buildPayrollImportPreview(
       slPayOverride: v.slPay,
       otHoursOverride: null,
       otPayOverride: v.otPay,
-      // The file only carries the allowance total.
-      dailyAllowanceOverride: v.netAllowances,
-      travelAllowance: 0,
-      laundryAllowance: 0,
-      medicalCashAllowance: 0,
-      supervisorAllowance: 0,
+      // The allowance total, less what the file breaks out (if anything).
+      dailyAllowanceOverride: v.netAllowances - (split ? split.travel + split.laundry + split.medicalCash + split.supervisor : 0),
+      travelAllowance: split?.travel ?? 0,
+      laundryAllowance: split?.laundry ?? 0,
+      medicalCashAllowance: split?.medicalCash ?? 0,
+      supervisorAllowance: split?.supervisor ?? 0,
       sssContributionOverride: v.sss,
       sssWispOverride: v.sssWisp,
       philHealthContributionOverride: v.philHealth,
