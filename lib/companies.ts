@@ -59,6 +59,9 @@ export interface CompanyConfig {
   // Payroll Processing's columns, column names and payslip labels follow
   // this company's own payroll sheet (lib/payroll-layout.ts); standard if unset.
   payrollLayout?: "daro";
+  // Payroll Processing lists each allowance (rice, uniform, laundry,
+  // medical cash, additional) instead of one Allowances total.
+  allowanceBreakdown?: boolean;
   // People who sign in here with the same email and password as in another
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
   // match here, it's checked against `from`'s database and, if right, saved
@@ -155,6 +158,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     adminAccountNumbers: ["ADMIN-01"],
     // LSM OP / LSM ADM / CEO sheets — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "lsmbiz",
+    allowanceBreakdown: true,
     orgChartPhotos: true,
   },
   daro: {

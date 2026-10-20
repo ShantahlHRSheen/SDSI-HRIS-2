@@ -2,7 +2,7 @@ import { FormAmountRow, FormFootnote, FormRow, FormSection, FormShell } from "@/
 import { COMPANY_INFO } from "@/lib/bir";
 import { withShownNames } from "@/lib/demo-mode";
 import { currentCompany } from "@/lib/companies";
-import { payrollLabel } from "@/lib/payroll-layout";
+import { ALLOWANCE_PARTS, payrollLabel } from "@/lib/payroll-layout";
 import { branchName, departmentName, formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee, PayrollPeriod } from "@/lib/types";
 import type { PayrollLine } from "@/lib/payroll";
@@ -49,7 +49,19 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
           <FormAmountRow label="Basic Pay" value={line.basicPay} />
           <FormAmountRow label={payrollLabel("latesUndertime", "Late Deduction")} value={-line.latesUndertime || 0} />
           <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction || 0} />
-          <FormAmountRow label={payrollLabel("netAllowances", "Net Allowances")} value={line.netAllowances} />
+          {currentCompany().allowanceBreakdown ? (
+            <>
+              {ALLOWANCE_PARTS.filter((p) => p.deMinimis).map((p) => (
+                <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />
+              ))}
+              <FormAmountRow label="Total Rice, Uniform, Laundry & Medical" value={ALLOWANCE_PARTS.filter((p) => p.deMinimis).reduce((t, p) => t + line[p.key], 0)} bold />
+              {ALLOWANCE_PARTS.filter((p) => !p.deMinimis).map((p) => (
+                <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />
+              ))}
+            </>
+          ) : (
+            <FormAmountRow label={payrollLabel("netAllowances", "Net Allowances")} value={line.netAllowances} />
+          )}
           <FormAmountRow label={payrollLabel("otPay", "Overtime Pay")} value={line.otPay} />
           <FormAmountRow label="Holiday Pay" value={line.holidayPay} />
           <FormAmountRow label="Sick Leave Pay" value={line.slPay} />
