@@ -228,6 +228,33 @@ body {
     border: 0;
     border-radius: 0;
   }
+  /* LSMBiz / Daro: several payslips printed at once, each kept to one A4
+     page (smaller type and tighter rows than a single printed slip). */
+  html[data-company] .print-stack-page.print-stack-form {
+    padding: 10mm 15mm 0;
+  }
+  html[data-company] .print-stack-form .payslip-compact {
+    font-size: 12px;
+    line-height: 15px;
+  }
+  html[data-company] .print-stack-form .payslip-compact .divide-y > div {
+    padding-top: 1px;
+    padding-bottom: 1px;
+  }
+  html[data-company] .print-stack-form .payslip-compact .mb-1\.5 {
+    margin-bottom: 3px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  html[data-company] .print-stack-form .payslip-compact .mb-4 {
+    margin-bottom: 6px;
+  }
+  html[data-company] .print-stack-form .payslip-compact .mb-5 {
+    margin-bottom: 8px;
+  }
+  html[data-company] .print-stack-form .payslip-compact .mt-8 {
+    margin-top: 16px;
+  }
 }
 
 .print-stack {
@@ -251,4 +278,16 @@ body {
 html[data-company="lsmbiz"] header,
 html[data-company="daro"] header {
   box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
+}
+
+/* LSMBiz Payroll Processing: the register's header and total rows and the
+   Employee column in light green. Solid colours, since those cells stay
+   in place (sticky) while the table scrolls under them. */
+html[data-company="lsmbiz"] .payroll-register thead th,
+html[data-company="lsmbiz"] .payroll-register thead td,
+html[data-company="lsmbiz"] .payroll-register tfoot td {
+  background-color: #dff3dc;
+}
+html[data-company="lsmbiz"] .payroll-register tbody td:first-child:not([colspan]) {
+  background-color: #eef9ec;
 }
