@@ -411,7 +411,7 @@ export default function PayrollProcessingPage() {
               />
             ) : (
               <div className="max-h-[75vh] overflow-auto">
-                <table className="w-full min-w-[2400px] text-sm">
+                <table className="payroll-register w-full min-w-[2400px] text-sm">
                   <thead className="sticky top-0 z-20 bg-[var(--surface-1)] shadow-[inset_0_-1px_0_var(--border-hairline)]">
                     <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
                       <th className="sticky left-0 z-30 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2 font-medium">Employee</th>
