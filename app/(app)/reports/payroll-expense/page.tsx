@@ -10,7 +10,8 @@ import { TrendChart } from "@/components/charts/TrendChart";
 import { MultiSelect, type FilterMode } from "@/components/reports/MultiSelect";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { EmptyState } from "@/components/EmptyState";
-import { departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, fullName } from "@/lib/helpers";
+import { branchName, departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, fullName } from "@/lib/helpers";
+import { currentCompany } from "@/lib/companies";
 import {
   FULL_ATTENDANCE_DAYS_PER_MONTH,
   FULL_ATTENDANCE_MONTH_KEY,
@@ -206,6 +207,26 @@ export default function PayrollExpenseReportPage() {
   });
   const byDivision = groupByDivision(byDepartment, departments);
   const divisionTotal = (key: string) => byDivision.find((d) => d.division === key)?.payroll.totalWithVouchers ?? 0;
+  // Companies without Shantahl's divisions see the same breakdown per branch;
+  // vouchers count under their payee's branch.
+  const byBranchView = currentCompany().payrollExpenseByBranch ?? false;
+  const vouchersByBranch = sumBy(filterVoucherAmounts(allVoucherAmounts, analyticsFilters, employees), (a) =>
+    (a.employeeId && employees.find((e) => e.id === a.employeeId)?.branchId) || OTHER_PAYEE,
+  );
+  const payrollByBranch = groupByBranch(filtered, employees, branches);
+  const groupRows = byBranchView
+    ? [
+        ...payrollByBranch.map((r) => ({ key: r.branchId, label: r.label, payroll: r.payroll })),
+        // Branches (or payees outside the roster) with vouchers but no payroll.
+        ...[...vouchersByBranch.keys()]
+          .filter((id) => !payrollByBranch.some((r) => r.branchId === id))
+          .map((id) => ({ key: id, label: id === OTHER_PAYEE ? "Other payees" : branchName(id), payroll: summarizePayroll([]) })),
+      ].map((r) => {
+        const vouchers = vouchersByBranch.get(r.key) ?? 0;
+        return { ...r, payroll: { ...r.payroll, vouchers, totalWithVouchers: r.payroll.totalEmployerExpense + vouchers } };
+      })
+    : byDivision.map((r) => ({ key: r.division as string, label: r.label, payroll: r.payroll }));
+  const groupName = byBranchView ? "Branch" : "Division";
 
   const branchesThisMonth = groupByBranch(filterFactsWithShares(viewFacts, employees, { ...analyticsFilters, monthKey: currentMonthKey }, allocations), employees, branches);
   const branchesPrevMonth = groupByBranch(filterFactsWithShares(facts, employees, { ...analyticsFilters, monthKey: previousMonthKey }, allocations), employees, branches);
@@ -258,7 +279,7 @@ export default function PayrollExpenseReportPage() {
   function exportDivisionCsv() {
     const csv = toCsv(
       [
-        "Division",
+        groupName,
         "Employees",
         "Basic Salary",
         "Allowances",
@@ -272,7 +293,7 @@ export default function PayrollExpenseReportPage() {
         "Vouchers",
         "Total Expense",
       ],
-      byDivision.map((r) => [
+      groupRows.map((r) => [
         r.label,
         r.payroll.employeeCount,
         r.payroll.basicSalary,
@@ -288,7 +309,7 @@ export default function PayrollExpenseReportPage() {
         r.payroll.totalWithVouchers,
       ]),
     );
-    downloadCsv("payroll-expense-by-division.csv", csv);
+    downloadCsv(byBranchView ? "payroll-expense-per-branch.csv" : "payroll-expense-by-division.csv", csv);
   }
 
   function exportBranchCsv() {
@@ -461,8 +482,12 @@ export default function PayrollExpenseReportPage() {
         <StatTile label="Employees covered" value={summary.employeeCount.toString()} />
         <StatTile label="Payroll expense" value={formatCurrencyCompact(summary.totalEmployerExpense)} hint="employer payroll cost" />
         <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint={filters.branchIds.length && modes.branchIds === "include" ? "payees linked to an employee only" : "department vouchers"} />
-        <StatTile label="Business Units" value={formatCurrencyCompact(divisionTotal("business_units"))} hint="MLM · Cosmetics · Darofy · Board" />
-        <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Board staff" />
+        {!byBranchView && (
+          <>
+            <StatTile label="Business Units" value={formatCurrencyCompact(divisionTotal("business_units"))} hint="MLM · Cosmetics · Darofy · Board" />
+            <StatTile label="Shared Services" value={formatCurrencyCompact(divisionTotal("shared_services"))} hint="Ops · HR · Finance · Accounting · Board staff" />
+          </>
+        )}
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -487,20 +512,20 @@ export default function PayrollExpenseReportPage() {
         </div>
       </div>
 
-      {/* --- Business Units vs Shared Services --- */}
+      {/* --- Business Units vs Shared Services (or per branch) --- */}
       <div className="mt-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-medium text-[var(--text-primary)]">Payroll expense by division</div>
+          <div className="text-sm font-medium text-[var(--text-primary)]">{byBranchView ? "Payroll Expense Per Branch" : "Payroll expense by division"}</div>
           <ExportBar onExportCsv={exportDivisionCsv} label="Export" />
         </div>
-        {byDivision.length === 0 ? (
+        {groupRows.length === 0 ? (
           <EmptyState icon={Wallet} title="No data" description="Adjust your filters." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
-                  <th className="px-3 py-2 font-medium">Division</th>
+                  <th className="px-3 py-2 font-medium">{groupName}</th>
                   <th className="px-3 py-2 font-medium"># Employees</th>
                   <th className="px-3 py-2 font-medium">Basic Salary</th>
                   <th className="px-3 py-2 font-medium">Allowances</th>
@@ -516,8 +541,8 @@ export default function PayrollExpenseReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {byDivision.map((r) => (
-                  <tr key={r.division} className="border-b border-[var(--gridline)] last:border-0">
+                {groupRows.map((r) => (
+                  <tr key={r.key} className="border-b border-[var(--gridline)] last:border-0">
                     <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{r.label}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{r.payroll.employeeCount}</td>
                     <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(r.payroll.basicSalary)}</td>
@@ -537,28 +562,30 @@ export default function PayrollExpenseReportPage() {
               <tfoot>
                 <tr className="border-t border-[var(--border-hairline)] font-medium text-[var(--text-primary)]">
                   <td className="px-3 py-2">Total</td>
-                  <td className="tabular px-3 py-2">{Math.round(byDivision.reduce((t, r) => t + r.payroll.employeeCount, 0) * 100) / 100}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.basicSalary, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.allowances, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.overtimePay, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.holidayPay, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.leavePay, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.employerSSS, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.employerHDMF, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.employerPhilHealth, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.totalEmployerExpense, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.vouchers, 0))}</td>
-                  <td className="tabular px-3 py-2">{formatCurrencyCompact(byDivision.reduce((t, r) => t + r.payroll.totalWithVouchers, 0))}</td>
+                  <td className="tabular px-3 py-2">{Math.round(groupRows.reduce((t, r) => t + r.payroll.employeeCount, 0) * 100) / 100}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.basicSalary, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.allowances, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.overtimePay, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.holidayPay, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.leavePay, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.employerSSS, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.employerHDMF, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.employerPhilHealth, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.totalEmployerExpense, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.vouchers, 0))}</td>
+                  <td className="tabular px-3 py-2">{formatCurrencyCompact(groupRows.reduce((t, r) => t + r.payroll.totalWithVouchers, 0))}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
-        <div className="mt-2 text-xs text-[var(--text-muted)]">
-          Business Units: MLM, Cosmetics and Darofy departments. Each business unit President&rsquo;s salary is counted in their own business unit.
-          {splitNotes.length > 0 && <> Shared between departments: {splitNotes.join("; ")}.</>} Shared Services: Operations, Human Resources, Finance, Accounting and the rest of
-          the Board department (Vice Chairperson, Chemist).
-        </div>
+        {!byBranchView && (
+          <div className="mt-2 text-xs text-[var(--text-muted)]">
+            Business Units: MLM, Cosmetics and Darofy departments. Each business unit President&rsquo;s salary is counted in their own business unit.
+            {splitNotes.length > 0 && <> Shared between departments: {splitNotes.join("; ")}.</>} Shared Services: Operations, Human Resources, Finance, Accounting and the rest of
+            the Board department (Vice Chairperson, Chemist).
+          </div>
+        )}
       </div>
 
       {/* --- 6A: Payroll expense per department --- */}

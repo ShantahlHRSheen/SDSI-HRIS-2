@@ -62,6 +62,9 @@ export interface CompanyConfig {
   // Payroll Processing lists each allowance (rice, uniform, laundry,
   // medical cash, additional) instead of one Allowances total.
   allowanceBreakdown?: boolean;
+  // Payroll Expense Report groups payroll by branch instead of by division
+  // (Business Units / Shared Services, which are Shantahl's).
+  payrollExpenseByBranch?: boolean;
   // People who sign in here with the same email and password as in another
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
   // match here, it's checked against `from`'s database and, if right, saved
@@ -159,6 +162,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // LSM OP / LSM ADM / CEO sheets — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "lsmbiz",
     allowanceBreakdown: true,
+    payrollExpenseByBranch: true,
     orgChartPhotos: true,
   },
   daro: {
