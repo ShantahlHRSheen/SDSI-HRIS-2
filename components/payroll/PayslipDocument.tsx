@@ -50,7 +50,15 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
           <FormAmountRow label={payrollLabel("latesUndertime", "Late Deduction")} value={-line.latesUndertime || 0} />
           <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction || 0} />
           {currentCompany().allowanceBreakdown ? (
-            ALLOWANCE_PARTS.filter((p) => !p.onlyIfUsed || line[p.key] !== 0).map((p) => <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />)
+            <>
+              {ALLOWANCE_PARTS.filter((p) => p.deMinimis).map((p) => (
+                <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />
+              ))}
+              <FormAmountRow label="Total Rice, Uniform, Laundry & Medical" value={ALLOWANCE_PARTS.filter((p) => p.deMinimis).reduce((t, p) => t + line[p.key], 0)} bold />
+              {ALLOWANCE_PARTS.filter((p) => !p.deMinimis).map((p) => (
+                <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />
+              ))}
+            </>
           ) : (
             <FormAmountRow label={payrollLabel("netAllowances", "Net Allowances")} value={line.netAllowances} />
           )}

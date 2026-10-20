@@ -96,7 +96,7 @@ export function payrollLeadColumn(): "type" | "position" {
 // in it, so the figures on screen always add up to the net pay.
 export function payrollColumns(lines: PayrollLine[]): PayrollColumn[] {
   if (currentCompany().allowanceBreakdown) {
-    return STANDARD.flatMap((c) => (c.key === "netAllowances" ? allowanceColumns(lines) : [c]));
+    return STANDARD.flatMap((c) => (c.key === "netAllowances" ? allowanceColumns() : [c]));
   }
   if (currentCompany().payrollLayout !== "daro") return STANDARD;
   const shown = new Set(DARO.map((c) => c.key));
@@ -105,19 +105,23 @@ export function payrollColumns(lines: PayrollLine[]): PayrollColumn[] {
   return [...DARO.slice(0, -1), ...extra, DARO[DARO.length - 1]];
 }
 
-// LSMBiz: each allowance in its own column (supervisor only when used).
-function allowanceColumns(lines: PayrollLine[]): PayrollColumn[] {
-  return ALLOWANCE_PARTS.filter((p) => !p.onlyIfUsed || lines.some((l) => l[p.key] !== 0)).map((p) => col(p.key, p.short));
+// LSMBiz: each allowance in its own column.
+function allowanceColumns(): PayrollColumn[] {
+  return ALLOWANCE_PARTS.map((p) => col(p.key, p.short));
 }
 
 // The allowances that make up netAllowances, for companies that list them
-// (allowanceBreakdown): register column name, and name on the payslip.
-export const ALLOWANCE_PARTS: { key: "dailyAllowance" | "laundryAllowance" | "medicalCashAllowance" | "travelAllowance" | "supervisorAllowance"; short: string; label: string; onlyIfUsed?: boolean }[] = [
-  { key: "dailyAllowance", short: "Rice & Uniform", label: "Rice & Uniform Allowance" },
-  { key: "laundryAllowance", short: "Laundry", label: "Laundry Allowance" },
-  { key: "medicalCashAllowance", short: "Medical Cash", label: "Medical Cash Allowance" },
-  { key: "travelAllowance", short: "Travel & Other", label: "Travel & Other Allowances" },
-  { key: "supervisorAllowance", short: "Supervisor", label: "Supervisor Allowance", onlyIfUsed: true },
+// (allowanceBreakdown = LSMBiz): register column name, and name on the
+// payslip and edit form. LSMBiz has no travel or supervisor allowance; it
+// keeps its Additional Allowance (the file's ALLOWANCE) and its uniform
+// allowance in those two fields. `deMinimis`: part of the De Minimis total
+// shown on the payslip.
+export const ALLOWANCE_PARTS: { key: "dailyAllowance" | "supervisorAllowance" | "laundryAllowance" | "medicalCashAllowance" | "travelAllowance"; short: string; label: string; deMinimis: boolean }[] = [
+  { key: "dailyAllowance", short: "Rice", label: "Rice Allowance", deMinimis: true },
+  { key: "supervisorAllowance", short: "Uniform", label: "Uniform Allowance", deMinimis: true },
+  { key: "laundryAllowance", short: "Laundry", label: "Laundry Allowance", deMinimis: true },
+  { key: "medicalCashAllowance", short: "Medical", label: "Medical Cash Allowance", deMinimis: true },
+  { key: "travelAllowance", short: "Additional Allow.", label: "Additional Allowance", deMinimis: false },
 ];
 
 // Names for payroll figures on the payslip and in the edit form, where a

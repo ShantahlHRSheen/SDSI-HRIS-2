@@ -31,6 +31,7 @@ type Field =
   | "holiday"
   | "vlsl"
   | "deMinimis"
+  | "uniformRate"
   | "laundryRate"
   | "medicalRate"
   | "allowance"
@@ -71,6 +72,7 @@ const HEADERS: Record<string, Field> = {
   // Rice / uniform / laundry / medical columns are per-day rates; this is
   // their total for the period.
   "de minimis benefits for the period": "deMinimis",
+  "uniform allowance": "uniformRate",
   "laundry allowance": "laundryRate",
   "medical cash allowance": "medicalRate",
   // LSM ADM: the ALLOWANCES sheet's net allowances, paid with the payslip.
@@ -259,13 +261,16 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
     const paidOnTop = format === "daro" ? n("allowance") : 0;
     const allowances = n("deMinimis") + n("allowance") - paidOnTop;
     const grossSalary = n("basic") - n("late") + n("adjAllowance") + n("holiday") + n("vlsl") + allowances;
-    // LSMBiz: laundry and medical cash broken out of De Minimis (per-day
-    // rate × days; rice and uniform stay the daily allowance), and the
-    // ALLOWANCE column as travel & other allowances.
+    // LSMBiz: De Minimis split into uniform, laundry and medical cash (each
+    // per-day rate × days) and rice (the rest, which stays the daily
+    // allowance); ALLOWANCE is its Additional Allowance. LSMBiz has no
+    // travel or supervisor allowance, so those slots hold Additional and
+    // Uniform (named so in lib/payroll-layout.ts).
     const round2 = (x: number) => Math.round(x * 100) / 100;
+    const uniform = round2(n("uniformRate") * n("days"));
     const laundry = round2(n("laundryRate") * n("days"));
     const medicalCash = round2(n("medicalRate") * n("days"));
-    const splitDeMinimis = laundry + medicalCash <= n("deMinimis") + 0.005;
+    const splitDeMinimis = uniform + laundry + medicalCash <= n("deMinimis") + 0.005;
     const { employee, similar } = findEmployee(rawName);
     rows.push({
       rowNumber: r,
@@ -274,7 +279,9 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
       similarName: similar || undefined,
       allowances:
         format === "lsmbiz"
-          ? { travel: n("allowance"), laundry: splitDeMinimis ? laundry : 0, medicalCash: splitDeMinimis ? medicalCash : 0, supervisor: 0 }
+          ? splitDeMinimis
+            ? { travel: n("allowance"), laundry, medicalCash, supervisor: uniform }
+            : { travel: n("allowance"), laundry: 0, medicalCash: 0, supervisor: 0 }
           : undefined,
       values: {
         daysWorking: n("days"),

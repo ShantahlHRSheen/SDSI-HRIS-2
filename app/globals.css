@@ -234,8 +234,8 @@ body {
     padding: 10mm 15mm 0;
   }
   html[data-company] .print-stack-form .payslip-compact {
-    font-size: 12px;
-    line-height: 15px;
+    font-size: 11.5px;
+    line-height: 13.5px;
   }
   html[data-company] .print-stack-form .payslip-compact .divide-y > div {
     padding-top: 1px;

@@ -59,8 +59,8 @@ export interface CompanyConfig {
   // Payroll Processing's columns, column names and payslip labels follow
   // this company's own payroll sheet (lib/payroll-layout.ts); standard if unset.
   payrollLayout?: "daro";
-  // Payroll Processing lists each allowance (rice & uniform, laundry,
-  // medical cash, travel & other) instead of one Allowances total.
+  // Payroll Processing lists each allowance (rice, uniform, laundry,
+  // medical cash, additional) instead of one Allowances total.
   allowanceBreakdown?: boolean;
   // People who sign in here with the same email and password as in another
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
