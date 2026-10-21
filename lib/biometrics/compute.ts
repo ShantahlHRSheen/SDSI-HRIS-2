@@ -14,9 +14,11 @@ import type { BiometricDayMark, Holiday, LateDayDetail, LeaveRequest, UndertimeD
 //     employee has an approved leave that day;
 //   * approved Vacation / Sick Leave (with pay) days fill in VL / SL days;
 //   * regular holidays on work days count as holiday days (paid);
-//   * days after the file's last date aren't counted at all (the file was
-//     downloaded before the cut-off ended), and on the day it was downloaded
-//     a time in without a time out isn't a missing punch (still at work);
+//   * days after the file's last date (the file was downloaded before the
+//     cut-off ended) count as present, with no late / undertime — "pending":
+//     the next cut-off's file settles them (see settlePending in
+//     corrections.ts); on the day it was downloaded a time in without a time
+//     out isn't a missing punch (still at work) and its time out is pending;
 //   * a day marked instead of punched (HR's sheet): SL / VL fill in a leave
 //     day, unpaid leave isn't an absence, a half day counts ½ day, and work
 //     at another branch / outside counts as a day worked.
@@ -52,6 +54,10 @@ export interface ComputedAttendance {
   missingPunches: MissingPunch[];
   // Days with punches outside the cut-off are ignored; this counts days in it.
   daysWithPunches: number;
+  // Days after the file's last date, counted as present until the next file
+  // shows them; and the download day whose time out isn't in the file yet.
+  pendingDates: string[];
+  pendingTimeOut: string | null;
 }
 
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
@@ -170,6 +176,8 @@ export function computeAttendance(input: {
     absentDates: [],
     missingPunches: [],
     daysWithPunches: 0,
+    pendingDates: [],
+    pendingTimeOut: null,
   };
   const hired = input.dateHired?.slice(0, 10) ?? null;
 
@@ -194,6 +202,12 @@ export function computeAttendance(input: {
 
     }
     if (punches.length === 0) {
+      // The download day, before this person's shift had started: pending too.
+      if (input.lastDateInProgress && d === input.fileLastDate && isWorkDay(d) && !holidayDates.has(d) && !onLeave.has(d) && !(hired && d < hired)) {
+        out.daysWorked++;
+        out.pendingDates.push(d);
+        continue;
+      }
       if (isWorkDay(d) && !holidayDates.has(d) && !onLeave.has(d) && !(hired && d < hired)) {
         out.absenceInstances++;
         out.absentDates.push(d);
@@ -210,6 +224,7 @@ export function computeAttendance(input: {
       if (t < midpoint) timeIn = t;
       else timeOut = t;
       const stillAtWork = timeOut === null && input.lastDateInProgress && d === input.fileLastDate;
+      if (stillAtWork) out.pendingTimeOut = d;
       if (!stillAtWork && mark !== "half") out.missingPunches.push({ date: d, missing: timeIn === null ? "in" : "out", punch: punches[0] });
     } else {
       timeIn = minutes(punches[0]);
@@ -234,7 +249,25 @@ export function computeAttendance(input: {
       out.undertimeDayDetails.push({ date: d, undertimeRawMinutes: under });
     }
   }
+  // Days the file doesn't reach yet: present (paid), settled next cut-off.
+  if (end < periodEnd)
+    for (const d of datesBetween(addDays(end, 1), periodEnd)) {
+      if (isWorkDay(d) && regularHolidays.has(d)) out.holidayDays++;
+      out.vlDays += vl.get(d) ?? 0;
+      out.slDays += sl.get(d) ?? 0;
+      if (!isWorkDay(d) || holidayDates.has(d) || onLeave.has(d) || (hired && d < hired)) continue;
+      out.daysWorked++;
+      out.pendingDates.push(d);
+    }
   out.vlDays = Math.round(out.vlDays * 100) / 100;
   out.slDays = Math.round(out.slDays * 100) / 100;
   return out;
+}
+
+// Dates a file really covers: days a fair share of its people punched.
+export function coveredDates(people: { days: Map<string, string[]> }[]): string[] {
+  const perDay = new Map<string, number>();
+  for (const p of people) for (const [d, t] of p.days) if (t.length) perDay.set(d, (perDay.get(d) ?? 0) + 1);
+  const busiest = Math.max(0, ...perDay.values());
+  return [...perDay].filter(([, n]) => n >= busiest * 0.25).map(([d]) => d).sort();
 }

@@ -486,6 +486,36 @@ export interface BiometricDetail {
   correctionIds?: string[];
   // Days marked in the file instead of punched (HR's attendance sheet).
   marks?: Record<string, BiometricDayMark>;
+  // Days the file didn't reach (downloaded before the cut-off ended), paid as
+  // present; and the download day whose time out wasn't in the file yet.
+  pending?: { dates: string[]; timeOutDate: string | null };
+  // The file's punches for the days just before this cut-off (and which of
+  // them the file really covers) — to settle the previous cut-off's pending days.
+  earlier?: { days: Record<string, string[]>; covered: string[] };
+  // The previous cut-off's pending days, as the next file shows them — the
+  // input for settling them in this cut-off (recomputed with corrections).
+  prior?: {
+    periodId: string;
+    start: string;
+    end: string;
+    dates: string[];
+    timeOutDate: string | null;
+    schedule: { timeIn: string; timeOut: string };
+    days: Record<string, string[]>;
+    covered: string[];
+  };
+  // What settling them found, added to this cut-off's figures.
+  carryOver?: BiometricCarryOver;
+}
+
+export interface BiometricCarryOver {
+  periodId: string;
+  absentDates: string[];
+  lateDayDetails: LateDayDetail[];
+  undertimeDayDetails: UndertimeDayDetail[];
+  missingPunches: { date: string; missing: "in" | "out"; punch: string }[];
+  // Pending days this file doesn't show either: still counted as present.
+  unsettled: string[];
 }
 
 // SL / VL: on leave · unpaid: leave without pay · half: half day ·

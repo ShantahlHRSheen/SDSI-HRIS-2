@@ -17,7 +17,7 @@ import { buildAttendanceImportPreview, parseAttendanceWorkbook, type AttendanceI
 import type { AttendancePeriodRecord, Employee } from "@/lib/types";
 import { readSpreadsheet } from "@/lib/biometrics/read-sheets";
 import { parseBiometrics, type BioFile } from "@/lib/biometrics/parse";
-import { BiometricsImportModal } from "@/components/attendance/BiometricsImportModal";
+import { BiometricsImportModal, CarryOverNote } from "@/components/attendance/BiometricsImportModal";
 
 // "Oct 3 (no time-out, in at 08:24)" — a missing punch, for HR and the employee.
 function missingPunchText(m: { date: string; missing: "in" | "out"; punch: string }): string {
@@ -328,6 +328,16 @@ export default function AttendancePage() {
                               <AlertTriangle size={10} /> {rec.missingPunches.length} missing punch{rec.missingPunches.length === 1 ? "" : "es"}
                             </span>
                           )}
+                          {(() => {
+                            const pend = rec.biometricDetail?.pending;
+                            const n = (pend?.dates.length ?? 0) + (pend?.timeOutDate ? 1 : 0);
+                            return n > 0 && period?.status === "open" ? (
+                              <span title={`Not in the file yet, counted as present: ${[...(pend?.dates ?? []), ...(pend?.timeOutDate ? [`${pend.timeOutDate} (time out)`] : [])].map((d) => formatDate(d.slice(0, 10)) + d.slice(10)).join(", ")}. Settled with next cut-off's file.`} className="ml-1.5 inline-block rounded bg-[var(--gridline)]/60 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--text-secondary)]">
+                                {n} day{n === 1 ? "" : "s"} pending
+                              </span>
+                            ) : null;
+                          })()}
+                          {rec.biometricDetail?.carryOver && <span className="ml-1.5 inline-block align-middle"><CarryOverNote carry={rec.biometricDetail.carryOver} /></span>}
                           {!!rec.biometricDetail?.correctionIds?.length && (
                             <span title="Approved attendance corrections are reflected in these figures" className="ml-1.5 inline-block rounded bg-[var(--status-good)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-good)]">
                               {rec.biometricDetail.correctionIds.length} correction{rec.biometricDetail.correctionIds.length === 1 ? "" : "s"} applied
