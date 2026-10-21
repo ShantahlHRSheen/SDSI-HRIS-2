@@ -90,6 +90,7 @@ const HEADERS: Record<string, Field> = {
   bir: "tax",
   uniform: "uniform",
   "uniform/ id lace": "uniform",
+  "uniform/ lace": "uniform",
   "sss - ee": "sss",
   "sss - ee + mpf": "sss",
   "sss loan + sss calamity loan": "sssLoan",
@@ -214,7 +215,10 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMa
   for (let r = 1; r <= Math.min(10, ws.rowCount) && headerRow === null; r++) {
     const found: Partial<Record<Field, number>> = {};
     ws.getRow(r).eachCell((cell, col) => {
-      const field = HEADERS[headerText(cell)];
+      const text = headerText(cell);
+      // The uniform deduction's name varies by month ("Uniform/ ID Lace",
+      // "Uniform/ Lace", …).
+      const field = HEADERS[text] ?? (/^uniform ?\//.test(text) ? "uniform" : undefined);
       if (field && found[field] === undefined) found[field] = col;
     });
     if (REQUIRED.every((f) => found[f] !== undefined)) {
