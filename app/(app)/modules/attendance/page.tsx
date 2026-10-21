@@ -86,7 +86,18 @@ export default function AttendancePage() {
     setImportError(null);
     try {
       const buffer = await file.arrayBuffer();
-      const parsed = await parseAttendanceWorkbook(buffer);
+      // Not an attendance-tracker workbook? It may be a biometrics export:
+      // open it in the biometrics import instead.
+      const parsed = await parseAttendanceWorkbook(buffer.slice(0)).catch(async (err) => {
+        try {
+          const sheets = await readSpreadsheet(buffer);
+          setBio({ file: parseBiometrics(sheets, period?.start ?? new Date().toISOString().slice(0, 10)), name: file.name });
+          return null;
+        } catch {
+          throw new Error(`${err instanceof Error ? err.message : "Could not read this file."} It isn't a biometrics export the HRIS recognizes either.`);
+        }
+      });
+      if (!parsed) return;
       const preview = buildAttendanceImportPreview(parsed, employees);
       setImportPreview(preview);
       const matchingPeriod = payrollPeriods.find((p) => p.start === preview.periodStart && p.end === preview.periodEnd);
