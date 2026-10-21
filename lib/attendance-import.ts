@@ -312,6 +312,8 @@ export interface AttendanceImportMatch {
   parsed: ParsedAttendanceRow;
   employee: Employee;
   isLateOutlier: boolean;
+  // Matched to a slightly different spelling (Daro DTR) — shown for HR to check.
+  similarName?: boolean;
 }
 
 export interface AttendanceImportPreview {

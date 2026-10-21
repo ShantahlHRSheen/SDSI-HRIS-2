@@ -133,7 +133,8 @@ function sheetCaption(ws: ExcelJS.Worksheet, headerRow: number): string {
 // employee may still be on the payroll under her maiden name, which is her
 // middle name in the 201 file ("Santiago, Noemi" = Noemi Santiago Berber);
 // that is tried only when the surname finds no one.
-function nameMatcher(employees: Employee[]) {
+// Also used by the Daro DTR import (lib/attendance-import-daro.ts).
+export function employeeNameMatcher(employees: Employee[]) {
   const strip = (s: string) => normalizeName(s).replace(/\b(sr|jr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim();
   const byKey = new Map<string, Employee[]>();
   const byMaidenKey = new Map<string, Employee[]>();
@@ -170,10 +171,20 @@ function nameMatcher(employees: Employee[]) {
   // names in another order — only when exactly one employee fits. These
   // are flagged in the import preview for HR to check.
   const similar = (raw: string): Employee | undefined => {
-    if (!raw.includes(",")) return undefined;
-    const [last, first] = raw.split(",").map((s) => strip(s));
-    if (!last || !first) return undefined;
-    const hits = employees.filter((e) => {
+    // "Last, First", or without a comma either order ("Joan Lee Jose").
+    const words = raw.replace(/,/g, " , ").trim().split(/\s+/).filter((w) => w !== ",");
+    const pairs: [string, string][] = raw.includes(",")
+      ? [raw.split(",").map((s) => strip(s)) as [string, string]]
+      : words.slice(1).flatMap((_, i) => [
+          [strip(words.slice(0, i + 1).join(" ")), strip(words.slice(i + 1).join(" "))] as [string, string],
+          [strip(words.slice(i + 1).join(" ")), strip(words.slice(0, i + 1).join(" "))] as [string, string],
+        ]);
+    const hits = new Set<Employee>();
+    for (const [last, first] of pairs) if (last && first) similarTo(last, first).forEach((e) => hits.add(e));
+    return pick([...hits]);
+  };
+  const similarTo = (last: string, first: string): Employee[] =>
+    employees.filter((e) => {
       const eLast = strip(e.lastName);
       const eFirsts = [strip(e.firstName), strip(e.firstName.split(" ")[0])];
       const firstSame = eFirsts.includes(first);
@@ -182,8 +193,6 @@ function nameMatcher(employees: Employee[]) {
       const firstReordered = sortedWords(strip(e.firstName)) === sortedWords(first);
       return (firstSame && editDistance(eLast, last) <= 2) || (eLast === last && (firstClose || firstReordered));
     });
-    return pick(hits);
-  };
   return (raw: string): { employee?: Employee; similar: boolean } => {
     const exact = find(byKey, raw) ?? find(byMaidenKey, raw);
     if (exact) return { employee: exact, similar: false };
@@ -209,7 +218,7 @@ interface LsmbizSheet {
   rows: ParsedPayrollRow[];
 }
 
-function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof nameMatcher>, format: PayrollWorkbookFormat): LsmbizSheet | null {
+function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof employeeNameMatcher>, format: PayrollWorkbookFormat): LsmbizSheet | null {
   let headerRow: number | null = null;
   const cols: Partial<Record<Field, number>> = {};
   for (let r = 1; r <= Math.min(10, ws.rowCount) && headerRow === null; r++) {
@@ -340,7 +349,7 @@ function captionCutOff(caption: string): string {
 export async function parseLsmbizPayrollWorkbook(buffer: ArrayBuffer, employees: Employee[], format: PayrollWorkbookFormat = "lsmbiz"): Promise<ParsedPayrollWorkbook[]> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
-  const findEmployee = nameMatcher(employees);
+  const findEmployee = employeeNameMatcher(employees);
 
   const sheets = wb.worksheets
     .filter((ws) => ws.state === "visible")
