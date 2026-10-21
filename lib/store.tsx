@@ -266,7 +266,7 @@ interface HrisContextShape {
   addEmployee: (input: Omit<Employee, "id" | "employeeNumber">) => void;
 
   upsertAttendancePeriodRecord: (input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">) => void;
-  importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => void;
+  importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => Promise<void>;
 
   upsertPayrollLineOverride: (input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">) => void;
   // Resolves to an error message, or null on success.
@@ -822,7 +822,10 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       if (supabaseSession) {
         try {
           const imported = await importAttendancePeriodRecordsRows(periodId, rows, actor?.name ?? "System");
-          setState((prev) => ({ ...prev, attendancePeriodRecords: [...imported, ...prev.attendancePeriodRecords.filter((r) => r.periodId !== periodId)] }));
+          // Only the imported employees are replaced: a branch's biometrics
+          // import leaves the period's other employees as they were.
+          const ids = new Set(rows.map((r) => r.employeeId));
+          setState((prev) => ({ ...prev, attendancePeriodRecords: [...imported, ...prev.attendancePeriodRecords.filter((r) => !(r.periodId === periodId && ids.has(r.employeeId)))] }));
           logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
           return;
         } catch (err) {
@@ -839,7 +842,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
           updatedBy: actor?.name ?? "System",
           updatedAt: TODAY,
         }));
-        const rest = prev.attendancePeriodRecords.filter((r) => r.periodId !== periodId);
+        const ids = new Set(rows.map((r) => r.employeeId));
+        const rest = prev.attendancePeriodRecords.filter((r) => !(r.periodId === periodId && ids.has(r.employeeId)));
         return { ...prev, attendancePeriodRecords: [...imported, ...rest] };
       });
       logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
