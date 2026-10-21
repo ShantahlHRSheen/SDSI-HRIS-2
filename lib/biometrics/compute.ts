@@ -1,4 +1,4 @@
-import type { Holiday, LateDayDetail, LeaveRequest, UndertimeDayDetail } from "../types";
+import type { BiometricDayMark, Holiday, LateDayDetail, LeaveRequest, UndertimeDayDetail } from "../types";
 
 // Attendance for one person and one payroll cut-off, worked out from their
 // biometrics punches and their branch's schedule:
@@ -16,7 +16,10 @@ import type { Holiday, LateDayDetail, LeaveRequest, UndertimeDayDetail } from ".
 //   * regular holidays on work days count as holiday days (paid);
 //   * days after the file's last date aren't counted at all (the file was
 //     downloaded before the cut-off ended), and on the day it was downloaded
-//     a time in without a time out isn't a missing punch (still at work).
+//     a time in without a time out isn't a missing punch (still at work);
+//   * a day marked instead of punched (HR's sheet): SL / VL fill in a leave
+//     day, unpaid leave isn't an absence, a half day counts ½ day, and work
+//     at another branch / outside counts as a day worked.
 
 export interface BranchSchedule {
   timeIn: string; // "08:00"
@@ -88,6 +91,30 @@ export function fileCoverage(people: { days: Map<string, string[]> }[], schedule
   return { lastDate, lastDateInProgress: that.length > 0 && onlyIn / that.length >= 0.5 };
 }
 
+// The shift someone actually kept, from their days with both a time in and
+// a time out: of the branch schedules, the one closest to their usual
+// (median) time in and time out. Their own branch's schedule is kept unless
+// another fits better by over an hour a day — so habitual lateness still
+// counts. Null with fewer than 3 such days.
+export function inferSchedule(days: Map<string, string[]>, candidates: BranchSchedule[], preferred?: BranchSchedule): BranchSchedule | null {
+  const ins: number[] = [];
+  const outs: number[] = [];
+  for (const t of days.values()) {
+    const p = distinctPunches(t);
+    if (p.length < 2) continue;
+    ins.push(minutes(p[0]));
+    outs.push(minutes(p[p.length - 1]));
+  }
+  if (ins.length < 3) return null;
+  const median = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  const mi = median(ins);
+  const mo = median(outs);
+  const cost = (s: BranchSchedule) => Math.abs(mi - minutes(s.timeIn)) + Math.abs(mo - minutes(s.timeOut));
+  const best = [...candidates].sort((a, b) => cost(a) - cost(b))[0];
+  if (preferred && (!best || cost(preferred) - cost(best) <= 60)) return preferred;
+  return best ?? null;
+}
+
 export function computeAttendance(input: {
   days: Map<string, string[]>;
   schedule: BranchSchedule;
@@ -100,6 +127,7 @@ export function computeAttendance(input: {
   // still in progress when the file was downloaded.
   fileLastDate?: string | null;
   lastDateInProgress?: boolean;
+  marks?: Map<string, BiometricDayMark>;
 }): ComputedAttendance {
   const { schedule, periodStart, periodEnd } = input;
   const schedIn = minutes(schedule.timeIn);
@@ -147,6 +175,18 @@ export function computeAttendance(input: {
     out.vlDays += vl.get(d) ?? 0;
     out.slDays += sl.get(d) ?? 0;
 
+    const mark = input.marks?.get(d);
+    if (punches.length === 0 && mark && isWorkDay(d)) {
+      if (mark === "SL" && !onLeave.has(d)) out.slDays++;
+      if (mark === "VL" && !onLeave.has(d)) out.vlDays++;
+      if (mark === "half") {
+        out.daysWorked += 0.5;
+        out.halfDayInstances++;
+        out.halfDayDates.push(d);
+      }
+      if (mark === "field") out.daysWorked++;
+      continue;
+    }
     if (punches.length === 0) {
       if (isWorkDay(d) && !holidayDates.has(d) && !onLeave.has(d) && !(hired && d < hired)) {
         out.absenceInstances++;

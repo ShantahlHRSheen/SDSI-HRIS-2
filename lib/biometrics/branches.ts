@@ -30,10 +30,11 @@ const tokens = (s: string) => normalizeName(s).split(" ").filter((t) => t.length
 // last name, or — if exactly one employee fits — every word of the file's
 // name found in theirs ("FRANK JONH DELA CRUZ" → Frank Jonh Paul Dela Cruz).
 // Nicknames ("kboy") match no one; HR picks the employee once.
-export function matchEmployeeByName(name: string, employees: Employee[]): Employee | undefined {
+// `includeFormer`: also resigned / terminated employees (for a past cut-off).
+export function matchEmployeeByName(name: string, employees: Employee[], includeFormer = false): Employee | undefined {
   const n = normalizeName(name);
   if (!n || n.split(" ").length < 2) return undefined;
-  const current = employees.filter((e) => e.status !== "resigned" && e.status !== "terminated");
+  const current = includeFormer ? employees : employees.filter((e) => e.status !== "resigned" && e.status !== "terminated");
   const exact = current.filter((e) => normalizeName(`${e.firstName} ${e.lastName}`) === n || normalizeName(`${e.lastName}, ${e.firstName}`) === n);
   if (exact.length === 1) return exact[0];
   const want = tokens(name);

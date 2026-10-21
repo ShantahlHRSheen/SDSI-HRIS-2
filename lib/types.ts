@@ -484,7 +484,13 @@ export interface BiometricDetail {
   lastDateInProgress: boolean;
   // Attendance corrections now reflected in the figures.
   correctionIds?: string[];
+  // Days marked in the file instead of punched (HR's attendance sheet).
+  marks?: Record<string, BiometricDayMark>;
 }
+
+// SL / VL: on leave · unpaid: leave without pay · half: half day ·
+// field: working at another branch / outside (counted as present).
+export type BiometricDayMark = "SL" | "VL" | "unpaid" | "half" | "field";
 
 // Per-employee, per-period manual inputs/overrides layered on top of the
 // automatic payroll computation — allowance amounts, loans/deductions the
