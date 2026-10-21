@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
@@ -42,7 +42,7 @@ export function BiometricsImportModal({
   const branches = useMemo(() => (allowedBranchIds ? allBranches.filter((b) => allowedBranchIds.includes(b.id)) : allBranches), [allBranches, allowedBranchIds]);
   // HR's attendance sheet has every branch in it: each employee is checked
   // against their own branch's schedule ("all").
-  const [branchId, setBranchId] = useState(() => ((file.format === "sheet" || file.format === "daily") && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
+  const [branchId, setBranchId] = useState(() => ((file.format === "sheet" || file.format === "daily" || file.format === "branches") && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
   // Branch staff only see and match their own branch's employees.
   const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
   // The cut-off the file is for: the latest one holding a good share of its
@@ -95,13 +95,28 @@ export function BiometricsImportModal({
   }, [allBranches]);
   const scheduleChoices = useMemo(() => [...new Map(Object.values(BRANCH_SCHEDULES).map((s) => [`${s.timeIn}-${s.timeOut}`, s])).values()], []);
   const coverage = useMemo(() => fileCoverage(file.people, schedule), [file, schedule]);
-  const covered = useMemo(() => coveredDates(file.people), [file]);
+  // A consolidated file: each branch tab has its own last date (its machine
+  // was downloaded on its own day).
+  const tabCoverage = useMemo(() => {
+    const groups = new Map<string, BioFile["people"]>();
+    for (const p of file.people) groups.set(p.branchHint ?? "", [...(groups.get(p.branchHint ?? "") ?? []), p]);
+    return new Map([...groups].map(([tab, people]) => [tab, { ...fileCoverage(people, schedule), covered: coveredDates(people) }]));
+  }, [file, schedule]);
+  // The branch a tab is for (its name), for matches saved by that branch's own imports.
+  const tabBranch = useCallback((p: BioFile["people"][number]) => (p.branchHint ? guessBranch(p.branchHint, allBranches)?.id : undefined), [allBranches]);
   const prevPeriod = useMemo(() => (period ? previousPeriod(period, payrollPeriods) : undefined), [period, payrollPeriods]);
 
   const rows = useMemo(() => {
     if (!period) return [];
     return file.people.map((p) => {
-      const saved = links?.find((l) => l.branchId === branchId && l.deviceKey === p.key)?.employeeId;
+      const tb = tabBranch(p);
+      const saved = (
+        links?.find((l) => l.branchId === branchId && l.deviceKey === p.key) ??
+        (tb ? links?.find((l) => l.branchId === tb && l.deviceKey === p.branchKey) : undefined) ??
+        // A name matched once in an all-branches file.
+        (p.branchKey?.startsWith("name:") ? links?.find((l) => l.branchId === ALL && l.deviceKey === p.branchKey) : undefined)
+      )?.employeeId;
+      const cov = tabCoverage.get(p.branchHint ?? "")!;
       const auto = saved ?? (p.name ? (matchEmployeeByName(p.name, inCutoffEmployees, true) ?? matchEmployeeByName(p.name, employees))?.id : undefined);
       const employeeId = assigned[p.key] ?? auto ?? "";
       const emp = employeeId ? byId.get(employeeId) : undefined;
@@ -126,9 +141,9 @@ export function BiometricsImportModal({
         exempt,
         days: Object.fromEntries([...p.days].filter(inCutoff)),
         ...(Object.keys(marks).length ? { marks } : {}),
-        fileLastDate: coverage.lastDate,
-        lastDateInProgress: coverage.lastDateInProgress,
-        ...(Object.keys(earlierDays).length ? { earlier: { days: earlierDays, covered: covered.filter(isEarlier) } } : {}),
+        fileLastDate: cov.lastDate,
+        lastDateInProgress: cov.lastDateInProgress,
+        ...(Object.keys(earlierDays).length ? { earlier: { days: earlierDays, covered: cov.covered.filter(isEarlier) } } : {}),
       };
       const prevRecord = emp && prevPeriod ? attendancePeriodRecords.find((r) => r.periodId === prevPeriod.id && r.employeeId === emp.id) : undefined;
       const detail = withPrior(baseDetail, prevPeriod, prevRecord);
@@ -142,8 +157,8 @@ export function BiometricsImportModal({
         holidays,
         approvedLeaves: emp ? leaveRequests.filter((l) => l.status === "approved" && l.employeeId === emp.id) : [],
         dateHired: emp?.dateHired,
-        fileLastDate: coverage.lastDate,
-        lastDateInProgress: coverage.lastDateInProgress,
+        fileLastDate: cov.lastDate,
+        lastDateInProgress: cov.lastDateInProgress,
         marks: p.marks,
       });
       const noPunches = inPeriod === 0 && ![...(p.marks?.keys() ?? [])].some((d) => d >= period.start && d <= period.end);
@@ -152,7 +167,7 @@ export function BiometricsImportModal({
       const carryOver = emp ? biometricsAttendance({ employee: emp, period, detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes: "" }).biometricDetail?.carryOver : undefined;
       return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt, detail, rowSchedule, carryOver, correctionsApplied: corrected?.applied.length ?? 0 };
     });
-  }, [file, links, branchId, assigned, skipped, byId, employees, inCutoffEmployees, scheduleChoices, period, prevPeriod, covered, attendancePeriodRecords, schedule, holidays, leaveRequests, correctionRequests, coverage]);
+  }, [file, links, branchId, assigned, skipped, byId, employees, inCutoffEmployees, scheduleChoices, period, prevPeriod, tabCoverage, tabBranch, attendancePeriodRecords, schedule, holidays, leaveRequests, correctionRequests]);
 
   const included = rows.filter((r) => r.include);
   const dupes = new Set(included.map((r) => r.employeeId).filter((id, i, a) => a.indexOf(id) !== i));
@@ -175,8 +190,18 @@ export function BiometricsImportModal({
     setBusy(true);
     try {
       const newLinks = included
-        .filter((r) => links?.find((l) => l.branchId === branchId && l.deviceKey === r.person.key)?.employeeId !== r.employeeId)
-        .map((r) => ({ branchId, deviceKey: r.person.key, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId }));
+        .filter((r) => {
+          const tb = tabBranch(r.person);
+          const l = tb && r.person.branchKey ? links?.find((x) => x.branchId === tb && x.deviceKey === r.person.branchKey) : links?.find((x) => x.branchId === branchId && x.deviceKey === r.person.key);
+          return l?.employeeId !== r.employeeId;
+        })
+        .map((r) => {
+          // A branch tab's match is saved for that branch, as its own imports do.
+          const tb = tabBranch(r.person);
+          return tb && r.person.branchKey
+            ? { branchId: tb, deviceKey: r.person.branchKey, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId }
+            : { branchId, deviceKey: r.person.key, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId };
+        });
       if (isRealAccount) await saveBiometricLinks(newLinks);
       const notes = (r: (typeof targets)[number]) =>
         branchId === ALL ? `Attendance sheet — ${allBranches.find((b) => b.id === r.emp?.branchId)?.name ?? "no branch"} (${r.rowSchedule.timeIn}–${r.rowSchedule.timeOut})` : `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`;
@@ -271,9 +296,17 @@ export function BiometricsImportModal({
           </div>
         )}
 
-        {(file.unidentified > 0 || (coverage.lastDate && period && coverage.lastDate < period.end) || (replacing > 0 && !recordsOnly) || dupes.size > 0) && (
+        {(file.unidentified > 0 || file.format === "branches" || (coverage.lastDate && period && coverage.lastDate < period.end) || (replacing > 0 && !recordsOnly) || dupes.size > 0) && (
           <div className="space-y-1 rounded-lg border border-[var(--status-warning)]/40 p-3 text-xs text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
-            {coverage.lastDate && period && coverage.lastDate < period.end && (
+            {file.format === "branches" && period && (
+              <div>
+                Each branch tab is read on its own:{" "}
+                {[...tabCoverage]
+                  .map(([tab, c]) => `${tab} up to ${c.lastDate ? shortDate(c.lastDate) : "—"}${c.lastDate && c.lastDate < period.end && !recordsOnly ? " (later days pending)" : ""}`)
+                  .join(" · ")}
+              </div>
+            )}
+            {file.format !== "branches" && coverage.lastDate && period && coverage.lastDate < period.end && (
               <div>
                 The file only has punches up to <b>{formatDate(coverage.lastDate)}</b>
                 {coverage.lastDateInProgress ? " (downloaded during that day)" : ""}: {recordsOnly ? "the days after it aren't counted (not as absences either)." : "the days after it count as present for now, with no late or undertime. Next cut-off's file settles them — any absence, late or undertime found then is deducted in that payroll."}

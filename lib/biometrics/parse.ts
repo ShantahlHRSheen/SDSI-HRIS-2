@@ -28,10 +28,14 @@ export interface BioPerson {
   days: Map<string, string[]>;
   // Days marked instead of punched (HR's sheet only).
   marks?: Map<string, BiometricDayMark>;
+  // A workbook with a tab per branch: the tab's name, and the person's key
+  // within that branch's machine (as saved for that branch's own imports).
+  branchHint?: string;
+  branchKey?: string;
 }
 
 export interface BioFile {
-  format: "summary" | "logs" | "sheet" | "daily";
+  format: "summary" | "logs" | "sheet" | "daily" | "branches";
   formatLabel: string;
   rangeStart: string | null;
   rangeEnd: string | null;
@@ -88,6 +92,8 @@ function withYear(month: number, day: number, near: string): string | null {
 // A day cell of the summary layout: "10.01", "10. 08", "9. 30", or the number
 // 10.1 (Excel dropped the zero: the 10th, never the 1st, which would be 10.01).
 function summaryDay(v: CellValue | undefined, near: string): string | null {
+  const iso = isoIn(v);
+  if (iso) return iso;
   if (typeof v === "number") {
     const month = Math.floor(v);
     return withYear(month, Math.round((v - month) * 100), near);
@@ -216,7 +222,12 @@ function dayMark(v: CellValue | undefined): BiometricDayMark | null {
 // earlier than the one before it is in the afternoon. "11- 8:09 PM" starts at 11:00.
 function sheetTimes(v: CellValue | undefined): string[] {
   const bare = /^\s*(\d{1,2})\s*-\s*(?=\d)/.exec(text(v));
-  const times = [...(bare && Number(bare[1]) < 24 ? [`${bare[1].padStart(2, "0")}:00`] : []), ...timesIn(v)];
+  return twelveHour([...(bare && Number(bare[1]) < 24 ? [`${bare[1].padStart(2, "0")}:00`] : []), ...timesIn(v)]);
+}
+
+// Times in the order they were written: one earlier than the one before it
+// is in the afternoon (a 12-hour clock without AM/PM).
+function twelveHour(times: string[]): string[] {
   const out: string[] = [];
   for (const t of times) {
     const prev = out[out.length - 1];
@@ -444,7 +455,9 @@ function parseSummary(sheet: Sheet, fallbackNear: string): Omit<BioFile, "format
     for (const base of [0, 8]) {
       const date = summaryDay(row[base], near);
       if (!date) continue;
-      const times = [2, 3, 4, 5, 6, 7].flatMap((k) => timesIn(row[base + k]));
+      // In column order; a later column's earlier time is p.m. on a 12-hour
+      // clock (Bacolod: IN 10:10 … OUT "08:12" = 20:12).
+      const times = twelveHour([2, 3, 4, 5, 6, 7].flatMap((k) => timesIn(row[base + k])));
       addPunches(current.days, date, times);
     }
   }
@@ -466,7 +479,41 @@ function mergeSameKey(people: BioPerson[]): BioPerson[] {
   return [...byKey.values()];
 }
 
+// Tab names that are a machine's own (its export's other sheets), not a branch.
+const MACHINE_SHEET = /log|detail|summary|stat|report|exception|record|sheet\d*$|^card|^shift/i;
+
 export function parseBiometrics(sheets: Sheet[], fallbackNear: string): BioFile {
+  // A consolidated workbook: one tab per branch, each that branch machine's
+  // own export. Each tab is read in its own format; people are kept apart
+  // per tab (machine IDs repeat between branches).
+  if (sheets.length > 1 && sheets.every((s) => s.name.trim() && !MACHINE_SHEET.test(s.name.trim()))) {
+    const tabs = sheets.flatMap((s) => {
+      try {
+        const f = parseOneExport([s], fallbackNear);
+        return f.people.length || f.unidentified ? [{ name: s.name.trim(), f }] : [];
+      } catch {
+        return [];
+      }
+    });
+    if (tabs.length > 1) {
+      const people = tabs.flatMap(({ name, f }) => f.people.map((p) => ({ ...p, key: `${name}|${p.key}`, branchHint: name, branchKey: p.key })));
+      const starts = tabs.map((t) => t.f.rangeStart).filter((d): d is string => !!d).sort();
+      const ends = tabs.map((t) => t.f.rangeEnd).filter((d): d is string => !!d).sort();
+      return {
+        format: "branches",
+        formatLabel: `Consolidated file (${tabs.length} branches: ${tabs.map((t) => t.name).join(", ")})`,
+        rangeStart: starts[0] ?? null,
+        rangeEnd: ends[ends.length - 1] ?? null,
+        people,
+        unidentified: tabs.reduce((t, x) => t + x.f.unidentified, 0),
+        shift: null,
+      };
+    }
+  }
+  return parseOneExport(sheets, fallbackNear);
+}
+
+function parseOneExport(sheets: Sheet[], fallbackNear: string): BioFile {
   // The shift line some machines print ("Shift1 (09:00-18:00;…)").
   let shift: BioFile["shift"] = null;
   for (const s of sheets)
@@ -485,7 +532,7 @@ export function parseBiometrics(sheets: Sheet[], fallbackNear: string): BioFile 
     const r = parseSheet(hrSheet);
     if (r.people.length) return { ...r, format: "sheet", formatLabel: "HR attendance sheet (all branches)", shift };
   }
-  const logs = sheets.find((s) => /^(Attend\.?\s*Logs|Detail)$/i.test(s.name.trim()));
+  const logs = sheets.find((s) => /^(Attend\.?\s*Logs|Detail)$/i.test(s.name.trim()) || s.rows.slice(0, 3).some((r) => r.some((c) => /^Attend\.?\s*Logs$/i.test(text(c)))));
   if (logs) {
     const r = parseLogs(logs, fallbackNear);
     if (r.people.length) return { ...r, format: "logs", formatLabel: "Attendance logs (punches per day)", shift };
