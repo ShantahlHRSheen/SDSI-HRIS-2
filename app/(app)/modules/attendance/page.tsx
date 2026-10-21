@@ -1,7 +1,8 @@
 "use client";
 
 import { useApplyApprovedCorrections } from "@/components/attendance/useApplyApprovedCorrections";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { fetchMyImportBranches } from "@/lib/supabase/repo";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Fingerprint, Pencil, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -38,6 +39,8 @@ export default function AttendancePage() {
     currentEmployee,
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
+    branches,
+    isRealAccount,
   } = useHris();
   // Approved attendance corrections update biometrics attendance.
   useApplyApprovedCorrections();
@@ -54,6 +57,13 @@ export default function AttendancePage() {
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bioInputRef = useRef<HTMLInputElement>(null);
+  // Branch staff allowed to import their own branch (supabase/migrate_phase48_branch_attendance_import.sql).
+  const [myImportBranches, setMyImportBranches] = useState<string[]>([]);
+  const [branchImportDone, setBranchImportDone] = useState<string | null>(null);
+  useEffect(() => {
+    if (canManage || !isRealAccount) return;
+    fetchMyImportBranches(branches.filter((b) => b.id !== "br-unassigned").map((b) => b.id)).then(setMyImportBranches, () => setMyImportBranches([]));
+  }, [canManage, isRealAccount, branches]);
   const [bio, setBio] = useState<{ file: BioFile; name: string } | null>(null);
 
   async function handleBiometricsSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -117,7 +127,43 @@ export default function AttendancePage() {
     const myRecord = period ? attendancePeriodRecords.find((r) => r.periodId === period.id && r.employeeId === currentEmployee?.id) : undefined;
     return (
       <div>
-        <PageHeader title="My Attendance" subtitle="Your attendance summary per payroll period, as recorded by HR/Payroll." />
+        <PageHeader
+          title="My Attendance"
+          subtitle="Your attendance summary per payroll period, as recorded by HR/Payroll."
+          actions={
+            myImportBranches.length > 0 && (
+              <>
+                <input ref={bioInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBiometricsSelected} />
+                <button onClick={() => bioInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+                  <Fingerprint size={16} /> Import {branches.filter((b) => myImportBranches.includes(b.id)).map((b) => b.name).join(" / ")} biometrics
+                </button>
+              </>
+            )
+          }
+        />
+        {importError && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">
+            <AlertTriangle size={16} className="shrink-0" /> {importError}
+          </div>
+        )}
+        {branchImportDone && (
+          <div className="mb-4 rounded-lg border border-[var(--status-good)]/40 px-3 py-2 text-sm text-[var(--status-good)]" style={{ background: "color-mix(in srgb, var(--status-good) 8%, transparent)" }}>
+            {branchImportDone}
+          </div>
+        )}
+        {bio && (
+          <BiometricsImportModal
+            file={bio.file}
+            fileName={bio.name}
+            allowedBranchIds={myImportBranches}
+            onClose={() => setBio(null)}
+            onImported={(id, count) => {
+              setBio(null);
+              const p = payrollPeriods.find((x) => x.id === id);
+              setBranchImportDone(`Imported ${count} employee${count === 1 ? "" : "s"}' attendance${p ? ` for ${formatDate(p.start)} – ${formatDate(p.end)}` : ""}. HR will review it before payroll.`);
+            }}
+          />
+        )}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <select value={period?.id ?? ""} onChange={(e) => setPeriodId(e.target.value)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
             {payrollPeriods.map((p) => (
