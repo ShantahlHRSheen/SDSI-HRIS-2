@@ -16,7 +16,7 @@ import { branchName, departmentName, formatDate, fullName } from "@/lib/helpers"
 import { buildAttendanceImportPreview, parseAttendanceWorkbook, type AttendanceImportPreview } from "@/lib/attendance-import";
 import type { AttendancePeriodRecord, Employee } from "@/lib/types";
 import { readSpreadsheet } from "@/lib/biometrics/read-sheets";
-import { parseBiometrics, type BioFile } from "@/lib/biometrics/parse";
+import { mergeBioFiles, parseBiometrics, type BioFile } from "@/lib/biometrics/parse";
 import { BiometricsImportModal, CarryOverNote } from "@/components/attendance/BiometricsImportModal";
 
 // "Oct 3 (no time-out, in at 08:24)" — a missing punch, for HR and the employee.
@@ -84,24 +84,48 @@ export default function AttendancePage() {
   }, [canManage, isRealAccount, branches]);
   const [bio, setBio] = useState<{ file: BioFile; name: string } | null>(null);
 
+  // One or more biometrics files (picked together: e.g. this cut-off's and
+  // the last one's, to settle its last days) read as one import.
+  async function openBiometrics(files: File[]) {
+    const near = period?.start ?? new Date().toISOString().slice(0, 10);
+    const read: BioFile[] = [];
+    for (const f of files) {
+      try {
+        read.push(parseBiometrics(await readSpreadsheet(await f.arrayBuffer()), near));
+      } catch (err) {
+        throw new Error(`${files.length > 1 ? `${f.name}: ` : ""}${err instanceof Error ? err.message : "Could not read this biometrics file."}`);
+      }
+    }
+    setBio({ file: mergeBioFiles(read), name: files.map((f) => f.name).join(" + ") });
+  }
+
   async function handleBiometricsSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
     setImportError(null);
     try {
-      const sheets = await readSpreadsheet(await file.arrayBuffer());
-      setBio({ file: parseBiometrics(sheets, period?.start ?? new Date().toISOString().slice(0, 10)), name: file.name });
+      await openBiometrics(files);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Could not read this biometrics file.");
     }
   }
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
+    const file = files[0];
     e.target.value = "";
     if (!file) return;
     setImportError(null);
+    // Several files: biometrics exports to read together.
+    if (files.length > 1) {
+      try {
+        await openBiometrics(files);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : "Could not read these files.");
+      }
+      return;
+    }
     try {
       const buffer = await file.arrayBuffer();
       // Not an attendance-tracker workbook? It may be a biometrics export:
@@ -162,7 +186,7 @@ export default function AttendancePage() {
           actions={
             myImportBranches.length > 0 && (
               <>
-                <input ref={bioInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBiometricsSelected} />
+                <input ref={bioInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleBiometricsSelected} />
                 <button onClick={() => bioInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
                   <Fingerprint size={16} /> Import {branches.filter((b) => myImportBranches.includes(b.id)).map((b) => b.name).join(" / ")} biometrics
                 </button>
@@ -247,8 +271,8 @@ export default function AttendancePage() {
         subtitle="Days Worked, Holiday, SL, VL, and Late/Undertime minutes per payroll period — imported from the attendance tracker or entered manually. Overtime pay and leave pay are sourced from approved Overtime/Leave requests, not from here."
         actions={
           <>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelected} />
-            <input ref={bioInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBiometricsSelected} />
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleFileSelected} />
+            <input ref={bioInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleBiometricsSelected} />
             <button onClick={() => bioInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--series-1)] hover:bg-[var(--series-1)]/10">
               <Fingerprint size={16} /> Import biometrics
             </button>
