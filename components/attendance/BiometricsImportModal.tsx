@@ -84,6 +84,15 @@ export function BiometricsImportModal({
     () => employees.filter((e) => (e.status !== "resigned" && e.status !== "terminated") || inCutoffIds.has(e.id)).sort((a, b) => fullName(a).localeCompare(fullName(b))),
     [employees, inCutoffIds],
   );
+  // The branch schedules, grouped by shift ("08:00–17:00 · Cabanatuan, Pangasinan").
+  const scheduleGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const [id, sc] of Object.entries(BRANCH_SCHEDULES)) {
+      const label = `${sc.timeIn}–${sc.timeOut}`;
+      groups.set(label, [...(groups.get(label) ?? []), allBranches.find((b) => b.id === id)?.name ?? id]);
+    }
+    return [...groups].map(([label, names]) => ({ label, names }));
+  }, [allBranches]);
   const scheduleChoices = useMemo(() => [...new Map(Object.values(BRANCH_SCHEDULES).map((s) => [`${s.timeIn}-${s.timeOut}`, s])).values()], []);
   const coverage = useMemo(() => fileCoverage(file.people, schedule), [file, schedule]);
 
@@ -212,12 +221,23 @@ export function BiometricsImportModal({
             </select>
           </label>
           <div>
-            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{branchId === ALL ? "Schedule when a shift can't be told" : "Schedule (Mon–Sat, no grace period)"}</span>
-            <div className="flex items-center gap-1.5">
-              <input type="time" value={schedule.timeIn} onChange={(e) => setSchedule((s) => ({ ...s, timeIn: e.target.value }))} className={`${input} w-full`} aria-label="Time in" />
-              <span className="text-[var(--text-muted)]">–</span>
-              <input type="time" value={schedule.timeOut} onChange={(e) => setSchedule((s) => ({ ...s, timeOut: e.target.value }))} className={`${input} w-full`} aria-label="Time out" />
-            </div>
+            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{branchId === ALL ? "Schedule (each employee's branch)" : "Schedule (Mon–Sat, no grace period)"}</span>
+            {branchId === ALL ? (
+              <div className="text-xs text-[var(--text-secondary)]">
+                {scheduleGroups.map((g) => (
+                  <div key={g.label}>
+                    <span className="tabular">{g.label}</span> · {g.names.join(", ")}
+                  </div>
+                ))}
+                <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">Someone who clearly kept another shift is checked against it.</div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <input type="time" value={schedule.timeIn} onChange={(e) => setSchedule((s) => ({ ...s, timeIn: e.target.value }))} className={`${input} w-full`} aria-label="Time in" />
+                <span className="text-[var(--text-muted)]">–</span>
+                <input type="time" value={schedule.timeOut} onChange={(e) => setSchedule((s) => ({ ...s, timeOut: e.target.value }))} className={`${input} w-full`} aria-label="Time out" />
+              </div>
+            )}
           </div>
         </div>
 
