@@ -308,7 +308,17 @@ function dailyHeader(sheet: Sheet): { at: number; col: (label: RegExp) => number
   for (let i = 0; i < Math.min(sheet.rows.length, 10); i++) {
     const cells = sheet.rows[i].map((c) => text(c).toLowerCase());
     const col = (label: RegExp) => cells.findIndex((c) => label.test(c));
-    if (col(/^date$/) >= 0 && col(/name/) >= 0 && col(/^time\s*in$/) >= 0 && col(/^time\s*out$/) >= 0) return { at: i, col };
+    if (col(/name/) < 0 || col(/^time\s*in$/) < 0 || col(/^time\s*out$/) < 0) continue;
+    // The date column: headed "Date", else the one holding dates (a header cell can be blank or 0).
+    let dateCol = col(/^date$/);
+    if (dateCol < 0) {
+      const below = sheet.rows.slice(i + 1, i + 40);
+      const width = Math.max(0, ...below.map((r) => r.length));
+      for (let k = 0; k < width && dateCol < 0; k++) if (below.filter((r) => isoIn(r[k])).length >= 3) dateCol = k;
+    }
+    if (dateCol < 0) continue;
+    const found = dateCol;
+    return { at: i, col: (label: RegExp) => (label.source === "^date$" ? found : col(label)) };
   }
   return null;
 }
@@ -324,24 +334,41 @@ function parseDaily(sheet: Sheet): Omit<BioFile, "format" | "formatLabel" | "shi
     dayType: header.col(/^day\s*type$/),
     branch: header.col(/^branch$/),
   };
+  const rows = sheet.rows.slice(header.at + 1);
+  // Each person's rows sit under a name heading ("ABOGUIN, MA. ABEGAIL FATIMA").
+  // One name for the whole block: the first "Last, First" in its rows
+  // (they match the 201 file best), else any row name, else the heading.
+  const blockName = new Map<number, string>();
+  {
+    let title = "";
+    let members: number[] = [];
+    const close = () => {
+      const names = members.map((i) => text(rows[i][c.name])).filter(Boolean);
+      const name = names.find((n) => n.includes(",")) ?? (title.includes(",") ? title : (names[0] ?? title));
+      for (const i of members) blockName.set(i, name);
+      members = [];
+    };
+    rows.forEach((row, i) => {
+      if (isoIn(row[c.date])) return void members.push(i);
+      const t = text(row[0]);
+      if (t && !/^total/i.test(t) && /[A-Za-z]{3}/.test(t)) {
+        close();
+        title = t;
+      }
+    });
+    close();
+  }
   const people = new Map<string, BioPerson>();
-  let title = ""; // the name heading over each person's rows ("ABOGUIN, MA. ABEGAIL FATIMA")
   let unidentified = 0;
   let first: string | null = null;
   let last: string | null = null;
   // Holidays the file marks ("SPECIAL HOLIDAY"), per branch: not absences there.
   const holidays = new Set<string>();
   const branchOf = new Map<string, string>();
-  for (const row of sheet.rows.slice(header.at + 1)) {
+  for (const [i, row] of rows.entries()) {
     const date = isoIn(row[c.date]);
-    if (!date) {
-      const t = text(row[0]);
-      if (t && !/^total/i.test(t) && /[A-Za-z]{3}/.test(t)) title = t;
-      continue;
-    }
-    // The row's name, or the heading when the row's has no comma ("Aboguin Ma. Abegail Fatima").
-    const rowName = text(row[c.name]);
-    const name = rowName.includes(",") || !title ? rowName || title : title;
+    if (!date) continue;
+    const name = blockName.get(i) ?? "";
     const key = personKey("", name);
     if (!key) {
       unidentified++;
