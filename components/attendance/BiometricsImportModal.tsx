@@ -7,7 +7,7 @@ import { Modal } from "@/components/Modal";
 import { formatDate, fullName } from "@/lib/helpers";
 import { reportSaveError } from "@/lib/save-errors";
 import type { BioFile } from "@/lib/biometrics/parse";
-import { computeAttendance, fileCoverage, type BranchSchedule } from "@/lib/biometrics/compute";
+import { computeAttendance, fileCoverage, inferSchedule, type BranchSchedule } from "@/lib/biometrics/compute";
 import { applyCorrections, biometricsAttendance } from "@/lib/biometrics/corrections";
 import type { BiometricDetail } from "@/lib/types";
 import { BRANCH_SCHEDULES, guessBranch, matchEmployeeByName } from "@/lib/biometrics/branches";
@@ -19,6 +19,7 @@ import { importBranchAttendanceRows } from "@/lib/supabase/repo";
 // for next time), see what the HRIS worked out, then import.
 
 const shortDate = (d: string) => formatDate(d).replace(/, \d{4}$/, "");
+const ALL = "all";
 
 // `allowedBranchIds`: branch staff importing their own branch only (HR and
 // payroll leave it out: any branch). Their import is saved by the database
@@ -38,7 +39,9 @@ export function BiometricsImportModal({
 }) {
   const { employees: allEmployees, branches: allBranches, payrollPeriods, holidays, leaveRequests, correctionRequests, attendancePeriodRecords, importAttendancePeriodRecords, updateAttendanceDetails, isRealAccount } = useHris();
   const branches = useMemo(() => (allowedBranchIds ? allBranches.filter((b) => allowedBranchIds.includes(b.id)) : allBranches), [allBranches, allowedBranchIds]);
-  const [branchId, setBranchId] = useState(() => guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""));
+  // HR's attendance sheet has every branch in it: each employee is checked
+  // against their own branch's schedule ("all").
+  const [branchId, setBranchId] = useState(() => (file.format === "sheet" && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
   // Branch staff only see and match their own branch's employees.
   const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
   // The cut-off holding most of the file's punch days.
@@ -73,29 +76,41 @@ export function BiometricsImportModal({
 
   const period = payrollPeriods.find((p) => p.id === periodId);
   const byId = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+  // Employees already in the cut-off (resigned since or not) come first when
+  // matching names, so a past cut-off's file finds the people paid in it.
+  const inCutoffIds = useMemo(() => new Set(attendancePeriodRecords.filter((r) => r.periodId === periodId).map((r) => r.employeeId)), [attendancePeriodRecords, periodId]);
+  const inCutoffEmployees = useMemo(() => employees.filter((e) => inCutoffIds.has(e.id)), [employees, inCutoffIds]);
   const pickable = useMemo(
-    () => employees.filter((e) => e.status !== "resigned" && e.status !== "terminated").sort((a, b) => fullName(a).localeCompare(fullName(b))),
-    [employees],
+    () => employees.filter((e) => (e.status !== "resigned" && e.status !== "terminated") || inCutoffIds.has(e.id)).sort((a, b) => fullName(a).localeCompare(fullName(b))),
+    [employees, inCutoffIds],
   );
+  const scheduleChoices = useMemo(() => [...new Map(Object.values(BRANCH_SCHEDULES).map((s) => [`${s.timeIn}-${s.timeOut}`, s])).values()], []);
   const coverage = useMemo(() => fileCoverage(file.people, schedule), [file, schedule]);
 
   const rows = useMemo(() => {
     if (!period) return [];
     return file.people.map((p) => {
       const saved = links?.find((l) => l.branchId === branchId && l.deviceKey === p.key)?.employeeId;
-      const auto = saved ?? (p.name ? matchEmployeeByName(p.name, employees)?.id : undefined);
+      const auto = saved ?? (p.name ? (matchEmployeeByName(p.name, inCutoffEmployees, true) ?? matchEmployeeByName(p.name, employees))?.id : undefined);
       const employeeId = assigned[p.key] ?? auto ?? "";
       const emp = employeeId ? byId.get(employeeId) : undefined;
       const inPeriod = [...p.days.keys()].filter((d) => d >= period.start && d <= period.end).length;
       // Fixed-rate (monthly) employees have no late/undertime deductions and
       // are paid by the half-month, not by days worked.
       const exempt = emp?.payrollType === "monthly";
+      // All branches: each person's own shift, worked out from their punches
+      // (their branch's schedule unless another clearly fits better).
+      const branchSchedule = emp ? BRANCH_SCHEDULES[emp.branchId] : undefined;
+      const rowSchedule = branchId === ALL ? (inferSchedule(p.days, scheduleChoices, branchSchedule) ?? branchSchedule ?? schedule) : schedule;
       // What's saved with the record so approved corrections can be applied later.
+      const inCutoff = ([d]: [string, unknown]) => d >= period.start && d <= period.end;
+      const marks = p.marks ? Object.fromEntries([...p.marks].filter(inCutoff)) : {};
       const detail: BiometricDetail = {
-        branchId,
-        schedule,
+        branchId: branchId === ALL ? (emp?.branchId ?? ALL) : branchId,
+        schedule: rowSchedule,
         exempt,
-        days: Object.fromEntries([...p.days].filter(([d]) => d >= period.start && d <= period.end)),
+        days: Object.fromEntries([...p.days].filter(inCutoff)),
+        ...(Object.keys(marks).length ? { marks } : {}),
         fileLastDate: coverage.lastDate,
         lastDateInProgress: coverage.lastDateInProgress,
       };
@@ -103,7 +118,7 @@ export function BiometricsImportModal({
       const corrected = emp ? applyCorrections(detail, correctionRequests.filter((c) => c.employeeId === emp.id), period) : null;
       const computed = computeAttendance({
         days: corrected?.days ?? p.days,
-        schedule,
+        schedule: rowSchedule,
         periodStart: period.start,
         periodEnd: period.end,
         holidays,
@@ -111,18 +126,19 @@ export function BiometricsImportModal({
         dateHired: emp?.dateHired,
         fileLastDate: coverage.lastDate,
         lastDateInProgress: coverage.lastDateInProgress,
+        marks: p.marks,
       });
-      const noPunches = inPeriod === 0;
+      const noPunches = inPeriod === 0 && ![...(p.marks?.keys() ?? [])].some((d) => d >= period.start && d <= period.end);
       const include = !!emp && !noPunches && !skipped[p.key];
-      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt, detail, correctionsApplied: corrected?.applied.length ?? 0 };
+      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt, detail, rowSchedule, correctionsApplied: corrected?.applied.length ?? 0 };
     });
-  }, [file, links, branchId, assigned, skipped, byId, employees, period, schedule, holidays, leaveRequests, correctionRequests, coverage]);
+  }, [file, links, branchId, assigned, skipped, byId, employees, inCutoffEmployees, scheduleChoices, period, schedule, holidays, leaveRequests, correctionRequests, coverage]);
 
   const included = rows.filter((r) => r.include);
   const dupes = new Set(included.map((r) => r.employeeId).filter((id, i, a) => a.indexOf(id) !== i));
-  const existing = new Set(attendancePeriodRecords.filter((r) => r.periodId === periodId).map((r) => r.employeeId));
+  const existing = inCutoffIds;
   const replacing = included.filter((r) => existing.has(r.employeeId)).length;
-  const branch = branches.find((b) => b.id === branchId);
+  const branch = branchId === ALL ? { id: ALL, name: "All branches" } : branches.find((b) => b.id === branchId);
   const scheduleOk = /^\d{2}:\d{2}$/.test(schedule.timeIn) && /^\d{2}:\d{2}$/.test(schedule.timeOut) && schedule.timeIn < schedule.timeOut;
   // Locked / closed cut-offs are already paid: their attendance stays as is.
   const periodLocked = !!period && period.status !== "open";
@@ -142,8 +158,9 @@ export function BiometricsImportModal({
         .filter((r) => links?.find((l) => l.branchId === branchId && l.deviceKey === r.person.key)?.employeeId !== r.employeeId)
         .map((r) => ({ branchId, deviceKey: r.person.key, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId }));
       if (isRealAccount) await saveBiometricLinks(newLinks);
-      const notes = `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`;
-      const rowsToSave = targets.map((r) => biometricsAttendance({ employee: r.emp!, period, detail: r.detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes }));
+      const notes = (r: (typeof targets)[number]) =>
+        branchId === ALL ? `Attendance sheet — ${allBranches.find((b) => b.id === r.emp?.branchId)?.name ?? "no branch"} (${r.rowSchedule.timeIn}–${r.rowSchedule.timeOut})` : `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`;
+      const rowsToSave = targets.map((r) => biometricsAttendance({ employee: r.emp!, period, detail: r.detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes: notes(r) }));
       if (recordsOnly) {
         onImported(period.id, await updateAttendanceDetails(period.id, rowsToSave));
         return;
@@ -174,6 +191,7 @@ export function BiometricsImportModal({
             <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Branch</span>
             <select value={branchId} onChange={(e) => chooseBranch(e.target.value)} className={`${input} w-full`}>
               <option value="">Choose the branch…</option>
+              {!allowedBranchIds && <option value={ALL}>All branches (each employee&rsquo;s own schedule)</option>}
               {branches
                 .filter((b) => b.id !== "br-unassigned")
                 .map((b) => (
@@ -194,7 +212,7 @@ export function BiometricsImportModal({
             </select>
           </label>
           <div>
-            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Schedule (Mon–Sat, no grace period)</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{branchId === ALL ? "Schedule when a shift can't be told" : "Schedule (Mon–Sat, no grace period)"}</span>
             <div className="flex items-center gap-1.5">
               <input type="time" value={schedule.timeIn} onChange={(e) => setSchedule((s) => ({ ...s, timeIn: e.target.value }))} className={`${input} w-full`} aria-label="Time in" />
               <span className="text-[var(--text-muted)]">–</span>
@@ -276,6 +294,7 @@ export function BiometricsImportModal({
                       ))}
                     </select>
                     {r.saved && !assigned[r.person.key] && <div className="text-[10px] text-[var(--text-muted)]">matched before</div>}
+                    {branchId === ALL && r.emp && <div className="text-[10px] text-[var(--text-muted)]">{allBranches.find((b) => b.id === r.emp!.branchId)?.name ?? "No branch"} · {r.rowSchedule.timeIn}–{r.rowSchedule.timeOut}</div>}
                   </td>
                   {r.noPunches ? (
                     <td colSpan={6} className="px-2 py-2 text-xs text-[var(--text-muted)]">

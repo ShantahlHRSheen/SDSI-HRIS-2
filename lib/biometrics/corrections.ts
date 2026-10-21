@@ -58,6 +58,7 @@ export function biometricsAttendance(input: {
     dateHired: employee.dateHired,
     fileLastDate: detail.fileLastDate,
     lastDateInProgress: detail.lastDateInProgress,
+    marks: detail.marks ? new Map(Object.entries(detail.marks)) : undefined,
   });
   return {
     employeeId: employee.id,
