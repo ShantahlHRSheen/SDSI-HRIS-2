@@ -497,3 +497,34 @@ export function parseBiometrics(sheets: Sheet[], fallbackNear: string): BioFile 
   }
   throw new Error("The HRIS couldn't find anyone's time-ins and time-outs in this file. Is it the biometrics export?");
 }
+
+// Several files picked together (e.g. this cut-off's and the last one's, as
+// the machine exports one per cut-off) read as one: each person's punches
+// and day marks from all of them.
+export function mergeBioFiles(files: BioFile[]): BioFile {
+  if (files.length === 1) return files[0];
+  const byKey = new Map<string, BioPerson>();
+  for (const f of files)
+    for (const p of f.people) {
+      const prev = byKey.get(p.key);
+      if (!prev) {
+        byKey.set(p.key, { ...p, days: new Map([...p.days].map(([d, t]) => [d, [...t]])), marks: p.marks ? new Map(p.marks) : undefined });
+        continue;
+      }
+      for (const [d, t] of p.days) addPunches(prev.days, d, t);
+      if (p.marks) for (const [d, m] of p.marks) (prev.marks ??= new Map()).set(d, m);
+      if (!prev.name && p.name) prev.name = p.name;
+    }
+  const starts = files.map((f) => f.rangeStart).filter((d): d is string => !!d).sort();
+  const ends = files.map((f) => f.rangeEnd).filter((d): d is string => !!d).sort();
+  const labels = [...new Set(files.map((f) => f.formatLabel))];
+  return {
+    format: files[0].format,
+    formatLabel: `${labels.join(" + ")} · ${files.length} files`,
+    rangeStart: starts[0] ?? null,
+    rangeEnd: ends[ends.length - 1] ?? null,
+    people: [...byKey.values()],
+    unidentified: files.reduce((t, f) => t + f.unidentified, 0),
+    shift: files.find((f) => f.shift)?.shift ?? null,
+  };
+}

@@ -45,15 +45,14 @@ export function BiometricsImportModal({
   const [branchId, setBranchId] = useState(() => ((file.format === "sheet" || file.format === "daily") && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
   // Branch staff only see and match their own branch's employees.
   const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
-  // The cut-off holding most of the file's punch days.
+  // The cut-off the file is for: the latest one holding a good share of its
+  // punch days (two files picked together: this cut-off's, not the last one's).
   const [periodId, setPeriodId] = useState(() => {
     const dates = file.people.flatMap((x) => [...x.days.keys()]);
-    let best = { id: payrollPeriods[payrollPeriods.length - 1]?.id ?? "", n: 0 };
-    for (const p of payrollPeriods) {
-      const n = dates.filter((d) => d >= p.start && d <= p.end).length;
-      if (n > best.n) best = { id: p.id, n };
-    }
-    return best.id;
+    const counts = payrollPeriods.map((p) => ({ p, n: dates.filter((d) => d >= p.start && d <= p.end).length }));
+    const most = Math.max(0, ...counts.map((c) => c.n));
+    const fit = counts.filter((c) => most > 0 && c.n >= most * 0.5).sort((a, b) => b.p.start.localeCompare(a.p.start))[0];
+    return fit?.p.id ?? payrollPeriods[payrollPeriods.length - 1]?.id ?? "";
   });
   const [schedule, setSchedule] = useState<BranchSchedule>(() => BRANCH_SCHEDULES[branchId] ?? file.shift ?? { timeIn: "08:00", timeOut: "17:00" });
   const [links, setLinks] = useState<BiometricLink[] | null>(isRealAccount ? null : []);
