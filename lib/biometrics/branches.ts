@@ -13,7 +13,7 @@ export const BRANCH_SCHEDULES: Record<string, BranchSchedule> = {
   "br-lcn": { timeIn: "09:00", timeOut: "18:00" }, // Lucena
   "br-ceb": { timeIn: "10:00", timeOut: "19:00" }, // Cebu
   "br-mnl": { timeIn: "10:00", timeOut: "19:00" }, // Manila
-  "br-mdu": { timeIn: "10:00", timeOut: "18:00" }, // Mandaue
+  "br-mdu": { timeIn: "10:00", timeOut: "19:00" }, // Mandaue
   "br-dvo": { timeIn: "11:00", timeOut: "20:00" }, // Davao
   "br-bcd": { timeIn: "11:00", timeOut: "20:00" }, // Bacolod
 };
