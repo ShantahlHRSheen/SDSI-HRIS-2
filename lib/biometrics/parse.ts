@@ -31,7 +31,7 @@ export interface BioPerson {
 }
 
 export interface BioFile {
-  format: "summary" | "logs" | "sheet";
+  format: "summary" | "logs" | "sheet" | "daily";
   formatLabel: string;
   rangeStart: string | null;
   rangeEnd: string | null;
@@ -301,6 +301,85 @@ function parseSheet(sheet: Sheet): Omit<BioFile, "format" | "formatLabel" | "shi
   return { rangeStart: all[0] ?? null, rangeEnd: all[all.length - 1] ?? null, people: mergeSameKey(people), unidentified };
 }
 
+// ---- "daily" layout (one row per person per day) ------------------------------
+
+// The header row: "Date", "Employee Name", "Time In", "Time Out", …
+function dailyHeader(sheet: Sheet): { at: number; col: (label: RegExp) => number } | null {
+  for (let i = 0; i < Math.min(sheet.rows.length, 10); i++) {
+    const cells = sheet.rows[i].map((c) => text(c).toLowerCase());
+    const col = (label: RegExp) => cells.findIndex((c) => label.test(c));
+    if (col(/^date$/) >= 0 && col(/name/) >= 0 && col(/^time\s*in$/) >= 0 && col(/^time\s*out$/) >= 0) return { at: i, col };
+  }
+  return null;
+}
+
+function parseDaily(sheet: Sheet): Omit<BioFile, "format" | "formatLabel" | "shift"> {
+  const header = dailyHeader(sheet)!;
+  const c = {
+    date: header.col(/^date$/),
+    id: header.col(/^(emp(loyee)?\s*)?id$/),
+    name: header.col(/name/),
+    punches: [/^time\s*in$/, /^break\s*out$/, /^break\s*in$/, /^time\s*out$/].map(header.col).filter((k) => k >= 0),
+    status: header.col(/^status$/),
+    dayType: header.col(/^day\s*type$/),
+    branch: header.col(/^branch$/),
+  };
+  const people = new Map<string, BioPerson>();
+  let title = ""; // the name heading over each person's rows ("ABOGUIN, MA. ABEGAIL FATIMA")
+  let unidentified = 0;
+  let first: string | null = null;
+  let last: string | null = null;
+  // Holidays the file marks ("SPECIAL HOLIDAY"), per branch: not absences there.
+  const holidays = new Set<string>();
+  const branchOf = new Map<string, string>();
+  for (const row of sheet.rows.slice(header.at + 1)) {
+    const date = isoIn(row[c.date]);
+    if (!date) {
+      const t = text(row[0]);
+      if (t && !/^total/i.test(t) && /[A-Za-z]{3}/.test(t)) title = t;
+      continue;
+    }
+    // The row's name, or the heading when the row's has no comma ("Aboguin Ma. Abegail Fatima").
+    const rowName = text(row[c.name]);
+    const name = rowName.includes(",") || !title ? rowName || title : title;
+    const key = personKey("", name);
+    if (!key) {
+      unidentified++;
+      continue;
+    }
+    const person = people.get(key) ?? { key, deviceId: c.id >= 0 ? text(row[c.id]) : "", name, days: new Map(), marks: new Map() };
+    people.set(key, person);
+    const times = c.punches.flatMap((k) => timesIn(row[k]));
+    addPunches(person.days, date, times);
+    const status = c.status >= 0 ? text(row[c.status]).toLowerCase() : "";
+    const mark: BiometricDayMark | null = /half/.test(status)
+      ? "half"
+      : /unpaid|lwop|without pay/.test(status)
+        ? "unpaid"
+        : /^s\.?l\b|sick/.test(status)
+          ? "SL"
+          : /^v\.?l\b|vacation/.test(status)
+            ? "VL"
+            : /present/.test(status) && !times.length
+              ? "field"
+              : null;
+    if (mark) person.marks!.set(date, mark);
+    const branch = c.branch >= 0 ? text(row[c.branch]).toUpperCase() : "";
+    branchOf.set(key, branch);
+    if (c.dayType >= 0 && /holiday/i.test(text(row[c.dayType]))) holidays.add(`${branch}|${date}`);
+    if (times.length) {
+      if (!first || date < first) first = date;
+      if (!last || date > last) last = date;
+    }
+  }
+  for (const p of people.values())
+    for (const h of holidays) {
+      const [branch, date] = h.split("|");
+      if (branch === branchOf.get(p.key) && !p.days.get(date)?.length && !p.marks!.has(date)) p.marks!.set(date, "holiday");
+    }
+  return { rangeStart: first, rangeEnd: last, people: [...people.values()], unidentified };
+}
+
 // ---- "summary" layout --------------------------------------------------------
 
 function parseSummary(sheet: Sheet, fallbackNear: string): Omit<BioFile, "format" | "formatLabel" | "shift"> {
@@ -369,6 +448,11 @@ export function parseBiometrics(sheets: Sheet[], fallbackNear: string): BioFile 
       if (m && m[1] !== "00:00") shift = { timeIn: m[1].padStart(5, "0"), timeOut: m[2].padStart(5, "0") };
     }
 
+  const daily = sheets.find((s) => dailyHeader(s));
+  if (daily) {
+    const r = parseDaily(daily);
+    if (r.people.length) return { ...r, format: "daily", formatLabel: "Daily attendance report (all branches)", shift };
+  }
   const hrSheet = sheets.find((s) => s.rows.filter(isTotalDays).length >= 2 && s.rows.some(isSheetDateRow));
   if (hrSheet) {
     const r = parseSheet(hrSheet);

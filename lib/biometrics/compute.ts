@@ -190,7 +190,8 @@ export function computeAttendance(input: {
         out.halfDayDates.push(d);
       }
       if (mark === "field") out.daysWorked++;
-      continue;
+      continue; // "unpaid" / "holiday": not an absence
+
     }
     if (punches.length === 0) {
       if (isWorkDay(d) && !holidayDates.has(d) && !onLeave.has(d) && !(hired && d < hired)) {
@@ -209,13 +210,14 @@ export function computeAttendance(input: {
       if (t < midpoint) timeIn = t;
       else timeOut = t;
       const stillAtWork = timeOut === null && input.lastDateInProgress && d === input.fileLastDate;
-      if (!stillAtWork) out.missingPunches.push({ date: d, missing: timeIn === null ? "in" : "out", punch: punches[0] });
+      if (!stillAtWork && mark !== "half") out.missingPunches.push({ date: d, missing: timeIn === null ? "in" : "out", punch: punches[0] });
     } else {
       timeIn = minutes(punches[0]);
       timeOut = minutes(punches[punches.length - 1]);
     }
     if (!isWorkDay(d)) continue; // Sunday work: counted as a day, no late/undertime.
-    if (timeIn !== null && timeOut !== null && (timeIn >= midpoint || timeOut <= midpoint)) {
+    // A day the file marks as a half day is one, whatever its punches.
+    if (mark === "half" || (timeIn !== null && timeOut !== null && (timeIn >= midpoint || timeOut <= midpoint))) {
       out.halfDayInstances++;
       out.halfDayDates.push(d);
     }
