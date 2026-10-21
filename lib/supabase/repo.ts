@@ -986,6 +986,40 @@ export async function upsertAttendancePeriodRecordRow(
   if (error) throw error;
   return toAttendancePeriodRecord(data);
 }
+// Attendance records only, for a locked / closed cut-off: the day-by-day
+// late / undertime / half-day / absence / missing-punch details are saved on
+// employees who already have attendance there, while everything payroll
+// uses (days, minutes, VL/SL, holidays) stays as it was. Employees with no
+// attendance in that cut-off are skipped — adding them would add them to
+// payroll.
+export async function updateAttendanceDetailRows(
+  periodId: string,
+  rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[],
+): Promise<AttendancePeriodRecord[]> {
+  const out: AttendancePeriodRecord[] = [];
+  for (const r of rows) {
+    const { data, error } = await getSupabaseClient()
+      .from("attendance_period_records")
+      .update({
+        late_instances: r.lateInstances ?? null,
+        late_day_details: r.lateDayDetails ?? null,
+        undertime_instances: r.undertimeInstances ?? null,
+        undertime_day_details: r.undertimeDayDetails ?? null,
+        half_day_instances: r.halfDayInstances ?? null,
+        half_day_dates: r.halfDayDates ?? null,
+        absence_instances: r.absenceInstances ?? null,
+        absent_dates: r.absentDates ?? null,
+        ...(r.missingPunches !== undefined ? { missing_punches: r.missingPunches } : {}),
+      })
+      .eq("period_id", periodId)
+      .eq("employee_id", r.employeeId)
+      .select();
+    if (error) throw error;
+    out.push(...(data ?? []).map(toAttendancePeriodRecord));
+  }
+  return out;
+}
+
 // A branch's biometrics import by its own people (supabase/migrate_phase48_branch_attendance_import.sql):
 // saved by the database after checking the caller may import that branch.
 export async function importBranchAttendanceRows(

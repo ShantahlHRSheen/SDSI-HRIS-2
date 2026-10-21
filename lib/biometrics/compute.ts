@@ -41,6 +41,10 @@ export interface ComputedAttendance {
   undertimeInstances: number;
   undertimeDayDetails: UndertimeDayDetail[];
   absenceInstances: number;
+  // Days in after mid-shift or out before it — a record only: those days
+  // still count as worked, with the late / undertime minutes as usual.
+  halfDayInstances: number;
+  halfDayDates: string[];
   absentDates: string[];
   missingPunches: MissingPunch[];
   // Days with punches outside the cut-off are ignored; this counts days in it.
@@ -128,6 +132,8 @@ export function computeAttendance(input: {
     undertimeInstances: 0,
     undertimeDayDetails: [],
     absenceInstances: 0,
+    halfDayInstances: 0,
+    halfDayDates: [],
     absentDates: [],
     missingPunches: [],
     daysWithPunches: 0,
@@ -164,6 +170,10 @@ export function computeAttendance(input: {
       timeOut = minutes(punches[punches.length - 1]);
     }
     if (!isWorkDay(d)) continue; // Sunday work: counted as a day, no late/undertime.
+    if (timeIn !== null && timeOut !== null && (timeIn >= midpoint || timeOut <= midpoint)) {
+      out.halfDayInstances++;
+      out.halfDayDates.push(d);
+    }
     if (timeIn !== null && timeIn > schedIn) {
       const late = timeIn - schedIn;
       out.lateMinutes += late;
