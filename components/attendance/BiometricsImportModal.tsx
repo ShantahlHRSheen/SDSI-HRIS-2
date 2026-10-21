@@ -79,7 +79,10 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
       });
       const noPunches = inPeriod === 0;
       const include = !!emp && !noPunches && !skipped[p.key];
-      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include };
+      // Fixed-rate (monthly) employees have no late/undertime deductions and
+      // are paid by the half-month, not by days worked.
+      const exempt = emp?.payrollType === "monthly";
+      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt };
     });
   }, [file, links, branchId, assigned, skipped, byId, employees, period, schedule, holidays, leaveRequests, coverage]);
 
@@ -105,12 +108,12 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         period.id,
         included.map((r) => ({
           employeeId: r.employeeId,
-          daysWorked: r.computed.daysWorked,
+          daysWorked: r.exempt ? 0 : r.computed.daysWorked,
           holidayDays: r.computed.holidayDays,
           slDays: r.computed.slDays,
           vlDays: r.computed.vlDays,
-          lateMinutes: r.computed.lateMinutes,
-          undertimeMinutes: r.computed.undertimeMinutes,
+          lateMinutes: r.exempt ? 0 : r.computed.lateMinutes,
+          undertimeMinutes: r.exempt ? 0 : r.computed.undertimeMinutes,
           notes: `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`,
           lateInstances: r.computed.lateInstances,
           lateDayDetails: r.computed.lateDayDetails,
@@ -247,9 +250,17 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
                     </td>
                   ) : (
                     <>
-                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.daysWorked}</td>
-                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.lateMinutes ? `${r.computed.lateMinutes}m (${r.computed.lateInstances}×)` : "—"}</td>
-                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.undertimeMinutes ? `${r.computed.undertimeMinutes}m (${r.computed.undertimeInstances}×)` : "—"}</td>
+                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.exempt ? <span title="Fixed-rate: paid by the half-month">—</span> : r.computed.daysWorked}</td>
+                      {r.exempt ? (
+                        <td colSpan={2} className="px-2 py-2 text-xs text-[var(--text-muted)]" title={`Biometrics: late ${r.computed.lateMinutes}m, undertime ${r.computed.undertimeMinutes}m`}>
+                          Fixed-rate — no late/undertime deduction
+                        </td>
+                      ) : (
+                        <>
+                          <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.lateMinutes ? `${r.computed.lateMinutes}m (${r.computed.lateInstances}×)` : "—"}</td>
+                          <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.undertimeMinutes ? `${r.computed.undertimeMinutes}m (${r.computed.undertimeInstances}×)` : "—"}</td>
+                        </>
+                      )}
                       <td className="px-2 py-2 text-xs text-[var(--text-secondary)]" title={r.computed.absentDates.map(shortDate).join(", ")}>
                         {r.computed.absenceInstances || "—"}
                       </td>
@@ -282,7 +293,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         </div>
 
         <div className="text-xs text-[var(--text-muted)]">
-          First punch = time in, last punch = time out. Late and undertime are counted from the schedule above with no grace period. Missing punches are flagged for you and shown to the employee on their attendance, so they can file an attendance correction. Matches you choose are remembered for this branch.
+          First punch = time in, last punch = time out. Late and undertime are counted from the schedule above with no grace period; fixed-rate employees have none deducted. Missing punches are flagged for you and shown to the employee on their attendance, so they can file an attendance correction. Matches you choose are remembered for this branch.
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
