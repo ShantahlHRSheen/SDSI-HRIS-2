@@ -5058,6 +5058,35 @@ revoke all on function import_branch_attendance(text, jsonb) from public, anon;
 grant execute on function import_branch_attendance(text, jsonb) to authenticated;
 
 
+-- Phase 49: named attendance importers take over their branch
+create or replace function app_can_import_branch(p_branch text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_branch is not null and p_branch <> 'br-unassigned' and (
+    app_has_any_role(array['hr_admin', 'payroll_officer']::app_role[])
+    or exists (select 1 from branches b where b.id = p_branch and b.approver_id = app_current_employee_id())
+    or exists (select 1 from attendance_importers i where i.branch_id = p_branch and i.employee_id = app_current_employee_id())
+    or (
+      not exists (select 1 from attendance_importers i where i.branch_id = p_branch)
+      and exists (
+        select 1 from employees me
+         where me.id = app_current_employee_id() and me.branch_id = p_branch
+           and (
+             exists (select 1 from employees e where e.supervisor_id = me.id and e.branch_id = p_branch and e.status in ('active', 'on_leave'))
+             or not exists (select 1 from employees o where o.branch_id = p_branch and o.id <> me.id and o.status in ('active', 'on_leave'))
+           )
+      )
+    )
+  );
+$$;
+
+revoke all on function app_can_import_branch(text) from public, anon;
+grant execute on function app_can_import_branch(text) to authenticated;
+
 -- Starter settings
 -- ---------------------------------------------------------------------------
 
