@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useApplyApprovedCorrections } from "@/components/attendance/useApplyApprovedCorrections";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { fetchMyImportBranches } from "@/lib/supabase/repo";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Fingerprint, Pencil, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -16,8 +18,8 @@ import { buildDaroDtrPreview, latestDtrPeriod, parseDaroDtrWorkbook, type DtrPer
 import { currentCompany } from "@/lib/companies";
 import type { AttendancePeriodRecord, Employee } from "@/lib/types";
 import { readSpreadsheet } from "@/lib/biometrics/read-sheets";
-import { parseBiometrics, type BioFile } from "@/lib/biometrics/parse";
-import { BiometricsImportModal } from "@/components/attendance/BiometricsImportModal";
+import { mergeBioFiles, parseBiometrics, type BioFile } from "@/lib/biometrics/parse";
+import { BiometricsImportModal, CarryOverNote } from "@/components/attendance/BiometricsImportModal";
 
 // "Oct 3 (no time-out, in at 08:24)" — a missing punch, for HR and the employee.
 function missingPunchText(m: { date: string; missing: "in" | "out"; punch: string }): string {
@@ -25,6 +27,24 @@ function missingPunchText(m: { date: string; missing: "in" | "out"; punch: strin
 }
 
 const LATE_OUTLIER_AVG_MIN_PER_DAY = 60;
+
+// Late / undertime from the day-by-day record (biometrics or the tracker).
+// A closed cut-off keeps the minutes payroll used, which can differ (e.g.
+// late paid as an amount), so the record is shown beside them.
+function recordedMinutes(rec: AttendancePeriodRecord) {
+  const late = (rec.lateDayDetails ?? []).reduce((t, d) => t + (d.lateRawMinutes ?? 0), 0);
+  const under = (rec.undertimeDayDetails ?? []).reduce((t, d) => t + (d.undertimeRawMinutes ?? 0), 0);
+  return { late, lateTimes: rec.lateInstances ?? rec.lateDayDetails?.length ?? 0, under, underTimes: rec.undertimeInstances ?? rec.undertimeDayDetails?.length ?? 0 };
+}
+
+function RecordedNote({ paid, recorded, times }: { paid: number; recorded: number; times: number }) {
+  if (!recorded || recorded === paid) return null;
+  return (
+    <div className="text-[10px] text-[var(--text-muted)]" title="From the attendance record. Payroll used the figure above.">
+      record: {recorded} ({times}×)
+    </div>
+  );
+}
 
 function isLateOutlier(rec: { daysWorked: number; lateMinutes: number }): boolean {
   return rec.daysWorked > 0 && rec.lateMinutes / rec.daysWorked > LATE_OUTLIER_AVG_MIN_PER_DAY;
@@ -39,7 +59,11 @@ export default function AttendancePage() {
     currentEmployee,
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
+    branches,
+    isRealAccount,
   } = useHris();
+  // Approved attendance corrections update biometrics attendance.
+  useApplyApprovedCorrections();
 
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
   const { period, setPeriodId } = useSelectedPayrollPeriod();
@@ -64,26 +88,57 @@ export default function AttendancePage() {
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bioInputRef = useRef<HTMLInputElement>(null);
+  // Branch staff allowed to import their own branch (supabase/migrate_phase48_branch_attendance_import.sql).
+  const [myImportBranches, setMyImportBranches] = useState<string[]>([]);
+  const [branchImportDone, setBranchImportDone] = useState<string | null>(null);
+  useEffect(() => {
+    if (canManage || !isRealAccount) return;
+    fetchMyImportBranches(branches.filter((b) => b.id !== "br-unassigned").map((b) => b.id)).then(setMyImportBranches, () => setMyImportBranches([]));
+  }, [canManage, isRealAccount, branches]);
   const [bio, setBio] = useState<{ file: BioFile; name: string } | null>(null);
 
+  // One or more biometrics files (picked together: e.g. this cut-off's and
+  // the last one's, to settle its last days) read as one import.
+  async function openBiometrics(files: File[]) {
+    const near = period?.start ?? new Date().toISOString().slice(0, 10);
+    const read: BioFile[] = [];
+    for (const f of files) {
+      try {
+        read.push(parseBiometrics(await readSpreadsheet(await f.arrayBuffer()), near));
+      } catch (err) {
+        throw new Error(`${files.length > 1 ? `${f.name}: ` : ""}${err instanceof Error ? err.message : "Could not read this biometrics file."}`);
+      }
+    }
+    setBio({ file: mergeBioFiles(read), name: files.map((f) => f.name).join(" + ") });
+  }
+
   async function handleBiometricsSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
     setImportError(null);
     try {
-      const sheets = await readSpreadsheet(await file.arrayBuffer());
-      setBio({ file: parseBiometrics(sheets, period?.start ?? new Date().toISOString().slice(0, 10)), name: file.name });
+      await openBiometrics(files);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Could not read this biometrics file.");
     }
   }
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
+    const file = files[0];
     e.target.value = "";
     if (!file) return;
     setImportError(null);
+    // Several files: biometrics exports to read together.
+    if (files.length > 1) {
+      try {
+        await openBiometrics(files);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : "Could not read these files.");
+      }
+      return;
+    }
     try {
       const buffer = await file.arrayBuffer();
       if (currentCompany().attendanceImportFormat === "daro") {
@@ -92,7 +147,18 @@ export default function AttendancePage() {
         setDtr(people);
         return;
       }
-      const parsed = await parseAttendanceWorkbook(buffer);
+      // Not an attendance-tracker workbook? It may be a biometrics export:
+      // open it in the biometrics import instead.
+      const parsed = await parseAttendanceWorkbook(buffer.slice(0)).catch(async (err) => {
+        try {
+          const sheets = await readSpreadsheet(buffer);
+          setBio({ file: parseBiometrics(sheets, period?.start ?? new Date().toISOString().slice(0, 10)), name: file.name });
+          return null;
+        } catch {
+          throw new Error(`${err instanceof Error ? err.message : "Could not read this file."} It isn't a biometrics export the HRIS recognizes either.`);
+        }
+      });
+      if (!parsed) return;
       const preview = buildAttendanceImportPreview(parsed, employees);
       setTrackerPreview(preview);
       const matchingPeriod = payrollPeriods.find((p) => p.start === preview.periodStart && p.end === preview.periodEnd);
@@ -133,7 +199,43 @@ export default function AttendancePage() {
     const myRecord = period ? attendancePeriodRecords.find((r) => r.periodId === period.id && r.employeeId === currentEmployee?.id) : undefined;
     return (
       <div>
-        <PageHeader title="My Attendance" subtitle="Your attendance summary per payroll period, as recorded by HR/Payroll." />
+        <PageHeader
+          title="My Attendance"
+          subtitle="Your attendance summary per payroll period, as recorded by HR/Payroll."
+          actions={
+            myImportBranches.length > 0 && (
+              <>
+                <input ref={bioInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleBiometricsSelected} />
+                <button onClick={() => bioInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
+                  <Fingerprint size={16} /> Import {branches.filter((b) => myImportBranches.includes(b.id)).map((b) => b.name).join(" / ")} biometrics
+                </button>
+              </>
+            )
+          }
+        />
+        {importError && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">
+            <AlertTriangle size={16} className="shrink-0" /> {importError}
+          </div>
+        )}
+        {branchImportDone && (
+          <div className="mb-4 rounded-lg border border-[var(--status-good)]/40 px-3 py-2 text-sm text-[var(--status-good)]" style={{ background: "color-mix(in srgb, var(--status-good) 8%, transparent)" }}>
+            {branchImportDone}
+          </div>
+        )}
+        {bio && (
+          <BiometricsImportModal
+            file={bio.file}
+            fileName={bio.name}
+            allowedBranchIds={myImportBranches}
+            onClose={() => setBio(null)}
+            onImported={(id, count) => {
+              setBio(null);
+              const p = payrollPeriods.find((x) => x.id === id);
+              setBranchImportDone(`Imported ${count} employee${count === 1 ? "" : "s"}' attendance${p ? ` for ${formatDate(p.start)} – ${formatDate(p.end)}` : ""}. HR will review it before payroll.`);
+            }}
+          />
+        )}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <select value={period?.id ?? ""} onChange={(e) => setPeriodId(e.target.value)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm">
             {payrollPeriods.map((p) => (
@@ -149,8 +251,13 @@ export default function AttendancePage() {
             <StatTile label="Holiday days" value={myRecord.holidayDays.toString()} />
             <StatTile label="SL days" value={myRecord.slDays.toString()} />
             <StatTile label="VL days" value={myRecord.vlDays.toString()} />
-            <StatTile label="Late (min)" value={myRecord.lateMinutes.toString()} />
-            <StatTile label="Undertime (min)" value={myRecord.undertimeMinutes.toString()} />
+            <StatTile label="Late (min)" value={(myRecord.lateMinutes || recordedMinutes(myRecord).late).toString()} />
+            <StatTile label="Undertime (min)" value={(myRecord.undertimeMinutes || recordedMinutes(myRecord).under).toString()} />
+          </div>
+        )}
+        {!!myRecord?.biometricDetail?.correctionIds?.length && (
+          <div className="mt-4 rounded-xl border border-[var(--status-good)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-good) 8%, transparent)" }}>
+            {myRecord.biometricDetail.correctionIds.length} approved attendance correction{myRecord.biometricDetail.correctionIds.length === 1 ? " is" : "s are"} already reflected in this attendance.
           </div>
         )}
         {myRecord?.missingPunches && myRecord.missingPunches.length > 0 && (
@@ -183,8 +290,8 @@ export default function AttendancePage() {
         subtitle="Days Worked, Holiday, SL, VL, and Late/Undertime minutes per payroll period — imported from the attendance tracker or entered manually. Overtime pay and leave pay are sourced from approved Overtime/Leave requests, not from here."
         actions={
           <>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelected} />
-            <input ref={bioInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBiometricsSelected} />
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleFileSelected} />
+            <input ref={bioInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleBiometricsSelected} />
             <button onClick={() => bioInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--series-1)] hover:bg-[var(--series-1)]/10">
               <Fingerprint size={16} /> Import biometrics
             </button>
@@ -238,6 +345,7 @@ export default function AttendancePage() {
                   <th className="px-3 py-2 font-medium">VL</th>
                   <th className="px-3 py-2 font-medium">Late (min)</th>
                   <th className="px-3 py-2 font-medium">Undertime (min)</th>
+                  <th className="px-3 py-2 font-medium" title="Absences / half days, from the attendance record">Absent / half</th>
                   <th className="px-3 py-2 font-medium">Source</th>
                   <th className="px-3 py-2 font-medium">Actions</th>
                 </tr>
@@ -253,6 +361,7 @@ export default function AttendancePage() {
                   .map((rec) => {
                     const emp = byId.get(rec.employeeId);
                     const outlier = isLateOutlier(rec);
+                    const rm = recordedMinutes(rec);
                     return (
                       <tr key={rec.id} className="border-b border-[var(--gridline)] last:border-0">
                         <td className="px-3 py-2 text-[var(--text-primary)]">
@@ -260,6 +369,21 @@ export default function AttendancePage() {
                           {rec.missingPunches && rec.missingPunches.length > 0 && (
                             <span title={rec.missingPunches.map(missingPunchText).join("\n")} className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
                               <AlertTriangle size={10} /> {rec.missingPunches.length} missing punch{rec.missingPunches.length === 1 ? "" : "es"}
+                            </span>
+                          )}
+                          {(() => {
+                            const pend = rec.biometricDetail?.pending;
+                            const n = (pend?.dates.length ?? 0) + (pend?.timeOutDate ? 1 : 0);
+                            return n > 0 && period?.status === "open" ? (
+                              <span title={`Not in the file yet, counted as present: ${[...(pend?.dates ?? []), ...(pend?.timeOutDate ? [`${pend.timeOutDate} (time out)`] : [])].map((d) => formatDate(d.slice(0, 10)) + d.slice(10)).join(", ")}. Settled with next cut-off's file.`} className="ml-1.5 inline-block rounded bg-[var(--gridline)]/60 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--text-secondary)]">
+                                {n} day{n === 1 ? "" : "s"} pending
+                              </span>
+                            ) : null;
+                          })()}
+                          {rec.biometricDetail?.carryOver && <span className="ml-1.5 inline-block align-middle"><CarryOverNote carry={rec.biometricDetail.carryOver} /></span>}
+                          {!!rec.biometricDetail?.correctionIds?.length && (
+                            <span title="Approved attendance corrections are reflected in these figures" className="ml-1.5 inline-block rounded bg-[var(--status-good)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-good)]">
+                              {rec.biometricDetail.correctionIds.length} correction{rec.biometricDetail.correctionIds.length === 1 ? "" : "s"} applied
                             </span>
                           )}
                         </td>
@@ -271,8 +395,15 @@ export default function AttendancePage() {
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">
                           <span className={outlier ? "text-[var(--status-warning)]" : ""}>{rec.lateMinutes}</span>
                           {outlier && <AlertTriangle size={12} className="ml-1 inline text-[var(--status-warning)]" />}
+                          <RecordedNote paid={rec.lateMinutes} recorded={rm.late} times={rm.lateTimes} />
                         </td>
-                        <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.undertimeMinutes}</td>
+                        <td className="tabular px-3 py-2 text-[var(--text-secondary)]">
+                          {rec.undertimeMinutes}
+                          <RecordedNote paid={rec.undertimeMinutes} recorded={rm.under} times={rm.underTimes} />
+                        </td>
+                        <td className="tabular px-3 py-2 text-xs text-[var(--text-secondary)]" title={[...(rec.absentDates ?? []).map((d) => `Absent ${formatDate(d)}`), ...(rec.halfDayDates ?? []).map((d) => `Half day ${formatDate(d)}`)].join("\n")}>
+                          {rec.absenceInstances || rec.halfDayInstances ? `${rec.absenceInstances ?? 0} / ${rec.halfDayInstances ?? 0}` : "—"}
+                        </td>
                         <td className="px-3 py-2"><Badge tone={rec.source === "import" ? "info" : "muted"}>{rec.source}</Badge></td>
                         <td className="px-3 py-2">
                           {emp && (

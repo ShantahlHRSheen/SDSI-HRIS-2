@@ -7,30 +7,54 @@ import { Modal } from "@/components/Modal";
 import { formatDate, fullName } from "@/lib/helpers";
 import { reportSaveError } from "@/lib/save-errors";
 import type { BioFile } from "@/lib/biometrics/parse";
-import { computeAttendance, fileCoverage, type BranchSchedule } from "@/lib/biometrics/compute";
+import { computeAttendance, coveredDates, fileCoverage, inferSchedule, type BranchSchedule } from "@/lib/biometrics/compute";
+import { applyCorrections, biometricsAttendance, previousPeriod, withPrior } from "@/lib/biometrics/corrections";
+import type { BiometricCarryOver, BiometricDetail } from "@/lib/types";
 import { BRANCH_SCHEDULES, guessBranch, matchEmployeeByName } from "@/lib/biometrics/branches";
 import { fetchBiometricLinks, saveBiometricLinks, type BiometricLink } from "@/lib/supabase/biometric-links";
+import { importBranchAttendanceRows } from "@/lib/supabase/repo";
 
 // Review screen for a branch's biometrics file: pick the branch and cut-off,
 // check the schedule, match each person in the file to an employee (saved
 // for next time), see what the HRIS worked out, then import.
 
 const shortDate = (d: string) => formatDate(d).replace(/, \d{4}$/, "");
+const ALL = "all";
+const shiftDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 
-export function BiometricsImportModal({ file, fileName, onClose, onImported }: { file: BioFile; fileName: string; onClose: () => void; onImported: (periodId: string) => void }) {
-  const { employees, branches, payrollPeriods, holidays, leaveRequests, attendancePeriodRecords, importAttendancePeriodRecords, isRealAccount } = useHris();
-  const [branchId, setBranchId] = useState(() => guessBranch(fileName, branches)?.id ?? "");
-  // The cut-off holding most of the file's punch days.
+// `allowedBranchIds`: branch staff importing their own branch only (HR and
+// payroll leave it out: any branch). Their import is saved by the database
+// after it checks the branch (import_branch_attendance).
+export function BiometricsImportModal({
+  file,
+  fileName,
+  onClose,
+  onImported,
+  allowedBranchIds,
+}: {
+  file: BioFile;
+  fileName: string;
+  onClose: () => void;
+  onImported: (periodId: string, count: number) => void;
+  allowedBranchIds?: string[];
+}) {
+  const { employees: allEmployees, branches: allBranches, payrollPeriods, holidays, leaveRequests, correctionRequests, attendancePeriodRecords, importAttendancePeriodRecords, updateAttendanceDetails, isRealAccount } = useHris();
+  const branches = useMemo(() => (allowedBranchIds ? allBranches.filter((b) => allowedBranchIds.includes(b.id)) : allBranches), [allBranches, allowedBranchIds]);
+  // HR's attendance sheet has every branch in it: each employee is checked
+  // against their own branch's schedule ("all").
+  const [branchId, setBranchId] = useState(() => ((file.format === "sheet" || file.format === "daily") && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
+  // Branch staff only see and match their own branch's employees.
+  const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
+  // The cut-off the file is for: the latest one holding a good share of its
+  // punch days (two files picked together: this cut-off's, not the last one's).
   const [periodId, setPeriodId] = useState(() => {
     const dates = file.people.flatMap((x) => [...x.days.keys()]);
-    let best = { id: payrollPeriods[payrollPeriods.length - 1]?.id ?? "", n: 0 };
-    for (const p of payrollPeriods) {
-      const n = dates.filter((d) => d >= p.start && d <= p.end).length;
-      if (n > best.n) best = { id: p.id, n };
-    }
-    return best.id;
+    const counts = payrollPeriods.map((p) => ({ p, n: dates.filter((d) => d >= p.start && d <= p.end).length }));
+    const most = Math.max(0, ...counts.map((c) => c.n));
+    const fit = counts.filter((c) => most > 0 && c.n >= most * 0.5).sort((a, b) => b.p.start.localeCompare(a.p.start))[0];
+    return fit?.p.id ?? payrollPeriods[payrollPeriods.length - 1]?.id ?? "";
   });
-  const [schedule, setSchedule] = useState<BranchSchedule>(() => BRANCH_SCHEDULES[guessBranch(fileName, branches)?.id ?? ""] ?? file.shift ?? { timeIn: "08:00", timeOut: "17:00" });
+  const [schedule, setSchedule] = useState<BranchSchedule>(() => BRANCH_SCHEDULES[branchId] ?? file.shift ?? { timeIn: "08:00", timeOut: "17:00" });
   const [links, setLinks] = useState<BiometricLink[] | null>(isRealAccount ? null : []);
   const [assigned, setAssigned] = useState<Record<string, string>>({});
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
@@ -52,23 +76,67 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
 
   const period = payrollPeriods.find((p) => p.id === periodId);
   const byId = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+  // Employees already in the cut-off (resigned since or not) come first when
+  // matching names, so a past cut-off's file finds the people paid in it.
+  const inCutoffIds = useMemo(() => new Set(attendancePeriodRecords.filter((r) => r.periodId === periodId).map((r) => r.employeeId)), [attendancePeriodRecords, periodId]);
+  const inCutoffEmployees = useMemo(() => employees.filter((e) => inCutoffIds.has(e.id)), [employees, inCutoffIds]);
   const pickable = useMemo(
-    () => employees.filter((e) => e.status !== "resigned" && e.status !== "terminated").sort((a, b) => fullName(a).localeCompare(fullName(b))),
-    [employees],
+    () => employees.filter((e) => (e.status !== "resigned" && e.status !== "terminated") || inCutoffIds.has(e.id)).sort((a, b) => fullName(a).localeCompare(fullName(b))),
+    [employees, inCutoffIds],
   );
+  // The branch schedules, grouped by shift ("08:00–17:00 · Cabanatuan, Pangasinan").
+  const scheduleGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const [id, sc] of Object.entries(BRANCH_SCHEDULES)) {
+      const label = `${sc.timeIn}–${sc.timeOut}`;
+      groups.set(label, [...(groups.get(label) ?? []), allBranches.find((b) => b.id === id)?.name ?? id]);
+    }
+    return [...groups].map(([label, names]) => ({ label, names }));
+  }, [allBranches]);
+  const scheduleChoices = useMemo(() => [...new Map(Object.values(BRANCH_SCHEDULES).map((s) => [`${s.timeIn}-${s.timeOut}`, s])).values()], []);
   const coverage = useMemo(() => fileCoverage(file.people, schedule), [file, schedule]);
+  const covered = useMemo(() => coveredDates(file.people), [file]);
+  const prevPeriod = useMemo(() => (period ? previousPeriod(period, payrollPeriods) : undefined), [period, payrollPeriods]);
 
   const rows = useMemo(() => {
     if (!period) return [];
     return file.people.map((p) => {
       const saved = links?.find((l) => l.branchId === branchId && l.deviceKey === p.key)?.employeeId;
-      const auto = saved ?? (p.name ? matchEmployeeByName(p.name, employees)?.id : undefined);
+      const auto = saved ?? (p.name ? (matchEmployeeByName(p.name, inCutoffEmployees, true) ?? matchEmployeeByName(p.name, employees))?.id : undefined);
       const employeeId = assigned[p.key] ?? auto ?? "";
       const emp = employeeId ? byId.get(employeeId) : undefined;
       const inPeriod = [...p.days.keys()].filter((d) => d >= period.start && d <= period.end).length;
+      // Fixed-rate (monthly) employees have no late/undertime deductions and
+      // are paid by the half-month, not by days worked.
+      const exempt = emp?.payrollType === "monthly";
+      // All branches: each person's own shift, worked out from their punches
+      // (their branch's schedule unless another clearly fits better).
+      const branchSchedule = emp ? BRANCH_SCHEDULES[emp.branchId] : undefined;
+      const rowSchedule = branchId === ALL ? (inferSchedule(p.days, scheduleChoices, branchSchedule) ?? branchSchedule ?? schedule) : schedule;
+      // What's saved with the record so approved corrections can be applied later.
+      const inCutoff = ([d]: [string, unknown]) => d >= period.start && d <= period.end;
+      const marks = p.marks ? Object.fromEntries([...p.marks].filter(inCutoff)) : {};
+      // The days just before the cut-off: they settle the previous one's pending days.
+      const earlierFrom = prevPeriod && prevPeriod.start > shiftDays(period.start, -10) ? prevPeriod.start : shiftDays(period.start, -10);
+      const isEarlier = (d: string) => d >= earlierFrom && d < period.start;
+      const earlierDays = Object.fromEntries([...p.days].filter(([d]) => isEarlier(d)));
+      const baseDetail: BiometricDetail = {
+        branchId: branchId === ALL ? (emp?.branchId ?? ALL) : branchId,
+        schedule: rowSchedule,
+        exempt,
+        days: Object.fromEntries([...p.days].filter(inCutoff)),
+        ...(Object.keys(marks).length ? { marks } : {}),
+        fileLastDate: coverage.lastDate,
+        lastDateInProgress: coverage.lastDateInProgress,
+        ...(Object.keys(earlierDays).length ? { earlier: { days: earlierDays, covered: covered.filter(isEarlier) } } : {}),
+      };
+      const prevRecord = emp && prevPeriod ? attendancePeriodRecords.find((r) => r.periodId === prevPeriod.id && r.employeeId === emp.id) : undefined;
+      const detail = withPrior(baseDetail, prevPeriod, prevRecord);
+      // Corrections already approved for these days are applied straight away.
+      const corrected = emp ? applyCorrections(detail, correctionRequests.filter((c) => c.employeeId === emp.id), period) : null;
       const computed = computeAttendance({
-        days: p.days,
-        schedule,
+        days: corrected?.days ?? p.days,
+        schedule: rowSchedule,
         periodStart: period.start,
         periodEnd: period.end,
         holidays,
@@ -76,22 +144,31 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         dateHired: emp?.dateHired,
         fileLastDate: coverage.lastDate,
         lastDateInProgress: coverage.lastDateInProgress,
+        marks: p.marks,
       });
-      const noPunches = inPeriod === 0;
+      const noPunches = inPeriod === 0 && ![...(p.marks?.keys() ?? [])].some((d) => d >= period.start && d <= period.end);
       const include = !!emp && !noPunches && !skipped[p.key];
-      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include };
+      // What the previous cut-off's pending days turned out to be (paid in this one).
+      const carryOver = emp ? biometricsAttendance({ employee: emp, period, detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes: "" }).biometricDetail?.carryOver : undefined;
+      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt, detail, rowSchedule, carryOver, correctionsApplied: corrected?.applied.length ?? 0 };
     });
-  }, [file, links, branchId, assigned, skipped, byId, employees, period, schedule, holidays, leaveRequests, coverage]);
+  }, [file, links, branchId, assigned, skipped, byId, employees, inCutoffEmployees, scheduleChoices, period, prevPeriod, covered, attendancePeriodRecords, schedule, holidays, leaveRequests, correctionRequests, coverage]);
 
   const included = rows.filter((r) => r.include);
   const dupes = new Set(included.map((r) => r.employeeId).filter((id, i, a) => a.indexOf(id) !== i));
-  const existing = new Set(attendancePeriodRecords.filter((r) => r.periodId === periodId).map((r) => r.employeeId));
+  const existing = inCutoffIds;
   const replacing = included.filter((r) => existing.has(r.employeeId)).length;
-  const branch = branches.find((b) => b.id === branchId);
+  const branch = branchId === ALL ? { id: ALL, name: "All branches" } : branches.find((b) => b.id === branchId);
   const scheduleOk = /^\d{2}:\d{2}$/.test(schedule.timeIn) && /^\d{2}:\d{2}$/.test(schedule.timeOut) && schedule.timeIn < schedule.timeOut;
   // Locked / closed cut-offs are already paid: their attendance stays as is.
   const periodLocked = !!period && period.status !== "open";
-  const canImport = !!branch && !!period && !periodLocked && scheduleOk && included.length > 0 && dupes.size === 0 && links !== null && !busy;
+  // HR can still save a past cut-off's day-by-day record (late, undertime,
+  // half days, absences, missing punches) for employees already in it —
+  // days worked, minutes, leaves and holidays, and so payroll, stay as paid.
+  const recordsOnly = periodLocked && !allowedBranchIds;
+  const targets = recordsOnly ? included.filter((r) => existing.has(r.employeeId)) : included;
+  const notInPeriod = included.length - targets.length;
+  const canImport = !!branch && !!period && (!periodLocked || recordsOnly) && scheduleOk && targets.length > 0 && dupes.size === 0 && links !== null && !busy;
 
   async function confirm() {
     if (!canImport || !period || !branch) return;
@@ -101,27 +178,16 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         .filter((r) => links?.find((l) => l.branchId === branchId && l.deviceKey === r.person.key)?.employeeId !== r.employeeId)
         .map((r) => ({ branchId, deviceKey: r.person.key, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId }));
       if (isRealAccount) await saveBiometricLinks(newLinks);
-      await importAttendancePeriodRecords(
-        period.id,
-        included.map((r) => ({
-          employeeId: r.employeeId,
-          daysWorked: r.computed.daysWorked,
-          holidayDays: r.computed.holidayDays,
-          slDays: r.computed.slDays,
-          vlDays: r.computed.vlDays,
-          lateMinutes: r.computed.lateMinutes,
-          undertimeMinutes: r.computed.undertimeMinutes,
-          notes: `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`,
-          lateInstances: r.computed.lateInstances,
-          lateDayDetails: r.computed.lateDayDetails,
-          undertimeInstances: r.computed.undertimeInstances,
-          undertimeDayDetails: r.computed.undertimeDayDetails,
-          absenceInstances: r.computed.absenceInstances,
-          absentDates: r.computed.absentDates,
-          missingPunches: r.computed.missingPunches,
-        })),
-      );
-      onImported(period.id);
+      const notes = (r: (typeof targets)[number]) =>
+        branchId === ALL ? `Attendance sheet — ${allBranches.find((b) => b.id === r.emp?.branchId)?.name ?? "no branch"} (${r.rowSchedule.timeIn}–${r.rowSchedule.timeOut})` : `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`;
+      const rowsToSave = targets.map((r) => biometricsAttendance({ employee: r.emp!, period, detail: r.detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes: notes(r) }));
+      if (recordsOnly) {
+        onImported(period.id, await updateAttendanceDetails(period.id, rowsToSave));
+        return;
+      }
+      if (allowedBranchIds && isRealAccount) await importBranchAttendanceRows(period.id, rowsToSave);
+      else await importAttendancePeriodRecords(period.id, rowsToSave);
+      onImported(period.id, rowsToSave.length);
     } catch (err) {
       reportSaveError("Couldn't import the biometrics", err);
     } finally {
@@ -145,6 +211,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
             <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Branch</span>
             <select value={branchId} onChange={(e) => chooseBranch(e.target.value)} className={`${input} w-full`}>
               <option value="">Choose the branch…</option>
+              {!allowedBranchIds && <option value={ALL}>All branches (each employee&rsquo;s own schedule)</option>}
               {branches
                 .filter((b) => b.id !== "br-unassigned")
                 .map((b) => (
@@ -165,16 +232,34 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
             </select>
           </label>
           <div>
-            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Schedule (Mon–Sat, no grace period)</span>
-            <div className="flex items-center gap-1.5">
-              <input type="time" value={schedule.timeIn} onChange={(e) => setSchedule((s) => ({ ...s, timeIn: e.target.value }))} className={`${input} w-full`} aria-label="Time in" />
-              <span className="text-[var(--text-muted)]">–</span>
-              <input type="time" value={schedule.timeOut} onChange={(e) => setSchedule((s) => ({ ...s, timeOut: e.target.value }))} className={`${input} w-full`} aria-label="Time out" />
-            </div>
+            <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{branchId === ALL ? "Schedule (each employee's branch)" : "Schedule (Mon–Sat, no grace period)"}</span>
+            {branchId === ALL ? (
+              <div className="text-xs text-[var(--text-secondary)]">
+                {scheduleGroups.map((g) => (
+                  <div key={g.label}>
+                    <span className="tabular">{g.label}</span> · {g.names.join(", ")}
+                  </div>
+                ))}
+                <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">Someone who clearly kept another shift is checked against it.</div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <input type="time" value={schedule.timeIn} onChange={(e) => setSchedule((s) => ({ ...s, timeIn: e.target.value }))} className={`${input} w-full`} aria-label="Time in" />
+                <span className="text-[var(--text-muted)]">–</span>
+                <input type="time" value={schedule.timeOut} onChange={(e) => setSchedule((s) => ({ ...s, timeOut: e.target.value }))} className={`${input} w-full`} aria-label="Time out" />
+              </div>
+            )}
           </div>
         </div>
 
-        {periodLocked && period && (
+        {recordsOnly && period && (
+          <div className="rounded-lg border border-[var(--series-1)]/40 p-3 text-xs text-[var(--text-secondary)]">
+            {formatDate(period.start)} – {formatDate(period.end)} is {period.status} in Payroll Processing: only the attendance record is saved (late, undertime, half days, absences and missing punches per day). Days worked, late/undertime minutes, leaves and holidays stay as they are, so payroll and payslips don&rsquo;t change.
+            {notInPeriod > 0 && <> {notInPeriod} employee{notInPeriod === 1 ? " has" : "s have"} no attendance in this cut-off and {notInPeriod === 1 ? "is" : "are"} skipped.</>}
+          </div>
+        )}
+
+        {periodLocked && !recordsOnly && period && (
           <div className="rounded-lg border border-[var(--status-critical)]/40 p-3 text-xs text-[var(--status-critical)]">
             {formatDate(period.start)} – {formatDate(period.end)} is {period.status} in Payroll Processing, so its attendance can&rsquo;t be replaced. You can still review the figures here; to import them, reopen the cut-off first.
           </div>
@@ -186,11 +271,12 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
           </div>
         )}
 
-        {(file.unidentified > 0 || (coverage.lastDate && period && coverage.lastDate < period.end) || replacing > 0 || dupes.size > 0) && (
+        {(file.unidentified > 0 || (coverage.lastDate && period && coverage.lastDate < period.end) || (replacing > 0 && !recordsOnly) || dupes.size > 0) && (
           <div className="space-y-1 rounded-lg border border-[var(--status-warning)]/40 p-3 text-xs text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
             {coverage.lastDate && period && coverage.lastDate < period.end && (
               <div>
-                The file only has punches up to <b>{formatDate(coverage.lastDate)}</b>: the days after it aren&rsquo;t counted (not as absences either). Import the complete file after the cut-off to finish it.
+                The file only has punches up to <b>{formatDate(coverage.lastDate)}</b>
+                {coverage.lastDateInProgress ? " (downloaded during that day)" : ""}: {recordsOnly ? "the days after it aren't counted (not as absences either)." : "the days after it count as present for now, with no late or undertime. Next cut-off's file settles them — any absence, late or undertime found then is deducted in that payroll."}
               </div>
             )}
             {file.unidentified > 0 && (
@@ -198,7 +284,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
                 {file.unidentified} block{file.unidentified === 1 ? " has" : "s have"} no name and no ID in the file, so {file.unidentified === 1 ? "it" : "they"} can&rsquo;t be imported — enter {file.unidentified === 1 ? "that person" : "those people"} by hand.
               </div>
             )}
-            {replacing > 0 && <div>{replacing} employee{replacing === 1 ? " already has" : "s already have"} attendance for this cut-off — importing replaces it with the biometrics figures.</div>}
+            {replacing > 0 && !recordsOnly && <div>{replacing} employee{replacing === 1 ? " already has" : "s already have"} attendance for this cut-off — importing replaces it with the biometrics figures.</div>}
             {dupes.size > 0 && <div className="text-[var(--status-critical)]">The same employee is matched to more than one person in the file: {[...dupes].map((id) => (byId.get(id) ? fullName(byId.get(id)!) : id)).join(", ")}.</div>}
           </div>
         )}
@@ -240,6 +326,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
                       ))}
                     </select>
                     {r.saved && !assigned[r.person.key] && <div className="text-[10px] text-[var(--text-muted)]">matched before</div>}
+                    {branchId === ALL && r.emp && <div className="text-[10px] text-[var(--text-muted)]">{allBranches.find((b) => b.id === r.emp!.branchId)?.name ?? "No branch"} · {r.rowSchedule.timeIn}–{r.rowSchedule.timeOut}</div>}
                   </td>
                   {r.noPunches ? (
                     <td colSpan={6} className="px-2 py-2 text-xs text-[var(--text-muted)]">
@@ -247,14 +334,27 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
                     </td>
                   ) : (
                     <>
-                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.daysWorked}</td>
-                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.lateMinutes ? `${r.computed.lateMinutes}m (${r.computed.lateInstances}×)` : "—"}</td>
-                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.undertimeMinutes ? `${r.computed.undertimeMinutes}m (${r.computed.undertimeInstances}×)` : "—"}</td>
+                      <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.exempt ? <span title="Fixed-rate: paid by the half-month">—</span> : r.computed.daysWorked}
+                        {r.computed.halfDayInstances > 0 && <div className="text-[10px] text-[var(--text-muted)]" title={r.computed.halfDayDates.map(shortDate).join(", ")}>{r.computed.halfDayInstances} half day{r.computed.halfDayInstances === 1 ? "" : "s"}</div>}
+                        {!recordsOnly && r.computed.pendingDates.length > 0 && <div className="text-[10px] text-[var(--text-muted)]" title={r.computed.pendingDates.map(shortDate).join(", ")}>incl. {r.computed.pendingDates.length} not in the file yet</div>}
+                      </td>
+                      {r.exempt ? (
+                        <td colSpan={2} className="px-2 py-2 text-xs text-[var(--text-muted)]" title={`Biometrics: late ${r.computed.lateMinutes}m, undertime ${r.computed.undertimeMinutes}m`}>
+                          Fixed-rate — no late/undertime deduction
+                        </td>
+                      ) : (
+                        <>
+                          <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.lateMinutes ? `${r.computed.lateMinutes}m (${r.computed.lateInstances}×)` : "—"}</td>
+                          <td className="tabular px-2 py-2 text-[var(--text-secondary)]">{r.computed.undertimeMinutes ? `${r.computed.undertimeMinutes}m (${r.computed.undertimeInstances}×)` : "—"}</td>
+                        </>
+                      )}
                       <td className="px-2 py-2 text-xs text-[var(--text-secondary)]" title={r.computed.absentDates.map(shortDate).join(", ")}>
                         {r.computed.absenceInstances || "—"}
                       </td>
                       <td className="tabular px-2 py-2 text-xs text-[var(--text-secondary)]">{r.computed.vlDays || r.computed.slDays ? `${r.computed.vlDays} / ${r.computed.slDays}` : "—"}</td>
                       <td className="px-2 py-2 text-xs">
+                        {r.carryOver && <CarryOverNote carry={r.carryOver} />}
+                        {r.correctionsApplied > 0 && <div className="text-[10px] text-[var(--status-good)]">{r.correctionsApplied} approved correction{r.correctionsApplied === 1 ? "" : "s"} applied</div>}
                         {r.computed.missingPunches.length ? (
                           <span className="text-[var(--status-warning)]">
                             {r.computed.missingPunches.map((m) => `${shortDate(m.date)} (no time ${m.missing})`).join(", ")}
@@ -282,7 +382,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         </div>
 
         <div className="text-xs text-[var(--text-muted)]">
-          First punch = time in, last punch = time out. Late and undertime are counted from the schedule above with no grace period. Missing punches are flagged for you and shown to the employee on their attendance, so they can file an attendance correction. Matches you choose are remembered for this branch.
+          First punch = time in, last punch = time out. Late and undertime are counted from the schedule above with no grace period; fixed-rate employees have none deducted. Missing punches are flagged for you and shown to the employee on their attendance, so they can file an attendance correction. Matches you choose are remembered for this branch.
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -291,10 +391,29 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
             Cancel
           </button>
           <button onClick={confirm} disabled={!canImport} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
-            {busy ? "Importing…" : `Import ${included.length} employee${included.length === 1 ? "" : "s"}${missingCount ? ` · ${missingCount} missing punch${missingCount === 1 ? "" : "es"} flagged` : ""}`}
+            {busy ? "Importing…" : recordsOnly ? `Save records for ${targets.length} employee${targets.length === 1 ? "" : "s"} (payroll unchanged)` : `Import ${included.length} employee${included.length === 1 ? "" : "s"}${missingCount ? ` · ${missingCount} missing punch${missingCount === 1 ? "" : "es"} flagged` : ""}`}
           </button>
         </div>
       </div>
     </Modal>
+  );
+}
+
+// The previous cut-off's pending days, as this file shows them.
+export function CarryOverNote({ carry }: { carry: BiometricCarryOver }) {
+  const late = carry.lateDayDetails.reduce((t, x) => t + x.lateRawMinutes, 0);
+  const under = carry.undertimeDayDetails.reduce((t, x) => t + x.undertimeRawMinutes, 0);
+  const parts = [
+    carry.absentDates.length ? `${carry.absentDates.length} absent (${carry.absentDates.map(shortDate).join(", ")})` : "",
+    late ? `${late}m late` : "",
+    under ? `${under}m undertime` : "",
+    carry.missingPunches.length ? `${carry.missingPunches.length} missing punch${carry.missingPunches.length === 1 ? "" : "es"}` : "",
+  ].filter(Boolean);
+  if (!parts.length && !carry.unsettled.length) return <div className="text-[10px] text-[var(--text-muted)]">Last cut-off&rsquo;s pending days: all present</div>;
+  return (
+    <div className="text-[10px] text-[var(--status-warning)]" title="Days the last cut-off's file didn't reach, paid as present then; deducted in this payroll">
+      {parts.length > 0 && <>From last cut-off: {parts.join(", ")}</>}
+      {carry.unsettled.length > 0 && <div className="text-[var(--text-muted)]">{carry.unsettled.map(shortDate).join(", ")} not in this file — still counted present</div>}
+    </div>
   );
 }

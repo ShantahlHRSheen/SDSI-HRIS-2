@@ -1,4 +1,4 @@
-import type { Holiday, LateDayDetail, LeaveRequest, UndertimeDayDetail } from "../types";
+import type { BiometricDayMark, Holiday, LateDayDetail, LeaveRequest, UndertimeDayDetail } from "../types";
 
 // Attendance for one person and one payroll cut-off, worked out from their
 // biometrics punches and their branch's schedule:
@@ -14,9 +14,14 @@ import type { Holiday, LateDayDetail, LeaveRequest, UndertimeDayDetail } from ".
 //     employee has an approved leave that day;
 //   * approved Vacation / Sick Leave (with pay) days fill in VL / SL days;
 //   * regular holidays on work days count as holiday days (paid);
-//   * days after the file's last date aren't counted at all (the file was
-//     downloaded before the cut-off ended), and on the day it was downloaded
-//     a time in without a time out isn't a missing punch (still at work).
+//   * days after the file's last date (the file was downloaded before the
+//     cut-off ended) count as present, with no late / undertime — "pending":
+//     the next cut-off's file settles them (see settlePending in
+//     corrections.ts); on the day it was downloaded a time in without a time
+//     out isn't a missing punch (still at work) and its time out is pending;
+//   * a day marked instead of punched (HR's sheet): SL / VL fill in a leave
+//     day, unpaid leave isn't an absence, a half day counts ½ day, and work
+//     at another branch / outside counts as a day worked.
 
 export interface BranchSchedule {
   timeIn: string; // "08:00"
@@ -41,10 +46,18 @@ export interface ComputedAttendance {
   undertimeInstances: number;
   undertimeDayDetails: UndertimeDayDetail[];
   absenceInstances: number;
+  // Days in after mid-shift or out before it — a record only: those days
+  // still count as worked, with the late / undertime minutes as usual.
+  halfDayInstances: number;
+  halfDayDates: string[];
   absentDates: string[];
   missingPunches: MissingPunch[];
   // Days with punches outside the cut-off are ignored; this counts days in it.
   daysWithPunches: number;
+  // Days after the file's last date, counted as present until the next file
+  // shows them; and the download day whose time out isn't in the file yet.
+  pendingDates: string[];
+  pendingTimeOut: string | null;
 }
 
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
@@ -75,13 +88,42 @@ function leaveDayWeights(leave: LeaveRequest, holidays: Set<string>): Map<string
 // The file's last date with punches, and whether most people only have a
 // time in that day (the file was downloaded mid-shift).
 export function fileCoverage(people: { days: Map<string, string[]> }[], schedule: BranchSchedule): { lastDate: string | null; lastDateInProgress: boolean } {
+  // The last day a fair share of people punched: a stray punch or two on a
+  // later day (file downloaded that morning) doesn't stretch the file.
+  const perDay = new Map<string, number>();
+  for (const p of people) for (const [d, t] of p.days) if (t.length) perDay.set(d, (perDay.get(d) ?? 0) + 1);
+  const busiest = Math.max(0, ...perDay.values());
   let lastDate: string | null = null;
-  for (const p of people) for (const [d, t] of p.days) if (t.length && (!lastDate || d > lastDate)) lastDate = d;
+  for (const [d, n] of perDay) if (n >= busiest * 0.25 && (!lastDate || d > lastDate)) lastDate = d;
   if (!lastDate) return { lastDate: null, lastDateInProgress: false };
   const midpoint = (minutes(schedule.timeIn) + minutes(schedule.timeOut)) / 2;
   const that = people.map((p) => distinctPunches(p.days.get(lastDate!) ?? [])).filter((t) => t.length);
   const onlyIn = that.filter((t) => t.length === 1 && minutes(t[0]) < midpoint).length;
   return { lastDate, lastDateInProgress: that.length > 0 && onlyIn / that.length >= 0.5 };
+}
+
+// The shift someone actually kept, from their days with both a time in and
+// a time out: of the branch schedules, the one closest to their usual
+// (median) time in and time out. Their own branch's schedule is kept unless
+// another fits better by over an hour a day — so habitual lateness still
+// counts. Null with fewer than 3 such days.
+export function inferSchedule(days: Map<string, string[]>, candidates: BranchSchedule[], preferred?: BranchSchedule): BranchSchedule | null {
+  const ins: number[] = [];
+  const outs: number[] = [];
+  for (const t of days.values()) {
+    const p = distinctPunches(t);
+    if (p.length < 2) continue;
+    ins.push(minutes(p[0]));
+    outs.push(minutes(p[p.length - 1]));
+  }
+  if (ins.length < 3) return null;
+  const median = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  const mi = median(ins);
+  const mo = median(outs);
+  const cost = (s: BranchSchedule) => Math.abs(mi - minutes(s.timeIn)) + Math.abs(mo - minutes(s.timeOut));
+  const best = [...candidates].sort((a, b) => cost(a) - cost(b))[0];
+  if (preferred && (!best || cost(preferred) - cost(best) <= 60)) return preferred;
+  return best ?? null;
 }
 
 export function computeAttendance(input: {
@@ -96,6 +138,7 @@ export function computeAttendance(input: {
   // still in progress when the file was downloaded.
   fileLastDate?: string | null;
   lastDateInProgress?: boolean;
+  marks?: Map<string, BiometricDayMark>;
 }): ComputedAttendance {
   const { schedule, periodStart, periodEnd } = input;
   const schedIn = minutes(schedule.timeIn);
@@ -128,9 +171,13 @@ export function computeAttendance(input: {
     undertimeInstances: 0,
     undertimeDayDetails: [],
     absenceInstances: 0,
+    halfDayInstances: 0,
+    halfDayDates: [],
     absentDates: [],
     missingPunches: [],
     daysWithPunches: 0,
+    pendingDates: [],
+    pendingTimeOut: null,
   };
   const hired = input.dateHired?.slice(0, 10) ?? null;
 
@@ -141,7 +188,26 @@ export function computeAttendance(input: {
     out.vlDays += vl.get(d) ?? 0;
     out.slDays += sl.get(d) ?? 0;
 
+    const mark = input.marks?.get(d);
+    if (punches.length === 0 && mark && isWorkDay(d)) {
+      if (mark === "SL" && !onLeave.has(d)) out.slDays++;
+      if (mark === "VL" && !onLeave.has(d)) out.vlDays++;
+      if (mark === "half") {
+        out.daysWorked += 0.5;
+        out.halfDayInstances++;
+        out.halfDayDates.push(d);
+      }
+      if (mark === "field") out.daysWorked++;
+      continue; // "unpaid" / "holiday": not an absence
+
+    }
     if (punches.length === 0) {
+      // The download day, before this person's shift had started: pending too.
+      if (input.lastDateInProgress && d === input.fileLastDate && isWorkDay(d) && !holidayDates.has(d) && !onLeave.has(d) && !(hired && d < hired)) {
+        out.daysWorked++;
+        out.pendingDates.push(d);
+        continue;
+      }
       if (isWorkDay(d) && !holidayDates.has(d) && !onLeave.has(d) && !(hired && d < hired)) {
         out.absenceInstances++;
         out.absentDates.push(d);
@@ -158,12 +224,18 @@ export function computeAttendance(input: {
       if (t < midpoint) timeIn = t;
       else timeOut = t;
       const stillAtWork = timeOut === null && input.lastDateInProgress && d === input.fileLastDate;
-      if (!stillAtWork) out.missingPunches.push({ date: d, missing: timeIn === null ? "in" : "out", punch: punches[0] });
+      if (stillAtWork) out.pendingTimeOut = d;
+      if (!stillAtWork && mark !== "half") out.missingPunches.push({ date: d, missing: timeIn === null ? "in" : "out", punch: punches[0] });
     } else {
       timeIn = minutes(punches[0]);
       timeOut = minutes(punches[punches.length - 1]);
     }
     if (!isWorkDay(d)) continue; // Sunday work: counted as a day, no late/undertime.
+    // A day the file marks as a half day is one, whatever its punches.
+    if (mark === "half" || (timeIn !== null && timeOut !== null && (timeIn >= midpoint || timeOut <= midpoint))) {
+      out.halfDayInstances++;
+      out.halfDayDates.push(d);
+    }
     if (timeIn !== null && timeIn > schedIn) {
       const late = timeIn - schedIn;
       out.lateMinutes += late;
@@ -177,7 +249,25 @@ export function computeAttendance(input: {
       out.undertimeDayDetails.push({ date: d, undertimeRawMinutes: under });
     }
   }
+  // Days the file doesn't reach yet: present (paid), settled next cut-off.
+  if (end < periodEnd)
+    for (const d of datesBetween(addDays(end, 1), periodEnd)) {
+      if (isWorkDay(d) && regularHolidays.has(d)) out.holidayDays++;
+      out.vlDays += vl.get(d) ?? 0;
+      out.slDays += sl.get(d) ?? 0;
+      if (!isWorkDay(d) || holidayDates.has(d) || onLeave.has(d) || (hired && d < hired)) continue;
+      out.daysWorked++;
+      out.pendingDates.push(d);
+    }
   out.vlDays = Math.round(out.vlDays * 100) / 100;
   out.slDays = Math.round(out.slDays * 100) / 100;
   return out;
+}
+
+// Dates a file really covers: days a fair share of its people punched.
+export function coveredDates(people: { days: Map<string, string[]> }[]): string[] {
+  const perDay = new Map<string, number>();
+  for (const p of people) for (const [d, t] of p.days) if (t.length) perDay.set(d, (perDay.get(d) ?? 0) + 1);
+  const busiest = Math.max(0, ...perDay.values());
+  return [...perDay].filter(([, n]) => n >= busiest * 0.25).map(([d]) => d).sort();
 }

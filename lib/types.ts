@@ -468,7 +468,60 @@ export interface AttendancePeriodRecord {
   absentDates?: string[];
   // Biometrics import: days with only a time in or only a time out.
   missingPunches?: { date: string; missing: "in" | "out"; punch: string }[];
+  // Biometrics import: what the figures were worked out from, so approved
+  // attendance corrections can be applied later (lib/biometrics/corrections.ts).
+  biometricDetail?: BiometricDetail | null;
 }
+
+export interface BiometricDetail {
+  branchId: string;
+  schedule: { timeIn: string; timeOut: string };
+  // Fixed-rate: imported with no days / late / undertime.
+  exempt: boolean;
+  // Each day's punches as read from the file ("YYYY-MM-DD" → ["08:00", "17:00"]).
+  days: Record<string, string[]>;
+  fileLastDate: string | null;
+  lastDateInProgress: boolean;
+  // Attendance corrections now reflected in the figures.
+  correctionIds?: string[];
+  // Days marked in the file instead of punched (HR's attendance sheet).
+  marks?: Record<string, BiometricDayMark>;
+  // Days the file didn't reach (downloaded before the cut-off ended), paid as
+  // present; and the download day whose time out wasn't in the file yet.
+  pending?: { dates: string[]; timeOutDate: string | null };
+  // The file's punches for the days just before this cut-off (and which of
+  // them the file really covers) — to settle the previous cut-off's pending days.
+  earlier?: { days: Record<string, string[]>; covered: string[] };
+  // The previous cut-off's pending days, as the next file shows them — the
+  // input for settling them in this cut-off (recomputed with corrections).
+  prior?: {
+    periodId: string;
+    start: string;
+    end: string;
+    dates: string[];
+    timeOutDate: string | null;
+    schedule: { timeIn: string; timeOut: string };
+    days: Record<string, string[]>;
+    covered: string[];
+  };
+  // What settling them found, added to this cut-off's figures.
+  carryOver?: BiometricCarryOver;
+}
+
+export interface BiometricCarryOver {
+  periodId: string;
+  absentDates: string[];
+  lateDayDetails: LateDayDetail[];
+  undertimeDayDetails: UndertimeDayDetail[];
+  missingPunches: { date: string; missing: "in" | "out"; punch: string }[];
+  // Pending days this file doesn't show either: still counted as present.
+  unsettled: string[];
+}
+
+// SL / VL: on leave · unpaid: leave without pay · half: half day ·
+// field: working at another branch / outside (counted as present) ·
+// holiday: a holiday per the file (not an absence).
+export type BiometricDayMark = "SL" | "VL" | "unpaid" | "half" | "field" | "holiday";
 
 // Per-employee, per-period manual inputs/overrides layered on top of the
 // automatic payroll computation — allowance amounts, loans/deductions the

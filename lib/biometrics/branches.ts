@@ -13,7 +13,9 @@ export const BRANCH_SCHEDULES: Record<string, BranchSchedule> = {
   "br-lcn": { timeIn: "09:00", timeOut: "18:00" }, // Lucena
   "br-ceb": { timeIn: "10:00", timeOut: "19:00" }, // Cebu
   "br-mnl": { timeIn: "10:00", timeOut: "19:00" }, // Manila
+  "br-mdu": { timeIn: "10:00", timeOut: "19:00" }, // Mandaue
   "br-dvo": { timeIn: "11:00", timeOut: "20:00" }, // Davao
+  "br-bcd": { timeIn: "11:00", timeOut: "20:00" }, // Bacolod
 };
 
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
@@ -30,10 +32,11 @@ const tokens = (s: string) => normalizeName(s).split(" ").filter((t) => t.length
 // last name, or — if exactly one employee fits — every word of the file's
 // name found in theirs ("FRANK JONH DELA CRUZ" → Frank Jonh Paul Dela Cruz).
 // Nicknames ("kboy") match no one; HR picks the employee once.
-export function matchEmployeeByName(name: string, employees: Employee[]): Employee | undefined {
+// `includeFormer`: also resigned / terminated employees (for a past cut-off).
+export function matchEmployeeByName(name: string, employees: Employee[], includeFormer = false): Employee | undefined {
   const n = normalizeName(name);
   if (!n || n.split(" ").length < 2) return undefined;
-  const current = employees.filter((e) => e.status !== "resigned" && e.status !== "terminated");
+  const current = includeFormer ? employees : employees.filter((e) => e.status !== "resigned" && e.status !== "terminated");
   const exact = current.filter((e) => normalizeName(`${e.firstName} ${e.lastName}`) === n || normalizeName(`${e.lastName}, ${e.firstName}`) === n);
   if (exact.length === 1) return exact[0];
   const want = tokens(name);

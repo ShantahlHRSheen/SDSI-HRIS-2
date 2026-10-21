@@ -1,5 +1,6 @@
 "use client";
 
+import { useApplyApprovedCorrections } from "@/components/attendance/useApplyApprovedCorrections";
 import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, FileCheck2, Lock, LockOpen, Pencil, Upload, Wallet } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -43,6 +44,8 @@ export default function PayrollProcessingPage() {
     updateGeneratedPayslip,
     currentUser,
   } = useHris();
+  // Approved attendance corrections update biometrics attendance.
+  useApplyApprovedCorrections();
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
 
   const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
