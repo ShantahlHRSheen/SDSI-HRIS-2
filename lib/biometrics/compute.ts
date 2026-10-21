@@ -82,8 +82,13 @@ function leaveDayWeights(leave: LeaveRequest, holidays: Set<string>): Map<string
 // The file's last date with punches, and whether most people only have a
 // time in that day (the file was downloaded mid-shift).
 export function fileCoverage(people: { days: Map<string, string[]> }[], schedule: BranchSchedule): { lastDate: string | null; lastDateInProgress: boolean } {
+  // The last day a fair share of people punched: a stray punch or two on a
+  // later day (file downloaded that morning) doesn't stretch the file.
+  const perDay = new Map<string, number>();
+  for (const p of people) for (const [d, t] of p.days) if (t.length) perDay.set(d, (perDay.get(d) ?? 0) + 1);
+  const busiest = Math.max(0, ...perDay.values());
   let lastDate: string | null = null;
-  for (const p of people) for (const [d, t] of p.days) if (t.length && (!lastDate || d > lastDate)) lastDate = d;
+  for (const [d, n] of perDay) if (n >= busiest * 0.25 && (!lastDate || d > lastDate)) lastDate = d;
   if (!lastDate) return { lastDate: null, lastDateInProgress: false };
   const midpoint = (minutes(schedule.timeIn) + minutes(schedule.timeOut)) / 2;
   const that = people.map((p) => distinctPunches(p.days.get(lastDate!) ?? [])).filter((t) => t.length);
