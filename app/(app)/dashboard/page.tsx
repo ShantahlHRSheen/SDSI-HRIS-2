@@ -151,9 +151,45 @@ export default function DashboardPage() {
         subtitle={`As of ${formatDate(TODAY)} · Company-wide unless noted`}
       />
 
+      {/* --- Monthly Employer Payroll Expense -------------------------------- */}
+      <section className="mt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Monthly Employer Payroll Expense</h2>
+          <Link href="/reports/payroll-expense" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatTile label="Total payroll expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense + voucherTotal)} hint={`${monthTag} · payroll + vouchers`} />
+          <StatTile label="Basic salary" value={formatCurrencyCompact(currentPayroll.basicSalary)} />
+          <StatTile label="Employer SSS + HDMF + PhilHealth" value={formatCurrencyCompact(currentPayroll.employerSSS + currentPayroll.employerHDMF + currentPayroll.employerPhilHealth)} />
+          <StatTile label="OT + Holiday + Leave pay" value={formatCurrencyCompact(currentPayroll.overtimePay + currentPayroll.holidayPay + currentPayroll.leavePay)} />
+          <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint="department vouchers" />
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend (incl. vouchers) — last 12 months</div>
+            <TrendChart data={payrollTrend} color="var(--series-1)" valueFormatter={(v) => formatCurrencyCompact(v)} />
+          </div>
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">
+              {variant === "team" ? `Team payroll expense (${monthTag})` : `Payroll expense by branch (${monthTag})`}
+            </div>
+            <HBarChart data={branchExpense} valueFormatter={(v) => formatCurrencyCompact(v)} />
+          </div>
+        </div>
+        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-[var(--gridline)]/30 p-2 text-xs text-[var(--text-secondary)]">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Payroll expense = Basic Salary + Allowances + Overtime Pay + Holiday Pay + Leave Pay + Employer SSS + Employer
+            HDMF (Pag-IBIG) + Employer PhilHealth, plus the department vouchers. Contribution percentages are illustrative placeholders — configure
+            verified, versioned rate tables in System Administration before relying on this for actual payroll.
+          </span>
+        </div>
+      </section>
+
+      {/* --- Headcount and employment status mix ----------------------------- */}
       {variant !== "payroll" && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <StatTile label="Active employees" value={active.length.toLocaleString()} hint="Regular + on-leave" />
             <StatTile label="Regular" value={statusCounts.regular.toString()} />
             <StatTile label="Probationary" value={statusCounts.probationary.toString()} />
@@ -171,6 +207,39 @@ export default function DashboardPage() {
             />
           </div>
         </>
+      )}
+
+      {/* --- Birthdays, new hires, resignations ----------------------------- */}
+      {variant !== "payroll" && (
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <ListCard
+            title="Upcoming birthdays"
+            icon={<Cake size={16} />}
+            items={birthdays.slice(0, 6).map(({ employee, daysUntil }) => (
+              <PersonRow key={employee.id} employee={employee} right={<Badge tone="info">{daysUntil === 0 ? "Today" : `in ${daysUntil}d`}</Badge>} />
+            ))}
+            emptyText="No birthdays in the next 30 days."
+            href="/employees"
+          />
+          <ListCard
+            title="New hires (60d)"
+            icon={<UserPlus size={16} />}
+            items={hires.map((e) => (
+              <PersonRow key={e.id} employee={e} right={<Badge tone="good">{formatDate(e.dateHired)}</Badge>} />
+            ))}
+            emptyText="No new hires in the last 60 days."
+            href="/employees"
+          />
+          <ListCard
+            title="Recent resignations (30d)"
+            icon={<UserMinus size={16} />}
+            items={resignations.map((e) => (
+              <PersonRow key={e.id} employee={e} right={<Badge tone="critical">{e.statusChangedAt ? formatDate(e.statusChangedAt) : ""}</Badge>} />
+            ))}
+            emptyText="No resignations in the last 30 days."
+            href="/employees"
+          />
+        </div>
       )}
 
       {/* --- Monthly Attendance --------------------------------------------- */}
@@ -245,73 +314,6 @@ export default function DashboardPage() {
             />
           </div>
         </section>
-      )}
-
-      {/* --- Monthly Employer Payroll Expense -------------------------------- */}
-      <section className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Monthly Employer Payroll Expense</h2>
-          <Link href="/reports/payroll-expense" className="text-xs text-[var(--series-1)] hover:underline">Full report →</Link>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatTile label="Total payroll expense" value={formatCurrencyCompact(currentPayroll.totalEmployerExpense + voucherTotal)} hint={`${monthTag} · payroll + vouchers`} />
-          <StatTile label="Basic salary" value={formatCurrencyCompact(currentPayroll.basicSalary)} />
-          <StatTile label="Employer SSS + HDMF + PhilHealth" value={formatCurrencyCompact(currentPayroll.employerSSS + currentPayroll.employerHDMF + currentPayroll.employerPhilHealth)} />
-          <StatTile label="OT + Holiday + Leave pay" value={formatCurrencyCompact(currentPayroll.overtimePay + currentPayroll.holidayPay + currentPayroll.leavePay)} />
-          <StatTile label="Vouchers" value={formatCurrencyCompact(voucherTotal)} hint="department vouchers" />
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Payroll expense trend (incl. vouchers) — last 12 months</div>
-            <TrendChart data={payrollTrend} color="var(--series-1)" valueFormatter={(v) => formatCurrencyCompact(v)} />
-          </div>
-          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
-            <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">
-              {variant === "team" ? `Team payroll expense (${monthTag})` : `Payroll expense by branch (${monthTag})`}
-            </div>
-            <HBarChart data={branchExpense} valueFormatter={(v) => formatCurrencyCompact(v)} />
-          </div>
-        </div>
-        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-[var(--gridline)]/30 p-2 text-xs text-[var(--text-secondary)]">
-          <Info size={14} className="mt-0.5 shrink-0" />
-          <span>
-            Payroll expense = Basic Salary + Allowances + Overtime Pay + Holiday Pay + Leave Pay + Employer SSS + Employer
-            HDMF (Pag-IBIG) + Employer PhilHealth, plus the department vouchers. Contribution percentages are illustrative placeholders — configure
-            verified, versioned rate tables in System Administration before relying on this for actual payroll.
-          </span>
-        </div>
-      </section>
-
-      {variant !== "payroll" && (
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <ListCard
-            title="Upcoming birthdays"
-            icon={<Cake size={16} />}
-            items={birthdays.slice(0, 6).map(({ employee, daysUntil }) => (
-              <PersonRow key={employee.id} employee={employee} right={<Badge tone="info">{daysUntil === 0 ? "Today" : `in ${daysUntil}d`}</Badge>} />
-            ))}
-            emptyText="No birthdays in the next 30 days."
-            href="/employees"
-          />
-          <ListCard
-            title="New hires (60d)"
-            icon={<UserPlus size={16} />}
-            items={hires.map((e) => (
-              <PersonRow key={e.id} employee={e} right={<Badge tone="good">{formatDate(e.dateHired)}</Badge>} />
-            ))}
-            emptyText="No new hires in the last 60 days."
-            href="/employees"
-          />
-          <ListCard
-            title="Recent resignations (30d)"
-            icon={<UserMinus size={16} />}
-            items={resignations.map((e) => (
-              <PersonRow key={e.id} employee={e} right={<Badge tone="critical">{e.statusChangedAt ? formatDate(e.statusChangedAt) : ""}</Badge>} />
-            ))}
-            emptyText="No resignations in the last 30 days."
-            href="/employees"
-          />
-        </div>
       )}
     </div>
   );
