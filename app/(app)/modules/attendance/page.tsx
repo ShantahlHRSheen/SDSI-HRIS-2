@@ -26,6 +26,24 @@ function missingPunchText(m: { date: string; missing: "in" | "out"; punch: strin
 
 const LATE_OUTLIER_AVG_MIN_PER_DAY = 60;
 
+// Late / undertime from the day-by-day record (biometrics or the tracker).
+// A closed cut-off keeps the minutes payroll used, which can differ (e.g.
+// late paid as an amount), so the record is shown beside them.
+function recordedMinutes(rec: AttendancePeriodRecord) {
+  const late = (rec.lateDayDetails ?? []).reduce((t, d) => t + (d.lateRawMinutes ?? 0), 0);
+  const under = (rec.undertimeDayDetails ?? []).reduce((t, d) => t + (d.undertimeRawMinutes ?? 0), 0);
+  return { late, lateTimes: rec.lateInstances ?? rec.lateDayDetails?.length ?? 0, under, underTimes: rec.undertimeInstances ?? rec.undertimeDayDetails?.length ?? 0 };
+}
+
+function RecordedNote({ paid, recorded, times }: { paid: number; recorded: number; times: number }) {
+  if (!recorded || recorded === paid) return null;
+  return (
+    <div className="text-[10px] text-[var(--text-muted)]" title="From the attendance record. Payroll used the figure above.">
+      record: {recorded} ({times}×)
+    </div>
+  );
+}
+
 function isLateOutlier(rec: { daysWorked: number; lateMinutes: number }): boolean {
   return rec.daysWorked > 0 && rec.lateMinutes / rec.daysWorked > LATE_OUTLIER_AVG_MIN_PER_DAY;
 }
@@ -190,8 +208,8 @@ export default function AttendancePage() {
             <StatTile label="Holiday days" value={myRecord.holidayDays.toString()} />
             <StatTile label="SL days" value={myRecord.slDays.toString()} />
             <StatTile label="VL days" value={myRecord.vlDays.toString()} />
-            <StatTile label="Late (min)" value={myRecord.lateMinutes.toString()} />
-            <StatTile label="Undertime (min)" value={myRecord.undertimeMinutes.toString()} />
+            <StatTile label="Late (min)" value={(myRecord.lateMinutes || recordedMinutes(myRecord).late).toString()} />
+            <StatTile label="Undertime (min)" value={(myRecord.undertimeMinutes || recordedMinutes(myRecord).under).toString()} />
           </div>
         )}
         {!!myRecord?.biometricDetail?.correctionIds?.length && (
@@ -284,6 +302,7 @@ export default function AttendancePage() {
                   <th className="px-3 py-2 font-medium">VL</th>
                   <th className="px-3 py-2 font-medium">Late (min)</th>
                   <th className="px-3 py-2 font-medium">Undertime (min)</th>
+                  <th className="px-3 py-2 font-medium" title="Absences / half days, from the attendance record">Absent / half</th>
                   <th className="px-3 py-2 font-medium">Source</th>
                   <th className="px-3 py-2 font-medium">Actions</th>
                 </tr>
@@ -299,6 +318,7 @@ export default function AttendancePage() {
                   .map((rec) => {
                     const emp = byId.get(rec.employeeId);
                     const outlier = isLateOutlier(rec);
+                    const rm = recordedMinutes(rec);
                     return (
                       <tr key={rec.id} className="border-b border-[var(--gridline)] last:border-0">
                         <td className="px-3 py-2 text-[var(--text-primary)]">
@@ -322,8 +342,15 @@ export default function AttendancePage() {
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">
                           <span className={outlier ? "text-[var(--status-warning)]" : ""}>{rec.lateMinutes}</span>
                           {outlier && <AlertTriangle size={12} className="ml-1 inline text-[var(--status-warning)]" />}
+                          <RecordedNote paid={rec.lateMinutes} recorded={rm.late} times={rm.lateTimes} />
                         </td>
-                        <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.undertimeMinutes}</td>
+                        <td className="tabular px-3 py-2 text-[var(--text-secondary)]">
+                          {rec.undertimeMinutes}
+                          <RecordedNote paid={rec.undertimeMinutes} recorded={rm.under} times={rm.underTimes} />
+                        </td>
+                        <td className="tabular px-3 py-2 text-xs text-[var(--text-secondary)]" title={[...(rec.absentDates ?? []).map((d) => `Absent ${formatDate(d)}`), ...(rec.halfDayDates ?? []).map((d) => `Half day ${formatDate(d)}`)].join("\n")}>
+                          {rec.absenceInstances || rec.halfDayInstances ? `${rec.absenceInstances ?? 0} / ${rec.halfDayInstances ?? 0}` : "—"}
+                        </td>
                         <td className="px-3 py-2"><Badge tone={rec.source === "import" ? "info" : "muted"}>{rec.source}</Badge></td>
                         <td className="px-3 py-2">
                           {emp && (
