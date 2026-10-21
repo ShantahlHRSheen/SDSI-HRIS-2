@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, Pencil, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
@@ -11,6 +11,8 @@ import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { branchName, departmentName, formatDate, fullName } from "@/lib/helpers";
 import { buildAttendanceImportPreview, parseAttendanceWorkbook, type AttendanceImportPreview } from "@/lib/attendance-import";
+import { buildDaroDtrPreview, latestDtrPeriod, parseDaroDtrWorkbook, type DtrPerson } from "@/lib/attendance-import-daro";
+import { currentCompany } from "@/lib/companies";
 import type { AttendancePeriodRecord, Employee } from "@/lib/types";
 
 const LATE_OUTLIER_AVG_MIN_PER_DAY = 60;
@@ -37,8 +39,19 @@ export default function AttendancePage() {
   const byId = new Map(employees.map((e) => [e.id, e]));
 
   const [editTarget, setEditTarget] = useState<{ employee: Employee; record: AttendancePeriodRecord | null } | null>(null);
-  const [importPreview, setImportPreview] = useState<AttendanceImportPreview | null>(null);
+  const [trackerPreview, setTrackerPreview] = useState<AttendanceImportPreview | null>(null);
+  // Daro's monthly DTR: read once, totalled for whichever period is chosen.
+  const [dtr, setDtr] = useState<DtrPerson[] | null>(null);
   const [importTargetPeriodId, setImportTargetPeriodId] = useState("");
+  const dtrPreview = useMemo(() => {
+    const target = payrollPeriods.find((p) => p.id === importTargetPeriodId);
+    return dtr && target ? buildDaroDtrPreview(dtr, employees, target) : null;
+  }, [dtr, importTargetPeriodId, payrollPeriods, employees]);
+  const importPreview = dtr ? dtrPreview : trackerPreview;
+  const closeImport = () => {
+    setTrackerPreview(null);
+    setDtr(null);
+  };
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,9 +62,15 @@ export default function AttendancePage() {
     setImportError(null);
     try {
       const buffer = await file.arrayBuffer();
+      if (currentCompany().attendanceImportFormat === "daro") {
+        const people = await parseDaroDtrWorkbook(buffer);
+        setImportTargetPeriodId(latestDtrPeriod(people, payrollPeriods)?.id ?? period?.id ?? "");
+        setDtr(people);
+        return;
+      }
       const parsed = await parseAttendanceWorkbook(buffer);
       const preview = buildAttendanceImportPreview(parsed, employees);
-      setImportPreview(preview);
+      setTrackerPreview(preview);
       const matchingPeriod = payrollPeriods.find((p) => p.start === preview.periodStart && p.end === preview.periodEnd);
       setImportTargetPeriodId(matchingPeriod?.id ?? period?.id ?? "");
     } catch (err) {
@@ -82,7 +101,7 @@ export default function AttendancePage() {
         absentDates: m.parsed.absentDates,
       })),
     );
-    setImportPreview(null);
+    closeImport();
     setPeriodId(importTargetPeriodId);
   }
 
@@ -236,7 +255,7 @@ export default function AttendancePage() {
           payrollPeriods={payrollPeriods}
           targetPeriodId={importTargetPeriodId}
           onTargetPeriodChange={setImportTargetPeriodId}
-          onCancel={() => setImportPreview(null)}
+          onCancel={closeImport}
           onConfirm={confirmImport}
         />
       )}
@@ -383,12 +402,23 @@ function ImportPreviewModal({
           </div>
         )}
 
+        {preview.matched.some((m) => m.similarName) && (
+          <div className="rounded-lg border border-[var(--status-warning)]/40 bg-[color-mix(in_srgb,var(--status-warning)_10%,transparent)] p-3">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--status-warning)]"><AlertTriangle size={14} /> Matched to a similarly spelled name — please check</div>
+            <ul className="space-y-0.5 text-xs text-[var(--text-secondary)]">
+              {preview.matched.filter((m) => m.similarName).map((m) => (
+                <li key={m.employee.id}>&ldquo;{m.parsed.rawName}&rdquo; → {m.employee.employeeNumber} {fullName(m.employee)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {preview.unmatched.length > 0 && (
           <div className="rounded-lg border border-[var(--border-hairline)] p-3">
             <div className="mb-1.5 text-xs font-medium text-[var(--text-primary)]">Not imported — no matching employee found ({preview.unmatched.length})</div>
             <ul className="space-y-0.5 text-xs text-[var(--text-secondary)]">
               {preview.unmatched.map((u, i) => (
-                <li key={i}>{u.rawName} — {u.branch} / {u.department}</li>
+                <li key={i}>{u.rawName} — {u.department ? `${u.branch} / ${u.department}` : u.branch}</li>
               ))}
             </ul>
           </div>

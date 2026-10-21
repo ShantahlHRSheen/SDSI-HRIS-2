@@ -59,6 +59,9 @@ export interface CompanyConfig {
   // Payroll Processing's columns, column names and payslip labels follow
   // this company's own payroll sheet (lib/payroll-layout.ts); standard if unset.
   payrollLayout?: "daro";
+  // Attendance's Import Excel reads this company's own DTR workbook
+  // (lib/attendance-import-daro.ts) instead of the attendance tracker export.
+  attendanceImportFormat?: "daro";
   // Payroll Processing lists each allowance (rice, uniform, laundry,
   // medical cash, additional) instead of one Allowances total.
   allowanceBreakdown?: boolean;
@@ -207,6 +210,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // workbook layout, with Daro's own columns — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "daro",
     payrollLayout: "daro",
+    // Monthly DTR, one sheet per branch: IN | OUT | IN | OUT per employee.
+    attendanceImportFormat: "daro",
     orgChartPhotos: true,
   },
 };
