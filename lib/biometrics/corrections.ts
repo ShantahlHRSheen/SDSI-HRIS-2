@@ -72,6 +72,8 @@ export function biometricsAttendance(input: {
     lateDayDetails: c.lateDayDetails,
     undertimeInstances: c.undertimeInstances,
     undertimeDayDetails: c.undertimeDayDetails,
+    halfDayInstances: c.halfDayInstances,
+    halfDayDates: c.halfDayDates,
     absenceInstances: c.absenceInstances,
     absentDates: c.absentDates,
     missingPunches: c.missingPunches,

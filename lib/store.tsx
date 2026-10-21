@@ -53,6 +53,7 @@ import {
   fetchVoucherAmountOverrides,
   fetchWorkSchedules,
   importAttendancePeriodRecordsRows,
+  updateAttendanceDetailRows,
   insertAnnouncement,
   deleteAnnouncementRow,
   insertAuditLog,
@@ -267,6 +268,8 @@ interface HrisContextShape {
 
   upsertAttendancePeriodRecord: (input: Omit<AttendancePeriodRecord, "id" | "source" | "updatedBy" | "updatedAt">) => void;
   importAttendancePeriodRecords: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => Promise<void>;
+  // Locked / closed cut-offs: save the day-by-day attendance details only (payroll unchanged).
+  updateAttendanceDetails: (periodId: string, rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[]) => Promise<number>;
 
   upsertPayrollLineOverride: (input: Omit<PayrollLineOverride, "id" | "updatedBy" | "updatedAt">) => void;
   // Resolves to an error message, or null on success.
@@ -852,6 +855,32 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       logAudit("Attendance", "import", `Imported attendance for ${rows.length} employee(s), period ${periodId}`);
     },
     [logAudit, currentUser, supabaseSession],
+  );
+
+  const updateAttendanceDetails: HrisContextShape["updateAttendanceDetails"] = useCallback(
+    async (periodId, rows) => {
+      if (!supabaseSession) {
+        const ids = new Map(rows.map((r) => [r.employeeId, r]));
+        let n = 0;
+        setState((prev) => ({
+          ...prev,
+          attendancePeriodRecords: prev.attendancePeriodRecords.map((r) => {
+            const row = r.periodId === periodId ? ids.get(r.employeeId) : undefined;
+            if (!row) return r;
+            n++;
+            const { lateInstances, lateDayDetails, undertimeInstances, undertimeDayDetails, halfDayInstances, halfDayDates, absenceInstances, absentDates, missingPunches } = row;
+            return { ...r, lateInstances, lateDayDetails, undertimeInstances, undertimeDayDetails, halfDayInstances, halfDayDates, absenceInstances, absentDates, missingPunches };
+          }),
+        }));
+        return n;
+      }
+      const updated = await updateAttendanceDetailRows(periodId, rows);
+      const byKey = new Map(updated.map((r) => [r.employeeId, r]));
+      setState((prev) => ({ ...prev, attendancePeriodRecords: prev.attendancePeriodRecords.map((r) => (r.periodId === periodId && byKey.has(r.employeeId) ? byKey.get(r.employeeId)! : r)) }));
+      logAudit("Attendance", "update", `Saved biometrics attendance records (payroll unchanged) for ${updated.length} employee(s), period ${periodId}`);
+      return updated.length;
+    },
+    [logAudit, supabaseSession],
   );
 
   const upsertPayrollLineOverride: HrisContextShape["upsertPayrollLineOverride"] = useCallback(
@@ -1800,6 +1829,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     addEmployee,
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
+    updateAttendanceDetails,
     upsertPayrollLineOverride,
     importPayrollRegister,
     updateGeneratedPayslip,
