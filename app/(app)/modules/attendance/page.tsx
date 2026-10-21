@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertTriangle, CalendarClock, Pencil, Upload } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CalendarClock, Fingerprint, Pencil, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { useSelectedPayrollPeriod } from "@/lib/use-payroll-period";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,6 +13,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { branchName, departmentName, formatDate, fullName } from "@/lib/helpers";
 import { buildAttendanceImportPreview, parseAttendanceWorkbook, type AttendanceImportPreview } from "@/lib/attendance-import";
 import type { AttendancePeriodRecord, Employee } from "@/lib/types";
+import { readSpreadsheet } from "@/lib/biometrics/read-sheets";
+import { parseBiometrics, type BioFile } from "@/lib/biometrics/parse";
+import { BiometricsImportModal } from "@/components/attendance/BiometricsImportModal";
+
+// "Oct 3 (no time-out, in at 08:24)" — a missing punch, for HR and the employee.
+function missingPunchText(m: { date: string; missing: "in" | "out"; punch: string }): string {
+  return `${formatDate(m.date).replace(/, \d{4}$/, "")} (no time-${m.missing}, ${m.missing === "out" ? "in" : "out"} at ${m.punch})`;
+}
 
 const LATE_OUTLIER_AVG_MIN_PER_DAY = 60;
 
@@ -41,6 +50,21 @@ export default function AttendancePage() {
   const [importTargetPeriodId, setImportTargetPeriodId] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bioInputRef = useRef<HTMLInputElement>(null);
+  const [bio, setBio] = useState<{ file: BioFile; name: string } | null>(null);
+
+  async function handleBiometricsSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportError(null);
+    try {
+      const sheets = await readSpreadsheet(await file.arrayBuffer());
+      setBio({ file: parseBiometrics(sheets, period?.start ?? new Date().toISOString().slice(0, 10)), name: file.name });
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Could not read this biometrics file.");
+    }
+  }
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -110,6 +134,25 @@ export default function AttendancePage() {
             <StatTile label="Undertime (min)" value={myRecord.undertimeMinutes.toString()} />
           </div>
         )}
+        {myRecord?.missingPunches && myRecord.missingPunches.length > 0 && (
+          <div className="mt-4 rounded-xl border border-[var(--status-warning)]/40 p-4 text-sm" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
+            <div className="flex items-center gap-1.5 font-medium text-[var(--text-primary)]">
+              <AlertTriangle size={15} className="text-[var(--status-warning)]" /> Missing punches ({myRecord.missingPunches.length})
+            </div>
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-[var(--text-secondary)]">
+              {myRecord.missingPunches.map((m) => (
+                <li key={m.date}>{missingPunchText(m)}</li>
+              ))}
+            </ul>
+            <div className="mt-2 text-xs text-[var(--text-secondary)]">
+              The biometrics recorded only one punch on these days. If you forgot to clock in or out,{" "}
+              <Link href="/modules/corrections" className="font-medium text-[var(--series-1)] hover:underline">
+                file an attendance correction
+              </Link>
+              .
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -122,6 +165,10 @@ export default function AttendancePage() {
         actions={
           <>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelected} />
+            <input ref={bioInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleBiometricsSelected} />
+            <button onClick={() => bioInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--series-1)] hover:bg-[var(--series-1)]/10">
+              <Fingerprint size={16} /> Import biometrics
+            </button>
             <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
               <Upload size={16} /> Import Excel
             </button>
@@ -189,7 +236,14 @@ export default function AttendancePage() {
                     const outlier = isLateOutlier(rec);
                     return (
                       <tr key={rec.id} className="border-b border-[var(--gridline)] last:border-0">
-                        <td className="px-3 py-2 text-[var(--text-primary)]">{emp ? fullName(emp) : rec.employeeId}</td>
+                        <td className="px-3 py-2 text-[var(--text-primary)]">
+                          {emp ? fullName(emp) : rec.employeeId}
+                          {rec.missingPunches && rec.missingPunches.length > 0 && (
+                            <span title={rec.missingPunches.map(missingPunchText).join("\n")} className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
+                              <AlertTriangle size={10} /> {rec.missingPunches.length} missing punch{rec.missingPunches.length === 1 ? "" : "es"}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{emp ? `${branchName(emp.branchId)} / ${departmentName(emp.departmentId)}` : "—"}</td>
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.daysWorked}</td>
                         <td className="tabular px-3 py-2 text-[var(--text-secondary)]">{rec.holidayDays}</td>
@@ -226,6 +280,18 @@ export default function AttendancePage() {
           onSave={(input) => {
             upsertAttendancePeriodRecord(input);
             setEditTarget(null);
+          }}
+        />
+      )}
+
+      {bio && (
+        <BiometricsImportModal
+          file={bio.file}
+          fileName={bio.name}
+          onClose={() => setBio(null)}
+          onImported={(id) => {
+            setBio(null);
+            setPeriodId(id);
           }}
         />
       )}

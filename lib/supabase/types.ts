@@ -290,6 +290,7 @@ export type AttendancePeriodRecordRow = {
   half_day_dates: string[] | null;
   absence_instances: number | null;
   absent_dates: string[] | null;
+  missing_punches?: { date: string; missing: "in" | "out"; punch: string }[] | null;
 };
 
 export type PayrollLineOverrideRow = {

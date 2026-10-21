@@ -466,6 +466,8 @@ export interface AttendancePeriodRecord {
   halfDayDates?: string[];
   absenceInstances?: number;
   absentDates?: string[];
+  // Biometrics import: days with only a time in or only a time out.
+  missingPunches?: { date: string; missing: "in" | "out"; punch: string }[];
 }
 
 // Per-employee, per-period manual inputs/overrides layered on top of the
