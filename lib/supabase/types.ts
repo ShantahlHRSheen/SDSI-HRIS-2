@@ -291,6 +291,7 @@ export type AttendancePeriodRecordRow = {
   absence_instances: number | null;
   absent_dates: string[] | null;
   missing_punches?: { date: string; missing: "in" | "out"; punch: string }[] | null;
+  biometric_detail?: import("../types").BiometricDetail | null;
 };
 
 export type PayrollLineOverrideRow = {

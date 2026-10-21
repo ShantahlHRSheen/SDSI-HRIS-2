@@ -1,5 +1,6 @@
 "use client";
 
+import { useApplyApprovedCorrections } from "@/components/attendance/useApplyApprovedCorrections";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Fingerprint, Pencil, Upload } from "lucide-react";
@@ -38,6 +39,8 @@ export default function AttendancePage() {
     upsertAttendancePeriodRecord,
     importAttendancePeriodRecords,
   } = useHris();
+  // Approved attendance corrections update biometrics attendance.
+  useApplyApprovedCorrections();
 
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
   const { period, setPeriodId } = useSelectedPayrollPeriod();
@@ -132,6 +135,11 @@ export default function AttendancePage() {
             <StatTile label="VL days" value={myRecord.vlDays.toString()} />
             <StatTile label="Late (min)" value={myRecord.lateMinutes.toString()} />
             <StatTile label="Undertime (min)" value={myRecord.undertimeMinutes.toString()} />
+          </div>
+        )}
+        {!!myRecord?.biometricDetail?.correctionIds?.length && (
+          <div className="mt-4 rounded-xl border border-[var(--status-good)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-good) 8%, transparent)" }}>
+            {myRecord.biometricDetail.correctionIds.length} approved attendance correction{myRecord.biometricDetail.correctionIds.length === 1 ? " is" : "s are"} already reflected in this attendance.
           </div>
         )}
         {myRecord?.missingPunches && myRecord.missingPunches.length > 0 && (
@@ -241,6 +249,11 @@ export default function AttendancePage() {
                           {rec.missingPunches && rec.missingPunches.length > 0 && (
                             <span title={rec.missingPunches.map(missingPunchText).join("\n")} className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
                               <AlertTriangle size={10} /> {rec.missingPunches.length} missing punch{rec.missingPunches.length === 1 ? "" : "es"}
+                            </span>
+                          )}
+                          {!!rec.biometricDetail?.correctionIds?.length && (
+                            <span title="Approved attendance corrections are reflected in these figures" className="ml-1.5 inline-block rounded bg-[var(--status-good)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-good)]">
+                              {rec.biometricDetail.correctionIds.length} correction{rec.biometricDetail.correctionIds.length === 1 ? "" : "s"} applied
                             </span>
                           )}
                         </td>

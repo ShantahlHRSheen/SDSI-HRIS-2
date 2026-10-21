@@ -787,7 +787,10 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       const actor = currentUser;
       if (supabaseSession) {
         try {
-          const entry = await upsertAttendancePeriodRecordRow(input, actor?.name ?? "System");
+          // A hand edit of a biometrics row is final: it stops being
+          // recomputed from the punches (lib/biometrics/corrections.ts).
+          const wasBiometrics = state.attendancePeriodRecords.some((r) => r.periodId === input.periodId && r.employeeId === input.employeeId && r.biometricDetail);
+          const entry = await upsertAttendancePeriodRecordRow(wasBiometrics ? { ...input, biometricDetail: null } : input, actor?.name ?? "System");
           setState((prev) => ({
             ...prev,
             attendancePeriodRecords: [entry, ...prev.attendancePeriodRecords.filter((r) => !(r.periodId === input.periodId && r.employeeId === input.employeeId))],
@@ -813,7 +816,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       });
       logAudit("Attendance", "update", `Manually updated attendance for period ${input.periodId}`);
     },
-    [logAudit, currentUser, supabaseSession],
+    [logAudit, currentUser, supabaseSession, state.attendancePeriodRecords],
   );
 
   const importAttendancePeriodRecords: HrisContextShape["importAttendancePeriodRecords"] = useCallback(

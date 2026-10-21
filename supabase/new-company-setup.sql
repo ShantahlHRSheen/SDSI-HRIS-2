@@ -4951,6 +4951,9 @@ create policy "biometric links hr" on biometric_links for all to authenticated
 
 alter table attendance_period_records add column if not exists missing_punches jsonb;
 
+-- Phase 47: approved attendance corrections update biometrics attendance
+alter table attendance_period_records add column if not exists biometric_detail jsonb;
+
 -- Starter settings
 -- ---------------------------------------------------------------------------
 

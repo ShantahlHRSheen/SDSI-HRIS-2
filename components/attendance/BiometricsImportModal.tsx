@@ -8,6 +8,8 @@ import { formatDate, fullName } from "@/lib/helpers";
 import { reportSaveError } from "@/lib/save-errors";
 import type { BioFile } from "@/lib/biometrics/parse";
 import { computeAttendance, fileCoverage, type BranchSchedule } from "@/lib/biometrics/compute";
+import { applyCorrections, biometricsAttendance } from "@/lib/biometrics/corrections";
+import type { BiometricDetail } from "@/lib/types";
 import { BRANCH_SCHEDULES, guessBranch, matchEmployeeByName } from "@/lib/biometrics/branches";
 import { fetchBiometricLinks, saveBiometricLinks, type BiometricLink } from "@/lib/supabase/biometric-links";
 
@@ -18,7 +20,7 @@ import { fetchBiometricLinks, saveBiometricLinks, type BiometricLink } from "@/l
 const shortDate = (d: string) => formatDate(d).replace(/, \d{4}$/, "");
 
 export function BiometricsImportModal({ file, fileName, onClose, onImported }: { file: BioFile; fileName: string; onClose: () => void; onImported: (periodId: string) => void }) {
-  const { employees, branches, payrollPeriods, holidays, leaveRequests, attendancePeriodRecords, importAttendancePeriodRecords, isRealAccount } = useHris();
+  const { employees, branches, payrollPeriods, holidays, leaveRequests, correctionRequests, attendancePeriodRecords, importAttendancePeriodRecords, isRealAccount } = useHris();
   const [branchId, setBranchId] = useState(() => guessBranch(fileName, branches)?.id ?? "");
   // The cut-off holding most of the file's punch days.
   const [periodId, setPeriodId] = useState(() => {
@@ -66,8 +68,22 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
       const employeeId = assigned[p.key] ?? auto ?? "";
       const emp = employeeId ? byId.get(employeeId) : undefined;
       const inPeriod = [...p.days.keys()].filter((d) => d >= period.start && d <= period.end).length;
+      // Fixed-rate (monthly) employees have no late/undertime deductions and
+      // are paid by the half-month, not by days worked.
+      const exempt = emp?.payrollType === "monthly";
+      // What's saved with the record so approved corrections can be applied later.
+      const detail: BiometricDetail = {
+        branchId,
+        schedule,
+        exempt,
+        days: Object.fromEntries([...p.days].filter(([d]) => d >= period.start && d <= period.end)),
+        fileLastDate: coverage.lastDate,
+        lastDateInProgress: coverage.lastDateInProgress,
+      };
+      // Corrections already approved for these days are applied straight away.
+      const corrected = emp ? applyCorrections(detail, correctionRequests.filter((c) => c.employeeId === emp.id), period) : null;
       const computed = computeAttendance({
-        days: p.days,
+        days: corrected?.days ?? p.days,
         schedule,
         periodStart: period.start,
         periodEnd: period.end,
@@ -79,12 +95,9 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
       });
       const noPunches = inPeriod === 0;
       const include = !!emp && !noPunches && !skipped[p.key];
-      // Fixed-rate (monthly) employees have no late/undertime deductions and
-      // are paid by the half-month, not by days worked.
-      const exempt = emp?.payrollType === "monthly";
-      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt };
+      return { person: p, employeeId, emp, saved: !!saved, computed, noPunches, include, exempt, detail, correctionsApplied: corrected?.applied.length ?? 0 };
     });
-  }, [file, links, branchId, assigned, skipped, byId, employees, period, schedule, holidays, leaveRequests, coverage]);
+  }, [file, links, branchId, assigned, skipped, byId, employees, period, schedule, holidays, leaveRequests, correctionRequests, coverage]);
 
   const included = rows.filter((r) => r.include);
   const dupes = new Set(included.map((r) => r.employeeId).filter((id, i, a) => a.indexOf(id) !== i));
@@ -104,25 +117,10 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         .filter((r) => links?.find((l) => l.branchId === branchId && l.deviceKey === r.person.key)?.employeeId !== r.employeeId)
         .map((r) => ({ branchId, deviceKey: r.person.key, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId }));
       if (isRealAccount) await saveBiometricLinks(newLinks);
+      const notes = `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`;
       await importAttendancePeriodRecords(
         period.id,
-        included.map((r) => ({
-          employeeId: r.employeeId,
-          daysWorked: r.exempt ? 0 : r.computed.daysWorked,
-          holidayDays: r.computed.holidayDays,
-          slDays: r.computed.slDays,
-          vlDays: r.computed.vlDays,
-          lateMinutes: r.exempt ? 0 : r.computed.lateMinutes,
-          undertimeMinutes: r.exempt ? 0 : r.computed.undertimeMinutes,
-          notes: `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`,
-          lateInstances: r.computed.lateInstances,
-          lateDayDetails: r.computed.lateDayDetails,
-          undertimeInstances: r.computed.undertimeInstances,
-          undertimeDayDetails: r.computed.undertimeDayDetails,
-          absenceInstances: r.computed.absenceInstances,
-          absentDates: r.computed.absentDates,
-          missingPunches: r.computed.missingPunches,
-        })),
+        included.map((r) => biometricsAttendance({ employee: r.emp!, period, detail: r.detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes })),
       );
       onImported(period.id);
     } catch (err) {
@@ -266,6 +264,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
                       </td>
                       <td className="tabular px-2 py-2 text-xs text-[var(--text-secondary)]">{r.computed.vlDays || r.computed.slDays ? `${r.computed.vlDays} / ${r.computed.slDays}` : "—"}</td>
                       <td className="px-2 py-2 text-xs">
+                        {r.correctionsApplied > 0 && <div className="text-[10px] text-[var(--status-good)]">{r.correctionsApplied} approved correction{r.correctionsApplied === 1 ? "" : "s"} applied</div>}
                         {r.computed.missingPunches.length ? (
                           <span className="text-[var(--status-warning)]">
                             {r.computed.missingPunches.map((m) => `${shortDate(m.date)} (no time ${m.missing})`).join(", ")}

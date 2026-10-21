@@ -933,6 +933,7 @@ function toAttendancePeriodRecord(r: AttendancePeriodRecordRow): AttendancePerio
     absenceInstances: r.absence_instances ?? undefined,
     absentDates: r.absent_dates ?? undefined,
     missingPunches: r.missing_punches ?? undefined,
+    biometricDetail: r.biometric_detail ?? undefined,
   };
 }
 function attendancePeriodRecordToRow(
@@ -963,6 +964,8 @@ function attendancePeriodRecordToRow(
     absent_dates: input.absentDates ?? null,
     // Only sent by the biometrics import (supabase/migrate_phase46_biometrics_import.sql).
     ...(input.missingPunches !== undefined ? { missing_punches: input.missingPunches } : {}),
+    // supabase/migrate_phase47_biometric_detail.sql
+    ...(input.biometricDetail !== undefined ? { biometric_detail: input.biometricDetail } : {}),
   };
 }
 
