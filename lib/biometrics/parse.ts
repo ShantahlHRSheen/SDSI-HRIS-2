@@ -226,14 +226,48 @@ function sheetTimes(v: CellValue | undefined): string[] {
   return out;
 }
 
+// Columns nobody punched in (Sundays), from everyone's times rows.
+function restColumns(rows: CellValue[][]): Set<number> {
+  const counts = new Map<number, number>();
+  rows.forEach((row, i) => {
+    if (!isTotalDays(row) || i < 1) return;
+    rows[i - 1].forEach((v, c) => {
+      if (timesIn(v).length) counts.set(c, (counts.get(c) ?? 0) + 1);
+    });
+  });
+  const most = Math.max(0, ...counts.values());
+  const out = new Set<number>();
+  if (!most) return out;
+  const width = Math.max(...counts.keys());
+  for (let c = 0; c <= width; c++) if ((counts.get(c) ?? 0) <= most * 0.1) out.add(c);
+  return out;
+}
+
+const isSunday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay() === 0;
+const shiftYear = (iso: string, by: number) => `${Number(iso.slice(0, 4)) + by}${iso.slice(4)}`;
+
+// A date row typed with the wrong year (a copied template): the year whose
+// Sundays are the columns nobody punched in.
+function fixSheetYear(dayCols: Map<number, string>, rest: Set<number>): Map<number, string> {
+  if (!rest.size) return dayCols;
+  const score = (by: number) => {
+    let n = 0;
+    for (const [c, d] of dayCols) if (isSunday(shiftYear(d, by))) n += rest.has(c) ? 1 : -1;
+    return n;
+  };
+  const best = [0, -1, 1].reduce((a, b) => (score(b) > score(a) ? b : a));
+  return best ? new Map([...dayCols].map(([c, d]) => [c, shiftYear(d, best)])) : dayCols;
+}
+
 function parseSheet(sheet: Sheet): Omit<BioFile, "format" | "formatLabel" | "shift"> {
   const rows = sheet.rows;
+  const rest = restColumns(rows);
   const firstDates = rows.find(isSheetDateRow);
-  let dayCols = firstDates ? sheetDayCols(firstDates) : new Map<number, string>();
+  let dayCols = firstDates ? fixSheetYear(sheetDayCols(firstDates), rest) : new Map<number, string>();
   const people: BioPerson[] = [];
   let unidentified = 0;
   for (let i = 0; i < rows.length; i++) {
-    if (isSheetDateRow(rows[i])) dayCols = sheetDayCols(rows[i]);
+    if (isSheetDateRow(rows[i])) dayCols = fixSheetYear(sheetDayCols(rows[i]), rest);
     if (!isTotalDays(rows[i]) || i < 2) continue;
     const header = rows[i - 2].map(text);
     const punchRow = rows[i - 1];
