@@ -41,7 +41,7 @@ export function BiometricsImportModal({
   const branches = useMemo(() => (allowedBranchIds ? allBranches.filter((b) => allowedBranchIds.includes(b.id)) : allBranches), [allBranches, allowedBranchIds]);
   // HR's attendance sheet has every branch in it: each employee is checked
   // against their own branch's schedule ("all").
-  const [branchId, setBranchId] = useState(() => (file.format === "sheet" && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
+  const [branchId, setBranchId] = useState(() => ((file.format === "sheet" || file.format === "daily") && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
   // Branch staff only see and match their own branch's employees.
   const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
   // The cut-off holding most of the file's punch days.

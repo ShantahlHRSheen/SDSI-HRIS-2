@@ -489,8 +489,9 @@ export interface BiometricDetail {
 }
 
 // SL / VL: on leave · unpaid: leave without pay · half: half day ·
-// field: working at another branch / outside (counted as present).
-export type BiometricDayMark = "SL" | "VL" | "unpaid" | "half" | "field";
+// field: working at another branch / outside (counted as present) ·
+// holiday: a holiday per the file (not an absence).
+export type BiometricDayMark = "SL" | "VL" | "unpaid" | "half" | "field" | "holiday";
 
 // Per-employee, per-period manual inputs/overrides layered on top of the
 // automatic payroll computation — allowance amounts, loans/deductions the
