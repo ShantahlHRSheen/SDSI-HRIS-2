@@ -468,6 +468,22 @@ export interface AttendancePeriodRecord {
   absentDates?: string[];
   // Biometrics import: days with only a time in or only a time out.
   missingPunches?: { date: string; missing: "in" | "out"; punch: string }[];
+  // Biometrics import: what the figures were worked out from, so approved
+  // attendance corrections can be applied later (lib/biometrics/corrections.ts).
+  biometricDetail?: BiometricDetail | null;
+}
+
+export interface BiometricDetail {
+  branchId: string;
+  schedule: { timeIn: string; timeOut: string };
+  // Fixed-rate: imported with no days / late / undertime.
+  exempt: boolean;
+  // Each day's punches as read from the file ("YYYY-MM-DD" → ["08:00", "17:00"]).
+  days: Record<string, string[]>;
+  fileLastDate: string | null;
+  lastDateInProgress: boolean;
+  // Attendance corrections now reflected in the figures.
+  correctionIds?: string[];
 }
 
 // Per-employee, per-period manual inputs/overrides layered on top of the

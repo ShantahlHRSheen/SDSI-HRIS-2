@@ -1,5 +1,6 @@
 "use client";
 
+import { useApplyApprovedCorrections } from "@/components/attendance/useApplyApprovedCorrections";
 import { Fragment, useMemo, useState } from "react";
 import { CutoffHeaderRow, CutoffSelect, cutoffOf, cutoffsIn } from "@/lib/cutoff";
 import { Check, FileEdit, FileText, X } from "lucide-react";
@@ -26,6 +27,8 @@ const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
 
 export default function AttendanceCorrectionsPage() {
   const { employees, correctionRequests, currentUser, currentEmployee, fileCorrectionRequest, decideCorrectionRequest, isRealAccount } = useHris();
+  // Approved attendance corrections update biometrics attendance.
+  useApplyApprovedCorrections();
   // The online Attendance Correction Form (real accounts): filed and signed
   // by the employee, approved by their department head, received by HR.
   const { forms, error: formsError, reload: reloadForms } = useCorrectionForms();
