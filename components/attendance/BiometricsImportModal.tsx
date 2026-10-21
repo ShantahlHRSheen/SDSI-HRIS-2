@@ -12,6 +12,7 @@ import { applyCorrections, biometricsAttendance } from "@/lib/biometrics/correct
 import type { BiometricDetail } from "@/lib/types";
 import { BRANCH_SCHEDULES, guessBranch, matchEmployeeByName } from "@/lib/biometrics/branches";
 import { fetchBiometricLinks, saveBiometricLinks, type BiometricLink } from "@/lib/supabase/biometric-links";
+import { importBranchAttendanceRows } from "@/lib/supabase/repo";
 
 // Review screen for a branch's biometrics file: pick the branch and cut-off,
 // check the schedule, match each person in the file to an employee (saved
@@ -19,9 +20,27 @@ import { fetchBiometricLinks, saveBiometricLinks, type BiometricLink } from "@/l
 
 const shortDate = (d: string) => formatDate(d).replace(/, \d{4}$/, "");
 
-export function BiometricsImportModal({ file, fileName, onClose, onImported }: { file: BioFile; fileName: string; onClose: () => void; onImported: (periodId: string) => void }) {
-  const { employees, branches, payrollPeriods, holidays, leaveRequests, correctionRequests, attendancePeriodRecords, importAttendancePeriodRecords, isRealAccount } = useHris();
-  const [branchId, setBranchId] = useState(() => guessBranch(fileName, branches)?.id ?? "");
+// `allowedBranchIds`: branch staff importing their own branch only (HR and
+// payroll leave it out: any branch). Their import is saved by the database
+// after it checks the branch (import_branch_attendance).
+export function BiometricsImportModal({
+  file,
+  fileName,
+  onClose,
+  onImported,
+  allowedBranchIds,
+}: {
+  file: BioFile;
+  fileName: string;
+  onClose: () => void;
+  onImported: (periodId: string, count: number) => void;
+  allowedBranchIds?: string[];
+}) {
+  const { employees: allEmployees, branches: allBranches, payrollPeriods, holidays, leaveRequests, correctionRequests, attendancePeriodRecords, importAttendancePeriodRecords, isRealAccount } = useHris();
+  const branches = useMemo(() => (allowedBranchIds ? allBranches.filter((b) => allowedBranchIds.includes(b.id)) : allBranches), [allBranches, allowedBranchIds]);
+  const [branchId, setBranchId] = useState(() => guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""));
+  // Branch staff only see and match their own branch's employees.
+  const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
   // The cut-off holding most of the file's punch days.
   const [periodId, setPeriodId] = useState(() => {
     const dates = file.people.flatMap((x) => [...x.days.keys()]);
@@ -32,7 +51,7 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
     }
     return best.id;
   });
-  const [schedule, setSchedule] = useState<BranchSchedule>(() => BRANCH_SCHEDULES[guessBranch(fileName, branches)?.id ?? ""] ?? file.shift ?? { timeIn: "08:00", timeOut: "17:00" });
+  const [schedule, setSchedule] = useState<BranchSchedule>(() => BRANCH_SCHEDULES[branchId] ?? file.shift ?? { timeIn: "08:00", timeOut: "17:00" });
   const [links, setLinks] = useState<BiometricLink[] | null>(isRealAccount ? null : []);
   const [assigned, setAssigned] = useState<Record<string, string>>({});
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
@@ -118,11 +137,10 @@ export function BiometricsImportModal({ file, fileName, onClose, onImported }: {
         .map((r) => ({ branchId, deviceKey: r.person.key, deviceName: r.person.name || r.person.deviceId, employeeId: r.employeeId }));
       if (isRealAccount) await saveBiometricLinks(newLinks);
       const notes = `Biometrics — ${branch.name} (${schedule.timeIn}–${schedule.timeOut})`;
-      await importAttendancePeriodRecords(
-        period.id,
-        included.map((r) => biometricsAttendance({ employee: r.emp!, period, detail: r.detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes })),
-      );
-      onImported(period.id);
+      const rowsToSave = included.map((r) => biometricsAttendance({ employee: r.emp!, period, detail: r.detail, corrections: correctionRequests, holidays, leaves: leaveRequests, notes }));
+      if (allowedBranchIds && isRealAccount) await importBranchAttendanceRows(period.id, rowsToSave);
+      else await importAttendancePeriodRecords(period.id, rowsToSave);
+      onImported(period.id, rowsToSave.length);
     } catch (err) {
       reportSaveError("Couldn't import the biometrics", err);
     } finally {
