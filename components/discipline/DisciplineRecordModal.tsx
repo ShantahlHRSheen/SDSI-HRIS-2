@@ -14,6 +14,8 @@ import { buildDisciplineResponsePdf, manilaDateTime } from "@/lib/discipline-pdf
 import { disciplineFileUrl, downloadDisciplineFile } from "@/lib/supabase/discipline-files";
 import { buildSignedNotice } from "@/lib/discipline-notice";
 import { SanctionForm } from "@/components/discipline/SanctionForm";
+import { FileViewer, viewerKind, type ViewerFile } from "@/components/discipline/FileViewer";
+import { ExcuseSection } from "@/components/discipline/ExcuseSection";
 
 // mode: "manage" — HR / department head (attach notice, download responses)
 //       "view"   — Upper Management (read-only, can download)
@@ -32,15 +34,11 @@ const safeName = (s: string) =>
     .replace(/_+/g, "_")
     .slice(0, 80);
 
-async function openFile(path: string, downloadName?: string) {
-  // Open the tab first (popup blockers), then point it at the signed link.
-  const tab = downloadName ? null : window.open("", "_blank");
+// Download a file (its signed link saves it).
+async function openFile(path: string, downloadName: string) {
   try {
-    const url = await disciplineFileUrl(path, downloadName);
-    if (tab) tab.location.href = url;
-    else window.location.href = url;
+    window.location.href = await disciplineFileUrl(path, downloadName);
   } catch (err) {
-    tab?.close();
     alert(err instanceof Error ? err.message : "Couldn't open the file.");
   }
 }
@@ -103,22 +101,33 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
     setBusy(null);
   }
 
+  // Files open inside the HRIS, over this window.
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
+  const closeViewer = () => {
+    if (viewer?.url.startsWith("blob:")) URL.revokeObjectURL(viewer.url);
+    setViewer(null);
+  };
+  async function view(path: string, name: string) {
+    setError(null);
+    try {
+      setViewer({ url: await disciplineFileUrl(path), name, kind: viewerKind(path) });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't open the file.");
+    }
+  }
   // A generated notice, printed with the signatures it has so far.
-  async function openSigned() {
+  async function viewGenerated(rec: DisciplinaryRecord, name: string) {
     setBusy("signed");
     setError(null);
     try {
-      const bytes = await buildSignedNotice(r, employees);
-      if (bytes) {
-        const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
-        window.open(url, "_blank");
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      }
+      const bytes = await buildSignedNotice(rec, employees);
+      if (bytes) setViewer({ url: URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" })), name, kind: "pdf" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't build the notice.");
     }
     setBusy(null);
   }
+  const openSigned = () => viewGenerated(r, `${DISCIPLINARY_LABELS[r.type]}${emp ? ` - ${fullName(emp)}` : ""}.pdf`);
 
   async function downloadAll() {
     if (!emp) return;
@@ -221,7 +230,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         ) : r.noticePath ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[var(--text-secondary)]">{r.noticeFileName ?? "notice.pdf"}</span>
-            <button onClick={() => openFile(r.noticePath!)} className={btn}>
+            <button onClick={() => view(r.noticePath!, r.noticeFileName ?? "notice.pdf")} className={btn}>
               <ExternalLink size={14} /> Open
             </button>
             <button onClick={() => openFile(r.noticePath!, r.noticeFileName ?? "notice.pdf")} className={btn}>
@@ -246,7 +255,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         <input ref={noticeInput} type="file" accept="application/pdf,.pdf" className="hidden" onChange={uploadNotice} />
       </div>
 
-      {/* HR Manager → Department Manager signatures */}
+      {/* HR Manager → Department Manager (→ Branch Manager) signatures */}
       {r.signFlow && (
         <div className={section}>
           <div className="mb-2 flex items-center gap-2 font-medium text-[var(--text-primary)]">
@@ -274,8 +283,39 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
             waiting={r.hrSignedAt ? "Waiting for the Department Manager to sign." : "Signs after the HR Manager."}
             onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "manager", png))}
           />
-          {!r.managerSignedAt && <div className="mt-3 text-xs text-[var(--text-muted)]">The employee receives this notice once both have signed.</div>}
+          {r.branchManagerId && (
+            <>
+              <div className="my-3 border-t border-[var(--gridline)]" />
+              <SignStep
+                title={`Branch Manager${(() => {
+                  const m = employees.find((e) => e.id === r.branchManagerId);
+                  return m ? ` — ${fullName(m)}` : "";
+                })()}`}
+                signedAt={r.branchManagerSignedAt}
+                canSign={!!r.managerSignedAt && !r.branchManagerSignedAt && r.branchManagerId === currentEmployee?.id}
+                waiting={r.managerSignedAt ? "Waiting for the Branch Manager to sign." : "Signs after the Department Manager."}
+                onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "branch", png))}
+              />
+            </>
+          )}
+          {(!r.managerSignedAt || (r.branchManagerId && !r.branchManagerSignedAt)) && (
+            <div className="mt-3 text-xs text-[var(--text-muted)]">The employee receives this notice once everyone above has signed.</div>
+          )}
         </div>
+      )}
+
+      {/* Late days the Department / Branch Manager asks HR to excuse */}
+      {r.noticeData?.kind === "tardiness" && mode !== "employee" && (
+        <ExcuseSection
+          record={r}
+          employees={employees}
+          canRequest={
+            (r.managerId === currentEmployee?.id || r.branchManagerId === currentEmployee?.id) &&
+            !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id)
+          }
+          canDecide={mode === "manage" && isHrManager}
+          onError={setError}
+        />
       )}
 
       {/* Acknowledgement */}
@@ -312,7 +352,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
               {r.explanationFilePath && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="mr-1 text-[var(--text-secondary)]">{r.explanationFileName ?? "explanation"}</span>
-                  <button onClick={() => openFile(r.explanationFilePath!)} className={btn}>
+                  <button onClick={() => view(r.explanationFilePath!, r.explanationFileName ?? "explanation")} className={btn}>
                     <ExternalLink size={14} /> Open
                   </button>
                   <button onClick={() => openFile(r.explanationFilePath!, r.explanationFileName ?? "explanation")} className={btn}>
@@ -378,10 +418,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
                   {nos.acknowledgedAt ? ` · received by the employee ${manilaDateTime(nos.acknowledgedAt)}` : " · waiting for the employee to sign as received"}
                 </span>
                 <button
-                  onClick={async () => {
-                    const bytes = await buildSignedNotice(nos, employees);
-                    if (bytes) window.open(URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" })), "_blank");
-                  }}
+                  onClick={() => viewGenerated(nos, `Notice of Sanction${emp ? ` - ${fullName(emp)}` : ""}.pdf`)}
                   className={btn}
                 >
                   <ExternalLink size={14} /> Open
@@ -399,6 +436,8 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
       })()}
 
       {error && <div className="rounded-lg bg-[var(--status-critical)]/10 p-3 text-sm text-[var(--status-critical)]">{error}</div>}
+
+      {viewer && <FileViewer file={viewer} onClose={closeViewer} />}
 
       {mode !== "employee" && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-hairline)] pt-3">

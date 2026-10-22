@@ -178,6 +178,10 @@ export type DisciplinaryRecordRow = {
   expl_hr_signature_path?: string | null;
   expl_mgr_received_at?: string | null;
   expl_mgr_signature_path?: string | null;
+  branch_manager_id?: string | null;
+  branch_manager_signed_at?: string | null;
+  branch_manager_signature_path?: string | null;
+  excuse_requests?: unknown;
 };
 
 export type AuditLogRow = {

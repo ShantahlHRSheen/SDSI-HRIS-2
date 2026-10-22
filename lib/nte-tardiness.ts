@@ -123,6 +123,11 @@ export function numberWords(n: number): string {
   return `${TENS[Math.floor(n / 10)]}${n % 10 ? `-${ONES[n % 10]}` : ""}`;
 }
 
+// Late days HR accepted to excuse on this NTE, with their reasons.
+export function excusedDays(r: DisciplinaryRecord): { date: string; reason: string }[] {
+  return (r.excuseRequests ?? []).filter((x) => x.status === "accepted").flatMap((x) => x.items.map((i) => ({ date: i.date, reason: i.reason })));
+}
+
 // The record's description (shown in Discipline and My Notices).
 export function tardinessNteDescription(month: string, days: TardyDay[]): string {
   return `${NTE_TARDINESS_RE} (${monthLabel(month)}): late ${days.length} days — ${days.map((d) => `${Number(d.date.slice(5, 7))}/${Number(d.date.slice(8, 10))} (${d.minutes}m)`).join(", ")}. Please submit a written explanation.`;

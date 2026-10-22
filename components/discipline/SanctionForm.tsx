@@ -6,7 +6,8 @@ import { useHris } from "@/lib/store";
 import { currentCompany } from "@/lib/companies";
 import { todayInManila } from "@/lib/leave-policy";
 import { loadHrLetterhead } from "@/lib/discipline-notice";
-import { monthLabel, SANCTION_CHOICES, suggestedPenalty } from "@/lib/nte-tardiness";
+import { excusedDays, monthLabel, NTE_TARDINESS_MIN_DAYS, SANCTION_CHOICES, suggestedPenalty } from "@/lib/nte-tardiness";
+import { formatDate } from "@/lib/helpers";
 import { buildTardinessSanctionPdf } from "@/lib/nte-tardiness-pdf";
 import type { DisciplinaryRecord, TardinessNteData, TardinessSanctionData } from "@/lib/types";
 
@@ -23,7 +24,10 @@ export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIss
   const d = nte.noticeData as TardinessNteData;
   const today = todayInManila();
   const [offense, setOffense] = useState(d.offense ?? 1);
-  const suggested = suggestedPenalty(d.days.length, offense);
+  // Late days HR accepted to excuse don't count.
+  const excused = excusedDays(nte);
+  const remaining = d.days.length - new Set(excused.map((x) => x.date)).size;
+  const suggested = suggestedPenalty(remaining, offense);
   const [choice, setChoice] = useState(suggested || SANCTION_CHOICES[0]);
   const [other, setOther] = useState("");
   const sanction = choice === "other" ? other.trim() : choice;
@@ -59,6 +63,7 @@ export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIss
       daysLate: d.days.length,
       offense,
       sanction,
+      ...(excused.length ? { excused } : {}),
       suspensionFrom: suspension ? from : null,
       suspensionTo: suspension ? suspTo : null,
       findings: findings.trim(),
@@ -100,6 +105,19 @@ export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIss
 
   return (
     <div className="space-y-3">
+      {excused.length > 0 && (
+        <div className="rounded-lg bg-[var(--gridline)]/30 p-3 text-xs text-[var(--text-secondary)]">
+          <span className="font-medium text-[var(--text-primary)]">
+            {excused.length} late day{excused.length === 1 ? "" : "s"} excused — {remaining} of {d.days.length} count.
+          </span>{" "}
+          {excused.map((x) => `${formatDate(x.date)} (${x.reason})`).join("; ")}
+          {remaining < NTE_TARDINESS_MIN_DAYS && (
+            <div className="mt-1 text-[var(--status-warning)]">
+              That&rsquo;s below {NTE_TARDINESS_MIN_DAYS} days. You may close this NTE with &ldquo;Mark resolved&rdquo; instead of issuing a sanction.
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Offense</span>
@@ -113,7 +131,7 @@ export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIss
         </label>
         <label className="block sm:col-span-2">
           <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-            Sanction {suggested && <span className="font-normal text-[var(--text-muted)]">— policy: {suggested} ({d.days.length} days late)</span>}
+            Sanction {suggested && <span className="font-normal text-[var(--text-muted)]">— policy: {suggested} ({remaining} days late)</span>}
           </span>
           <select value={choice} onChange={(e) => setChoice(e.target.value)} className={field}>
             {SANCTION_CHOICES.map((s) => (

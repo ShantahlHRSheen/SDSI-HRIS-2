@@ -39,9 +39,10 @@ export async function buildSignedNotice(r: DisciplinaryRecord, employees: Employ
     });
   }
   const hr = employees.find((e) => e.id === r.hrSignerId);
-  const [hrMark, managerMark, employeeMark] = await Promise.all([
+  const [hrMark, managerMark, branchMark, employeeMark] = await Promise.all([
     mark(r.hrSignaturePath, r.hrSignedAt, hr ? `${hr.firstName} ${hr.lastName}` : undefined),
     mark(r.managerSignaturePath, r.managerSignedAt),
+    mark(r.branchManagerSignaturePath, r.branchManagerSignedAt),
     mark(r.ackSignaturePath, r.acknowledgedAt),
   ]);
   return buildTardinessNtePdf([
@@ -56,7 +57,8 @@ export async function buildSignedNotice(r: DisciplinaryRecord, employees: Employ
       month: d.month,
       days: d.days,
       cc: d.cc,
-      signatures: { hr: hrMark, manager: managerMark, employee: employeeMark },
+      branchManager: d.branchManager ?? null,
+      signatures: { hr: hrMark, manager: managerMark, branch: branchMark, employee: employeeMark },
     },
   ]);
 }

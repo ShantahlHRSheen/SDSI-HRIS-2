@@ -115,7 +115,7 @@ import {
 } from "./mock-data";
 import { computeOverallScore, type KpiCategory } from "./performance-eval";
 import { setSalaryAdjustments, type SalaryAdjustment } from "./salary-adjustments";
-import { acknowledgeNotice, signNotice, receiveExplanation, attachNoticePdf, submitExplanation } from "./supabase/discipline-files";
+import { acknowledgeNotice, signNotice, receiveExplanation, requestExcuse, decideExcuse, attachNoticePdf, submitExplanation } from "./supabase/discipline-files";
 import { deleteSalaryAdjustmentRow, fetchSalaryAdjustments, insertSalaryAdjustment, updateSalaryAdjustmentRow, type SalaryAdjustmentInput } from "./supabase/salary-adjustments";
 import type {
   Announcement,
@@ -297,9 +297,12 @@ interface HrisContextShape {
   attachDisciplinaryNotice: (id: string, file: File) => Promise<string | null>;
   acknowledgeDisciplinaryRecord: (id: string, signaturePng: Blob) => Promise<string | null>;
   // HR Manager, then the Department Manager, sign a notice before the employee gets it.
-  signDisciplinaryRecord: (id: string, as: "hr" | "manager", signaturePng: Blob) => Promise<string | null>;
+  signDisciplinaryRecord: (id: string, as: "hr" | "manager" | "branch", signaturePng: Blob) => Promise<string | null>;
   // HR Manager / Department Manager sign to receive the written explanation.
   receiveDisciplinaryExplanation: (id: string, as: "hr" | "manager", signaturePng: Blob) => Promise<string | null>;
+  // Department / Branch Manager asks HR to excuse late days; HR decides.
+  requestDisciplinaryExcuse: (id: string, items: { date: string; minutes: number; reason: string }[]) => Promise<string | null>;
+  decideDisciplinaryExcuse: (id: string, requestId: string, accept: boolean) => Promise<string | null>;
   submitDisciplinaryExplanation: (id: string, text: string, file: File | null) => Promise<string | null>;
   setDisciplinaryStatus: (id: string, status: DisciplinaryRecord["status"]) => void;
 
@@ -1143,8 +1146,9 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       try {
         if (supabaseSession) replaceDisciplinaryRecord(await signNotice(id, as, signaturePng));
         else if (as === "hr") patchDisciplinaryRecord(id, { hrSignedAt: new Date().toISOString(), hrSignerId: currentEmployee?.id ?? null, hrSignaturePath: URL.createObjectURL(signaturePng) });
-        else patchDisciplinaryRecord(id, { managerSignedAt: new Date().toISOString(), managerSignaturePath: URL.createObjectURL(signaturePng) });
-        logAudit("Discipline", "sign", `Signed notice ${id} as ${as === "hr" ? "HR Manager" : "Department Manager"}`);
+        else if (as === "manager") patchDisciplinaryRecord(id, { managerSignedAt: new Date().toISOString(), managerSignaturePath: URL.createObjectURL(signaturePng) });
+        else patchDisciplinaryRecord(id, { branchManagerSignedAt: new Date().toISOString(), branchManagerSignaturePath: URL.createObjectURL(signaturePng) });
+        logAudit("Discipline", "sign", `Signed notice ${id} as ${as === "hr" ? "HR Manager" : as === "manager" ? "Department Manager" : "Branch Manager"}`);
         return null;
       } catch (err) {
         return errorText(err, "Couldn't save the signature.");
@@ -1167,6 +1171,47 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord, currentEmployee],
+  );
+
+  const requestDisciplinaryExcuse: HrisContextShape["requestDisciplinaryExcuse"] = useCallback(
+    async (id, items) => {
+      try {
+        if (supabaseSession) replaceDisciplinaryRecord(await requestExcuse(id, items));
+        else {
+          const rec = state.disciplinaryRecords.find((r) => r.id === id);
+          const role = rec?.branchManagerId === currentEmployee?.id ? "branch" : "manager";
+          patchDisciplinaryRecord(id, {
+            excuseRequests: [...(rec?.excuseRequests ?? []), { id: nextId("exc"), by: currentEmployee?.id ?? "", role, items, at: new Date().toISOString(), status: "pending" }],
+          });
+        }
+        logAudit("Discipline", "excuse", `Asked HR to excuse ${items.length} late day(s) on notice ${id}`);
+        return null;
+      } catch (err) {
+        return errorText(err, "Couldn't send the request.");
+      }
+    },
+    [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord, state.disciplinaryRecords, currentEmployee],
+  );
+
+  const decideDisciplinaryExcuse: HrisContextShape["decideDisciplinaryExcuse"] = useCallback(
+    async (id, requestId, accept) => {
+      try {
+        if (supabaseSession) replaceDisciplinaryRecord(await decideExcuse(id, requestId, accept));
+        else {
+          const rec = state.disciplinaryRecords.find((r) => r.id === id);
+          patchDisciplinaryRecord(id, {
+            excuseRequests: (rec?.excuseRequests ?? []).map((x) =>
+              x.id === requestId ? { ...x, status: accept ? "accepted" : "declined", decidedBy: currentEmployee?.id ?? null, decidedAt: new Date().toISOString() } : x,
+            ),
+          });
+        }
+        logAudit("Discipline", "excuse", `${accept ? "Accepted" : "Declined"} an excuse request on notice ${id}`);
+        return null;
+      } catch (err) {
+        return errorText(err, "Couldn't save the decision.");
+      }
+    },
+    [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord, state.disciplinaryRecords, currentEmployee],
   );
 
   const submitDisciplinaryExplanation: HrisContextShape["submitDisciplinaryExplanation"] = useCallback(
@@ -1877,6 +1922,8 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     acknowledgeDisciplinaryRecord,
     signDisciplinaryRecord,
     receiveDisciplinaryExplanation,
+    requestDisciplinaryExcuse,
+    decideDisciplinaryExcuse,
     submitDisciplinaryExplanation,
     setDisciplinaryStatus,
     addAnnouncement,
