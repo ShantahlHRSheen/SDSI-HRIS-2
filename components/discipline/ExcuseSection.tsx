@@ -176,6 +176,13 @@ export function ExcuseSection({
             >
               {busy === "send" ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Send to HR ({chosen.length} day{chosen.length === 1 ? "" : "s"})
             </button>
+            {!ready && (
+              <div className="text-xs text-[var(--status-warning)]">
+                {chosen.length === 0
+                  ? "Tick the late days to excuse."
+                  : `Write the reason for ${chosen.filter((x) => !(reasons[x.date] ?? "").trim()).length === 1 ? "the ticked day" : "each ticked day"} to send.`}
+              </div>
+            )}
           </div>
         ))}
     </div>

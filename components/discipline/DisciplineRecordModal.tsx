@@ -497,6 +497,7 @@ function SignStep({
           >
             {saving ? <Loader2 size={15} className="animate-spin" /> : <PenLine size={15} />} {action}
           </button>
+          {!hasInk && <div className="text-xs text-[var(--status-warning)]">Draw your signature in the box, or use Upload signature, to sign.</div>}
         </div>
       ) : (
         <div className="mt-1 text-[var(--text-muted)]">{waiting}</div>
