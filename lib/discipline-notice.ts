@@ -1,6 +1,7 @@
 import { currentCompany } from "./companies";
 import { buildTardinessNtePdf, buildTardinessSanctionPdf, type SignatureMark } from "./nte-tardiness-pdf";
 import { downloadDisciplineFile } from "./supabase/discipline-files";
+import { positionTitle } from "./helpers";
 import type { DisciplinaryRecord, Employee } from "./types";
 
 // A generated notice (record.noticeData) printed with the signatures it has
@@ -57,7 +58,13 @@ export async function buildSignedNotice(r: DisciplinaryRecord, employees: Employ
       month: d.month,
       days: d.days,
       cc: d.cc,
-      branchManager: d.branchManager ?? null,
+      // Notices issued before the Branch Manager was added: from their 201 file.
+      branchManager:
+        d.branchManager ??
+        (() => {
+          const bm = employees.find((e) => e.id === r.branchManagerId);
+          return bm ? { name: `${bm.lastName}, ${bm.firstName}`, title: positionTitle(bm.positionId).replace(/^—$/, "") } : null;
+        })(),
       signatures: { hr: hrMark, manager: managerMark, branch: branchMark, employee: employeeMark },
     },
   ]);
