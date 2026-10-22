@@ -513,6 +513,14 @@ function toDisciplinaryRecord(r: DisciplinaryRecordRow): DisciplinaryRecord {
     explanationFileName: r.explanation_file_name ?? null,
     explanationSubmittedAt: r.explanation_submitted_at ?? null,
     createdAt: r.created_at ?? null,
+    signFlow: r.sign_flow ?? false,
+    noticeData: (r.notice_data as DisciplinaryRecord["noticeData"]) ?? null,
+    managerId: r.manager_id ?? null,
+    hrSignerId: r.hr_signer_id ?? null,
+    hrSignedAt: r.hr_signed_at ?? null,
+    hrSignaturePath: r.hr_signature_path ?? null,
+    managerSignedAt: r.manager_signed_at ?? null,
+    managerSignaturePath: r.manager_signature_path ?? null,
   };
 }
 export { toDisciplinaryRecord };
@@ -530,6 +538,12 @@ function disciplinaryRecordToRow(input: Omit<DisciplinaryRecord, "id">): Omit<Di
   // before that migration has been run.
   if (input.requiresExplanation) row.requires_explanation = true;
   if (input.responseDue) row.response_due = input.responseDue;
+  // Phase 51: signed HR Manager → Department Manager → employee.
+  if (input.signFlow) {
+    row.sign_flow = true;
+    row.manager_id = input.managerId ?? null;
+    row.notice_data = input.noticeData ?? null;
+  }
   return row;
 }
 

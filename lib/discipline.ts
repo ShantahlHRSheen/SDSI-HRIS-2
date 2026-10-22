@@ -11,9 +11,12 @@ export const DISCIPLINE_TYPE_TONE: Record<DisciplinaryType, BadgeTone> = {
 };
 
 // Where the employee is in responding to a record.
-export type ResponseStage = "to_acknowledge" | "to_explain" | "explained" | "acknowledged";
+export type ResponseStage = "hr_to_sign" | "manager_to_sign" | "to_acknowledge" | "to_explain" | "explained" | "acknowledged";
 
 export function responseStage(r: DisciplinaryRecord): ResponseStage {
+  // Signed HR Manager → Department Manager before the employee gets it.
+  if (r.signFlow && !r.hrSignedAt) return "hr_to_sign";
+  if (r.signFlow && !r.managerSignedAt) return "manager_to_sign";
   if (!r.acknowledgedAt) return "to_acknowledge";
   if (r.explanationSubmittedAt) return "explained";
   if (r.requiresExplanation) return "to_explain";
@@ -24,6 +27,10 @@ export function responseBadge(r: DisciplinaryRecord, today: string, forEmployee 
   const stage = responseStage(r);
   const overdue = !!r.responseDue && r.responseDue < today;
   switch (stage) {
+    case "hr_to_sign":
+      return { label: "Awaiting HR Manager signature", tone: "warning" };
+    case "manager_to_sign":
+      return { label: "Awaiting Department Manager signature", tone: "warning" };
     case "to_acknowledge":
       return { label: forEmployee ? "Please acknowledge" : "Awaiting acknowledgement", tone: "warning" };
     case "to_explain":

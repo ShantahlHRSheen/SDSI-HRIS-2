@@ -262,6 +262,27 @@ export interface DisciplinaryRecord {
   explanationFileName?: string | null;
   explanationSubmittedAt?: string | null;
   createdAt?: string | null;
+  // Signed HR Manager → Department Manager → employee
+  // (supabase/migrate_phase51_discipline_signoff.sql): the employee sees it
+  // once both have signed.
+  signFlow?: boolean;
+  noticeData?: DisciplineNoticeData | null;
+  managerId?: string | null;
+  hrSignerId?: string | null;
+  hrSignedAt?: string | null;
+  hrSignaturePath?: string | null;
+  managerSignedAt?: string | null;
+  managerSignaturePath?: string | null;
+}
+
+// What a generated notice was made from, to print it with its signatures.
+export interface DisciplineNoticeData {
+  kind: "tardiness";
+  month: string; // "2026-09"
+  issueDate: string;
+  employeeName: string;
+  days: { date: string; minutes: number }[];
+  cc: { name: string; title: string } | null;
 }
 
 export interface AuditLog {
