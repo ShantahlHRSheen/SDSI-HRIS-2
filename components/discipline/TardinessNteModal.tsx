@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchTardinessPriorOffenses } from "@/lib/supabase/repo";
 import { Download } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
@@ -40,15 +41,20 @@ function download(bytes: Uint8Array, name: string) {
 }
 
 export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: string; onClose: () => void }) {
-  const { employees, payrollPeriods, attendancePeriodRecords, disciplinaryRecords, currentEmployee, addDisciplinaryRecord, attachDisciplinaryNotice } = useHris();
+  const { employees, payrollPeriods, attendancePeriodRecords, disciplinaryRecords, currentEmployee, addDisciplinaryRecord, attachDisciplinaryNotice, isRealAccount } = useHris();
+  // Offenses from tardiness NTEs given before the HRIS.
+  const [prior, setPrior] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (isRealAccount) fetchTardinessPriorOffenses().then(setPrior, () => {});
+  }, [isRealAccount]);
   const months = useMemo(() => completeMonths(payrollPeriods, attendancePeriodRecords), [payrollPeriods, attendancePeriodRecords]);
   const [month, setMonth] = useState(initialMonth ?? months[0] ?? "");
   const today = todayInManila();
   const company = currentCompany();
 
   const candidates = useMemo(
-    () => (month ? tardinessNteCandidates({ month, employees, records: attendancePeriodRecords, discipline: disciplinaryRecords }) : []),
-    [month, employees, attendancePeriodRecords, disciplinaryRecords],
+    () => (month ? tardinessNteCandidates({ month, employees, records: attendancePeriodRecords, discipline: disciplinaryRecords, prior }) : []),
+    [month, employees, attendancePeriodRecords, disciplinaryRecords, prior],
   );
   // Fixed-rate employees aren't held to late deductions: not selected by default.
   const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -180,6 +186,7 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
                       </td>
                       <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">
                         {ordinal(c.offense)} · {c.suggestedPenalty || "—"}
+                        {prior[c.employee.id] ? <div className="text-[10px] text-[var(--text-muted)]">incl. {prior[c.employee.id]} earlier NTE{prior[c.employee.id] === 1 ? "" : "s"} before the HRIS</div> : null}
                       </td>
                       <td className="px-2 py-2 text-xs">
                         {issued ? (

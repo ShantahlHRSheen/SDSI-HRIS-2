@@ -86,6 +86,8 @@ export function tardinessNteCandidates(input: {
   employees: Employee[];
   records: AttendancePeriodRecord[];
   discipline: DisciplinaryRecord[];
+  // Offenses from tardiness NTEs given before the HRIS, by employee.
+  prior?: Record<string, number>;
 }): TardinessNteCandidate[] {
   const { month } = input;
   const byEmployee = new Map<string, Map<string, number>>();
@@ -103,7 +105,8 @@ export function tardinessNteCandidates(input: {
     const employee = input.employees.find((e) => e.id === employeeId);
     if (!employee) continue;
     // Offenses before: their tardiness NTEs for earlier months.
-    const before = input.discipline.filter((r) => r.employeeId === employeeId && r.type === "nte" && (nteMonth(r.description) ?? "9999") < month).length;
+    const before =
+      (input.prior?.[employeeId] ?? 0) + input.discipline.filter((r) => r.employeeId === employeeId && r.type === "nte" && (nteMonth(r.description) ?? "9999") < month).length;
     const list = [...days].map(([date, minutes]) => ({ date, minutes })).sort((a, b) => a.date.localeCompare(b.date));
     out.push({ employee, days: list, offense: before + 1, suggestedPenalty: suggestedPenalty(list.length, before + 1) });
   }
