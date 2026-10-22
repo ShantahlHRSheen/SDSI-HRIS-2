@@ -34,6 +34,8 @@ const tokens = (s: string) => normalizeName(s).split(" ").filter((t) => t.length
 // Nicknames ("kboy") match no one; HR picks the employee once.
 // `includeFormer`: also resigned / terminated employees (for a past cut-off).
 export function matchEmployeeByName(name: string, employees: Employee[], includeFormer = false): Employee | undefined {
+  // Machine names typed without spaces: "CatherineMogato" → "Catherine Mogato".
+  name = name.replace(/([a-z])([A-Z])/g, "$1 $2");
   const n = normalizeName(name);
   if (!n || n.split(" ").length < 2) return undefined;
   const current = includeFormer ? employees : employees.filter((e) => e.status !== "resigned" && e.status !== "terminated");
