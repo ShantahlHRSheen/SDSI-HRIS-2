@@ -5,7 +5,7 @@ import type { Branch, Holiday } from "./types";
 // counted absent: a holiday the employee didn't work counts as present.
 //
 // The dates are the Holidays list (Admin → Holidays) plus the 2026 national
-// days below and each branch city's local special (non-working) days, found
+// days (and company-wide days off) below and each branch city's local special (non-working) days, found
 // by the branch's name or address. Sources: Proclamation No. 1006 (2026
 // holidays), 1189 (Eid'l Fitr), 1264 (Eid'l Adha), and the local
 // proclamations / laws noted per entry.
@@ -19,6 +19,7 @@ const NATIONAL: { date: string; name: string }[] = [
   { date: "2026-04-04", name: "Black Saturday" },
   { date: "2026-04-09", name: "Araw ng Kagitingan" },
   { date: "2026-05-01", name: "Labor Day" },
+  { date: "2026-05-02", name: "Company day off (HR)" },
   { date: "2026-05-27", name: "Eid'l Adha" },
   { date: "2026-06-12", name: "Independence Day" },
   { date: "2026-08-21", name: "Ninoy Aquino Day" },
