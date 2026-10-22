@@ -1306,3 +1306,14 @@ export async function insertAuditLog(input: Omit<AuditLog, "id" | "createdAt">):
   if (error) throw error;
   return toAuditLog({ ...row, created_at: new Date().toISOString() } as AuditLogRow);
 }
+
+// Tardiness NTEs given before the HRIS (supabase/migrate_phase51_discipline_signoff.sql):
+// offenses per employee. Empty if the table isn't there yet.
+export async function fetchTardinessPriorOffenses(): Promise<Record<string, number>> {
+  const client = getSupabaseClient() as unknown as {
+    from: (t: string) => { select: (c: string) => PromiseLike<{ data: { employee_id: string; offenses: number }[] | null; error: unknown }> };
+  };
+  const { data, error } = await client.from("tardiness_prior_offenses").select("employee_id, offenses");
+  if (error || !data) return {};
+  return Object.fromEntries(data.map((r) => [r.employee_id, r.offenses]));
+}

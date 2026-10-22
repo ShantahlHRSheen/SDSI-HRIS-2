@@ -179,3 +179,20 @@ create policy "discipline files upload" on storage.objects for insert to authent
         )
     )
   );
+
+-- Tardiness NTEs given before the HRIS (paper notices): how many offenses
+-- each employee already had, counted with the HRIS's own tardiness NTEs for
+-- the next one's offense number. HR only.
+create table if not exists tardiness_prior_offenses (
+  employee_id text primary key references employees (id) on delete cascade,
+  offenses integer not null check (offenses >= 0),
+  note text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table tardiness_prior_offenses enable row level security;
+
+drop policy if exists "tardiness prior offenses hr" on tardiness_prior_offenses;
+create policy "tardiness prior offenses hr" on tardiness_prior_offenses for all to authenticated
+  using (app_has_any_role(array['hr_admin']::app_role[]))
+  with check (app_has_any_role(array['hr_admin']::app_role[]));
