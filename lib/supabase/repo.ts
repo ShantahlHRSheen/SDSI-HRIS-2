@@ -529,6 +529,7 @@ function toDisciplinaryRecord(r: DisciplinaryRecordRow): DisciplinaryRecord {
     branchManagerId: r.branch_manager_id ?? null,
     branchManagerSignedAt: r.branch_manager_signed_at ?? null,
     branchManagerSignaturePath: r.branch_manager_signature_path ?? null,
+    withdrawnAt: r.withdrawn_at ?? null,
     excuseRequests: Array.isArray(r.excuse_requests)
       ? (r.excuse_requests as Record<string, unknown>[]).map((x) => ({
           id: String(x.id),

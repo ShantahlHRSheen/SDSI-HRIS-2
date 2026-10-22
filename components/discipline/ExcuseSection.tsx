@@ -6,6 +6,7 @@ import { useHris } from "@/lib/store";
 import { Badge } from "@/components/Badge";
 import { formatDate, fullName } from "@/lib/helpers";
 import { manilaDateTime } from "@/lib/discipline-pdf";
+import { NTE_TARDINESS_MIN_DAYS } from "@/lib/nte-tardiness";
 import type { DisciplinaryRecord, Employee, TardinessNteData } from "@/lib/types";
 
 // Late days the Department / Branch Manager asks HR not to count as
@@ -38,6 +39,9 @@ export function ExcuseSection({
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const chosen = open.filter((x) => picked[x.date]);
+  // Late days left once accepted requests (and, for a pending one, it too) are excused.
+  const accepted = new Set(requests.filter((x) => x.status === "accepted").flatMap((x) => x.items.map((i) => i.date)));
+  const leftIf = (extra: string[]) => d.days.length - new Set([...accepted, ...extra]).size;
   const ready = chosen.length > 0 && chosen.every((x) => (reasons[x.date] ?? "").trim());
   const name = (id: string | null | undefined) => {
     const e = employees.find((x) => x.id === id);
@@ -65,6 +69,27 @@ export function ExcuseSection({
   }
 
   if (!requests.length && !canRequest) return null;
+  if (r.withdrawnAt)
+    return (
+      <div className={section}>
+        <div className="mb-1 flex items-center gap-2 font-medium text-[var(--text-primary)]">
+          <ShieldCheck size={16} /> NTE withdrawn
+        </div>
+        <p className="text-sm text-[var(--text-secondary)]">
+          After the excused days, only {leftIf([])} late day{leftIf([]) === 1 ? "" : "s"} remain — below {NTE_TARDINESS_MIN_DAYS}. The NTE was withdrawn on {manilaDateTime(r.withdrawnAt)}; the employee never received it.
+        </p>
+        <ul className="mt-2 space-y-1 text-sm">
+          {requests
+            .filter((x) => x.status === "accepted")
+            .flatMap((x) => x.items)
+            .map((i) => (
+              <li key={i.date} className="text-[var(--text-primary)]">
+                <span className="font-medium">{formatDate(i.date)}</span> — {i.reason}
+              </li>
+            ))}
+        </ul>
+      </div>
+    );
 
   return (
     <div className={section}>
@@ -72,7 +97,7 @@ export function ExcuseSection({
         <ShieldCheck size={16} /> Late days to excuse
       </div>
       <p className="mb-3 text-xs text-[var(--text-muted)]">
-        The Department or Branch Manager can ask HR not to count late days with a valid reason (an approved excuse, official business…). Days HR accepts are taken off the days late in the Notice of Sanction.
+        The Department or Branch Manager can ask HR not to count late days with a valid reason (an approved excuse, official business…). The employee doesn&rsquo;t receive the NTE while a request waits for HR. If the accepted days leave fewer than {NTE_TARDINESS_MIN_DAYS} late days, the NTE is withdrawn; otherwise they&rsquo;re taken off the days late in the Notice of Sanction.
       </p>
 
       {requests.length > 0 && (
@@ -101,7 +126,10 @@ export function ExcuseSection({
                     disabled={!!busy}
                     className="flex items-center gap-1 rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)] disabled:opacity-40"
                   >
-                    {busy === x.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Accept — don&rsquo;t count {x.items.length === 1 ? "this day" : `these ${x.items.length} days`}
+                    {busy === x.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}{" "}
+                    {leftIf(x.items.map((i) => i.date)) < NTE_TARDINESS_MIN_DAYS
+                      ? `Accept — ${leftIf(x.items.map((i) => i.date))} days left, the NTE will be withdrawn`
+                      : `Accept — don't count ${x.items.length === 1 ? "this day" : `these ${x.items.length} days`}`}
                   </button>
                   <button
                     onClick={() => decide(x.id, false)}
