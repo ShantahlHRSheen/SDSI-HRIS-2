@@ -12,7 +12,6 @@ import { applyCorrections, biometricsAttendance, previousPeriod, withPrior } fro
 import type { BiometricCarryOver, BiometricDetail } from "@/lib/types";
 import { BRANCH_SCHEDULES, guessBranch, matchEmployeeByName } from "@/lib/biometrics/branches";
 import { fetchBiometricLinks, saveBiometricLinks, type BiometricLink } from "@/lib/supabase/biometric-links";
-import { importBranchAttendanceRows } from "@/lib/supabase/repo";
 
 // Review screen for a branch's biometrics file: pick the branch and cut-off,
 // check the schedule, match each person in the file to an employee (saved
@@ -22,29 +21,23 @@ const shortDate = (d: string) => formatDate(d).replace(/, \d{4}$/, "");
 const ALL = "all";
 const shiftDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 
-// `allowedBranchIds`: branch staff importing their own branch only (HR and
-// payroll leave it out: any branch). Their import is saved by the database
-// after it checks the branch (import_branch_attendance).
 export function BiometricsImportModal({
   file,
   fileName,
   onClose,
   onImported,
-  allowedBranchIds,
 }: {
   file: BioFile;
   fileName: string;
   onClose: () => void;
   onImported: (periodId: string, count: number) => void;
-  allowedBranchIds?: string[];
 }) {
   const { employees: allEmployees, branches: allBranches, payrollPeriods, holidays, leaveRequests, correctionRequests, attendancePeriodRecords, importAttendancePeriodRecords, updateAttendanceDetails, isRealAccount } = useHris();
-  const branches = useMemo(() => (allowedBranchIds ? allBranches.filter((b) => allowedBranchIds.includes(b.id)) : allBranches), [allBranches, allowedBranchIds]);
+  const branches = allBranches;
   // HR's attendance sheet has every branch in it: each employee is checked
   // against their own branch's schedule ("all").
-  const [branchId, setBranchId] = useState(() => ((file.format === "sheet" || file.format === "daily" || file.format === "branches") && !allowedBranchIds ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
-  // Branch staff only see and match their own branch's employees.
-  const employees = useMemo(() => (allowedBranchIds ? allEmployees.filter((e) => e.branchId === branchId) : allEmployees), [allEmployees, allowedBranchIds, branchId]);
+  const [branchId, setBranchId] = useState(() => (file.format === "sheet" || file.format === "daily" || file.format === "branches" ? ALL : (guessBranch(fileName, branches)?.id ?? (branches.length === 1 ? branches[0].id : ""))));
+  const employees = allEmployees;
   // The cut-off the file is for: the latest one holding a good share of its
   // punch days (two files picked together: this cut-off's, not the last one's).
   const [periodId, setPeriodId] = useState(() => {
@@ -184,7 +177,7 @@ export function BiometricsImportModal({
   // HR can still save a past cut-off's day-by-day record (late, undertime,
   // half days, absences, missing punches) for employees already in it —
   // days worked, minutes, leaves and holidays, and so payroll, stay as paid.
-  const recordsOnly = periodLocked && !allowedBranchIds;
+  const recordsOnly = periodLocked;
   const targets = recordsOnly ? included.filter((r) => existing.has(r.employeeId)) : included;
   const notInPeriod = included.length - targets.length;
   const canImport = !!branch && !!period && (!periodLocked || recordsOnly) && scheduleOk && targets.length > 0 && dupes.size === 0 && links !== null && !busy;
@@ -214,8 +207,7 @@ export function BiometricsImportModal({
         onImported(period.id, await updateAttendanceDetails(period.id, rowsToSave));
         return;
       }
-      if (allowedBranchIds && isRealAccount) await importBranchAttendanceRows(period.id, rowsToSave);
-      else await importAttendancePeriodRecords(period.id, rowsToSave);
+      await importAttendancePeriodRecords(period.id, rowsToSave);
       onImported(period.id, rowsToSave.length);
     } catch (err) {
       reportSaveError("Couldn't import the biometrics", err);
@@ -240,7 +232,7 @@ export function BiometricsImportModal({
             <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Branch</span>
             <select value={branchId} onChange={(e) => chooseBranch(e.target.value)} className={`${input} w-full`}>
               <option value="">Choose the branch…</option>
-              {!allowedBranchIds && <option value={ALL}>All branches (each employee&rsquo;s own schedule)</option>}
+              <option value={ALL}>All branches (each employee&rsquo;s own schedule)</option>
               {branches
                 .filter((b) => b.id !== "br-unassigned")
                 .map((b) => (
