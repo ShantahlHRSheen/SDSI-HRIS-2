@@ -76,6 +76,9 @@ export interface CompanyConfig {
   // Org Chart shows photos of the company's own chart that HR uploads,
   // instead of one drawn from the 201 files.
   orgChartPhotos?: boolean;
+  // The HR Department's letterhead banner on generated notices (NTEs);
+  // a plain text heading if unset.
+  hrLetterhead?: string;
 }
 
 const TBA = { tin: "", address: "", phone: "", email: "", rdoCode: "" };
@@ -88,6 +91,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     logo: "/brand/shantahl-circle.png",
     formLogo: "/brand/shantahl-form-logo.png",
     idCardLogo: "/brand/shantahl-logo.png",
+    hrLetterhead: "/brand/shantahl-hr-letterhead.png",
     // Green gradient bands, emergency contact + return-to on the back.
     idCardStyle: "modern",
     info: {

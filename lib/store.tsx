@@ -115,7 +115,7 @@ import {
 } from "./mock-data";
 import { computeOverallScore, type KpiCategory } from "./performance-eval";
 import { setSalaryAdjustments, type SalaryAdjustment } from "./salary-adjustments";
-import { acknowledgeNotice, attachNoticePdf, submitExplanation } from "./supabase/discipline-files";
+import { acknowledgeNotice, signNotice, attachNoticePdf, submitExplanation } from "./supabase/discipline-files";
 import { deleteSalaryAdjustmentRow, fetchSalaryAdjustments, insertSalaryAdjustment, updateSalaryAdjustmentRow, type SalaryAdjustmentInput } from "./supabase/salary-adjustments";
 import type {
   Announcement,
@@ -296,6 +296,8 @@ interface HrisContextShape {
   // Discipline notices (phase 20). Each resolves to an error message, or null on success.
   attachDisciplinaryNotice: (id: string, file: File) => Promise<string | null>;
   acknowledgeDisciplinaryRecord: (id: string, signaturePng: Blob) => Promise<string | null>;
+  // HR Manager, then the Department Manager, sign a notice before the employee gets it.
+  signDisciplinaryRecord: (id: string, as: "hr" | "manager", signaturePng: Blob) => Promise<string | null>;
   submitDisciplinaryExplanation: (id: string, text: string, file: File | null) => Promise<string | null>;
   setDisciplinaryStatus: (id: string, status: DisciplinaryRecord["status"]) => void;
 
@@ -1134,6 +1136,21 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord],
   );
 
+  const signDisciplinaryRecord: HrisContextShape["signDisciplinaryRecord"] = useCallback(
+    async (id, as, signaturePng) => {
+      try {
+        if (supabaseSession) replaceDisciplinaryRecord(await signNotice(id, as, signaturePng));
+        else if (as === "hr") patchDisciplinaryRecord(id, { hrSignedAt: new Date().toISOString(), hrSignerId: currentEmployee?.id ?? null, hrSignaturePath: URL.createObjectURL(signaturePng) });
+        else patchDisciplinaryRecord(id, { managerSignedAt: new Date().toISOString(), managerSignaturePath: URL.createObjectURL(signaturePng) });
+        logAudit("Discipline", "sign", `Signed notice ${id} as ${as === "hr" ? "HR Manager" : "Department Manager"}`);
+        return null;
+      } catch (err) {
+        return errorText(err, "Couldn't save the signature.");
+      }
+    },
+    [logAudit, supabaseSession, replaceDisciplinaryRecord, patchDisciplinaryRecord, currentEmployee],
+  );
+
   const submitDisciplinaryExplanation: HrisContextShape["submitDisciplinaryExplanation"] = useCallback(
     async (id, text, file) => {
       try {
@@ -1840,6 +1857,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     addDisciplinaryRecord,
     attachDisciplinaryNotice,
     acknowledgeDisciplinaryRecord,
+    signDisciplinaryRecord,
     submitDisciplinaryExplanation,
     setDisciplinaryStatus,
     addAnnouncement,

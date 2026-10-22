@@ -28,7 +28,14 @@ export default function MyNoticesPage() {
     [disciplinaryRecords, currentEmployee],
   );
   const needAction = mine.filter((r) => ["to_acknowledge", "to_explain"].includes(responseStage(r))).length;
+  // Notices waiting for this person's signature as Department Manager.
+  const toSign = useMemo(
+    () => disciplinaryRecords.filter((r) => r.managerId === currentEmployee?.id && r.employeeId !== currentEmployee?.id && responseStage(r) === "manager_to_sign"),
+    [disciplinaryRecords, currentEmployee],
+  );
+  const [signId, setSignId] = useState<string | null>(null);
   const open = mine.find((r) => r.id === openId) ?? null;
+  const signing = disciplinaryRecords.find((r) => r.id === signId) ?? null;
 
   return (
     <div>
@@ -36,6 +43,34 @@ export default function MyNoticesPage() {
         title="My Notices"
         subtitle="Notices issued to you by HR or your department head. Open each notice, sign to acknowledge that you received it, and submit your written explanation when one is requested."
       />
+
+      {toSign.length > 0 && (
+        <div className="mb-6">
+          <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">To sign as Department Manager</div>
+          <div className="space-y-2">
+            {toSign.map((r) => {
+              const emp = employees.find((e) => e.id === r.employeeId);
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setSignId(r.id)}
+                  className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--status-warning)]/50 bg-[var(--status-warning)]/5 p-4 text-left hover:bg-[var(--gridline)]/30"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={DISCIPLINE_TYPE_TONE[r.type]}>{DISCIPLINARY_LABELS[r.type]}</Badge>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">{emp ? fullName(emp) : r.employeeId}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{formatDate(r.date)} · signed by the HR Manager</span>
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)]">{r.description}</div>
+                  </div>
+                  <span className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">Open & sign</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {needAction > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-sm text-[var(--text-primary)]">
@@ -86,6 +121,7 @@ export default function MyNoticesPage() {
       )}
 
       <DisciplineRecordModal record={open} employees={employees} mode="employee" onClose={() => setOpenId(null)} />
+      <DisciplineRecordModal record={signing} employees={employees} mode="manager" onClose={() => setSignId(null)} />
     </div>
   );
 }

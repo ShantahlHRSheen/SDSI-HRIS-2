@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, Plus, ShieldAlert } from "lucide-react";
+import { AlarmClock, FileText, Plus, ShieldAlert } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/Badge";
@@ -13,6 +13,8 @@ import { DISCIPLINARY_LABELS } from "@/lib/types";
 import type { DisciplinaryType } from "@/lib/types";
 import { DISCIPLINE_TYPE_TONE, NTE_RESPONSE_DAYS, addDays, responseBadge } from "@/lib/discipline";
 import { todayInManila } from "@/lib/leave-policy";
+import { TardinessNteModal } from "@/components/discipline/TardinessNteModal";
+import { completeMonths, issuedTardinessNte, monthLabel, tardinessNteCandidates } from "@/lib/nte-tardiness";
 
 const field = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
 
@@ -26,7 +28,22 @@ export default function DisciplinePage() {
     addDisciplinaryRecord,
     attachDisciplinaryNotice,
     setDisciplinaryStatus,
+    payrollPeriods,
+    attendancePeriodRecords,
   } = useHris();
+  const [showTardiness, setShowTardiness] = useState(false);
+  const isHr = !!currentUser?.roles.includes("hr_admin");
+  // The latest month whose attendance is complete, and who in it still needs
+  // a tardiness NTE (fixed-rate employees aside).
+  const tardiness = useMemo(() => {
+    if (!isHr) return null;
+    const month = completeMonths(payrollPeriods, attendancePeriodRecords)[0];
+    if (!month) return null;
+    const pending = tardinessNteCandidates({ month, employees: allEmployees, records: attendancePeriodRecords, discipline: disciplinaryRecords }).filter(
+      (c) => c.employee.payrollType !== "monthly" && !issuedTardinessNte(disciplinaryRecords, c.employee.id, month),
+    );
+    return { month, pending: pending.length };
+  }, [isHr, payrollPeriods, attendancePeriodRecords, allEmployees, disciplinaryRecords]);
   const [typeFilter, setTypeFilter] = useState<"all" | DisciplinaryType>("all");
   const [showCreate, setShowCreate] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -109,6 +126,15 @@ export default function DisciplinePage() {
         subtitle="Incident reports, warnings, suspensions, and Notice to Explain / Notice of Decision records. Employees receive them in My Notices, sign to acknowledge, and submit their written explanation."
         actions={
           canManage && (
+            <>
+            {isHr && (
+              <button
+                onClick={() => setShowTardiness(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--series-1)] hover:bg-[var(--series-1)]/10"
+              >
+                <AlarmClock size={16} /> Tardiness NTEs
+              </button>
+            )}
             <button
               onClick={() => {
                 setForm({ ...emptyForm, date: today, responseDue: addDays(today, NTE_RESPONSE_DAYS) });
@@ -120,9 +146,31 @@ export default function DisciplinePage() {
             >
               <Plus size={16} /> New record
             </button>
+            </>
           )
         }
       />
+
+      {tardiness && tardiness.pending > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
+          <AlarmClock size={18} className="shrink-0 text-[var(--status-warning)]" />
+          <div className="flex-1 text-[var(--text-secondary)]">
+            <span className="font-medium text-[var(--text-primary)]">{monthLabel(tardiness.month)} attendance is complete.</span> {tardiness.pending} employee{tardiness.pending === 1 ? " was" : "s were"} late 5 or more days and {tardiness.pending === 1 ? "has" : "have"} no tardiness NTE yet.
+          </div>
+          <button onClick={() => setShowTardiness(true)} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]">
+            Review &amp; issue NTEs
+          </button>
+        </div>
+      )}
+      {isHr && (() => {
+        const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt).length;
+        return waiting > 0 ? (
+          <div className="mb-4 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
+            <span className="font-medium text-[var(--text-primary)]">{waiting} notice{waiting === 1 ? " is" : "s are"} waiting for your signature as HR Manager.</span> Open each one marked &ldquo;Awaiting HR Manager signature&rdquo; to sign; it then goes to the Department Manager, then to the employee.
+          </div>
+        ) : null;
+      })()}
+      {showTardiness && <TardinessNteModal initialMonth={tardiness?.month} onClose={() => setShowTardiness(false)} />}
 
       <div className="mb-4 flex flex-wrap gap-2">
         <button

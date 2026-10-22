@@ -12,11 +12,13 @@ import { DISCIPLINE_TYPE_TONE, responseBadge } from "@/lib/discipline";
 import { todayInManila } from "@/lib/leave-policy";
 import { buildDisciplineResponsePdf, manilaDateTime } from "@/lib/discipline-pdf";
 import { disciplineFileUrl, downloadDisciplineFile } from "@/lib/supabase/discipline-files";
+import { buildSignedNotice } from "@/lib/discipline-notice";
 
 // mode: "manage" — HR / department head (attach notice, download responses)
 //       "view"   — Upper Management (read-only, can download)
 //       "employee" — the employee the record is addressed to (acknowledge, explain)
-export type DisciplineModalMode = "manage" | "view" | "employee";
+//       "manager" — the Department Manager who signs it (phase 51)
+export type DisciplineModalMode = "manage" | "view" | "employee" | "manager";
 
 const btn =
   "flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40";
@@ -61,7 +63,7 @@ export function DisciplineRecordModal({
 }
 
 function Body({ record, employees, mode }: { record: DisciplinaryRecord; employees: Employee[]; mode: DisciplineModalMode }) {
-  const { attachDisciplinaryNotice, acknowledgeDisciplinaryRecord, submitDisciplinaryExplanation, disciplinaryRecords } = useHris();
+  const { attachDisciplinaryNotice, acknowledgeDisciplinaryRecord, submitDisciplinaryExplanation, signDisciplinaryRecord, disciplinaryRecords, currentUser, currentEmployee } = useHris();
   // Always show the freshest copy of the record from the store.
   const r = disciplinaryRecords.find((d) => d.id === record.id) ?? record;
   const emp = employees.find((e) => e.id === r.employeeId);
@@ -95,13 +97,35 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
     setBusy(null);
   }
 
+  // A generated notice, printed with the signatures it has so far.
+  async function openSigned() {
+    setBusy("signed");
+    setError(null);
+    try {
+      const bytes = await buildSignedNotice(r, employees);
+      if (bytes) {
+        const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't build the notice.");
+    }
+    setBusy(null);
+  }
+
   async function downloadAll() {
     if (!emp) return;
     setBusy("pdf");
     setError(null);
     try {
       const get = (p: string | null | undefined) => (p ? downloadDisciplineFile(p) : Promise.resolve(null));
-      const [notice, signature, explanationFile] = await Promise.all([get(r.noticePath), get(r.ackSignaturePath), get(r.explanationFilePath)]);
+      const signed = r.noticeData ? await buildSignedNotice(r, employees) : null;
+      const [notice, signature, explanationFile] = await Promise.all([
+        signed ? Promise.resolve(new Blob([signed as BlobPart], { type: "application/pdf" })) : get(r.noticePath),
+        get(r.ackSignaturePath),
+        get(r.explanationFilePath),
+      ]);
       const bytes = await buildDisciplineResponsePdf({
         record: r,
         employeeName: fullName(emp),
@@ -171,7 +195,16 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         <div className="mb-2 flex items-center gap-2 font-medium text-[var(--text-primary)]">
           <FileText size={16} /> Notice
         </div>
-        {r.noticePath ? (
+        {r.noticeData && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <button onClick={openSigned} disabled={busy !== null} className={btn}>
+              {busy === "signed" ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />} Open the notice{r.hrSignedAt ? " (with signatures)" : ""}
+            </button>
+          </div>
+        )}
+        {r.noticePath && r.noticeData ? (
+          <div className="text-xs text-[var(--text-muted)]">Unsigned copy as issued: {r.noticeFileName ?? "notice.pdf"}</div>
+        ) : r.noticePath ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[var(--text-secondary)]">{r.noticeFileName ?? "notice.pdf"}</span>
             <button onClick={() => openFile(r.noticePath!)} className={btn}>
@@ -198,6 +231,38 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         )}
         <input ref={noticeInput} type="file" accept="application/pdf,.pdf" className="hidden" onChange={uploadNotice} />
       </div>
+
+      {/* HR Manager → Department Manager signatures */}
+      {r.signFlow && (
+        <div className={section}>
+          <div className="mb-2 flex items-center gap-2 font-medium text-[var(--text-primary)]">
+            <PenLine size={16} /> Signatures
+          </div>
+          <SignStep
+            title="HR Manager"
+            signedAt={r.hrSignedAt}
+            signerName={(() => {
+              const s = employees.find((e) => e.id === r.hrSignerId);
+              return s ? fullName(s) : undefined;
+            })()}
+            canSign={!r.hrSignedAt && !!currentUser?.roles.includes("hr_admin")}
+            waiting="Waiting for the HR Manager to sign."
+            onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "hr", png))}
+          />
+          <div className="my-3 border-t border-[var(--gridline)]" />
+          <SignStep
+            title={`Department Manager${(() => {
+              const m = employees.find((e) => e.id === r.managerId);
+              return m ? ` — ${fullName(m)}` : "";
+            })()}`}
+            signedAt={r.managerSignedAt}
+            canSign={!!r.hrSignedAt && !r.managerSignedAt && !!r.managerId && r.managerId === currentEmployee?.id}
+            waiting={r.hrSignedAt ? "Waiting for the Department Manager to sign." : "Signs after the HR Manager."}
+            onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "manager", png))}
+          />
+          {!r.managerSignedAt && <div className="mt-3 text-xs text-[var(--text-muted)]">The employee receives this notice once both have signed.</div>}
+        </div>
+      )}
 
       {/* Acknowledgement */}
       <div className={section}>
@@ -263,6 +328,56 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
             {busy === "pdf" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Download complete file (PDF)
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+function SignStep({
+  title,
+  signedAt,
+  signerName,
+  canSign,
+  waiting,
+  onSign,
+}: {
+  title: string;
+  signedAt?: string | null;
+  signerName?: string;
+  canSign: boolean;
+  waiting: string;
+  onSign: (png: Blob) => Promise<void>;
+}) {
+  const pad = useRef<SignaturePadHandle>(null);
+  const [hasInk, setHasInk] = useState(false);
+  const [saving, setSaving] = useState(false);
+  return (
+    <div>
+      <div className="text-xs font-medium text-[var(--text-secondary)]">{title}</div>
+      {signedAt ? (
+        <div className="mt-1 flex items-center gap-1.5 text-[var(--status-good)]">
+          <Check size={14} /> Signed{signerName ? ` by ${signerName}` : ""} on {manilaDateTime(signedAt)}
+        </div>
+      ) : canSign ? (
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-[var(--text-secondary)]">Open the notice above, then sign below.</p>
+          <SignaturePad ref={pad} onChange={setHasInk} />
+          <button
+            onClick={async () => {
+              const png = await pad.current?.toPng();
+              if (!png) return;
+              setSaving(true);
+              await onSign(png);
+              setSaving(false);
+            }}
+            disabled={!hasInk || saving}
+            className={primary}
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <PenLine size={15} />} Sign the notice
+          </button>
+        </div>
+      ) : (
+        <div className="mt-1 text-[var(--text-muted)]">{waiting}</div>
       )}
     </div>
   );

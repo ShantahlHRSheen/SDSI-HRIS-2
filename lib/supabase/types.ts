@@ -165,6 +165,14 @@ export type DisciplinaryRecordRow = {
   explanation_file_name?: string | null;
   explanation_submitted_at?: string | null;
   created_at?: string;
+  sign_flow?: boolean;
+  notice_data?: unknown;
+  manager_id?: string | null;
+  hr_signer_id?: string | null;
+  hr_signed_at?: string | null;
+  hr_signature_path?: string | null;
+  manager_signed_at?: string | null;
+  manager_signature_path?: string | null;
 };
 
 export type AuditLogRow = {
