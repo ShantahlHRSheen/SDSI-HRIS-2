@@ -65,13 +65,13 @@ export function DisciplineRecordModal({
 
 function Body({ record, employees, mode }: { record: DisciplinaryRecord; employees: Employee[]; mode: DisciplineModalMode }) {
   const { attachDisciplinaryNotice, acknowledgeDisciplinaryRecord, submitDisciplinaryExplanation, signDisciplinaryRecord, receiveDisciplinaryExplanation, disciplinaryRecords, currentUser, currentEmployee } = useHris();
+  // Always show the freshest copy of the record from the store.
+  const r = disciplinaryRecords.find((d) => d.id === record.id) ?? record;
   const isHrManager = !!currentUser?.roles.includes("hr_admin");
   const managerName = (() => {
     const m = employees.find((e) => e.id === r.managerId);
     return m ? fullName(m) : "";
   })();
-  // Always show the freshest copy of the record from the store.
-  const r = disciplinaryRecords.find((d) => d.id === record.id) ?? record;
   const emp = employees.find((e) => e.id === r.employeeId);
   const issuer = employees.find((e) => e.id === r.issuedBy);
   const today = todayInManila();
