@@ -19,6 +19,8 @@ export interface ResponsePdfInput {
   notice: Blob | null;
   signature: Blob | null;
   explanationFile: Blob | null;
+  // The HR Manager's / Department Manager's signed receipt of the explanation.
+  receipts?: { label: string; name: string; at: string; signature: Blob | null }[];
 }
 
 const A4: [number, number] = [595.28, 841.89];
@@ -197,6 +199,26 @@ export async function buildDisciplineResponsePdf(input: ResponsePdfInput): Promi
     if (record.explanationFileName) w.text(`Attached file: ${record.explanationFileName} (on the following page${input.explanationFile ? "s" : ""})`, { size: 9.5, color: MUTED });
   } else {
     w.text(record.requiresExplanation ? "Not yet submitted by the employee." : "No written explanation was requested.", { size: 10, color: MUTED });
+  }
+
+  if (input.receipts?.length) {
+    w.y -= 6;
+    w.rule();
+    w.text("EXPLANATION RECEIVED BY", { size: 11, bold: true, gap: 4 });
+    for (const rc of input.receipts) {
+      const img = rc.signature ? await embedImage(doc, rc.signature) : null;
+      w.ensure(90);
+      if (img) {
+        const scale = Math.min(180 / img.width, 55 / img.height, 1);
+        const h = img.height * scale;
+        w.page.drawImage(img, { x: MARGIN, y: w.y - h, width: img.width * scale, height: h });
+        w.y -= h + 4;
+      }
+      w.page.drawLine({ start: { x: MARGIN, y: w.y }, end: { x: MARGIN + 220, y: w.y }, thickness: 0.8, color: INK });
+      w.y -= 4;
+      w.text(`${rc.name || rc.label}`, { size: 10, bold: true });
+      w.text(`${rc.label} - received ${manilaDateTime(rc.at)} (Philippine time)`, { size: 9, color: MUTED, gap: 10 });
+    }
   }
 
   if (input.explanationFile) {
