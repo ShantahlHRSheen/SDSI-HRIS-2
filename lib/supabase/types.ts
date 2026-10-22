@@ -182,6 +182,7 @@ export type DisciplinaryRecordRow = {
   branch_manager_signed_at?: string | null;
   branch_manager_signature_path?: string | null;
   excuse_requests?: unknown;
+  withdrawn_at?: string | null;
 };
 
 export type AuditLogRow = {

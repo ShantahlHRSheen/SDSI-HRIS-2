@@ -5412,21 +5412,26 @@ create policy "discipline receipt files upload" on storage.objects for insert to
 --   * branch_manager_id: the employee's branch approver (branches.approver_id,
 --     e.g. Cebu: Mary Jane Pedrano), set when the notice is issued.
 --   * Order: HR Manager → Department Manager → Branch Manager → employee.
---     The employee sees the notice only once every named signatory signed.
+--     The employee sees the notice only once every named signatory signed,
+--     no excuse request is waiting for HR, and it wasn't withdrawn (excused
+--     days left fewer than 5 late days).
 --
 -- Safe to run any time, and safe to re-run (after phases 51–52).
 
 alter table disciplinary_records
   add column if not exists branch_manager_id text references employees (id) on delete set null,
   add column if not exists branch_manager_signed_at timestamptz,
-  add column if not exists branch_manager_signature_path text;
+  add column if not exists branch_manager_signature_path text,
+  add column if not exists excuse_requests jsonb not null default '[]'::jsonb,
+  add column if not exists withdrawn_at timestamptz;
 
 drop policy if exists "discipline read" on disciplinary_records;
 create policy "discipline read" on disciplinary_records for select to authenticated
   using (
     (app_can_view_discipline(employee_id)
       and (employee_id is distinct from app_current_employee_id() or not sign_flow
-           or (manager_signed_at is not null and (branch_manager_id is null or branch_manager_signed_at is not null))))
+           or (manager_signed_at is not null and (branch_manager_id is null or branch_manager_signed_at is not null)
+               and withdrawn_at is null and not (excuse_requests @> '[{"status": "pending"}]'::jsonb))))
     or (manager_id is not null and manager_id = app_current_employee_id())
     or (branch_manager_id is not null and branch_manager_id = app_current_employee_id())
   );
@@ -5481,6 +5486,9 @@ begin
   if r.id is null or not r.sign_flow then
     raise exception 'This notice doesn''t need signatures.';
   end if;
+  if r.withdrawn_at is not null then
+    raise exception 'This notice was withdrawn.';
+  end if;
   prefix := case
     when r.hr_signed_at is null then '/hrsign-'
     when r.manager_signed_at is null then '/mgrsign-'
@@ -5528,8 +5536,9 @@ begin
   if r.id is null or r.employee_id is distinct from app_current_employee_id() then
     raise exception 'This notice isn''t addressed to you.';
   end if;
-  if r.sign_flow and (r.manager_signed_at is null or (r.branch_manager_id is not null and r.branch_manager_signed_at is null)) then
-    raise exception 'This notice isn''t signed yet.';
+  if r.sign_flow and (r.manager_signed_at is null or (r.branch_manager_id is not null and r.branch_manager_signed_at is null)
+                      or r.withdrawn_at is not null or r.excuse_requests @> '[{"status": "pending"}]'::jsonb) then
+    raise exception 'This notice isn''t ready for you yet.';
   end if;
   if r.acknowledged_at is not null then
     raise exception 'You have already acknowledged this notice.';
@@ -5560,9 +5569,10 @@ create policy "discipline branch manager files upload" on storage.objects for in
 
 -- Excuse requests: the Department / Branch Manager asks HR not to count
 -- some late days, each with its reason; HR accepts or declines each request.
+-- When the accepted days leave fewer than 5 late days, the NTE is withdrawn
+-- (resolved; the employee never receives it).
 --   [{ "id", "by", "role": "manager"|"branch", "items": [{ "date", "minutes", "reason" }],
 --      "at", "status": "pending"|"accepted"|"declined", "decided_by", "decided_at" }]
-alter table disciplinary_records add column if not exists excuse_requests jsonb not null default '[]'::jsonb;
 
 create or replace function app_guard_discipline_excuses()
 returns trigger
@@ -5575,7 +5585,8 @@ begin
   end if;
   if tg_op = 'INSERT' then
     new.excuse_requests := '[]'::jsonb;
-  elsif new.excuse_requests is distinct from old.excuse_requests then
+    new.withdrawn_at := null;
+  elsif new.excuse_requests is distinct from old.excuse_requests or new.withdrawn_at is distinct from old.withdrawn_at then
     raise exception 'Excuse requests change only through the Department / Branch Manager and HR.';
   end if;
   return new;
@@ -5601,6 +5612,9 @@ begin
   select * into r from disciplinary_records where id = record_id for update;
   if r.id is null or not r.sign_flow then
     raise exception 'This notice doesn''t take excuse requests.';
+  end if;
+  if r.withdrawn_at is not null then
+    raise exception 'This notice was withdrawn.';
   end if;
   role := case when r.manager_id = me then 'manager' when r.branch_manager_id = me then 'branch' end;
   if role is null then
@@ -5652,6 +5666,14 @@ begin
        from jsonb_array_elements(r.excuse_requests) with ordinality as t(x, ord))
    where id = record_id
   returning * into r;
+  -- Fewer than 5 late days left once the accepted ones are excused: withdrawn.
+  if accept and jsonb_typeof(r.notice_data->'days') = 'array'
+     and jsonb_array_length(r.notice_data->'days') - (
+       select count(distinct i->>'date')
+       from jsonb_array_elements(r.excuse_requests) x, jsonb_array_elements(x->'items') i
+       where x->>'status' = 'accepted') < 5 then
+    update disciplinary_records set withdrawn_at = now(), status = 'resolved' where id = record_id returning * into r;
+  end if;
   perform set_config('app.discipline_response', 'off', true);
   return r;
 end;

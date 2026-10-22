@@ -280,6 +280,9 @@ export interface DisciplinaryRecord {
   branchManagerSignaturePath?: string | null;
   // Late days the Department / Branch Manager asks HR not to count (phase 53).
   excuseRequests?: ExcuseRequest[];
+  // Set when accepted excuses left fewer than 5 late days: the NTE is
+  // withdrawn and the employee never receives it.
+  withdrawnAt?: string | null;
   // Signed receipt of the employee's explanation (phase 52).
   explHrReceiverId?: string | null;
   explHrReceivedAt?: string | null;

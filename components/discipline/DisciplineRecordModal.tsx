@@ -268,7 +268,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
               const s = employees.find((e) => e.id === r.hrSignerId);
               return s ? fullName(s) : undefined;
             })()}
-            canSign={!r.hrSignedAt && !!currentUser?.roles.includes("hr_admin")}
+            canSign={!r.withdrawnAt && !r.hrSignedAt && !!currentUser?.roles.includes("hr_admin")}
             waiting="Waiting for the HR Manager to sign."
             onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "hr", png))}
           />
@@ -279,7 +279,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
               return m ? ` — ${fullName(m)}` : "";
             })()}`}
             signedAt={r.managerSignedAt}
-            canSign={!!r.hrSignedAt && !r.managerSignedAt && !!r.managerId && r.managerId === currentEmployee?.id}
+            canSign={!r.withdrawnAt && !!r.hrSignedAt && !r.managerSignedAt && !!r.managerId && r.managerId === currentEmployee?.id}
             waiting={r.hrSignedAt ? "Waiting for the Department Manager to sign." : "Signs after the HR Manager."}
             onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "manager", png))}
           />
@@ -292,7 +292,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
                   return m ? ` — ${fullName(m)}` : "";
                 })()}`}
                 signedAt={r.branchManagerSignedAt}
-                canSign={!!r.managerSignedAt && !r.branchManagerSignedAt && r.branchManagerId === currentEmployee?.id}
+                canSign={!r.withdrawnAt && !!r.managerSignedAt && !r.branchManagerSignedAt && r.branchManagerId === currentEmployee?.id}
                 waiting={r.managerSignedAt ? "Waiting for the Branch Manager to sign." : "Signs after the Department Manager."}
                 onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "branch", png))}
               />

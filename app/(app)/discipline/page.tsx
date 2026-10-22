@@ -163,7 +163,7 @@ export default function DisciplinePage() {
         </div>
       )}
       {isHr && (() => {
-        const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt).length;
+        const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt && !r.withdrawnAt).length;
         const toReceive = disciplinaryRecords.filter((r) => r.signFlow && r.explanationSubmittedAt && !r.explHrReceivedAt).length;
         const toSanction = disciplinaryRecords.filter(
           (r) => r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id),
