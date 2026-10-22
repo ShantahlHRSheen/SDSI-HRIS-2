@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Download, Paperclip, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { FileViewer, saveFile, type ViewerFile } from "@/components/FileViewer";
 import type { LeaveAttachment, LeaveAttachmentKind, LeaveRequest } from "@/lib/types";
 
 export const ATTACHMENT_RETENTION_DAYS = 30;
@@ -79,19 +80,20 @@ export function LeaveDocuments({ request, canUpload, onlineForm = false }: { req
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [pendingKind, setPendingKind] = useState<LeaveAttachmentKind | null>(null);
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
 
   if (kinds.length === 0 && Object.keys(latest).length === 0) return <span className="text-xs text-[var(--text-muted)]">—</span>;
 
   async function download(a: LeaveAttachment) {
     setError(null);
     try {
+      // PDFs and photos are shown in the HRIS viewer; HEIC photos (which most
+      // browsers can't show) are downloaded.
       const url = await leaveAttachmentUrl(a);
-      const link = document.createElement("a");
-      link.href = url;
-      link.rel = "noopener";
-      link.click();
+      if (/hei[cf]/i.test(a.contentType)) await saveFile(url, a.fileName);
+      else setViewer({ url, name: a.fileName, kind: a.contentType.startsWith("image/") ? "image" : "pdf" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not download the file.");
+      setError(err instanceof Error ? err.message : "Could not open the file.");
     }
   }
 
@@ -157,6 +159,7 @@ export function LeaveDocuments({ request, canUpload, onlineForm = false }: { req
         );
       })}
       {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
+      {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
     </div>
   );
 }

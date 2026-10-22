@@ -130,6 +130,13 @@ export async function hrChatFileDownloadUrl(path: string, fileName: string): Pro
   return data.signedUrl;
 }
 
+// A short-lived link for viewing a chat file (PDF or photo) inside the HRIS.
+export async function hrChatFileViewUrl(path: string): Promise<string> {
+  const { data, error } = await getSupabaseClient().storage.from(HR_CHAT_FILE_BUCKET).createSignedUrl(path, 300);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
 export async function markHrThreadRead(employeeId: string): Promise<void> {
   const client = getSupabaseClient() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }> };
   const { error } = await client.rpc("mark_hr_thread_read", { thread_employee_id: employeeId });

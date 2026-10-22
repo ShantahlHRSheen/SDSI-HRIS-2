@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Download, FileText, Paperclip, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { canView, FileViewer, saveFile, viewerKind, type ViewerFile } from "@/components/FileViewer";
 import type { AnnouncementFile } from "@/lib/types";
 
 export const MAX_FILES = 5;
@@ -36,32 +37,23 @@ export function fileSize(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-// Attached files on a posted announcement: open (PDFs, text) or download.
+// Attached files on a posted announcement: PDFs open in the HRIS viewer;
+// the rest (Word, Excel…) are downloaded.
 export function AnnouncementFileList({ files }: { files: AnnouncementFile[] }) {
   const { announcementFileUrl } = useHris();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
   if (!files.length) return null;
 
   async function open(file: AnnouncementFile, download: boolean) {
     setBusy(file.path);
     setError(null);
-    // Open the tab first (popup blockers allow it only on the click itself).
-    const tab = download ? null : window.open("", "_blank");
     try {
       const url = await announcementFileUrl(file, download);
-      if (tab) tab.location.href = url;
-      else {
-        // The link is served as an attachment, so the page stays put.
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      }
+      if (download) await saveFile(url, file.name);
+      else setViewer({ url, name: file.name, kind: viewerKind(file.name) });
     } catch {
-      tab?.close();
       setError("Couldn't open the file — refresh and try again.");
     } finally {
       setBusy(null);
@@ -71,7 +63,7 @@ export function AnnouncementFileList({ files }: { files: AnnouncementFile[] }) {
   return (
     <div className="mt-3 space-y-1.5">
       {files.map((f) => {
-        const viewable = f.type === "application/pdf" || f.type.startsWith("text/");
+        const viewable = canView(f.name, f.type);
         return (
           <div key={f.path} className="flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/20 px-3 py-2 text-sm">
             <FileText size={16} className="shrink-0 text-[var(--text-muted)]" />
@@ -96,6 +88,7 @@ export function AnnouncementFileList({ files }: { files: AnnouncementFile[] }) {
         );
       })}
       {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
+      {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { FileViewer, type ViewerFile } from "@/components/FileViewer";
 import { withFileType } from "@/components/leave/LeaveAttachments";
 import { prepareBulletinPhoto } from "@/lib/id-images";
 import type { AnnouncementImage } from "@/lib/types";
@@ -12,11 +13,12 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif"];
 
 // Photo grid on a posted announcement. Links are fetched on demand (they
-// expire after an hour); clicking a photo opens it full size.
+// expire after an hour); clicking a photo opens it full size in the HRIS.
 export function AnnouncementPhotoGrid({ images }: { images: AnnouncementImage[] }) {
   const { announcementImageUrls } = useHris();
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState(false);
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
   const key = images.map((i) => i.path).join("|");
 
   useEffect(() => {
@@ -34,30 +36,32 @@ export function AnnouncementPhotoGrid({ images }: { images: AnnouncementImage[] 
   if (!images.length) return null;
   if (failed) return <div className="mt-2 text-xs text-[var(--text-muted)]">Photos couldn&rsquo;t be loaded — refresh to try again.</div>;
   return (
-    <div className={`mt-3 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
-      {images.map((img) =>
-        urls[img.path] ? (
-          <a
-            key={img.path}
-            href={urls[img.path]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`block overflow-hidden rounded-lg border border-[var(--border-hairline)] ${images.length === 1 ? "w-fit max-w-full" : "bg-[var(--gridline)]/30"}`}
-          >
-            {/* Whole photo, never cropped: one photo keeps its own shape (up to most of the screen height); several are fitted into equal tiles. */}
-            {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URLs from Supabase Storage */}
-            <img
-              src={urls[img.path]}
-              alt={img.name}
-              className={images.length === 1 ? "block h-auto max-h-[80vh] w-auto max-w-full" : "h-48 w-full object-contain sm:h-56"}
-              loading="lazy"
-            />
-          </a>
-        ) : (
-          <div key={img.path} className={`animate-pulse rounded-lg bg-[var(--gridline)]/40 ${images.length === 1 ? "h-60" : "h-40"}`} />
-        ),
-      )}
-    </div>
+    <>
+      <div className={`mt-3 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
+        {images.map((img) =>
+          urls[img.path] ? (
+            <button
+              type="button"
+              key={img.path}
+              onClick={() => setViewer({ url: urls[img.path], name: img.name, kind: "image" })}
+              className={`block overflow-hidden rounded-lg border border-[var(--border-hairline)] ${images.length === 1 ? "w-fit max-w-full" : "bg-[var(--gridline)]/30"}`}
+            >
+              {/* Whole photo, never cropped: one photo keeps its own shape (up to most of the screen height); several are fitted into equal tiles. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URLs from Supabase Storage */}
+              <img
+                src={urls[img.path]}
+                alt={img.name}
+                className={images.length === 1 ? "block h-auto max-h-[80vh] w-auto max-w-full" : "h-48 w-full object-contain sm:h-56"}
+                loading="lazy"
+              />
+            </button>
+          ) : (
+            <div key={img.path} className={`animate-pulse rounded-lg bg-[var(--gridline)]/40 ${images.length === 1 ? "h-60" : "h-40"}`} />
+          ),
+        )}
+      </div>
+      {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
+    </>
   );
 }
 
