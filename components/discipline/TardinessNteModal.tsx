@@ -113,7 +113,7 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
         responseDue: addDays(today, NTE_RESPONSE_DAYS),
         signFlow: true,
         managerId: managerOf(c.employee),
-        noticeData: { kind: "tardiness", month, issueDate: today, employeeName: input.employeeName, days: c.days, cc: input.cc },
+        noticeData: { kind: "tardiness", month, issueDate: today, employeeName: input.employeeName, days: c.days, cc: input.cc, offense: c.offense },
       });
       if (!saved) {
         failed.push(letterName(c.employee));

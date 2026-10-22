@@ -165,7 +165,10 @@ export default function DisciplinePage() {
       {isHr && (() => {
         const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt).length;
         const toReceive = disciplinaryRecords.filter((r) => r.signFlow && r.explanationSubmittedAt && !r.explHrReceivedAt).length;
-        return waiting > 0 || toReceive > 0 ? (
+        const toSanction = disciplinaryRecords.filter(
+          (r) => r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id),
+        ).length;
+        return waiting > 0 || toReceive > 0 || toSanction > 0 ? (
           <div className="mb-4 space-y-1 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
             {waiting > 0 && (
               <div>
@@ -175,6 +178,11 @@ export default function DisciplinePage() {
             {toReceive > 0 && (
               <div>
                 <span className="font-medium text-[var(--text-primary)]">{toReceive} written explanation{toReceive === 1 ? " is" : "s are"} waiting for you to receive.</span> Open the record and sign under the explanation.
+              </div>
+            )}
+            {toSanction > 0 && (
+              <div>
+                <span className="font-medium text-[var(--text-primary)]">{toSanction} tardiness NTE{toSanction === 1 ? " is" : "s are"} ready for a Notice of Sanction</span> — the explanation was received by you and the Department Manager. Open the NTE to fill in the sanction.
               </div>
             )}
           </div>

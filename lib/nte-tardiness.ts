@@ -74,6 +74,8 @@ const PENALTIES: { label: string; min: number; steps: string[] }[] = [
   { label: "5 days late in a month", min: 5, steps: ["Verbal Warning", "Written Warning", "Stern Warning", "3 days suspension"] },
 ];
 export const PENALTY_TABLE = [...PENALTIES].reverse();
+// Every sanction in the policy, mildest first.
+export const SANCTION_CHOICES = ["Verbal Warning", "Written Warning", "Stern Warning", "3 days suspension", "6 days suspension", "30 days suspension", "Termination"];
 
 export function suggestedPenalty(daysLate: number, offense: number): string {
   const row = PENALTIES.find((r) => daysLate >= r.min);

@@ -268,3 +268,105 @@ export async function buildTardinessNtePdf(inputs: TardinessNteInput[]): Promise
   }
   return doc.save();
 }
+
+// ---- Notice of Sanction ------------------------------------------------------
+
+export interface TardinessSanctionInput {
+  companyName: string;
+  companyShort: string;
+  companyAddress: string;
+  companyContact: string;
+  letterhead: Uint8Array | null;
+  employeeName: string;
+  issueDate: string;
+  month: string;
+  cc: { name: string; title: string } | null;
+  nteDate: string;
+  explanationDate: string | null;
+  daysLate: number;
+  offense: number;
+  sanction: string;
+  suspensionFrom: string | null;
+  suspensionTo: string | null;
+  findings: string;
+  signatures?: { hr?: SignatureMark | null; employee?: SignatureMark | null };
+}
+
+const ORDINAL = ["", "FIRST", "SECOND", "THIRD", "FOURTH", "FIFTH", "SIXTH"];
+const dayAfter = (iso: string) => new Date(Date.parse(`${iso}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+
+export async function buildTardinessSanctionPdf(n: TardinessSanctionInput): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.setTitle(`Notice of Sanction - Habitual Tardiness - ${n.employeeName}`);
+  doc.setProducer("LSM Group HRIS");
+  const fonts = { regular: await doc.embedFont(StandardFonts.TimesRoman), bold: await doc.embedFont(StandardFonts.TimesRomanBold) };
+  const head = n.letterhead ? await doc.embedPng(n.letterhead).catch(() => null) : null;
+  const p = new Page(doc, fonts, head, { name: n.companyName, sub: `Human Resources Department · ${[n.companyAddress, n.companyContact].filter(Boolean).join(" · ")}` });
+  p.field("TO:", n.employeeName);
+  p.field("FROM:", `${n.companyShort} Human Resource Department`);
+  p.field("DATE:", longDate(n.issueDate));
+  p.field("RE:", "Notice of Sanction - Habitual Tardiness");
+  if (n.cc) p.field("CC.:", n.cc.name);
+  p.page.drawLine({ start: { x: MARGIN, y: p.y - 2 }, end: { x: A4[0] - MARGIN, y: p.y - 2 }, thickness: 1, color: INK });
+  p.y -= 18;
+
+  p.para([
+    { t: "This refers to the Notice to Explain dated " },
+    { t: longDate(n.nteDate), bold: true },
+    { t: " regarding your habitual tardiness for the month of " },
+    { t: monthLabel(n.month).toUpperCase(), bold: true, underline: true },
+    { t: ", in which you were late for " },
+    { t: `${numberWords(n.daysLate)} (${n.daysLate}) times`, bold: true, underline: true },
+    { t: "." },
+  ]);
+  p.para([
+    {
+      t: n.explanationDate
+        ? `The Company has received and carefully evaluated your written explanation submitted on ${longDate(n.explanationDate)}.`
+        : "The Company has given you the opportunity to explain, and has carefully evaluated the matter.",
+    },
+  ]);
+  for (const para of n.findings.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)) p.para([{ t: para.replace(/\s*\n\s*/g, " ") }]);
+  const susp = n.suspensionFrom && n.suspensionTo;
+  p.para([
+    { t: `In accordance with the Company Policy of ${n.companyName} on habitual tardiness, and this being your ` },
+    { t: `${ORDINAL[n.offense] ?? `${n.offense}th`} OFFENSE`, bold: true },
+    { t: ", you are hereby meted the sanction of " },
+    { t: n.sanction.toUpperCase(), bold: true, underline: true },
+    ...(susp
+      ? [
+          { t: ", to be served from " },
+          { t: longDate(n.suspensionFrom!), bold: true },
+          { t: " to " },
+          { t: longDate(n.suspensionTo!), bold: true },
+          { t: `. You are expected to report back to work on ${longDate(dayAfter(n.suspensionTo!))}` },
+        ]
+      : []),
+    { t: "." },
+  ]);
+  p.para([{ t: "Please be reminded that a repetition of the same or a similar offense shall be dealt with more severely, in accordance with the Company Policy." }]);
+  p.para([{ t: "For your information and strict compliance." }], 11.5, 6);
+  p.text("Thank you!", { gap: 14 });
+
+  const sig = n.signatures ?? {};
+  p.ensure(130);
+  const top = p.y;
+  const size = 11.5;
+  const nameY = top - size - 54;
+  p.page.drawText("Issued by:", { x: MARGIN, y: top - size, size, font: fonts.regular, color: INK });
+  await drawSignature(doc, p.page, sig.hr, MARGIN, nameY + size + 2, fonts.regular);
+  p.page.drawText(sig.hr?.name ? clean(sig.hr.name) : "HR DEPARTMENT", { x: MARGIN, y: nameY, size, font: fonts.bold, color: INK });
+  if (sig.hr?.name) p.page.drawText("HR Manager", { x: MARGIN, y: nameY - size * 1.5, size, font: fonts.bold, color: INK });
+  if (n.cc) {
+    const x = A4[0] / 2 + 20;
+    p.page.drawText("CC:", { x, y: top - size, size, font: fonts.regular, color: INK });
+    p.page.drawText(clean(n.cc.name), { x, y: nameY, size, font: fonts.bold, color: INK });
+    if (n.cc.title) p.page.drawText(clean(n.cc.title), { x, y: nameY - size * 1.5, size, font: fonts.bold, color: INK });
+  }
+  p.y = nameY - size * 1.5 - 34;
+  p.ensure(70);
+  const recY = p.y - 40;
+  await drawSignature(doc, p.page, sig.employee, MARGIN + 175, recY + 6, fonts.regular);
+  p.page.drawText("Received and acknowledged by: ______________________________________", { x: MARGIN, y: recY, size, font: fonts.regular, color: INK });
+  return doc.save();
+}
