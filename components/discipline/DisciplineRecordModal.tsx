@@ -255,7 +255,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         <input ref={noticeInput} type="file" accept="application/pdf,.pdf" className="hidden" onChange={uploadNotice} />
       </div>
 
-      {/* HR Manager → Department Manager (→ Branch Manager) signatures */}
+      {/* HR Manager → (Branch Manager, noted by) → Department Manager signatures */}
       {r.signFlow && (
         <div className={section}>
           <div className="mb-2 flex items-center gap-2 font-medium text-[var(--text-primary)]">
@@ -272,6 +272,21 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
             waiting="Waiting for the HR Manager to sign."
             onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "hr", png))}
           />
+          {r.branchManagerId && (
+            <>
+              <div className="my-3 border-t border-[var(--gridline)]" />
+              <SignStep
+                title={`Branch Manager (noted by)${(() => {
+                  const m = employees.find((e) => e.id === r.branchManagerId);
+                  return m ? ` — ${fullName(m)}` : "";
+                })()}`}
+                signedAt={r.branchManagerSignedAt}
+                canSign={!r.withdrawnAt && !!r.hrSignedAt && !r.branchManagerSignedAt && r.branchManagerId === currentEmployee?.id}
+                waiting={r.hrSignedAt ? "Waiting for the Branch Manager to sign and note." : "Signs and notes after the HR Manager."}
+                onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "branch", png))}
+              />
+            </>
+          )}
           <div className="my-3 border-t border-[var(--gridline)]" />
           <SignStep
             title={`Department Manager${(() => {
@@ -279,25 +294,12 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
               return m ? ` — ${fullName(m)}` : "";
             })()}`}
             signedAt={r.managerSignedAt}
-            canSign={!r.withdrawnAt && !!r.hrSignedAt && !r.managerSignedAt && !!r.managerId && r.managerId === currentEmployee?.id}
-            waiting={r.hrSignedAt ? "Waiting for the Department Manager to sign." : "Signs after the HR Manager."}
+            canSign={!r.withdrawnAt && !!r.hrSignedAt && (!r.branchManagerId || !!r.branchManagerSignedAt) && !r.managerSignedAt && !!r.managerId && r.managerId === currentEmployee?.id}
+            waiting={
+              !r.hrSignedAt ? "Signs after the HR Manager." : r.branchManagerId && !r.branchManagerSignedAt ? "Signs after the Branch Manager." : "Waiting for the Department Manager to sign."
+            }
             onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "manager", png))}
           />
-          {r.branchManagerId && (
-            <>
-              <div className="my-3 border-t border-[var(--gridline)]" />
-              <SignStep
-                title={`Branch Manager${(() => {
-                  const m = employees.find((e) => e.id === r.branchManagerId);
-                  return m ? ` — ${fullName(m)}` : "";
-                })()}`}
-                signedAt={r.branchManagerSignedAt}
-                canSign={!r.withdrawnAt && !!r.managerSignedAt && !r.branchManagerSignedAt && r.branchManagerId === currentEmployee?.id}
-                waiting={r.managerSignedAt ? "Waiting for the Branch Manager to sign." : "Signs after the Department Manager."}
-                onSign={async (png) => setError(await signDisciplinaryRecord(r.id, "branch", png))}
-              />
-            </>
-          )}
           {(!r.managerSignedAt || (r.branchManagerId && !r.branchManagerSignedAt)) && (
             <div className="mt-3 text-xs text-[var(--text-muted)]">The employee receives this notice once everyone above has signed.</div>
           )}

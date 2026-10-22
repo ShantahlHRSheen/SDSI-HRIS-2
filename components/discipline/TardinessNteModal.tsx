@@ -61,8 +61,9 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
   const isPicked = (c: TardinessNteCandidate) => picked[`${month}|${c.employee.id}`] ?? (c.employee.payrollType !== "monthly" && !issuedTardinessNte(disciplinaryRecords, c.employee.id, month));
   const [managers, setManagers] = useState<Record<string, string>>({});
   const managerOf = (e: Employee) => managers[e.id] ?? defaultManager(e, employees);
-  // The branch's approver (e.g. Cebu's Branch Manager) signs after the
-  // Department Manager — unless it's the employee or the same person.
+  // The branch's approver (e.g. Cebu's Branch Manager) signs and notes right
+  // after HR, before the Department Manager — unless it's the employee or the
+  // same person.
   const branchManagerOf = (e: Employee) => {
     const id = branches.find((b) => b.id === e.branchId)?.approverId;
     return id && id !== e.id && id !== managerOf(e) ? employees.find((x) => x.id === id) : undefined;
