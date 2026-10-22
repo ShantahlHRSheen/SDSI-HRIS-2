@@ -273,6 +273,12 @@ export interface DisciplinaryRecord {
   hrSignaturePath?: string | null;
   managerSignedAt?: string | null;
   managerSignaturePath?: string | null;
+  // Signed receipt of the employee's explanation (phase 52).
+  explHrReceiverId?: string | null;
+  explHrReceivedAt?: string | null;
+  explHrSignaturePath?: string | null;
+  explMgrReceivedAt?: string | null;
+  explMgrSignaturePath?: string | null;
 }
 
 // What a generated notice was made from, to print it with its signatures.

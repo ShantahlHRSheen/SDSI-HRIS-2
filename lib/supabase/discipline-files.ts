@@ -67,6 +67,17 @@ export async function signNotice(recordId: string, as: "hr" | "manager", signatu
   return toDisciplinaryRecord(data);
 }
 
+// HR Manager / Department Manager: sign to receive the employee's written
+// explanation (supabase/migrate_phase52_discipline_explanation_receipt.sql).
+export async function receiveExplanation(recordId: string, as: "hr" | "manager", signaturePng: Blob): Promise<DisciplinaryRecord> {
+  const path = `${recordId}/${as === "hr" ? "hrrecv" : "mgrrecv"}-${stamp()}.png`;
+  await upload(path, signaturePng, "image/png");
+  const { data, error } = await rpc("discipline_receive_explanation", { record_id: recordId, signature_path: path });
+  if (error || !data)
+    throw new Error(/discipline_receive_explanation/.test(error?.message ?? "") ? "Receiving explanations isn't set up yet — run the latest database update (phase 52)." : (error?.message ?? "Couldn't save the signature."));
+  return toDisciplinaryRecord(data);
+}
+
 // Photos are re-saved as JPEG (max 2000 px) so they're small and can be
 // placed into the downloadable PDF; PDFs are kept as they are.
 async function prepareExplanationFile(file: File): Promise<{ blob: Blob; ext: string; type: string }> {

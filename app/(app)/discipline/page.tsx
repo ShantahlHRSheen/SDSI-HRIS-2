@@ -164,9 +164,19 @@ export default function DisciplinePage() {
       )}
       {isHr && (() => {
         const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt).length;
-        return waiting > 0 ? (
-          <div className="mb-4 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
-            <span className="font-medium text-[var(--text-primary)]">{waiting} notice{waiting === 1 ? " is" : "s are"} waiting for your signature as HR Manager.</span> Open each one marked &ldquo;Awaiting HR Manager signature&rdquo; to sign; it then goes to the Department Manager, then to the employee.
+        const toReceive = disciplinaryRecords.filter((r) => r.signFlow && r.explanationSubmittedAt && !r.explHrReceivedAt).length;
+        return waiting > 0 || toReceive > 0 ? (
+          <div className="mb-4 space-y-1 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
+            {waiting > 0 && (
+              <div>
+                <span className="font-medium text-[var(--text-primary)]">{waiting} notice{waiting === 1 ? " is" : "s are"} waiting for your signature as HR Manager.</span> Open each one marked &ldquo;Awaiting HR Manager signature&rdquo; to sign; it then goes to the Department Manager, then to the employee.
+              </div>
+            )}
+            {toReceive > 0 && (
+              <div>
+                <span className="font-medium text-[var(--text-primary)]">{toReceive} written explanation{toReceive === 1 ? " is" : "s are"} waiting for you to receive.</span> Open the record and sign under the explanation.
+              </div>
+            )}
           </div>
         ) : null;
       })()}

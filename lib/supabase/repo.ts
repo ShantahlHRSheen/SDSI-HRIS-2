@@ -521,6 +521,11 @@ function toDisciplinaryRecord(r: DisciplinaryRecordRow): DisciplinaryRecord {
     hrSignaturePath: r.hr_signature_path ?? null,
     managerSignedAt: r.manager_signed_at ?? null,
     managerSignaturePath: r.manager_signature_path ?? null,
+    explHrReceiverId: r.expl_hr_receiver_id ?? null,
+    explHrReceivedAt: r.expl_hr_received_at ?? null,
+    explHrSignaturePath: r.expl_hr_signature_path ?? null,
+    explMgrReceivedAt: r.expl_mgr_received_at ?? null,
+    explMgrSignaturePath: r.expl_mgr_signature_path ?? null,
   };
 }
 export { toDisciplinaryRecord };

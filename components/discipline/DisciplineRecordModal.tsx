@@ -63,7 +63,12 @@ export function DisciplineRecordModal({
 }
 
 function Body({ record, employees, mode }: { record: DisciplinaryRecord; employees: Employee[]; mode: DisciplineModalMode }) {
-  const { attachDisciplinaryNotice, acknowledgeDisciplinaryRecord, submitDisciplinaryExplanation, signDisciplinaryRecord, disciplinaryRecords, currentUser, currentEmployee } = useHris();
+  const { attachDisciplinaryNotice, acknowledgeDisciplinaryRecord, submitDisciplinaryExplanation, signDisciplinaryRecord, receiveDisciplinaryExplanation, disciplinaryRecords, currentUser, currentEmployee } = useHris();
+  const isHrManager = !!currentUser?.roles.includes("hr_admin");
+  const managerName = (() => {
+    const m = employees.find((e) => e.id === r.managerId);
+    return m ? fullName(m) : "";
+  })();
   // Always show the freshest copy of the record from the store.
   const r = disciplinaryRecords.find((d) => d.id === record.id) ?? record;
   const emp = employees.find((e) => e.id === r.employeeId);
@@ -121,11 +126,18 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
     try {
       const get = (p: string | null | undefined) => (p ? downloadDisciplineFile(p) : Promise.resolve(null));
       const signed = r.noticeData ? await buildSignedNotice(r, employees) : null;
-      const [notice, signature, explanationFile] = await Promise.all([
+      const [notice, signature, explanationFile, hrRecv, mgrRecv] = await Promise.all([
         signed ? Promise.resolve(new Blob([signed as BlobPart], { type: "application/pdf" })) : get(r.noticePath),
         get(r.ackSignaturePath),
         get(r.explanationFilePath),
+        get(r.explHrSignaturePath),
+        get(r.explMgrSignaturePath),
       ]);
+      const hrReceiver = employees.find((e) => e.id === r.explHrReceiverId);
+      const receipts = [
+        ...(r.explHrReceivedAt ? [{ label: "HR Manager", name: hrReceiver ? fullName(hrReceiver) : "", at: r.explHrReceivedAt, signature: hrRecv }] : []),
+        ...(r.explMgrReceivedAt ? [{ label: "Department Manager", name: managerName, at: r.explMgrReceivedAt, signature: mgrRecv }] : []),
+      ];
       const bytes = await buildDisciplineResponsePdf({
         record: r,
         employeeName: fullName(emp),
@@ -136,6 +148,7 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         notice,
         signature,
         explanationFile,
+        receipts,
       });
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
       const a = document.createElement("a");
@@ -306,6 +319,35 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
                   </button>
                 </div>
               )}
+              {/* Received by the HR Manager and the Department Manager (either order). */}
+              {mode !== "employee" && (
+                <div className="mt-3 space-y-3 border-t border-[var(--gridline)] pt-3">
+                  <SignStep
+                    title="Received by the HR Manager"
+                    signedAt={r.explHrReceivedAt}
+                    signerName={(() => {
+                      const s = employees.find((e) => e.id === r.explHrReceiverId);
+                      return s ? fullName(s) : undefined;
+                    })()}
+                    canSign={!r.explHrReceivedAt && isHrManager}
+                    hint="Read the explanation above, then sign to receive it."
+                    action="Sign as received"
+                    waiting="Not yet received by the HR Manager."
+                    onSign={async (png) => setError(await receiveDisciplinaryExplanation(r.id, "hr", png))}
+                  />
+                  {r.managerId && (
+                    <SignStep
+                      title={`Received by the Department Manager${managerName ? ` — ${managerName}` : ""}`}
+                      signedAt={r.explMgrReceivedAt}
+                      canSign={!r.explMgrReceivedAt && r.managerId === currentEmployee?.id}
+                      hint="Read the explanation above, then sign to receive it."
+                      action="Sign as received"
+                      waiting="Not yet received by the Department Manager."
+                      onSign={async (png) => setError(await receiveDisciplinaryExplanation(r.id, "manager", png))}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           ) : mode === "employee" ? (
             r.acknowledgedAt ? (
@@ -340,6 +382,8 @@ function SignStep({
   canSign,
   waiting,
   onSign,
+  hint = "Open the notice above, then sign below.",
+  action = "Sign the notice",
 }: {
   title: string;
   signedAt?: string | null;
@@ -347,6 +391,8 @@ function SignStep({
   canSign: boolean;
   waiting: string;
   onSign: (png: Blob) => Promise<void>;
+  hint?: string;
+  action?: string;
 }) {
   const pad = useRef<SignaturePadHandle>(null);
   const [hasInk, setHasInk] = useState(false);
@@ -360,7 +406,7 @@ function SignStep({
         </div>
       ) : canSign ? (
         <div className="mt-2 space-y-2">
-          <p className="text-xs text-[var(--text-secondary)]">Open the notice above, then sign below.</p>
+          <p className="text-xs text-[var(--text-secondary)]">{hint}</p>
           <SignaturePad ref={pad} onChange={setHasInk} />
           <button
             onClick={async () => {
@@ -373,7 +419,7 @@ function SignStep({
             disabled={!hasInk || saving}
             className={primary}
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <PenLine size={15} />} Sign the notice
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <PenLine size={15} />} {action}
           </button>
         </div>
       ) : (

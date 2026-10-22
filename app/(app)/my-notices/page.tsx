@@ -28,11 +28,17 @@ export default function MyNoticesPage() {
     [disciplinaryRecords, currentEmployee],
   );
   const needAction = mine.filter((r) => ["to_acknowledge", "to_explain"].includes(responseStage(r))).length;
-  // Notices waiting for this person's signature as Department Manager.
-  const toSign = useMemo(
-    () => disciplinaryRecords.filter((r) => r.managerId === currentEmployee?.id && r.employeeId !== currentEmployee?.id && responseStage(r) === "manager_to_sign"),
+  // Notices this person signs as Department Manager: to sign, explanations
+  // to receive, and the rest (newest first).
+  const managed = useMemo(
+    () =>
+      disciplinaryRecords
+        .filter((r) => r.managerId === currentEmployee?.id && r.employeeId !== currentEmployee?.id)
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))),
     [disciplinaryRecords, currentEmployee],
   );
+  const managerTodo = (r: (typeof managed)[number]) => (responseStage(r) === "manager_to_sign" ? "Sign the notice" : r.explanationSubmittedAt && !r.explMgrReceivedAt ? "Receive the explanation" : null);
+  const toSign = managed;
   const [signId, setSignId] = useState<string | null>(null);
   const open = mine.find((r) => r.id === openId) ?? null;
   const signing = disciplinaryRecords.find((r) => r.id === signId) ?? null;
@@ -46,25 +52,31 @@ export default function MyNoticesPage() {
 
       {toSign.length > 0 && (
         <div className="mb-6">
-          <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">To sign as Department Manager</div>
+          <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
+            As Department Manager
+            {managed.filter(managerTodo).length > 0 && <span className="ml-2 text-xs font-normal text-[var(--status-warning)]">{managed.filter(managerTodo).length} waiting for you</span>}
+          </div>
           <div className="space-y-2">
             {toSign.map((r) => {
               const emp = employees.find((e) => e.id === r.employeeId);
+              const todo = managerTodo(r);
+              const badge = responseBadge(r, today);
               return (
                 <button
                   key={r.id}
                   onClick={() => setSignId(r.id)}
-                  className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--status-warning)]/50 bg-[var(--status-warning)]/5 p-4 text-left hover:bg-[var(--gridline)]/30"
+                  className={`flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-left hover:bg-[var(--gridline)]/30 ${todo ? "border-[var(--status-warning)]/50 bg-[var(--status-warning)]/5" : "border-[var(--border-hairline)] bg-[var(--surface-1)]"}`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={DISCIPLINE_TYPE_TONE[r.type]}>{DISCIPLINARY_LABELS[r.type]}</Badge>
                       <span className="text-sm font-medium text-[var(--text-primary)]">{emp ? fullName(emp) : r.employeeId}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{formatDate(r.date)} · signed by the HR Manager</span>
+                      <span className="text-xs text-[var(--text-muted)]">{formatDate(r.date)}</span>
+                      <Badge tone={badge.tone}>{badge.label}</Badge>
                     </div>
                     <div className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)]">{r.description}</div>
                   </div>
-                  <span className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">Open & sign</span>
+                  <span className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">{todo ?? "View"}</span>
                 </button>
               );
             })}
