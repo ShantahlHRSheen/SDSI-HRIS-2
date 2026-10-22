@@ -547,8 +547,8 @@ function disciplinaryRecordToRow(input: Omit<DisciplinaryRecord, "id">): Omit<Di
   if (input.signFlow) {
     row.sign_flow = true;
     row.manager_id = input.managerId ?? null;
-    row.notice_data = input.noticeData ?? null;
   }
+  if (input.noticeData) row.notice_data = input.noticeData;
   return row;
 }
 

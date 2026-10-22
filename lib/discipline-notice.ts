@@ -1,5 +1,5 @@
 import { currentCompany } from "./companies";
-import { buildTardinessNtePdf, type SignatureMark } from "./nte-tardiness-pdf";
+import { buildTardinessNtePdf, buildTardinessSanctionPdf, type SignatureMark } from "./nte-tardiness-pdf";
 import { downloadDisciplineFile } from "./supabase/discipline-files";
 import type { DisciplinaryRecord, Employee } from "./types";
 
@@ -25,8 +25,19 @@ async function mark(path: string | null | undefined, at: string | null | undefin
 
 export async function buildSignedNotice(r: DisciplinaryRecord, employees: Employee[]): Promise<Uint8Array | null> {
   const d = r.noticeData;
-  if (!d || d.kind !== "tardiness") return null;
+  if (!d) return null;
   const company = currentCompany();
+  if (d.kind === "sanction") {
+    return buildTardinessSanctionPdf({
+      companyName: company.name,
+      companyShort: company.shortName,
+      companyAddress: company.info.address,
+      companyContact: [company.info.phone, company.info.email].filter(Boolean).join(" · "),
+      letterhead: await loadHrLetterhead(),
+      ...d,
+      signatures: { employee: await mark(r.ackSignaturePath, r.acknowledgedAt) },
+    });
+  }
   const hr = employees.find((e) => e.id === r.hrSignerId);
   const [hrMark, managerMark, employeeMark] = await Promise.all([
     mark(r.hrSignaturePath, r.hrSignedAt, hr ? `${hr.firstName} ${hr.lastName}` : undefined),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Download, ExternalLink, FileText, Loader2, Paperclip, PenLine, Upload } from "lucide-react";
+import { Check, Download, ExternalLink, FileText, Gavel, Loader2, Paperclip, PenLine, Upload } from "lucide-react";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { SignaturePad, type SignaturePadHandle } from "@/components/discipline/SignaturePad";
@@ -13,6 +13,7 @@ import { todayInManila } from "@/lib/leave-policy";
 import { buildDisciplineResponsePdf, manilaDateTime } from "@/lib/discipline-pdf";
 import { disciplineFileUrl, downloadDisciplineFile } from "@/lib/supabase/discipline-files";
 import { buildSignedNotice } from "@/lib/discipline-notice";
+import { SanctionForm } from "@/components/discipline/SanctionForm";
 
 // mode: "manage" — HR / department head (attach notice, download responses)
 //       "view"   — Upper Management (read-only, can download)
@@ -360,6 +361,42 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
           )}
         </div>
       )}
+
+      {/* Notice of Sanction (tardiness NTEs): HR decides once both have received the explanation. */}
+      {r.noticeData?.kind === "tardiness" && mode !== "employee" && (() => {
+        const nos = disciplinaryRecords.find((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id);
+        const ready = !!r.explHrReceivedAt && !!r.explMgrReceivedAt;
+        return (
+          <div className={section}>
+            <div className="mb-2 flex items-center gap-2 font-medium text-[var(--text-primary)]">
+              <Gavel size={16} /> Notice of Sanction
+            </div>
+            {nos ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[var(--text-secondary)]">
+                  Issued {formatDate(nos.date)} — {nos.noticeData?.kind === "sanction" ? nos.noticeData.sanction : ""}
+                  {nos.acknowledgedAt ? ` · received by the employee ${manilaDateTime(nos.acknowledgedAt)}` : " · waiting for the employee to sign as received"}
+                </span>
+                <button
+                  onClick={async () => {
+                    const bytes = await buildSignedNotice(nos, employees);
+                    if (bytes) window.open(URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" })), "_blank");
+                  }}
+                  className={btn}
+                >
+                  <ExternalLink size={14} /> Open
+                </button>
+              </div>
+            ) : !ready ? (
+              <div className="text-[var(--text-muted)]">Available once the HR Manager and the Department Manager have received the employee&rsquo;s written explanation.</div>
+            ) : mode === "manage" && isHrManager ? (
+              <SanctionForm nte={r} onIssued={() => setError(null)} />
+            ) : (
+              <div className="text-[var(--text-muted)]">Waiting for HR to issue the Notice of Sanction.</div>
+            )}
+          </div>
+        );
+      })()}
 
       {error && <div className="rounded-lg bg-[var(--status-critical)]/10 p-3 text-sm text-[var(--status-critical)]">{error}</div>}
 

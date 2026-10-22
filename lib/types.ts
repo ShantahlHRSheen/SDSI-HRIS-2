@@ -282,13 +282,35 @@ export interface DisciplinaryRecord {
 }
 
 // What a generated notice was made from, to print it with its signatures.
-export interface DisciplineNoticeData {
+export type DisciplineNoticeData = TardinessNteData | TardinessSanctionData;
+
+export interface TardinessNteData {
   kind: "tardiness";
   month: string; // "2026-09"
   issueDate: string;
   employeeName: string;
   days: { date: string; minutes: number }[];
   cc: { name: string; title: string } | null;
+  offense?: number; // 1 = first tardiness offense
+}
+
+// Notice of Sanction for a tardiness NTE, decided by HR after the
+// explanation was received.
+export interface TardinessSanctionData {
+  kind: "sanction";
+  nteId: string;
+  month: string;
+  issueDate: string;
+  employeeName: string;
+  cc: { name: string; title: string } | null;
+  nteDate: string;
+  explanationDate: string | null;
+  daysLate: number;
+  offense: number;
+  sanction: string; // "3 days suspension"
+  suspensionFrom: string | null;
+  suspensionTo: string | null;
+  findings: string;
 }
 
 export interface AuditLog {
