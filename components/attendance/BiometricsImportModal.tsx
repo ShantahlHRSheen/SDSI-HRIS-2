@@ -169,6 +169,10 @@ export function BiometricsImportModal({
     });
   }, [file, links, branchId, assigned, skipped, byId, employees, inCutoffEmployees, scheduleChoices, period, prevPeriod, tabCoverage, tabBranch, attendancePeriodRecords, schedule, holidays, leaveRequests, correctionRequests]);
 
+  // Entries with only a machine ID (no name) that nobody matched yet: left
+  // out of the list (guards, test entries, people no longer there).
+  const shownRows = rows.filter((r) => r.person.name || r.employeeId);
+  const idOnly = rows.length - shownRows.length;
   const included = rows.filter((r) => r.include);
   const dupes = new Set(included.map((r) => r.employeeId).filter((id, i, a) => a.indexOf(id) !== i));
   const existing = inCutoffIds;
@@ -296,7 +300,7 @@ export function BiometricsImportModal({
           </div>
         )}
 
-        {(file.unidentified > 0 || file.format === "branches" || (coverage.lastDate && period && coverage.lastDate < period.end) || (replacing > 0 && !recordsOnly) || dupes.size > 0) && (
+        {(file.unidentified > 0 || idOnly > 0 || file.format === "branches" || (coverage.lastDate && period && coverage.lastDate < period.end) || (replacing > 0 && !recordsOnly) || dupes.size > 0) && (
           <div className="space-y-1 rounded-lg border border-[var(--status-warning)]/40 p-3 text-xs text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
             {file.format === "branches" && period && (
               <div>
@@ -310,6 +314,11 @@ export function BiometricsImportModal({
               <div>
                 The file only has punches up to <b>{formatDate(coverage.lastDate)}</b>
                 {coverage.lastDateInProgress ? " (downloaded during that day)" : ""}: {recordsOnly ? "the days after it aren't counted (not as absences either)." : "the days after it count as present for now, with no late or undertime. Next cut-off's file settles them — any absence, late or undertime found then is deducted in that payroll."}
+              </div>
+            )}
+            {idOnly > 0 && (
+              <div>
+                {idOnly} entr{idOnly === 1 ? "y has" : "ies have"} only a machine ID number and no name, so {idOnly === 1 ? "it is" : "they are"} left out.
               </div>
             )}
             {file.unidentified > 0 && (
@@ -338,7 +347,7 @@ export function BiometricsImportModal({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {shownRows.map((r) => (
                 <tr key={r.person.key} className={`border-b border-[var(--gridline)] last:border-0 ${r.include ? "" : "opacity-60"}`}>
                   <td className="px-2 py-2 text-[var(--text-primary)]">
                     {r.person.name || <span className="text-[var(--text-muted)] italic">no name</span>}
