@@ -16,8 +16,10 @@ export interface TardinessNteInput {
   month: string; // "2026-09"
   days: TardyDay[];
   cc: { name: string; title: string } | null;
+  // The branch's manager, signing after the Department Manager (under CC).
+  branchManager?: { name: string; title: string } | null;
   // Signatures (PNG) printed over the Issued by / CC / Received lines.
-  signatures?: { hr?: SignatureMark | null; manager?: SignatureMark | null; employee?: SignatureMark | null };
+  signatures?: { hr?: SignatureMark | null; manager?: SignatureMark | null; branch?: SignatureMark | null; employee?: SignatureMark | null };
 }
 
 export interface SignatureMark {
@@ -244,10 +246,11 @@ export async function buildTardinessNtePdf(inputs: TardinessNteInput[]): Promise
     // Issued by (left) and CC (right), as in the template; each signature
     // sits just above the name it belongs to.
     const sig = n.signatures ?? {};
-    p.ensure(130);
+    p.ensure(n.branchManager ? 200 : 130);
     const top = p.y;
     const size = 11.5;
     const nameY = top - size - 54;
+    const bmNameY = nameY - size * 1.5 - 62;
     p.page.drawText("Issued by:", { x: MARGIN, y: top - size, size, font: fonts.regular, color: INK });
     await drawSignature(doc, p.page, sig.hr, MARGIN, nameY + size + 2, fonts.regular);
     p.page.drawText(sig.hr?.name ? clean(sig.hr.name) : "HR DEPARTMENT", { x: MARGIN, y: nameY, size, font: fonts.bold, color: INK });
@@ -259,7 +262,13 @@ export async function buildTardinessNtePdf(inputs: TardinessNteInput[]): Promise
       p.page.drawText(clean(n.cc.name), { x, y: nameY, size, font: fonts.bold, color: INK });
       if (n.cc.title) p.page.drawText(clean(n.cc.title), { x, y: nameY - size * 1.5, size, font: fonts.bold, color: INK });
     }
-    p.y = nameY - size * 1.5 - 34;
+    if (n.branchManager) {
+      const x = A4[0] / 2 + 20;
+      await drawSignature(doc, p.page, sig.branch, x, bmNameY + size + 2, fonts.regular);
+      p.page.drawText(clean(n.branchManager.name), { x, y: bmNameY, size, font: fonts.bold, color: INK });
+      if (n.branchManager.title) p.page.drawText(clean(n.branchManager.title), { x, y: bmNameY - size * 1.5, size, font: fonts.bold, color: INK });
+    }
+    p.y = (n.branchManager ? bmNameY : nameY) - size * 1.5 - 34;
     p.ensure(70);
     const recY = p.y - 40;
     await drawSignature(doc, p.page, sig.employee, MARGIN + 175, recY + 6, fonts.regular);
@@ -289,6 +298,8 @@ export interface TardinessSanctionInput {
   suspensionFrom: string | null;
   suspensionTo: string | null;
   findings: string;
+  // Late days HR excused on the managers' recommendation, with the reasons.
+  excused?: { date: string; reason: string }[];
   signatures?: { hr?: SignatureMark | null; employee?: SignatureMark | null };
 }
 
@@ -326,6 +337,16 @@ export async function buildTardinessSanctionPdf(n: TardinessSanctionInput): Prom
         : "The Company has given you the opportunity to explain, and has carefully evaluated the matter.",
     },
   ]);
+  if (n.excused?.length) {
+    const left = n.daysLate - n.excused.length;
+    p.para([
+      { t: "Upon the recommendation of your Department / Branch Manager, " },
+      { t: `${numberWords(n.excused.length)} (${n.excused.length})`, bold: true },
+      { t: ` of these days ${n.excused.length === 1 ? "was" : "were"} excused: ${n.excused.map((x) => `${mdY(x.date)} (${x.reason})`).join("; ")}. This leaves ` },
+      { t: `${numberWords(left)} (${left}) days`, bold: true, underline: true },
+      { t: " of tardiness." },
+    ]);
+  }
   for (const para of n.findings.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)) p.para([{ t: para.replace(/\s*\n\s*/g, " ") }]);
   const susp = n.suspensionFrom && n.suspensionTo;
   p.para([

@@ -59,8 +59,8 @@ export async function acknowledgeNotice(recordId: string, signaturePng: Blob): P
 
 // HR Manager, then the Department Manager: sign the notice
 // (supabase/migrate_phase51_discipline_signoff.sql).
-export async function signNotice(recordId: string, as: "hr" | "manager", signaturePng: Blob): Promise<DisciplinaryRecord> {
-  const path = `${recordId}/${as === "hr" ? "hrsign" : "mgrsign"}-${stamp()}.png`;
+export async function signNotice(recordId: string, as: "hr" | "manager" | "branch", signaturePng: Blob): Promise<DisciplinaryRecord> {
+  const path = `${recordId}/${as === "hr" ? "hrsign" : as === "manager" ? "mgrsign" : "bmsign"}-${stamp()}.png`;
   await upload(path, signaturePng, "image/png");
   const { data, error } = await rpc("discipline_sign", { record_id: recordId, signature_path: path });
   if (error || !data) throw new Error(/discipline_sign/.test(error?.message ?? "") ? "Signing isn't set up yet — run the latest database update (phase 51)." : (error?.message ?? "Couldn't save the signature."));
@@ -75,6 +75,20 @@ export async function receiveExplanation(recordId: string, as: "hr" | "manager",
   const { data, error } = await rpc("discipline_receive_explanation", { record_id: recordId, signature_path: path });
   if (error || !data)
     throw new Error(/discipline_receive_explanation/.test(error?.message ?? "") ? "Receiving explanations isn't set up yet — run the latest database update (phase 52)." : (error?.message ?? "Couldn't save the signature."));
+  return toDisciplinaryRecord(data);
+}
+
+// Department / Branch Manager: ask HR not to count some late days, each
+// with its reason; HR accepts or declines (phase 53).
+export async function requestExcuse(recordId: string, items: { date: string; minutes: number; reason: string }[]): Promise<DisciplinaryRecord> {
+  const { data, error } = await rpc("discipline_request_excuse", { record_id: recordId, items });
+  if (error || !data) throw new Error(/discipline_request_excuse/.test(error?.message ?? "") ? "Excuse requests aren't set up yet — run the latest database update (phase 53)." : (error?.message ?? "Couldn't send the request."));
+  return toDisciplinaryRecord(data);
+}
+
+export async function decideExcuse(recordId: string, requestId: string, accept: boolean): Promise<DisciplinaryRecord> {
+  const { data, error } = await rpc("discipline_decide_excuse", { record_id: recordId, request_id: requestId, accept });
+  if (error || !data) throw new Error(error?.message ?? "Couldn't save the decision.");
   return toDisciplinaryRecord(data);
 }
 

@@ -273,12 +273,30 @@ export interface DisciplinaryRecord {
   hrSignaturePath?: string | null;
   managerSignedAt?: string | null;
   managerSignaturePath?: string | null;
+  // The branch's approver (e.g. Cebu's Branch Manager) signs after the
+  // Department Manager (phase 53).
+  branchManagerId?: string | null;
+  branchManagerSignedAt?: string | null;
+  branchManagerSignaturePath?: string | null;
+  // Late days the Department / Branch Manager asks HR not to count (phase 53).
+  excuseRequests?: ExcuseRequest[];
   // Signed receipt of the employee's explanation (phase 52).
   explHrReceiverId?: string | null;
   explHrReceivedAt?: string | null;
   explHrSignaturePath?: string | null;
   explMgrReceivedAt?: string | null;
   explMgrSignaturePath?: string | null;
+}
+
+export interface ExcuseRequest {
+  id: string;
+  by: string; // employee id
+  role: "manager" | "branch";
+  items: { date: string; minutes: number; reason: string }[];
+  at: string;
+  status: "pending" | "accepted" | "declined";
+  decidedBy?: string | null;
+  decidedAt?: string | null;
 }
 
 // What a generated notice was made from, to print it with its signatures.
@@ -292,6 +310,7 @@ export interface TardinessNteData {
   days: { date: string; minutes: number }[];
   cc: { name: string; title: string } | null;
   offense?: number; // 1 = first tardiness offense
+  branchManager?: { name: string; title: string } | null;
 }
 
 // Notice of Sanction for a tardiness NTE, decided by HR after the
@@ -308,6 +327,7 @@ export interface TardinessSanctionData {
   daysLate: number;
   offense: number;
   sanction: string; // "3 days suspension"
+  excused?: { date: string; reason: string }[];
   suspensionFrom: string | null;
   suspensionTo: string | null;
   findings: string;

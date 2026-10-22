@@ -41,7 +41,7 @@ function download(bytes: Uint8Array, name: string) {
 }
 
 export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: string; onClose: () => void }) {
-  const { employees, payrollPeriods, attendancePeriodRecords, disciplinaryRecords, currentEmployee, addDisciplinaryRecord, attachDisciplinaryNotice, isRealAccount } = useHris();
+  const { employees, branches, payrollPeriods, attendancePeriodRecords, disciplinaryRecords, currentEmployee, addDisciplinaryRecord, attachDisciplinaryNotice, isRealAccount } = useHris();
   // Offenses from tardiness NTEs given before the HRIS.
   const [prior, setPrior] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -61,6 +61,12 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
   const isPicked = (c: TardinessNteCandidate) => picked[`${month}|${c.employee.id}`] ?? (c.employee.payrollType !== "monthly" && !issuedTardinessNte(disciplinaryRecords, c.employee.id, month));
   const [managers, setManagers] = useState<Record<string, string>>({});
   const managerOf = (e: Employee) => managers[e.id] ?? defaultManager(e, employees);
+  // The branch's approver (e.g. Cebu's Branch Manager) signs after the
+  // Department Manager — unless it's the employee or the same person.
+  const branchManagerOf = (e: Employee) => {
+    const id = branches.find((b) => b.id === e.branchId)?.approverId;
+    return id && id !== e.id && id !== managerOf(e) ? employees.find((x) => x.id === id) : undefined;
+  };
   const toIssue = candidates.filter((c) => isPicked(c) && !issuedTardinessNte(disciplinaryRecords, c.employee.id, month) && managerOf(c.employee));
   const managerChoices = useMemo(() => employees.filter((e) => e.status === "active").sort((a, b) => fullName(a).localeCompare(fullName(b))), [employees]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -79,6 +85,10 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
       month,
       days: c.days,
       cc: sup ? { name: letterName(sup), title: positionTitle(sup.positionId).replace(/^—$/, "") } : null,
+      branchManager: (() => {
+        const bm = branchManagerOf(c.employee);
+        return bm ? { name: letterName(bm), title: positionTitle(bm.positionId).replace(/^—$/, "") } : null;
+      })(),
     };
   }
 
@@ -113,7 +123,8 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
         responseDue: addDays(today, NTE_RESPONSE_DAYS),
         signFlow: true,
         managerId: managerOf(c.employee),
-        noticeData: { kind: "tardiness", month, issueDate: today, employeeName: input.employeeName, days: c.days, cc: input.cc, offense: c.offense },
+        branchManagerId: branchManagerOf(c.employee)?.id ?? null,
+        noticeData: { kind: "tardiness", month, issueDate: today, employeeName: input.employeeName, days: c.days, cc: input.cc, offense: c.offense, branchManager: input.branchManager ?? null },
       });
       if (!saved) {
         failed.push(letterName(c.employee));
@@ -195,6 +206,7 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
                             return m ? letterName(m) : "—";
                           })()}</span>
                         ) : (
+                          <>
                           <select
                             value={managerOf(c.employee)}
                             onChange={(e) => setManagers((m) => ({ ...m, [c.employee.id]: e.target.value }))}
@@ -211,6 +223,8 @@ export function TardinessNteModal({ initialMonth, onClose }: { initialMonth?: st
                                 </option>
                               ))}
                           </select>
+                          {branchManagerOf(c.employee) && <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">then Branch Manager: {letterName(branchManagerOf(c.employee)!)}</div>}
+                          </>
                         )}
                       </td>
                       <td className="px-2 py-2 text-xs">

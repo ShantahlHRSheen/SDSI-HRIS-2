@@ -526,6 +526,21 @@ function toDisciplinaryRecord(r: DisciplinaryRecordRow): DisciplinaryRecord {
     explHrSignaturePath: r.expl_hr_signature_path ?? null,
     explMgrReceivedAt: r.expl_mgr_received_at ?? null,
     explMgrSignaturePath: r.expl_mgr_signature_path ?? null,
+    branchManagerId: r.branch_manager_id ?? null,
+    branchManagerSignedAt: r.branch_manager_signed_at ?? null,
+    branchManagerSignaturePath: r.branch_manager_signature_path ?? null,
+    excuseRequests: Array.isArray(r.excuse_requests)
+      ? (r.excuse_requests as Record<string, unknown>[]).map((x) => ({
+          id: String(x.id),
+          by: String(x.by),
+          role: x.role === "branch" ? "branch" : "manager",
+          items: (Array.isArray(x.items) ? x.items : []) as { date: string; minutes: number; reason: string }[],
+          at: String(x.at),
+          status: x.status === "accepted" || x.status === "declined" ? x.status : "pending",
+          decidedBy: (x.decided_by as string | undefined) ?? null,
+          decidedAt: (x.decided_at as string | undefined) ?? null,
+        }))
+      : [],
   };
 }
 export { toDisciplinaryRecord };
@@ -547,6 +562,7 @@ function disciplinaryRecordToRow(input: Omit<DisciplinaryRecord, "id">): Omit<Di
   if (input.signFlow) {
     row.sign_flow = true;
     row.manager_id = input.managerId ?? null;
+    if (input.branchManagerId) row.branch_manager_id = input.branchManagerId;
   }
   if (input.noticeData) row.notice_data = input.noticeData;
   return row;

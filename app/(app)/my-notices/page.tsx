@@ -33,11 +33,18 @@ export default function MyNoticesPage() {
   const managed = useMemo(
     () =>
       disciplinaryRecords
-        .filter((r) => r.managerId === currentEmployee?.id && r.employeeId !== currentEmployee?.id)
+        .filter((r) => (r.managerId === currentEmployee?.id || r.branchManagerId === currentEmployee?.id) && r.employeeId !== currentEmployee?.id)
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))),
     [disciplinaryRecords, currentEmployee],
   );
-  const managerTodo = (r: (typeof managed)[number]) => (responseStage(r) === "manager_to_sign" ? "Sign the notice" : r.explanationSubmittedAt && !r.explMgrReceivedAt ? "Receive the explanation" : null);
+  const managerTodo = (r: (typeof managed)[number]) => {
+    const me = currentEmployee?.id;
+    const stage = responseStage(r);
+    if (stage === "manager_to_sign" && r.managerId === me) return "Sign the notice";
+    if (stage === "branch_to_sign" && r.branchManagerId === me) return "Sign the notice";
+    if (r.managerId === me && r.explanationSubmittedAt && !r.explMgrReceivedAt) return "Receive the explanation";
+    return null;
+  };
   const toSign = managed;
   const [signId, setSignId] = useState<string | null>(null);
   const open = mine.find((r) => r.id === openId) ?? null;
@@ -53,7 +60,7 @@ export default function MyNoticesPage() {
       {toSign.length > 0 && (
         <div className="mb-6">
           <div className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
-            As Department Manager
+            As Department / Branch Manager
             {managed.filter(managerTodo).length > 0 && <span className="ml-2 text-xs font-normal text-[var(--status-warning)]">{managed.filter(managerTodo).length} waiting for you</span>}
           </div>
           <div className="space-y-2">
