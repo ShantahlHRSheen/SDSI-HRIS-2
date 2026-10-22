@@ -12,7 +12,7 @@ export interface HrMessage {
   fromHr: boolean;
   body: string;
   imagePath: string | null;
-  // Set once the daily cleanup has deleted the photo (30 days after sending).
+  // Set when the photo was deleted by the old 30-day cleanup (chat photos and files are now kept).
   imageRemoved: boolean;
   // A document sent in the chat (supabase/migrate_phase45_hr_chat_files.sql).
   filePath: string | null;
@@ -24,7 +24,6 @@ export interface HrMessage {
 
 export const HR_MESSAGE_MAX = 2000;
 export const HR_CHAT_BUCKET = "hr-chat-images";
-export const HR_CHAT_PHOTO_DAYS = 30;
 export const HR_CHAT_FILE_BUCKET = "hr-chat-files";
 export const HR_CHAT_FILE_MAX_BYTES = 10 * 1024 * 1024;
 // Documents that can be sent (photos go through the photo button instead).

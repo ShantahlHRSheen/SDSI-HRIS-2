@@ -3,13 +3,9 @@ import { COMPANY_ORDER } from "@/lib/companies";
 import { companyDatabase } from "@/lib/server/supabase-admin";
 
 // Daily cleanup (scheduled in vercel.json), 30 days after upload, to free
-// up space:
-//   * leave-request files (signed leave forms, medical certificates). The
-//     attachment record stays, with deleted_at set, so the app can show that
-//     the file was removed.
-//   * photos sent in Chat with HR. The message stays, with image_removed_at
-//     set, so the chat shows "Photo removed".
-//   * files sent in Chat with HR, the same way (file_removed_at).
+// up space: leave-request files (signed leave forms, medical certificates).
+// The attachment record stays, with deleted_at set, so the app can show that
+// the file was removed. Photos and files sent in Chat with HR are kept.
 //
 // Needs these environment variables on the server (Vercel > Settings >
 // Environment Variables), never exposed to the browser:
@@ -17,8 +13,6 @@ import { companyDatabase } from "@/lib/server/supabase-admin";
 //   CRON_SECRET               — Vercel sends it as a Bearer token on cron calls
 const RETENTION_DAYS = 30;
 const BUCKET = "leave-attachments";
-const CHAT_BUCKET = "hr-chat-images";
-const CHAT_FILE_BUCKET = "hr-chat-files";
 
 // Runs for every company whose database is set up (lib/companies.ts).
 export async function GET(request: Request) {
@@ -72,58 +66,5 @@ async function purgeCompany(url: string, serviceKey: string) {
     else deleted += batch.length;
   }
 
-  // Chat photos: every file in the bucket older than the cut-off, including
-  // any whose message never got sent. Skipped until the chat migration runs.
-  let chatDeleted = 0;
-  const { data: chatPaths, error: chatErr } = await (supabase as unknown as {
-    rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: string[] | null; error: { message: string } | null }>;
-  }).rpc("hr_chat_expired_images", { older_than: cutoff });
-  if (chatErr) {
-    if (!/hr_chat_expired_images/.test(chatErr.message)) failures.push(chatErr.message);
-  } else {
-    const paths = chatPaths ?? [];
-    for (let i = 0; i < paths.length; i += 100) {
-      const batch = paths.slice(i, i + 100);
-      const { error: rmErr } = await supabase.storage.from(CHAT_BUCKET).remove(batch);
-      if (rmErr) {
-        failures.push(rmErr.message);
-        continue;
-      }
-      const { error: markErr } = await supabase
-        .from("hr_messages")
-        .update({ image_path: null, image_removed_at: new Date().toISOString() })
-        .in("image_path", batch);
-      if (markErr) failures.push(markErr.message);
-      else chatDeleted += batch.length;
-    }
-  }
-
-  // Chat files, the same way. Skipped until the chat-files migration runs.
-  let chatFilesDeleted = 0;
-  const { data: filePaths, error: fileErr } = await (supabase as unknown as {
-    rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: string[] | null; error: { message: string } | null }>;
-  }).rpc("hr_chat_expired_files", { older_than: cutoff });
-  if (fileErr) {
-    if (!/hr_chat_expired_files/.test(fileErr.message)) failures.push(fileErr.message);
-  } else {
-    const paths = filePaths ?? [];
-    for (let i = 0; i < paths.length; i += 100) {
-      const batch = paths.slice(i, i + 100);
-      const { error: rmErr } = await supabase.storage.from(CHAT_FILE_BUCKET).remove(batch);
-      if (rmErr) {
-        failures.push(rmErr.message);
-        continue;
-      }
-      const { error: markErr } = await (supabase as unknown as {
-        from: (t: string) => { update: (v: Record<string, unknown>) => { in: (c: string, v: string[]) => PromiseLike<{ error: { message: string } | null }> } };
-      })
-        .from("hr_messages")
-        .update({ file_path: null, file_removed_at: new Date().toISOString() })
-        .in("file_path", batch);
-      if (markErr) failures.push(markErr.message);
-      else chatFilesDeleted += batch.length;
-    }
-  }
-
-  return { cutoff, expired: expired.length, deleted, chatPhotosDeleted: chatDeleted, chatFilesDeleted, failures };
+  return { cutoff, expired: expired.length, deleted, failures };
 }

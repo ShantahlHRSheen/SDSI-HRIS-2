@@ -13,7 +13,6 @@ import {
   fetchHrReactions,
   fetchHrThread,
   HR_CHAT_FILE_TYPES,
-  HR_CHAT_PHOTO_DAYS,
   HR_REACTIONS,
   HR_MESSAGE_MAX,
   hrChatFileDownloadUrl,
@@ -296,7 +295,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                   <div
                     className={`mb-1 w-fit rounded-xl border border-dashed border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-muted)] italic ${mine ? "ml-auto" : ""}`}
                   >
-                    Photo removed — photos are kept for {HR_CHAT_PHOTO_DAYS} days
+                    Photo removed
                   </div>
                 )}
                 {m.filePath && (
@@ -315,7 +314,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                   <div
                     className={`mb-1 w-fit rounded-xl border border-dashed border-[var(--border-hairline)] px-3 py-2 text-xs text-[var(--text-muted)] italic ${mine ? "ml-auto" : ""}`}
                   >
-                    File removed — files are kept for {HR_CHAT_PHOTO_DAYS} days
+                    File removed
                   </div>
                 )}
                 {m.body &&
@@ -490,7 +489,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
             <Send size={16} /> <span className="hidden sm:inline">{sending ? "Sending…" : "Send"}</span>
           </button>
         </div>
-        <div className="mt-1 px-1 text-[11px] text-[var(--text-muted)]">Photos and files (up to 10 MB) are deleted automatically after {HR_CHAT_PHOTO_DAYS} days.</div>
+        <div className="mt-1 px-1 text-[11px] text-[var(--text-muted)]">Photos and files up to 10 MB.</div>
       </form>
     </div>
   );
