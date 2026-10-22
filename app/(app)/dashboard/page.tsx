@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceHolidaysByBranch } from "@/lib/attendance-holidays";
 import { useMemo } from "react";
 import Link from "next/link";
 import { AlarmClockOff, Cake, CalendarX2, Clock3, Info, UserMinus, UserPlus } from "lucide-react";
@@ -65,7 +66,7 @@ function variantFor(roles: string[]): "full" | "payroll" | "team" | "personal" {
 }
 
 export default function DashboardPage() {
-  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, employeeDepartmentAllocations } = useHris();
+  const { currentUser, currentEmployee, employees, branches, announcements, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, employeeDepartmentAllocations, holidays } = useHris();
   const roles = currentUser?.roles ?? [];
   const variant = variantFor(roles);
 
@@ -77,9 +78,11 @@ export default function DashboardPage() {
   }, [variant, currentEmployee, employees]);
 
   const branchFilter = variant === "team" && currentEmployee ? currentEmployee.branchId : undefined;
+  // Holidays count as present in the attendance rate (not payroll).
+  const holidaysByBranch = useMemo(() => attendanceHolidaysByBranch(holidays, branches), [holidays, branches]);
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, holidaysByBranch),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, holidaysByBranch],
   );
 
   // Department vouchers (Vouchers page) count as payroll expense too, as in

@@ -96,7 +96,21 @@ export function workingDaysInPeriod(period: PayrollPeriod): number {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-function buildFact(employee: Employee, month: MonthMeta, lines: PayrollLine[], records: AttendancePeriodRecord[], periods: PayrollPeriod[]): MonthlyEmployeeFact {
+// Holidays (Mon–Sat) inside a cut-off.
+function holidaysInPeriod(period: PayrollPeriod, holidays: Set<string>): Set<string> {
+  const out = new Set<string>();
+  for (const d of holidays) if (d >= period.start && d <= period.end && new Date(`${d}T00:00:00Z`).getUTCDay() !== 0) out.add(d);
+  return out;
+}
+
+function buildFact(
+  employee: Employee,
+  month: MonthMeta,
+  lines: PayrollLine[],
+  records: AttendancePeriodRecord[],
+  periods: PayrollPeriod[],
+  holidays: Set<string>,
+): MonthlyEmployeeFact {
   const sumLines = (f: (l: PayrollLine) => number) => round(lines.reduce((s, l) => s + f(l), 0));
 
   // Attendance counts only cut-offs where attendance was actually tracked:
@@ -110,13 +124,18 @@ function buildFact(employee: Employee, month: MonthMeta, lines: PayrollLine[], r
   let absentDays = 0;
   for (const r of tracked) {
     const period = periodById.get(r.periodId);
-    const required = period ? workingDaysInPeriod(period) : r.daysWorked;
+    // Holidays count as present (some branches run a skeletal set-up): a
+    // holiday marked absent is credited, and without HR's required days for
+    // the cut-off, holidays aren't required (lib/attendance-holidays.ts).
+    const inPeriod = period ? holidaysInPeriod(period, holidays) : new Set<string>();
+    const credited = new Set((r.absentDates ?? []).filter((d) => inPeriod.has(d))).size;
+    const required = period ? (period.requiredDays != null && period.requiredDays > 0 ? period.requiredDays : Math.max(0, workingDaysInPeriod(period) - inPeriod.size)) : r.daysWorked;
     workingDays += required;
     // Work beyond the required days (e.g. on a holiday or rest day) doesn't
     // push the rate past 100%.
-    presentDays += Math.min(r.daysWorked, required);
-    // Absences: as recorded, else the required days not worked or on leave.
-    absentDays += r.absenceInstances ?? Math.max(0, round(required - r.daysWorked - r.vlDays - r.slDays));
+    presentDays += Math.min(r.daysWorked + credited, required);
+    // Absences: as recorded (less holidays), else the required days not worked or on leave.
+    absentDays += r.absenceInstances != null ? Math.max(0, r.absenceInstances - credited) : Math.max(0, round(required - r.daysWorked - r.vlDays - r.slDays));
   }
   presentDays = round(presentDays);
   absentDays = round(absentDays);
@@ -209,8 +228,11 @@ export function getMonthlyFacts(
   payrollPeriods: PayrollPeriod[],
   // Salary adjustments are part of the payroll too (see lib/salary-adjustments.ts).
   adjustments: SalaryAdjustment[] = registeredSalaryAdjustments(),
+  // Holiday dates per branch id ("" = no branch), counted as present in the
+  // attendance figures only (lib/attendance-holidays.ts).
+  holidaysByBranch?: Map<string, Set<string>>,
 ): MonthlyEmployeeFact[] {
-  const inputs = [employees, attendanceRecords, overtimeRequests, overrides, payrollPeriods, adjustments];
+  const inputs = [employees, attendanceRecords, overtimeRequests, overrides, payrollPeriods, adjustments, holidaysByBranch];
   if (cachedFacts && cachedInputs && sameInputs(cachedInputs, inputs)) return cachedFacts;
 
   const months = getMonthsList();
@@ -244,7 +266,8 @@ export function getMonthlyFacts(
     for (const [employeeId, lines] of linesByEmployee) {
       const employee = employees.find((e) => e.id === employeeId);
       if (!employee) continue;
-      facts.push(buildFact(employee, month, lines, recordsByEmployee.get(employeeId) ?? [], periodsByEmployee.get(employeeId) ?? []));
+      const holidays = holidaysByBranch?.get(employee.branchId) ?? holidaysByBranch?.get("") ?? new Set<string>();
+      facts.push(buildFact(employee, month, lines, recordsByEmployee.get(employeeId) ?? [], periodsByEmployee.get(employeeId) ?? [], holidays));
     }
   }
 
@@ -583,5 +606,5 @@ export function fullAttendanceFacts(
   }));
   const lines = computePayrollForPeriod(period, active, records, [], stubOverrides, []);
   const byId = new Map(active.map((e) => [e.id, e]));
-  return lines.map((l) => buildFact(byId.get(l.employeeId)!, FULL_ATTENDANCE_MONTH, [l, l], [], [period, period]));
+  return lines.map((l) => buildFact(byId.get(l.employeeId)!, FULL_ATTENDANCE_MONTH, [l, l], [], [period, period], new Set()));
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { attendanceHolidaysByBranch } from "@/lib/attendance-holidays";
 import { useMemo, useState } from "react";
 import { CalendarCheck } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -35,6 +36,7 @@ export default function AttendanceReportPage() {
     overtimeRequests,
     payrollLineOverrides,
     payrollPeriods, salaryAdjustments,
+    holidays,
   } = useHris();
   const employees = useMemo(
     () => scopeEmployeesForViewer(allEmployees, currentUser?.roles ?? [], currentEmployee, employeeDepartmentAllocations),
@@ -44,9 +46,11 @@ export default function AttendanceReportPage() {
   const [employeeSearch, setEmployeeSearch] = useState("");
 
   const months = getMonthsList();
+  // Holidays count as present in the attendance rate (not payroll).
+  const holidaysByBranch = useMemo(() => attendanceHolidaysByBranch(holidays, branches), [holidays, branches]);
   const facts = useMemo(
-    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments),
-    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments],
+    () => getMonthlyFacts(employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, holidaysByBranch),
+    [employees, attendancePeriodRecords, overtimeRequests, payrollLineOverrides, payrollPeriods, salaryAdjustments, holidaysByBranch],
   );
 
   const analyticsFilters = {
