@@ -31,6 +31,7 @@ import {
   summarizeOvertime,
   summarizePayroll,
 } from "@/lib/monthly-analytics";
+import { TardinessNteSection } from "@/components/dashboard/TardinessNteSection";
 import { buildAbsenteeismRows, buildTardinessRows, flaggedAbsenteeism, flaggedTardiness, TARDINESS_THRESHOLD, ABSENTEEISM_THRESHOLD } from "@/lib/tardiness-absenteeism";
 import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
@@ -315,6 +316,9 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
+
+      {/* --- Tardiness NTEs issued each month (Discipline) ------------------- */}
+      {variant !== "payroll" && <TardinessNteSection employees={scoped} />}
     </div>
   );
 }
