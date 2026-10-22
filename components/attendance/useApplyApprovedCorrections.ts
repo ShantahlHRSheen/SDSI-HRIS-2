@@ -5,8 +5,8 @@ import { useHris } from "@/lib/store";
 import { attendanceChanged, biometricsAttendance, previousPeriod, withPrior, type AttendanceRow } from "@/lib/biometrics/corrections";
 
 // Keeps biometrics-imported attendance in step with approved attendance
-// corrections — and settles the previous cut-off's pending days (imports by
-// branch staff can't see that cut-off): whenever HR / payroll has a page open that uses attendance,
+// corrections — and settles the previous cut-off's pending days (when the
+// import didn't): whenever HR / payroll has a page open that uses attendance,
 // each open cut-off's biometrics records are recomputed with the approved
 // corrections applied, and any that changed are saved. Locked / closed
 // cut-offs are never touched. Runs again whenever corrections or records

@@ -1020,26 +1020,6 @@ export async function updateAttendanceDetailRows(
   return out;
 }
 
-// A branch's biometrics import by its own people (supabase/migrate_phase48_branch_attendance_import.sql):
-// saved by the database after checking the caller may import that branch.
-export async function importBranchAttendanceRows(
-  periodId: string,
-  rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[],
-): Promise<number> {
-  const payload = rows.map((row) => attendancePeriodRecordToRow({ ...row, periodId }, "import", ""));
-  const client = getSupabaseClient() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: number | null; error: { message: string } | null }> };
-  const { data, error } = await client.rpc("import_branch_attendance", { p_period: periodId, p_rows: payload });
-  if (error) throw new Error(/import_branch_attendance/.test(error.message) ? "Branch attendance import isn't set up yet — ask HR to run the latest database update." : error.message);
-  return data ?? 0;
-}
-
-// The branches the signed-in employee may import attendance for.
-export async function fetchMyImportBranches(branchIds: string[]): Promise<string[]> {
-  const client = getSupabaseClient() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: boolean | null; error: { message: string } | null }> };
-  const results = await Promise.all(branchIds.map((id) => client.rpc("app_can_import_branch", { p_branch: id }).then((r) => (r.error ? false : !!r.data))));
-  return branchIds.filter((_, i) => results[i]);
-}
-
 export async function importAttendancePeriodRecordsRows(
   periodId: string,
   rows: Omit<AttendancePeriodRecord, "id" | "periodId" | "source" | "updatedBy" | "updatedAt">[],

@@ -8,6 +8,9 @@ import type { AttendancePeriodRecord, Employee } from "./types";
 // ---------------------------------------------------------------------------
 
 export const TARDINESS_THRESHOLD = 5;
+// The report's grace period: a day counts as late from this many minutes.
+// (Payroll still deducts every late minute.)
+export const TARDINESS_GRACE_MINUTES = 5;
 export const ABSENTEEISM_THRESHOLD = 5;
 
 export interface TardinessDay {
@@ -42,9 +45,14 @@ export function buildTardinessRows(records: AttendancePeriodRecord[], employees:
     if (!rec.lateInstances) continue;
     const employee = employees.find((e) => e.id === rec.employeeId);
     if (!employee) continue;
+    // Days late by the grace period or more; a record without day details
+    // keeps its count.
+    const days = rec.lateDayDetails?.length ? rec.lateDayDetails.filter((d) => d.lateRawMinutes >= TARDINESS_GRACE_MINUTES) : null;
+    const instances = days ? days.length : rec.lateInstances;
+    if (!instances) continue;
     const row = byEmployee.get(employee.id) ?? { employee, lateInstances: 0, lateDays: [] };
-    row.lateInstances += rec.lateInstances;
-    (rec.lateDayDetails ?? []).forEach((d) => row.lateDays.push({ periodId: rec.periodId, date: d.date, lateRawMinutes: d.lateRawMinutes }));
+    row.lateInstances += instances;
+    (days ?? []).forEach((d) => row.lateDays.push({ periodId: rec.periodId, date: d.date, lateRawMinutes: d.lateRawMinutes }));
     byEmployee.set(employee.id, row);
   }
   return Array.from(byEmployee.values())

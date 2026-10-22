@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { branchName, departmentAllocationsForEmployee, departmentName, formatDate, fullName, scopeEmployeesForViewer } from "@/lib/helpers";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
-import { buildTardinessRows, flaggedTardiness, TARDINESS_THRESHOLD, type TardinessRow } from "@/lib/tardiness-absenteeism";
+import { buildTardinessRows, flaggedTardiness, TARDINESS_GRACE_MINUTES, TARDINESS_THRESHOLD, type TardinessRow } from "@/lib/tardiness-absenteeism";
 import type { Employee } from "@/lib/types";
 
 export default function TardinessReportPage() {
@@ -41,13 +41,13 @@ function SelfServiceView({ employee, records }: { employee: Employee | null; rec
 
   return (
     <div>
-      <PageHeader title="My Tardiness Record" subtitle="Days you clocked in late, drawn from imported attendance records." />
+      <PageHeader title="My Tardiness Record" subtitle={`Days you clocked in ${TARDINESS_GRACE_MINUTES} minutes late or more, drawn from imported attendance records.`} />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile label="Late instances" value={(mine?.lateInstances ?? 0).toString()} deltaTone={(mine?.lateInstances ?? 0) >= TARDINESS_THRESHOLD ? "bad" : "neutral"} />
         <StatTile label="Flag threshold" value={`${TARDINESS_THRESHOLD}+`} hint="instances" />
       </div>
       {!mine || mine.lateDays.length === 0 ? (
-        <EmptyState icon={AlarmClockOff} title="No late instances on record" description="Your imported attendance shows no days with late minutes." />
+        <EmptyState icon={AlarmClockOff} title="No late instances on record" description={`Your imported attendance shows no days ${TARDINESS_GRACE_MINUTES} or more minutes late.`} />
       ) : (
         <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
           <div className="overflow-x-auto">
@@ -143,7 +143,7 @@ function AdminView({
     <div>
       <PageHeader
         title="Tardiness Report"
-        subtitle={`Employees with ${TARDINESS_THRESHOLD}+ late instances across the selected periods, drawn from imported daily attendance.`}
+        subtitle={`Employees with ${TARDINESS_THRESHOLD}+ late instances across the selected periods, drawn from imported daily attendance. A day counts as late from ${TARDINESS_GRACE_MINUTES} minutes (grace period).`}
         actions={<ExportBar onExportCsv={exportCsv} />}
       />
 
