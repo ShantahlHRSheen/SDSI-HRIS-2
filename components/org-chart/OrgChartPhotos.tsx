@@ -6,6 +6,7 @@ import { useHris } from "@/lib/store";
 import { currentCompany } from "@/lib/companies";
 import { EmptyState } from "@/components/EmptyState";
 import { reportSaveError } from "@/lib/save-errors";
+import { FileViewer, type ViewerFile } from "@/components/FileViewer";
 import { fetchOrgChartPhotos, removeOrgChartPhoto, uploadOrgChartPhoto, type OrgChartPhoto } from "@/lib/supabase/company-documents";
 
 // Org chart as photos of the company's own chart, uploaded by HR
@@ -18,6 +19,7 @@ export function OrgChartPhotos() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
 
   const load = useCallback(() => {
     fetchOrgChartPhotos().then(
@@ -95,10 +97,10 @@ export function OrgChartPhotos() {
         <div className="space-y-4">
           {photos.map((p) => (
             <figure key={p.name} className="relative overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-white">
-              <a href={p.url} target="_blank" rel="noreferrer">
+              <button type="button" onClick={() => setViewer({ url: p.url, name: `${currentCompany().shortName} org chart`, kind: "image" })} className="block w-full">
                 {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed Storage URL */}
                 <img src={p.url} alt={`${currentCompany().name} organizational chart`} className="mx-auto block h-auto w-full" />
-              </a>
+              </button>
               {isHr && (
                 <button onClick={() => remove(p.name)} disabled={busy} className="absolute top-2 right-2 flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">
                   <Trash2 size={13} /> Remove
@@ -109,6 +111,7 @@ export function OrgChartPhotos() {
           <p className="text-center text-xs text-[var(--text-muted)]">Tap a photo to open it full size.</p>
         </div>
       )}
+      {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
     </section>
   );
 }

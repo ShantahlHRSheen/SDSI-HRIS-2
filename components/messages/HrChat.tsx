@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, FileText, ImagePlus, MessageCircle, Paperclip, Search, Send, Smile, SmilePlus, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
+import { canView, FileViewer, saveFile, viewerKind, type ViewerFile } from "@/components/FileViewer";
 import { fullName } from "@/lib/helpers";
 import { prepareChatPhoto } from "@/lib/id-images";
 import {
@@ -16,6 +17,7 @@ import {
   HR_REACTIONS,
   HR_MESSAGE_MAX,
   hrChatFileDownloadUrl,
+  hrChatFileViewUrl,
   hrChatFileProblem,
   hrChatPhotoUrls,
   markHrThreadRead,
@@ -62,12 +64,14 @@ function fileSize(bytes: number): string {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// Downloads a chat file under its own name (a fresh 5-minute link each time).
-async function downloadChatFile(path: string, name: string) {
+// PDFs and photos open in the HRIS viewer; other files are downloaded under
+// their own name (a fresh 5-minute link each time).
+async function openChatFile(path: string, name: string, view: (f: ViewerFile) => void) {
   try {
-    window.location.href = await hrChatFileDownloadUrl(path, name);
+    if (canView(name)) view({ url: await hrChatFileViewUrl(path), name, kind: viewerKind(name) });
+    else await saveFile(await hrChatFileDownloadUrl(path, name), name);
   } catch (err) {
-    reportSaveError("Couldn't download the file", err);
+    reportSaveError("Couldn't open the file", err);
   }
 }
 
@@ -118,6 +122,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
   const [photoError, setPhotoError] = useState<string | null>(null);
   const docInput = useRef<HTMLInputElement>(null);
   const [doc, setDoc] = useState<File | null>(null);
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
   const [photoUrls, setPhotoUrls] = useState<{
     urls: Record<string, string>;
     at: number;
@@ -254,6 +259,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3 sm:px-4">
         {loadError && !messages && <div className="py-6 text-center text-sm text-[var(--status-critical)]">{loadError}</div>}
         {!loadError && !messages && <div className="py-6 text-center text-sm text-[var(--text-muted)]">Loading…</div>}
@@ -272,7 +278,11 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
             <div key={m.id} className={`group flex items-center gap-1 ${mine ? "flex-row-reverse" : "flex-row"}`}>
               <div className={`max-w-[85%] sm:max-w-[70%]`}>
                 {m.imagePath && (
-                  <a href={photoUrls.urls[m.imagePath]} target="_blank" rel="noreferrer" className={`mb-1 block ${mine ? "ml-auto" : ""} w-fit`}>
+                  <button
+                    type="button"
+                    onClick={() => photoUrls.urls[m.imagePath!] && setViewer({ url: photoUrls.urls[m.imagePath!], name: "Photo", kind: "image" })}
+                    className={`mb-1 block ${mine ? "ml-auto" : ""} w-fit`}
+                  >
                     {photoUrls.urls[m.imagePath] ? (
                       <img src={photoUrls.urls[m.imagePath]} alt="Photo" className="max-h-64 max-w-full rounded-xl border border-[var(--border-hairline)]" />
                     ) : (
@@ -280,7 +290,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                         Loading photo…
                       </span>
                     )}
-                  </a>
+                  </button>
                 )}
                 {m.imageRemoved && (
                   <div
@@ -292,13 +302,13 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                 {m.filePath && (
                   <button
                     type="button"
-                    onClick={() => downloadChatFile(m.filePath!, m.fileName ?? "file")}
+                    onClick={() => openChatFile(m.filePath!, m.fileName ?? "file", setViewer)}
                     className={`mb-1 flex w-fit max-w-full items-center gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--gridline)]/40 ${mine ? "ml-auto" : ""}`}
-                    title="Download"
+                    title={canView(m.fileName ?? "") ? "View" : "Download"}
                   >
                     <FileText size={18} className="shrink-0 text-[var(--series-1)]" />
                     <span className="min-w-0 [overflow-wrap:anywhere]">{m.fileName ?? "File"}</span>
-                    <span className="shrink-0 text-xs text-[var(--text-muted)]">Download</span>
+                    <span className="shrink-0 text-xs text-[var(--text-muted)]">{canView(m.fileName ?? "") ? "View" : "Download"}</span>
                   </button>
                 )}
                 {m.fileRemoved && (

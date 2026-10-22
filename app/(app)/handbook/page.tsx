@@ -2,8 +2,9 @@
 
 import { currentCompany } from "@/lib/companies";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, Download, ExternalLink, Upload } from "lucide-react";
+import { BookOpen, Download, Maximize2, Upload } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { FileViewer } from "@/components/FileViewer";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { reportSaveError } from "@/lib/save-errors";
@@ -53,6 +54,7 @@ export default function HandbookPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
 
   const load = useCallback(() => {
     fetchCompanyDocument(HANDBOOK_PATH, downloadName()).then(
@@ -128,9 +130,15 @@ export default function HandbookPage() {
       {doc && (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <a href={doc.url} target="_blank" rel="noreferrer" onClick={recordDownload} className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]">
-              <ExternalLink size={16} /> Open full screen
-            </a>
+            <button
+              onClick={() => {
+                recordDownload();
+                setReading(true);
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]"
+            >
+              <Maximize2 size={16} /> Open full screen
+            </button>
             <a href={doc.downloadUrl} onClick={recordDownload} className={button}>
               <Download size={16} /> Download PDF
             </a>
@@ -149,6 +157,7 @@ export default function HandbookPage() {
           <iframe src={doc.url} title={`${currentCompany().shortName} Employee Handbook`} className="hidden h-[calc(100dvh-13rem)] min-h-[520px] w-full rounded-xl border border-[var(--border-hairline)] bg-white md:block" />
           <p className="mt-2 text-xs text-[var(--text-muted)] md:hidden">On a phone, tap &ldquo;Open full screen&rdquo; to read the handbook, or download it to keep a copy.</p>
           {info && seesAll && !ackError && <HandbookAckList info={info} acks={acks} downloads={downloads} doc={doc} onChanged={reloadAll} />}
+          {reading && <FileViewer file={{ url: doc.url, name: downloadName(), kind: "pdf" }} onClose={() => setReading(false)} />}
         </>
       )}
     </div>
