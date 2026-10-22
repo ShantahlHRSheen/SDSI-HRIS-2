@@ -16,10 +16,11 @@ export type ResponseStage = "withdrawn" | "excuse_pending" | "hr_to_sign" | "man
 export function responseStage(r: DisciplinaryRecord): ResponseStage {
   // Withdrawn: excused days left fewer than 5 late days.
   if (r.withdrawnAt) return "withdrawn";
-  // Signed HR Manager → Department Manager before the employee gets it.
+  // Signed HR Manager → Branch Manager (if any, notes it) → Department
+  // Manager before the employee gets it.
   if (r.signFlow && !r.hrSignedAt) return "hr_to_sign";
-  if (r.signFlow && !r.managerSignedAt) return "manager_to_sign";
   if (r.signFlow && r.branchManagerId && !r.branchManagerSignedAt) return "branch_to_sign";
+  if (r.signFlow && !r.managerSignedAt) return "manager_to_sign";
   // Held from the employee while a manager's excuse request waits for HR.
   if (r.signFlow && (r.excuseRequests ?? []).some((x) => x.status === "pending")) return "excuse_pending";
   if (!r.acknowledgedAt) return "to_acknowledge";
