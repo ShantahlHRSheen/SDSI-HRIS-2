@@ -57,3 +57,17 @@ begin
   return r;
 end;
 $$;
+
+-- The Branch Manager's signature can be uploaded once HR has signed.
+drop policy if exists "discipline branch manager files upload" on storage.objects;
+create policy "discipline branch manager files upload" on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'discipline-files'
+    and storage.filename(name) like 'bmsign-%'
+    and exists (
+      select 1 from disciplinary_records d
+      where d.id = (storage.foldername(name))[1]
+        and d.sign_flow and d.hr_signed_at is not null and d.branch_manager_signed_at is null
+        and d.branch_manager_id = app_current_employee_id()
+    )
+  );
