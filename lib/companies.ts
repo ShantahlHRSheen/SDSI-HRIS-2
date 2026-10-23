@@ -79,6 +79,10 @@ export interface CompanyConfig {
   // The HR Department's letterhead banner on generated notices (NTEs);
   // a plain text heading if unset.
   hrLetterhead?: string;
+  // Certificate of Employment (lib/coe-pdf.ts): letterhead banner, footer
+  // band and watermark images, where it's issued (after the company name)
+  // and HR's contact lines under the signature. A plain layout if unset.
+  coe?: { header?: string; footer?: string; watermark?: string; issuedAt: string; contact: string; email: string };
 }
 
 const TBA = { tin: "", address: "", phone: "", email: "", rdoCode: "" };
@@ -92,6 +96,14 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     formLogo: "/brand/shantahl-form-logo.png",
     idCardLogo: "/brand/shantahl-logo.png",
     hrLetterhead: "/brand/shantahl-hr-letterhead.png",
+    coe: {
+      header: "/brand/shantahl-coe-header.jpg",
+      footer: "/brand/shantahl-coe-footer.jpg",
+      watermark: "/brand/shantahl-coe-watermark.png",
+      issuedAt: "CABANATUAN CITY, NUEVA ECIJA (HEAD OFFICE)",
+      contact: "09051733206 / 044-960-0126",
+      email: "shantahlhr@gmail.com",
+    },
     // Green gradient bands, emergency contact + return-to on the back.
     idCardStyle: "modern",
     info: {

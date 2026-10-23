@@ -41,6 +41,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Performance Evaluations", href: "/evaluations", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "My Notices", href: "/my-notices", roles: ALL_ROLES, built: true },
+      { label: "Certificate of Employment", href: "/coe", roles: ALL_ROLES, built: true },
     ],
   },
   {
