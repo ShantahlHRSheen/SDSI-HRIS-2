@@ -34,6 +34,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Workforce",
     items: [
       { label: "Attendance", href: "/modules/attendance", roles: ALL_ROLES, built: true },
+      { label: "Work From Home", href: "/wfh", roles: ALL_ROLES, built: true },
       { label: "Leave Management", href: "/modules/leave", roles: ALL_ROLES, built: true },
       { label: "Overtime", href: "/modules/overtime", roles: ALL_ROLES, built: true },
       { label: "Attendance Corrections", href: "/modules/corrections", roles: ALL_ROLES, built: true },
