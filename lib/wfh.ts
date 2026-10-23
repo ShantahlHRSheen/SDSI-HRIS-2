@@ -26,6 +26,9 @@ export interface WfhSession {
   lastSeenAt: string;
   endedAt: string | null;
   report: string | null;
+  // Right now (phase 59): active, idle or screen locked, and since when.
+  state: "active" | "idle" | "locked";
+  stateSince: string | null;
 }
 
 export type WfhEventKind = "idle" | "locked" | "offline" | "check_ok" | "check_missed";
@@ -143,6 +146,8 @@ export async function fetchWfhDay(from: string, to: string): Promise<{ sessions:
     lastSeenAt: String(r.last_seen_at),
     endedAt: (r.ended_at as string | null) ?? null,
     report: (r.report as string | null) ?? null,
+    state: ((r.state as string) ?? "active") as WfhSession["state"],
+    stateSince: (r.state_since as string | null) ?? null,
   }));
   if (!sessions.length) return { sessions, events: [] };
   const ev = await client().from("wfh_events").select("*").in("session_id", sessions.map((s) => s.id)).order("started_at");
@@ -170,5 +175,11 @@ export const startWfh = async () => String(await call("wfh_start"));
 export const beatWfh = (session: string) => call("wfh_beat", { p_session: session }).then(() => undefined);
 export const logWfh = (session: string, kind: "idle" | "locked" | "check_ok" | "check_missed", startedAt: Date) =>
   call("wfh_log", { p_session: session, p_kind: kind, p_started: startedAt.toISOString() }).then(() => undefined);
+// Tells the board what the employee is doing now; skipped before phase 59.
+export const stateWfh = (session: string, state: "active" | "idle" | "locked", since: Date) =>
+  call("wfh_state", { p_session: session, p_state: state, p_since: since.toISOString() }).then(
+    () => undefined,
+    () => undefined,
+  );
 export const stopWfh = (session: string, report: string) => call("wfh_stop", { p_session: session, p_report: report }).then(() => undefined);
 export const explainWfh = (event: string, reason: string) => call("wfh_explain", { p_event: event, p_reason: reason }).then(() => undefined);

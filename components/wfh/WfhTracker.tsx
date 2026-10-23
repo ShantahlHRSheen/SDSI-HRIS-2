@@ -14,6 +14,7 @@ import {
   logWfh,
   planChecks,
   startWfh,
+  stateWfh,
   stopWfh,
   type WfhSchedule,
   type WfhSession,
@@ -112,6 +113,7 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
       if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission().catch(() => "denied");
       const id = await startWfh();
       sessionRef.current = id;
+      stateWfh(id, "active", new Date());
       cleanup();
       const ctl = new AbortController();
       abort.current = ctl;
@@ -123,11 +125,17 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
           if (!idleSince.current) idleSince.current = { at: new Date(Date.now() - (locked && !idle ? 0 : WFH_IDLE_MINUTES * 60_000)), kind: locked ? "locked" : "idle" };
           else if (locked) idleSince.current.kind = "locked";
           setState(locked ? "locked" : "idle");
+          if (sessionRef.current) stateWfh(sessionRef.current, idleSince.current.kind, idleSince.current.at);
         } else {
           const since = idleSince.current;
           idleSince.current = null;
           setState("active");
-          if (since && sessionRef.current) logWfh(sessionRef.current, since.kind, since.at).catch(() => {});
+          if (since && sessionRef.current) {
+            const id = sessionRef.current;
+            logWfh(id, since.kind, since.at)
+              .catch(() => {})
+              .then(() => stateWfh(id, "active", new Date()));
+          }
         }
       });
       await detector.start({ threshold: WFH_IDLE_MINUTES * 60_000, signal: ctl.signal });

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { WfhTracker } from "@/components/wfh/WfhTracker";
 import { WfhDayLog, WfhSchedules } from "@/components/wfh/WfhReview";
+import { WfhLive } from "@/components/wfh/WfhLive";
 import { todayInManila } from "@/lib/leave-policy";
 import { fetchWfhDay, fetchWfhSchedules, type WfhEvent, type WfhSchedule, type WfhSession } from "@/lib/wfh";
 
@@ -56,6 +57,9 @@ export default function WfhPage() {
       {error && <div className="mb-4 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">{error}</div>}
 
       {mine && <WfhTracker schedule={mine} openSession={open} onChanged={load} />}
+
+      {/* HR, Upper Management and supervisors: who's working right now. */}
+      {schedules && others.length > 0 && <WfhLive schedules={others} employees={employees} />}
 
       {schedules && !mine && !others.length && !isHr && <EmptyState icon={House} title="You aren't set up for work from home" description="HR sets who works from home. Ask HR if you need to." />}
 
