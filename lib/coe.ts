@@ -108,7 +108,8 @@ export function draftCoeData(input: {
   return {
     honorific: e.gender === "Female" ? "MS." : "MR.",
     fullName: [e.firstName, e.middleName, e.lastName].filter((x) => x?.trim()).join(" ").toUpperCase(),
-    lastName: e.lastName,
+    // "ABESAMIS" / "dela cruz" → "Abesamis" / "Dela Cruz" for "Mr. …".
+    lastName: e.lastName.trim().toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase()),
     female: e.gender === "Female",
     address: e.address ?? "",
     current: !former,
