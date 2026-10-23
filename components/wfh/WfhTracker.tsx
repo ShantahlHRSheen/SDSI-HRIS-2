@@ -5,7 +5,7 @@ import { Loader2, MonitorCheck, Play, ShieldCheck, Square } from "lucide-react";
 import { Modal } from "@/components/Modal";
 import { todayInManila } from "@/lib/leave-policy";
 import {
-  WFH_CHECK_RESPONSE_MINUTES,
+  WFH_CHECK_RESPONSE_SECONDS,
   WFH_IDLE_MINUTES,
   acknowledgeWfh,
   beatWfh,
@@ -47,6 +47,15 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
   const sessionRef = useRef<string | null>(null);
   const checkRef = useRef<Date | null>(null);
   const [missed, setMissed] = useState(false);
+  // Seconds left to answer the open check.
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!check) return;
+    const tick = () => setLeft(Math.max(0, WFH_CHECK_RESPONSE_SECONDS - Math.floor((Date.now() - check.shownAt.getTime()) / 1000)));
+    tick();
+    const t = window.setInterval(tick, 250);
+    return () => window.clearInterval(t);
+  }, [check]);
 
   const cleanup = useCallback(() => {
     abort.current?.abort();
@@ -77,7 +86,7 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
     setCheck({ code, shownAt });
     if ("Notification" in window && Notification.permission === "granted") {
       try {
-        new Notification("HRIS — Are you there?", { body: `Open the HRIS tab and type ${code} within ${WFH_CHECK_RESPONSE_MINUTES} minutes.`, requireInteraction: true });
+        new Notification("HRIS — Are you there?", { body: `Open the HRIS tab and type ${code} within ${WFH_CHECK_RESPONSE_SECONDS} seconds.`, requireInteraction: true });
       } catch {
         /* notifications are optional */
       }
@@ -89,7 +98,7 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
       setCheck(null);
       setMissed(true);
       if (sessionRef.current) logWfh(sessionRef.current, "check_missed", shownAt).catch(() => {});
-    }, WFH_CHECK_RESPONSE_MINUTES * 60_000);
+    }, WFH_CHECK_RESPONSE_SECONDS * 1000);
     timers.current.push(t);
   }
 
@@ -194,7 +203,7 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
       </div>
       {session ? (
         <p className="text-xs text-[var(--text-secondary)]">
-          Keep this HRIS tab open (it can be in the background) while you work in Excel, email or other apps. Time with no keyboard or mouse use for {WFH_IDLE_MINUTES}+ minutes, or a locked screen, is logged as idle. A few times a day an &ldquo;Are you there?&rdquo; check asks you to type a code here.
+          Keep this HRIS tab open (it can be in the background) while you work in Excel, email or other apps. Time with no keyboard or mouse use for {WFH_IDLE_MINUTES}+ minutes, or a locked screen, is logged as idle. A few times a day an &ldquo;Are you there?&rdquo; check asks you to type a code here within {WFH_CHECK_RESPONSE_SECONDS} seconds.
         </p>
       ) : openSession ? (
         <p className="text-xs text-[var(--status-warning)]">You didn&rsquo;t stop working last time (the tab was closed). Click Continue working — the time it was closed is logged — then Stop working at the end of the day.</p>
@@ -208,7 +217,7 @@ export function WfhTracker({ schedule, openSession, onChanged }: { schedule: Wfh
         {check && (
           <div className="space-y-3 text-sm">
             <p className="text-[var(--text-secondary)]">
-              Type this code within {WFH_CHECK_RESPONSE_MINUTES} minutes: <span className="text-2xl font-bold tracking-widest text-[var(--text-primary)]">{check.code}</span>
+              Type this code within {WFH_CHECK_RESPONSE_SECONDS} seconds{left !== null ? ` (${left}s left)` : ""}: <span className="text-2xl font-bold tracking-widest text-[var(--text-primary)]">{check.code}</span>
             </p>
             <input value={answer} onChange={(e) => setAnswer(e.target.value)} onKeyDown={(e) => e.key === "Enter" && answerCheck()} autoFocus inputMode="numeric" maxLength={4} className="w-32 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-lg tracking-widest" />
             <div className="flex justify-end">
@@ -262,7 +271,7 @@ function Acknowledge({ onDone }: { onDone: () => void }) {
       <ul className="mb-3 list-disc space-y-1 pl-5 text-[var(--text-secondary)]">
         <li>While you&rsquo;re clocked in (Start working → Stop working), the HRIS records your time in and out.</li>
         <li>It records when there&rsquo;s been no keyboard or mouse use on your computer for {WFH_IDLE_MINUTES}+ minutes, when your screen is locked, and when the HRIS tab is closed. It does not see what you type, which apps or sites you use, or your screen.</li>
-        <li>A few times a day it asks you to type a code to confirm you&rsquo;re there, and at the end of the day you write what you accomplished.</li>
+        <li>A few times a day it asks you to type a code within {WFH_CHECK_RESPONSE_SECONDS} seconds to confirm you&rsquo;re there (a missed check is logged), and at the end of the day you write what you accomplished.</li>
         <li>Only you, your supervisor and HR can see this log. You can add a reason to idle time (e.g. a call or meeting).</li>
         <li>Using auto-clickers or mouse jigglers to appear active is not allowed.</li>
       </ul>

@@ -7,8 +7,8 @@ import { getSupabaseClient } from "./supabase/client";
 // random "Are you there?" checks are logged; Stop working asks for the
 // day's accomplishment report. HR and the supervisor review each day.
 
-export const WFH_IDLE_MINUTES = 5;
-export const WFH_CHECK_RESPONSE_MINUTES = 3;
+export const WFH_IDLE_MINUTES = 3;
+export const WFH_CHECK_RESPONSE_SECONDS = 10;
 
 // 1 = Monday … 7 = Sunday. Hours ("08:00"–"17:00") or expected minutes.
 export type WfhDay = { start: string; end: string } | { minutes: number };
