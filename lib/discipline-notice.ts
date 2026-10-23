@@ -57,7 +57,12 @@ export async function buildSignedNotice(r: DisciplinaryRecord, employees: Employ
       issueDate: d.issueDate,
       month: d.month,
       days: d.days,
-      cc: d.cc,
+      // The Department Manager named on the record now (HR can reassign it
+      // until they sign), as their 201 file reads; else as issued.
+      cc: (() => {
+        const m = employees.find((e) => e.id === r.managerId);
+        return m ? { name: `${m.lastName}, ${m.firstName}`, title: positionTitle(m.positionId).replace(/^—$/, "") || (d.cc?.title ?? "") } : d.cc;
+      })(),
       // Notices issued before the Branch Manager was added: from their 201 file.
       branchManager:
         d.branchManager ??
