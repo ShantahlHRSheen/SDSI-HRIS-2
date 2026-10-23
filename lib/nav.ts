@@ -42,6 +42,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "My Notices", href: "/my-notices", roles: ALL_ROLES, built: true },
       { label: "Certificate of Employment", href: "/coe", roles: ALL_ROLES, built: true },
+      { label: "Pag-IBIG Loan Form", href: "/pagibig-loan", roles: ALL_ROLES, built: true },
     ],
   },
   {

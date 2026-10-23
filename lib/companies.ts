@@ -83,6 +83,14 @@ export interface CompanyConfig {
   // band and watermark images, where it's issued (after the company name)
   // and HR's contact lines under the signature. A plain layout if unset.
   coe?: { header?: string; footer?: string; watermark?: string; issuedAt: string; contact: string; email: string };
+  // Pag-IBIG Multi-Purpose Loan form (lib/mpl-pdf.ts): the employer's part —
+  // the authorized signatory (employee id), Pag-IBIG employer ID and the
+  // business address as the form splits it.
+  pagibigMpl?: {
+    signatoryId: string;
+    employerPagibigId: string;
+    address: { unit: string; building: string; house: string; street: string; subdivision: string; barangay: string; city: string; province: string; zip: string };
+  };
 }
 
 const TBA = { tin: "", address: "", phone: "", email: "", rdoCode: "" };
@@ -103,6 +111,11 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       issuedAt: "CABANATUAN CITY, NUEVA ECIJA (HEAD OFFICE)",
       contact: "09051733206 / 044-960-0126",
       email: "shantahlhr@gmail.com",
+    },
+    pagibigMpl: {
+      signatoryId: "emp-045", // Marlyn C. Leonardo, Operations Manager
+      employerPagibigId: "",
+      address: { unit: "", building: "", house: "109", street: "Apo St.", subdivision: "Mabini Homesite", barangay: "", city: "Cabanatuan City", province: "Nueva Ecija", zip: "3100" },
     },
     // Green gradient bands, emergency contact + return-to on the back.
     idCardStyle: "modern",
