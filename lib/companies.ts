@@ -114,7 +114,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     },
     pagibigMpl: {
       signatoryId: "emp-045", // Marlyn C. Leonardo, Operations Manager
-      employerPagibigId: "",
+      employerPagibigId: "208844580009",
       address: { unit: "", building: "", house: "109", street: "Apo St.", subdivision: "Mabini Homesite", barangay: "", city: "Cabanatuan City", province: "Nueva Ecija", zip: "3100" },
     },
     // Green gradient bands, emergency contact + return-to on the back.

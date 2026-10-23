@@ -9,7 +9,7 @@ import { mplTotals, MPL_MAX_LINES, type MplData } from "./mpl";
 
 export const MPL_FORM_URL = "/forms/pagibig-mplaf-hqp-slf-065.pdf";
 const H = 936;
-const INK = rgb(0, 0, 0.55);
+const INK = rgb(0, 0, 0);
 
 const clean = (t: string) =>
   t
