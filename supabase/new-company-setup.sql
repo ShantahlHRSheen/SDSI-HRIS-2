@@ -6099,7 +6099,7 @@ as $$
 declare
   me text := app_current_employee_id();
   r mpl_requests%rowtype;
-  note text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
 begin
   select * into r from mpl_requests where id = p_id for update;
   if not found then
@@ -6108,11 +6108,11 @@ begin
   if not ((r.status = 'hr' and app_is_hr_manager()) or (r.status = 'signatory' and (r.signatory_id = me or app_is_hr_manager()))) then
     raise exception 'You can''t decline this form now.';
   end if;
-  if note is null or char_length(note) > 500 then
+  if v_reason is null or char_length(v_reason) > 500 then
     raise exception 'Give the reason for declining (up to 500 characters).';
   end if;
   update mpl_requests
-     set status = 'declined', decline_reason = note,
+     set status = 'declined', decline_reason = v_reason,
          declined_name = (select trim(both ' ' from coalesce(first_name, '') || ' ' || coalesce(last_name, '')) from employees where id = me)
    where id = p_id;
 end;
