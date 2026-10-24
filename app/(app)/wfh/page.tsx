@@ -31,7 +31,8 @@ export default function WfhPage() {
       ([s, d, recent]) => {
         setSchedules(s);
         setDay(d);
-        setOpen(recent.sessions.find((x) => x.employeeId === me && !x.endedAt) ?? null);
+        // Only today's open session is continued; an older one is closed on Start working.
+        setOpen(recent.sessions.find((x) => x.employeeId === me && !x.endedAt && x.workDate === today) ?? null);
         setError(null);
       },
       (e: Error) => setError(e.message),
