@@ -44,7 +44,8 @@ export function buildTardinessRows(records: AttendancePeriodRecord[], employees:
   for (const rec of records) {
     if (!rec.lateInstances) continue;
     const employee = employees.find((e) => e.id === rec.employeeId);
-    if (!employee) continue;
+    // Fixed-rate (monthly) employees aren't held to tardiness / absenteeism.
+    if (!employee || employee.payrollType === "monthly") continue;
     // Days late by the grace period or more; a record without day details
     // keeps its count.
     const days = rec.lateDayDetails?.length ? rec.lateDayDetails.filter((d) => d.lateRawMinutes >= TARDINESS_GRACE_MINUTES) : null;
@@ -67,7 +68,8 @@ export function buildAbsenteeismRows(records: AttendancePeriodRecord[], employee
     const halfDayInstances = rec.halfDayInstances ?? 0;
     if (!absenceInstances && !halfDayInstances) continue;
     const employee = employees.find((e) => e.id === rec.employeeId);
-    if (!employee) continue;
+    // Fixed-rate (monthly) employees aren't held to tardiness / absenteeism.
+    if (!employee || employee.payrollType === "monthly") continue;
     const row = byEmployee.get(employee.id) ?? { employee, absenceInstances: 0, halfDayInstances: 0, totalInstances: 0, absentDays: [], halfDays: [] };
     row.absenceInstances += absenceInstances;
     row.halfDayInstances += halfDayInstances;

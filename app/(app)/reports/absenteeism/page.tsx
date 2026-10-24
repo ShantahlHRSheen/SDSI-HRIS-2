@@ -149,7 +149,7 @@ function AdminView({
     <div>
       <PageHeader
         title="Absenteeism Report"
-        subtitle={`Employees with ${ABSENTEEISM_THRESHOLD}+ combined absence/half-day instances across the selected periods, drawn from imported daily attendance.`}
+        subtitle={`Employees with ${ABSENTEEISM_THRESHOLD}+ combined absence/half-day instances across the selected periods, drawn from imported daily attendance. Fixed-rate employees aren't included.`}
         actions={<ExportBar onExportCsv={exportCsv} />}
       />
 

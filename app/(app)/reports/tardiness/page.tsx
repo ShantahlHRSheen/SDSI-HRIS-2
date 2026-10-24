@@ -143,7 +143,7 @@ function AdminView({
     <div>
       <PageHeader
         title="Tardiness Report"
-        subtitle={`Employees with ${TARDINESS_THRESHOLD}+ late instances across the selected periods, drawn from imported daily attendance. A day counts as late from ${TARDINESS_GRACE_MINUTES} minutes (grace period).`}
+        subtitle={`Employees with ${TARDINESS_THRESHOLD}+ late instances across the selected periods, drawn from imported daily attendance. A day counts as late from ${TARDINESS_GRACE_MINUTES} minutes (grace period). Fixed-rate employees aren't included.`}
         actions={<ExportBar onExportCsv={exportCsv} />}
       />
 
