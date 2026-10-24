@@ -141,12 +141,21 @@ const UNITS: Unit[] = [
         ],
       },
       {
-        name: "Marketing Department",
+        name: "Platform Marketing Department",
+        icon: Store,
+        people: [{ name: "Angela Acosta", title: "Platform Marketing Coordinator" }],
+      },
+      {
+        name: "Facebook Marketing Department",
         icon: Megaphone,
+        people: [{ name: "Sarah Mei Iglesia", title: "Facebook Marketing Head" }],
+      },
+      {
+        name: "Creatives and Production Department",
+        icon: Camera,
         people: [
-          { name: "Sarah Mei Iglesia", title: "Marketing Head" },
           { name: "Ronald Lugtu", title: "Video Editor" },
-          { name: "Angela Acosta", title: "Social Media Manager" },
+          { name: "Freelance Graphic Artists", title: "Graphic Artists", freelancer: true },
         ],
       },
     ],
