@@ -334,6 +334,9 @@ export interface TardinessSanctionData {
   suspensionFrom: string | null;
   suspensionTo: string | null;
   findings: string;
+  // A Notice of Sanction for any other NTE / incident report (phase 61): what
+  // it was about; month and daysLate are then unused.
+  general?: { recordType: "nte" | "incident_report"; about: string; recommendedBy?: string | null };
 }
 
 export interface AuditLog {

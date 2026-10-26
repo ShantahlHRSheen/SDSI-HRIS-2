@@ -302,6 +302,8 @@ export interface TardinessSanctionInput {
   findings: string;
   // Late days HR excused on the managers' recommendation, with the reasons.
   excused?: { date: string; reason: string }[];
+  // Any other NTE / incident report: what it was about (no tardiness wording).
+  general?: { recordType: "nte" | "incident_report"; about: string; recommendedBy?: string | null };
   signatures?: { hr?: SignatureMark | null; employee?: SignatureMark | null };
 }
 
@@ -310,7 +312,8 @@ const dayAfter = (iso: string) => new Date(Date.parse(`${iso}T00:00:00Z`) + 8640
 
 export async function buildTardinessSanctionPdf(n: TardinessSanctionInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  doc.setTitle(`Notice of Sanction - Habitual Tardiness - ${n.employeeName}`);
+  const g = n.general;
+  doc.setTitle(g ? `Notice of Sanction - ${n.employeeName}` : `Notice of Sanction - Habitual Tardiness - ${n.employeeName}`);
   doc.setProducer("LSM Group HRIS");
   const fonts = { regular: await doc.embedFont(StandardFonts.TimesRoman), bold: await doc.embedFont(StandardFonts.TimesRomanBold) };
   const head = n.letterhead ? await doc.embedPng(n.letterhead).catch(() => null) : null;
@@ -318,12 +321,20 @@ export async function buildTardinessSanctionPdf(n: TardinessSanctionInput): Prom
   p.field("TO:", n.employeeName);
   p.field("FROM:", `${n.companyShort} Human Resource Department`);
   p.field("DATE:", longDate(n.issueDate));
-  p.field("RE:", "Notice of Sanction - Habitual Tardiness");
+  p.field("RE:", g ? "Notice of Sanction" : "Notice of Sanction - Habitual Tardiness");
   if (n.cc) p.field("CC.:", n.cc.name);
   p.page.drawLine({ start: { x: MARGIN, y: p.y - 2 }, end: { x: A4[0] - MARGIN, y: p.y - 2 }, thickness: 1, color: INK });
   p.y -= 18;
 
-  p.para([
+  if (g)
+    p.para([
+      { t: `This refers to the ${g.recordType === "incident_report" ? "Incident Report" : "Notice to Explain"} dated ` },
+      { t: longDate(n.nteDate), bold: true },
+      { t: " regarding: " },
+      { t: g.about.replace(/\.$/, ""), bold: true },
+      { t: "." },
+    ]);
+  else p.para([
     { t: "This refers to the Notice to Explain dated " },
     { t: longDate(n.nteDate), bold: true },
     { t: " regarding your habitual tardiness for the month of " },
@@ -339,6 +350,7 @@ export async function buildTardinessSanctionPdf(n: TardinessSanctionInput): Prom
         : "The Company has given you the opportunity to explain, and has carefully evaluated the matter.",
     },
   ]);
+  if (g?.recommendedBy) p.para([{ t: `Your Department Head, ${g.recommendedBy}, has also submitted an assessment of your explanation and a recommendation to the Human Resource Department.` }]);
   if (n.excused?.length) {
     const left = n.daysLate - n.excused.length;
     p.para([
@@ -352,7 +364,7 @@ export async function buildTardinessSanctionPdf(n: TardinessSanctionInput): Prom
   for (const para of n.findings.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)) p.para([{ t: para.replace(/\s*\n\s*/g, " ") }]);
   const susp = n.suspensionFrom && n.suspensionTo;
   p.para([
-    { t: `In accordance with the Company Policy of ${n.companyName} on habitual tardiness, and this being your ` },
+    { t: `In accordance with the Company Policy of ${n.companyName}${g ? "" : " on habitual tardiness"}, and this being your ` },
     { t: `${ORDINAL[n.offense] ?? `${n.offense}th`} OFFENSE`, bold: true },
     { t: ", you are hereby meted the sanction of " },
     { t: n.sanction.toUpperCase(), bold: true, underline: true },
