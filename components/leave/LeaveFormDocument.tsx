@@ -35,6 +35,8 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
   const head: React.CSSProperties = { ...cell, ...exact, background: "#e8e8e8", fontWeight: 700, textAlign: "center", letterSpacing: "0.5px" };
   const label: React.CSSProperties = { fontWeight: 700 };
   const cat = (id: string) => form.category === id;
+  // e.g. the Vice Chairperson approving instead of a Department Head.
+  const approverTitle = form.departmentHeadId ? currentCompany().approverTitles?.[form.departmentHeadId] : undefined;
   const sick = form.category === "sick_with_pay" || form.category === "sick_without_pay";
   const c = form.credits;
   const headDays = form.headDays ?? defaultHeadDays(form.category, form.days);
@@ -73,7 +75,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
               <span style={label}>Department:</span> {form.department}
             </td>
             <td style={cell}>
-              <span style={label}>Department Head:</span> {form.departmentHead}
+              <span style={label}>{approverTitle ?? "Department Head"}:</span> {form.departmentHead}
             </td>
           </tr>
         </tbody>
@@ -167,7 +169,7 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
         <tbody>
           <tr>
             <td style={head} colSpan={2}>
-              DEPARTMENT HEAD&rsquo;S APPROVAL
+              {(approverTitle ?? "Department Head").toUpperCase()}&rsquo;S APPROVAL
             </td>
           </tr>
           <tr>
@@ -194,7 +196,10 @@ export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDo
                 <Signature url={signatures.head} />
                 <div style={{ borderBottom: "1px solid #111", fontWeight: 700, textTransform: "uppercase", minHeight: "16px" }}>{form.headSignedName ?? ""}</div>
                 <div style={{ fontSize: "8.5pt" }}>(Signature over printed name)</div>
-                <div style={{ fontSize: "8.5pt" }}>Department Manager{form.headSignedAt ? ` · ${signedOn(form.headSignedAt)}` : ""}</div>
+                <div style={{ fontSize: "8.5pt" }}>
+                  {approverTitle ?? "Department Manager"}
+                  {form.headSignedAt ? ` · ${signedOn(form.headSignedAt)}` : ""}
+                </div>
               </div>
             </td>
           </tr>
