@@ -1,12 +1,15 @@
 import type { Employee, LeaveRequest, PayrollPeriod } from "./types";
 import type { PayrollLine } from "./payroll";
+import { currentCompany } from "./companies";
 
 // 13th month pay and leave credits, per employee per year — the company's
 // "13TH MONTH PAY AND LEAVE CREDITS" sheet:
 // - Per month, the basic pay of the 1st cutoff (period starting on the 1st)
 //   and the 2nd cutoff (starting on the 16th), each less its lates /
 //   absences / undertime deductions, from the payroll.
-// - 13th month = the year's gross basic pay ÷ 12.
+// - 13th month = the year's gross basic pay ÷ 12. Where the company counts
+//   it (thirteenthMonthCashAllowance: LSMBiz), the Cash Allowance paid in
+//   the payroll is added before dividing.
 // - Monetized VL = unused vacation leave days × daily rate. Vacation leave
 //   is credited per half year (Jan–Jun, Jul–Dec) for the halves the employee
 //   was on the payroll; days used are the VL days paid in the payroll or the
@@ -21,6 +24,7 @@ export interface MonthFigures {
   l1: number; // lates / absences / undertime, 1st cutoff
   b2: number;
   l2: number;
+  c?: number; // Cash Allowance, both cutoffs (only where it counts)
 }
 export type MonthOverride = Partial<Record<keyof MonthFigures, number | null>>;
 
@@ -45,6 +49,7 @@ export interface ThirteenthMonthRow {
   months: (MonthFigures & { net: number; edited: boolean })[]; // index 0 = January
   monthsAuto: MonthFigures[]; // the payroll's own figures
   grossBasic: number;
+  cashAllowance?: number; // only where it counts
   thirteenthMonth: number;
   vlDays: number;
   vlDaysAuto: number;
@@ -102,6 +107,7 @@ export function computeThirteenthMonth(input: {
   positionTitle: (positionId: string) => string;
 }): ThirteenthMonthRow[] {
   const { year, employees, periods, linesByPeriod, leaveRequests, vlCreditsPerYear, entries, positionTitle } = input;
+  const withCash = !!currentCompany().thirteenthMonthCashAllowance;
   const entryBy = new Map(entries.filter((e) => e.year === year).map((e) => [e.employeeId, e]));
 
   // Payroll figures per employee: [month][cutoff], plus VL days and the latest rate.
@@ -115,11 +121,12 @@ export function computeThirteenthMonth(input: {
     for (const l of linesByPeriod.get(p.id) ?? []) {
       let a = acc.get(l.employeeId);
       if (!a) {
-        a = { cut: Array.from({ length: 12 }, () => ({ b1: 0, l1: 0, b2: 0, l2: 0 })), vlPaid: [0, 0], onPayroll: [false, false], rate: 0, rateFrom: "" };
+        a = { cut: Array.from({ length: 12 }, () => ({ b1: 0, l1: 0, b2: 0, l2: 0, ...(withCash ? { c: 0 } : {}) })), vlPaid: [0, 0], onPayroll: [false, false], rate: 0, rateFrom: "" };
         acc.set(l.employeeId, a);
       }
       const m = a.cut[month];
       const less = l.latesUndertime + l.undertimeDeduction;
+      if (withCash) m.c = (m.c ?? 0) + l.travelAllowance;
       if (second) {
         m.b2 += l.basicPay;
         m.l2 += less;
@@ -148,18 +155,19 @@ export function computeThirteenthMonth(input: {
     let edited = false;
     const monthsAuto = Array.from({ length: 12 }, (_, i) => {
       const c = a?.cut[i] ?? { b1: 0, l1: 0, b2: 0, l2: 0 };
-      return { b1: round2(c.b1), l1: round2(c.l1), b2: round2(c.b2), l2: round2(c.l2) };
+      return { b1: round2(c.b1), l1: round2(c.l1), b2: round2(c.b2), l2: round2(c.l2), ...(withCash ? { c: round2(c.c ?? 0) } : {}) };
     });
     const months = monthsAuto.map((auto, i) => {
       const ov = entry.months[String(i + 1)] ?? {};
-      const pick = (k: keyof MonthFigures) => (ov[k] ?? null) !== null ? (ov[k] as number) : auto[k];
-      const f = { b1: pick("b1"), l1: pick("l1"), b2: pick("b2"), l2: pick("l2") };
-      const monthEdited = (["b1", "l1", "b2", "l2"] as const).some((k) => (ov[k] ?? null) !== null);
+      const pick = (k: keyof MonthFigures) => ((ov[k] ?? null) !== null ? (ov[k] as number) : (auto[k] ?? 0));
+      const f = { b1: pick("b1"), l1: pick("l1"), b2: pick("b2"), l2: pick("l2"), ...(withCash ? { c: pick("c") } : {}) };
+      const monthEdited = (["b1", "l1", "b2", "l2", ...(withCash ? (["c"] as const) : [])] as const).some((k) => (ov[k] ?? null) !== null);
       edited ||= monthEdited;
       return { ...f, net: round2(f.b1 - f.l1 + f.b2 - f.l2), edited: monthEdited };
     });
     const grossBasic = round2(months.reduce((s, m) => s + m.net, 0));
-    const thirteenthMonth = round2(grossBasic / 12);
+    const cashAllowance = withCash ? round2(months.reduce((s, m) => s + (m.c ?? 0), 0)) : undefined;
+    const thirteenthMonth = round2((grossBasic + (cashAllowance ?? 0)) / 12);
 
     const requested = vlRequestDays(leaveRequests, id, year);
     const perHalf = vlCreditsPerYear / 2;
@@ -180,6 +188,7 @@ export function computeThirteenthMonth(input: {
       months,
       monthsAuto,
       grossBasic,
+      ...(cashAllowance !== undefined ? { cashAllowance } : {}),
       thirteenthMonth,
       vlDays,
       vlDaysAuto,
@@ -205,6 +214,7 @@ export interface ThirteenthMonthSlipData {
   designation: string;
   months: (MonthFigures & { net: number })[];
   grossBasic: number;
+  cashAllowance?: number;
   thirteenthMonth: number;
   vlDays: number;
   dailyRate: number;
@@ -223,6 +233,8 @@ export function toSlipData(r: ThirteenthMonthRow): ThirteenthMonthSlipData {
     designation: r.designation,
     months: r.months.map(({ b1, l1, b2, l2, net }) => ({ b1, l1, b2, l2, net })),
     grossBasic: r.grossBasic,
+    // Only where it counts, so other companies' released slips still match.
+    ...(r.cashAllowance !== undefined ? { cashAllowance: r.cashAllowance } : {}),
     thirteenthMonth: r.thirteenthMonth,
     vlDays: r.vlDays,
     dailyRate: r.dailyRate,

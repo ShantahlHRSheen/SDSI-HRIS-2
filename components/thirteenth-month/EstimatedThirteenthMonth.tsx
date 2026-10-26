@@ -10,6 +10,7 @@ import { summaryToPayrollLine } from "@/lib/payroll";
 import { formatCurrency, formatDate, positionTitle } from "@/lib/helpers";
 import { round2, type ThirteenthMonthSlipData } from "@/lib/thirteenth-month";
 import { TODAY } from "@/lib/mock-data";
+import { currentCompany } from "@/lib/companies";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
 
 // The employee's estimated 13th month pay for this year (on My Payslips),
@@ -28,12 +29,15 @@ export function EstimatedThirteenthMonth({ employee, payrollPeriods, payslips }:
   // `payslips` is oldest first, so the last copy per period wins.
   for (const p of payslips) if (periodById.get(p.periodId)?.start.startsWith(year)) latestPerPeriod.set(p.periodId, p);
 
+  const withCash = !!currentCompany().thirteenthMonthCashAllowance;
+  let cash = 0;
   const months = Array.from({ length: 12 }, () => ({ b1: 0, l1: 0, b2: 0, l2: 0 }));
   for (const [periodId, p] of latestPerPeriod) {
     const start = periodById.get(periodId)!.start;
     const m = months[Number(start.slice(5, 7)) - 1];
     const l = summaryToPayrollLine(p.summary);
     const less = l.latesUndertime + l.undertimeDeduction;
+    if (withCash) cash += l.travelAllowance;
     if (Number(start.slice(8, 10)) >= 16) {
       m.b2 += l.basicPay;
       m.l2 += less;
@@ -47,7 +51,8 @@ export function EstimatedThirteenthMonth({ employee, payrollPeriods, payslips }:
     return { ...r, net: round2(r.b1 - r.l1 + r.b2 - r.l2) };
   });
   const grossBasic = round2(slipMonths.reduce((s, m) => s + m.net, 0));
-  const estimated = round2(grossBasic / 12);
+  const cashAllowance = withCash ? round2(cash) : undefined;
+  const estimated = round2((grossBasic + (cashAllowance ?? 0)) / 12);
   const lastCovered = [...latestPerPeriod.keys()].map((id) => periodById.get(id)!.end).sort().pop();
   if (!(estimated > 0) || !lastCovered) return null;
 
@@ -56,6 +61,7 @@ export function EstimatedThirteenthMonth({ employee, payrollPeriods, payslips }:
     designation: positionTitle(employee.positionId),
     months: slipMonths,
     grossBasic,
+    ...(cashAllowance !== undefined ? { cashAllowance } : {}),
     thirteenthMonth: estimated,
     vlDays: 0,
     dailyRate: 0,
@@ -77,7 +83,9 @@ export function EstimatedThirteenthMonth({ employee, payrollPeriods, payslips }:
         <div className="tabular text-2xl font-semibold text-[var(--text-primary)]">{formatCurrency(estimated)}</div>
       </div>
       <div className="min-w-0 flex-1 text-xs text-[var(--text-secondary)]">
-        Your basic pay of {formatCurrency(grossBasic)} (less lates, absences and undertime) from {latestPerPeriod.size} released payslip
+        Your basic pay of {formatCurrency(grossBasic)} (less lates, absences and undertime)
+        {cashAllowance !== undefined && <> plus your Cash Allowance of {formatCurrency(cashAllowance)}</>}{" "}
+        from {latestPerPeriod.size} released payslip
         {latestPerPeriod.size === 1 ? "" : "s"} up to {asOf}, divided by 12. It grows with each payslip.
         <div className="mt-1 text-[var(--text-muted)]">Estimate only — the final amount is on your 13th month slip once HR releases it.</div>
       </div>
