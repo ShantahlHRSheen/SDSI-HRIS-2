@@ -53,7 +53,7 @@ export function AssessmentSection({
         <ClipboardCheck size={16} /> Department Head&rsquo;s assessment
       </div>
       <p className="mb-3 text-xs text-[var(--text-muted)]">
-        {issuerName || "The Department Head"} comments on the written explanation and recommends to HR the disciplinary action to give. The employee doesn&rsquo;t see this.
+        {`${issuerName || "The Department Head"} comments on the written explanation and recommends to HR the disciplinary action to give.`} The employee doesn&rsquo;t see this.
       </p>
 
       {assessment && !editing && (
