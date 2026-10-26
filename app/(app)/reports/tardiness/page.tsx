@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ExportBar } from "@/components/reports/ExportBar";
 import { branchName, departmentAllocationsForEmployee, departmentName, formatDate, fullName, scopeEmployeesForViewer } from "@/lib/helpers";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
-import { buildTardinessRows, flaggedTardiness, TARDINESS_GRACE_MINUTES, TARDINESS_THRESHOLD, type TardinessRow } from "@/lib/tardiness-absenteeism";
+import { buildTardinessRows, extraLateEmployeeIds, flaggedTardiness, TARDINESS_GRACE_MINUTES, TARDINESS_THRESHOLD, type TardinessRow } from "@/lib/tardiness-absenteeism";
 import type { Employee } from "@/lib/types";
 
 export default function TardinessReportPage() {
@@ -104,7 +104,9 @@ function AdminView({
   );
 
   const recordsInRange = records.filter((r) => periodIdsInRange.has(r.periodId));
-  const allRows = useMemo(() => buildTardinessRows(recordsInRange, employees), [recordsInRange, employees]);
+  const { currentEmployee } = useHris();
+  const extra = useMemo(() => extraLateEmployeeIds(currentEmployee?.id), [currentEmployee?.id]);
+  const allRows = useMemo(() => buildTardinessRows(recordsInRange, employees, extra), [recordsInRange, employees, extra]);
   const baseRows = showAll ? allRows : flaggedTardiness(allRows);
 
   const filtered = baseRows
