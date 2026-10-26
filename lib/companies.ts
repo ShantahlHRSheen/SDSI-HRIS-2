@@ -97,6 +97,9 @@ export interface CompanyConfig {
   // Fixed-rate employees are left out of the Tardiness Report, except these
   // (employee ids), whose lates only the listed viewers (employee ids) see.
   restrictedLates?: { employeeIds: string[]; viewerIds: string[] };
+  // Accounts (employee numbers) that don't get this company's HR Messages:
+  // no menu item, unread badge or inbox, even with HR access.
+  hrMessagesHiddenFrom?: string[];
   pagibigMpl?: {
     signatoryId: string;
     employerPagibigId: string;
@@ -205,6 +208,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     emailHint: "you@company.com",
     // Sheena Evangelista (LSM Group HR) manages LSMBiz's HRIS but isn't on its roster.
     adminAccountNumbers: ["ADMIN-01"],
+    // LSMBiz's HR handles its own HR Messages; Sheena doesn't see them.
+    hrMessagesHiddenFrom: ["ADMIN-01"],
     // LSM OP / LSM ADM / CEO sheets — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "lsmbiz",
     allowanceBreakdown: true,
@@ -250,6 +255,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Group HR, see supabase/daro-first-admin.sql) and Maricris Barlinan
     // (approves payroll; supabase/daro-payroll-signatories.sql).
     adminAccountNumbers: ["ADMIN-01", "ADMIN-02"],
+    // Daro's HR handles its own HR Messages; Sheena (ADMIN-01) doesn't see them.
+    hrMessagesHiddenFrom: ["ADMIN-01"],
     // Lowel and Sheilah Magdadaro and Maricris Barlinan use their Shantahl sign-in.
     linkedSignIn: { from: "sdsi", employeeNumbers: ["EMP-0001", "EMP-0002", "ADMIN-02"] },
     // HR uploads photos of Daro's own org chart, like LSMBiz.

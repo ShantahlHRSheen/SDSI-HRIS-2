@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, FileText, ImagePlus, MessageCircle, Paperclip, Search, Send, Smile, SmilePlus, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { currentCompany } from "@/lib/companies";
 import { reportSaveError } from "@/lib/save-errors";
 import { canView, FileViewer, saveFile, viewerKind, type ViewerFile } from "@/components/FileViewer";
 import { fullName } from "@/lib/helpers";
@@ -85,10 +86,19 @@ function usePolling(fn: () => void, ms: number) {
 }
 
 // Unread count for the menu badge. Zero (and no requests) for demo logins.
+// This company's HR Messages are kept from the signed-in account
+// (hrMessagesHiddenFrom in lib/companies.ts).
+export function useHrMessagesHidden(): boolean {
+  const { currentEmployee } = useHris();
+  const hidden = currentCompany().hrMessagesHiddenFrom;
+  return !!currentEmployee && !!hidden?.includes(currentEmployee.employeeNumber);
+}
+
 export function useHrUnreadCount(): number {
   const { currentUser, isRealAccount } = useHris();
   const [count, setCount] = useState(0);
-  const myId = currentUser?.employeeId ?? null;
+  const blocked = useHrMessagesHidden();
+  const myId = blocked ? null : currentUser?.employeeId ?? null;
   const isHr = !!currentUser?.roles.includes("hr_admin");
   const load = useCallback(() => {
     if (!isRealAccount || !myId) return;
