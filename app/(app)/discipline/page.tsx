@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlarmClock, FileText, Plus, ShieldAlert } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
@@ -15,6 +15,7 @@ import { DISCIPLINE_TYPE_TONE, NTE_RESPONSE_DAYS, addDays, responseBadge } from 
 import { todayInManila } from "@/lib/leave-policy";
 import { TardinessNteModal } from "@/components/discipline/TardinessNteModal";
 import { completeMonths, issuedTardinessNte, monthLabel, tardinessNteCandidates } from "@/lib/nte-tardiness";
+import { fetchAssessments, takesAssessment, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 const field = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
 
@@ -44,6 +45,14 @@ export default function DisciplinePage() {
     );
     return { month, pending: pending.length };
   }, [isHr, payrollPeriods, attendancePeriodRecords, allEmployees, disciplinaryRecords]);
+  // Department Heads' assessments of explanations (phase 61), refreshed
+  // when a record window closes.
+  const [assessments, setAssessments] = useState<DisciplineAssessment[]>([]);
+  const [assessRev, setAssessRev] = useState(0);
+  useEffect(() => {
+    fetchAssessments().then(setAssessments, () => setAssessments([]));
+  }, [assessRev, disciplinaryRecords]);
+  const hrIds = useMemo(() => new Set(allEmployees.filter((e) => e.roles.includes("hr_admin")).map((e) => e.id)), [allEmployees]);
   const [typeFilter, setTypeFilter] = useState<"all" | DisciplinaryType>("all");
   const [showCreate, setShowCreate] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -162,6 +171,16 @@ export default function DisciplinePage() {
           </button>
         </div>
       )}
+      {!isHr && (() => {
+        const toAssess = disciplinaryRecords.filter(
+          (r) => r.issuedBy === currentEmployee?.id && r.explanationSubmittedAt && r.status !== "resolved" && takesAssessment(r, hrIds) && !assessments.some((a) => a.recordId === r.id),
+        ).length;
+        return toAssess > 0 ? (
+          <div className="mb-4 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
+            <span className="font-medium text-[var(--text-primary)]">{toAssess} written explanation{toAssess === 1 ? " is" : "s are"} waiting for your assessment.</span> Open the record, comment on the explanation and recommend the disciplinary action to HR.
+          </div>
+        ) : null;
+      })()}
       {isHr && (() => {
         const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt && !r.withdrawnAt).length;
         const toReceive = disciplinaryRecords.filter((r) => r.signFlow && r.explanationSubmittedAt && !r.explHrReceivedAt).length;
@@ -169,7 +188,8 @@ export default function DisciplinePage() {
           (r) => r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id),
         ).length;
         const excuses = disciplinaryRecords.filter((r) => (r.excuseRequests ?? []).some((x) => x.status === "pending")).length;
-        return waiting > 0 || toReceive > 0 || toSanction > 0 || excuses > 0 ? (
+        const recommended = disciplinaryRecords.filter((r) => r.status !== "resolved" && assessments.some((a) => a.recordId === r.id)).length;
+        return waiting > 0 || toReceive > 0 || toSanction > 0 || excuses > 0 || recommended > 0 ? (
           <div className="mb-4 space-y-1 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
             {waiting > 0 && (
               <div>
@@ -179,6 +199,11 @@ export default function DisciplinePage() {
             {toReceive > 0 && (
               <div>
                 <span className="font-medium text-[var(--text-primary)]">{toReceive} written explanation{toReceive === 1 ? " is" : "s are"} waiting for you to receive.</span> Open the record and sign under the explanation.
+              </div>
+            )}
+            {recommended > 0 && (
+              <div>
+                <span className="font-medium text-[var(--text-primary)]">{recommended} record{recommended === 1 ? " has" : "s have"} the Department Head&rsquo;s recommended action.</span> Open the record to read the head&rsquo;s assessment of the explanation, then decide the action.
               </div>
             )}
             {excuses > 0 && (
@@ -254,6 +279,12 @@ export default function DisciplinePage() {
                     <td className="tabular px-4 py-2.5 text-[var(--text-secondary)]">{formatDate(r.date)}</td>
                     <td className="px-4 py-2.5">
                       <Badge tone={resp.tone}>{resp.label}</Badge>
+                      {(() => {
+                        if (!r.explanationSubmittedAt || !takesAssessment(r, hrIds)) return null;
+                        const a = assessments.find((x) => x.recordId === r.id);
+                        if (a) return <div className="mt-1 text-xs text-[var(--text-secondary)]">Head recommends: <span className="font-medium text-[var(--text-primary)]">{a.recommendation}</span></div>;
+                        return r.status !== "resolved" && (isHr || r.issuedBy === currentEmployee?.id) ? <div className="mt-1 text-xs text-[var(--status-warning)]">Waiting for the head&rsquo;s assessment</div> : null;
+                      })()}
                     </td>
                     <td className="px-4 py-2.5">
                       {r.status === "resolved" ? (
@@ -282,7 +313,7 @@ export default function DisciplinePage() {
         </div>
       )}
 
-      <DisciplineRecordModal record={openRecord} employees={allEmployees} mode={mode} onClose={() => setOpenId(null)} />
+      <DisciplineRecordModal record={openRecord} employees={allEmployees} mode={mode} onClose={() => (setOpenId(null), setAssessRev((x) => x + 1))} />
 
       <Modal open={showCreate} onClose={() => !saving && setShowCreate(false)} title="New disciplinary record" wide>
         <div className="space-y-4">

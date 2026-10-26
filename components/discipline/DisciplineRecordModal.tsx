@@ -16,6 +16,8 @@ import { buildSignedNotice } from "@/lib/discipline-notice";
 import { SanctionForm } from "@/components/discipline/SanctionForm";
 import { FileViewer, viewerKind, type ViewerFile } from "@/components/discipline/FileViewer";
 import { ExcuseSection } from "@/components/discipline/ExcuseSection";
+import { AssessmentSection } from "@/components/discipline/AssessmentSection";
+import { fetchAssessments, takesAssessment, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 // mode: "manage" — HR / department head (attach notice, download responses)
 //       "view"   — Upper Management (read-only, can download)
@@ -91,6 +93,23 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const noticeInput = useRef<HTMLInputElement>(null);
+
+  // The Department Head's assessment (phase 61) — never loaded for the employee.
+  const hrIds = new Set(employees.filter((e) => e.roles.includes("hr_admin")).map((e) => e.id));
+  const assessable = mode !== "employee" && !!r.explanationSubmittedAt && takesAssessment(r, hrIds);
+  const [assessment, setAssessment] = useState<DisciplineAssessment | null | undefined>(undefined);
+  const [assessRev, setAssessRev] = useState(0);
+  useEffect(() => {
+    if (!assessable) return;
+    let live = true;
+    fetchAssessments().then(
+      (all) => live && setAssessment(all.find((a) => a.recordId === r.id) ?? null),
+      () => live && setAssessment(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [assessable, r.id, assessRev]);
 
   async function uploadNotice(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -402,6 +421,17 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
             <div className="text-[var(--text-muted)]">Not submitted yet{r.responseDue ? ` — due ${formatDate(r.responseDue)}` : ""}.</div>
           )}
         </div>
+      )}
+
+      {assessable && assessment !== undefined && (
+        <AssessmentSection
+          key={assessment?.assessedAt ?? "none"}
+          record={r}
+          assessment={assessment}
+          issuerName={issuer ? fullName(issuer) : ""}
+          canAssess={r.issuedBy === currentEmployee?.id && r.status !== "resolved"}
+          onSaved={() => setAssessRev((x) => x + 1)}
+        />
       )}
 
       {/* Notice of Sanction (tardiness NTEs): HR decides once both have received the explanation. */}
