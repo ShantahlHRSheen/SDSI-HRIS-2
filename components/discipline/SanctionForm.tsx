@@ -9,6 +9,7 @@ import { loadHrLetterhead } from "@/lib/discipline-notice";
 import { excusedDays, monthLabel, NTE_TARDINESS_MIN_DAYS, SANCTION_CHOICES, suggestedPenalty } from "@/lib/nte-tardiness";
 import { formatDate } from "@/lib/helpers";
 import { buildTardinessSanctionPdf } from "@/lib/nte-tardiness-pdf";
+import { positionTitle } from "@/lib/helpers";
 import type { DisciplinaryRecord, TardinessNteData, TardinessSanctionData } from "@/lib/types";
 
 // HR's Notice of Sanction for a tardiness NTE, once the HR Manager and the
@@ -19,24 +20,50 @@ import type { DisciplinaryRecord, TardinessNteData, TardinessSanctionData } from
 const field = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
 const shiftDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 
-export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIssued: (id: string) => void }) {
-  const { currentEmployee, addDisciplinaryRecord, attachDisciplinaryNotice, setDisciplinaryStatus } = useHris();
-  const d = nte.noticeData as TardinessNteData;
+// Any other NTE / incident report (phase 61): the Department Head's
+// recommendation is pre-selected, and the head is the notice's CC.
+export function SanctionForm({
+  nte,
+  onIssued,
+  recommendation,
+}: {
+  nte: DisciplinaryRecord;
+  onIssued: (id: string) => void;
+  recommendation?: { action: string; byId: string | null; byName: string } | null;
+}) {
+  const { currentEmployee, employees, addDisciplinaryRecord, attachDisciplinaryNotice, setDisciplinaryStatus } = useHris();
+  const general = nte.noticeData?.kind !== "tardiness";
+  const emp = employees.find((e) => e.id === nte.employeeId);
+  const head = employees.find((e) => e.id === (recommendation?.byId ?? nte.issuedBy));
+  const d: TardinessNteData = general
+    ? {
+        kind: "tardiness",
+        month: "",
+        issueDate: nte.date,
+        employeeName: emp ? `${emp.lastName}, ${emp.firstName}` : "",
+        days: [],
+        cc: head ? { name: `${head.lastName}, ${head.firstName}`, title: positionTitle(head.positionId).replace(/^—$/, "") } : null,
+        offense: 1,
+      }
+    : (nte.noticeData as TardinessNteData);
   const today = todayInManila();
   const [offense, setOffense] = useState(d.offense ?? 1);
   // Late days HR accepted to excuse don't count.
-  const excused = excusedDays(nte);
+  const excused = general ? [] : excusedDays(nte);
   const remaining = d.days.length - new Set(excused.map((x) => x.date)).size;
-  const suggested = suggestedPenalty(remaining, offense);
-  const [choice, setChoice] = useState(suggested || SANCTION_CHOICES[0]);
-  const [other, setOther] = useState("");
+  const suggested = general ? (recommendation && SANCTION_CHOICES.includes(recommendation.action) ? recommendation.action : "") : suggestedPenalty(remaining, offense);
+  const recOther = general && recommendation && !SANCTION_CHOICES.includes(recommendation.action) && !/^No disciplinary action/.test(recommendation.action);
+  const [choice, setChoice] = useState(suggested || (recOther ? "other" : SANCTION_CHOICES[0]));
+  const [other, setOther] = useState(recOther ? recommendation!.action : "");
   const sanction = choice === "other" ? other.trim() : choice;
   const days = /^(\d+)\s*days?\s*suspension/i.exec(sanction)?.[1];
   const [from, setFrom] = useState(shiftDays(today, 1));
   const [to, setTo] = useState("");
   const suspTo = to || (days ? shiftDays(from, Number(days) - 1) : "");
   const [findings, setFindings] = useState(
-    "After evaluating your explanation, the Company finds that it does not sufficiently justify your repeated tardiness, which affects work operations and violates the Company Policy on attendance and punctuality.",
+    general
+      ? "After evaluating your explanation and your Department Head's assessment, the Company finds that it does not sufficiently justify your actions, which violate the Company's Code of Conduct."
+      : "After evaluating your explanation, the Company finds that it does not sufficiently justify your repeated tardiness, which affects work operations and violates the Company Policy on attendance and punctuality.",
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,11 +94,14 @@ export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIss
       suspensionFrom: suspension ? from : null,
       suspensionTo: suspension ? suspTo : null,
       findings: findings.trim(),
+      ...(general ? { general: { recordType: nte.type === "incident_report" ? "incident_report" : "nte", about: nte.description, recommendedBy: recommendation?.byName || null } } : {}),
     };
     const saved = await addDisciplinaryRecord({
       employeeId: nte.employeeId,
       type: "nod",
-      description: `Notice of Sanction - Habitual Tardiness (${monthLabel(d.month)}): ${sanction}${suspension ? ` from ${from} to ${suspTo}` : ""}.`,
+      description: general
+        ? `Notice of Sanction (${nte.type === "incident_report" ? "Incident Report" : "NTE"} of ${nte.date}): ${sanction}${suspension ? ` from ${from} to ${suspTo}` : ""}.`
+        : `Notice of Sanction - Habitual Tardiness (${monthLabel(d.month)}): ${sanction}${suspension ? ` from ${from} to ${suspTo}` : ""}.`,
       issuedBy: currentEmployee.id,
       date: today,
       status: "open",
@@ -131,13 +161,16 @@ export function SanctionForm({ nte, onIssued }: { nte: DisciplinaryRecord; onIss
         </label>
         <label className="block sm:col-span-2">
           <span className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
-            Sanction {suggested && <span className="font-normal text-[var(--text-muted)]">— policy: {suggested} ({remaining} days late)</span>}
+            Sanction{" "}
+            {general
+              ? recommendation && <span className="font-normal text-[var(--text-muted)]">— Department Head recommends: {recommendation.action}</span>
+              : suggested && <span className="font-normal text-[var(--text-muted)]">— policy: {suggested} ({remaining} days late)</span>}
           </span>
           <select value={choice} onChange={(e) => setChoice(e.target.value)} className={field}>
             {SANCTION_CHOICES.map((s) => (
               <option key={s} value={s}>
                 {s}
-                {s === suggested ? " (policy)" : ""}
+                {s === suggested ? (general ? " (recommended)" : " (policy)") : ""}
               </option>
             ))}
             <option value="other">Other…</option>

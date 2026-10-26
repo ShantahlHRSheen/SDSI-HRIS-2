@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, FileText, Plus, ShieldAlert } from "lucide-react";
+import { AlarmClock, FileText, ListChecks, Plus, ShieldAlert } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 import { DisciplineRecordModal, type DisciplineModalMode } from "@/components/discipline/DisciplineRecordModal";
-import { formatDate, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
+import { departmentName, formatDate, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import type { DisciplinaryType } from "@/lib/types";
-import { DISCIPLINE_TYPE_TONE, NTE_RESPONSE_DAYS, addDays, responseBadge } from "@/lib/discipline";
+import { DISCIPLINE_TYPE_TONE, NTE_RESPONSE_DAYS, addDays, responseBadge, responseStage } from "@/lib/discipline";
 import { todayInManila } from "@/lib/leave-policy";
 import { TardinessNteModal } from "@/components/discipline/TardinessNteModal";
 import { completeMonths, issuedTardinessNte, monthLabel, tardinessNteCandidates } from "@/lib/nte-tardiness";
@@ -74,7 +74,53 @@ export default function DisciplinePage() {
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt ?? "").localeCompare(a.createdAt ?? "")));
   }, [disciplinaryRecords, typeFilter, visibleEmployeeIds, currentEmployee]);
 
-  const openRecord = rows.find((r) => r.id === openId) ?? null;
+  // Any record this person can see (their own actions can be outside the
+  // departments they manage).
+  const openRecord = disciplinaryRecords.find((r) => r.id === openId) ?? null;
+
+  // By department: the employee's department, and the filter.
+  const [deptFilter, setDeptFilter] = useState("");
+  const deptOf = (employeeId: string) => allEmployees.find((e) => e.id === employeeId)?.departmentId ?? "";
+  const deptLabel = (id: string) => (id ? departmentName(id).replace(/^—$/, "No department") : "No department");
+  const deptOptions = useMemo(
+    () => [...new Set(rows.map((r) => deptOf(r.employeeId)))].sort((a, b) => deptLabel(a).localeCompare(deptLabel(b))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deptOf/deptLabel read allEmployees
+    [rows, allEmployees],
+  );
+  const groups = useMemo(() => {
+    const shown = rows.filter((r) => !deptFilter || deptOf(r.employeeId) === deptFilter);
+    const by = new Map<string, typeof rows>();
+    for (const r of shown) {
+      const k = deptOf(r.employeeId);
+      by.set(k, [...(by.get(k) ?? []), r]);
+    }
+    return [...by.entries()].sort((a, b) => deptLabel(a[0]).localeCompare(deptLabel(b[0])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deptOf/deptLabel read allEmployees
+  }, [rows, deptFilter, allEmployees]);
+
+  // What the signed-in person has to do, across every record they can see.
+  const myActions = useMemo(() => {
+    const me = currentEmployee?.id;
+    if (!me) return [];
+    const out: { r: (typeof disciplinaryRecords)[number]; action: string }[] = [];
+    for (const r of disciplinaryRecords) {
+      if (r.withdrawnAt || r.status === "resolved" || r.employeeId === me) continue;
+      const stage = responseStage(r);
+      if (isHr && stage === "hr_to_sign") out.push({ r, action: "Sign as HR Manager" });
+      if (stage === "branch_to_sign" && r.branchManagerId === me) out.push({ r, action: "Sign as Branch Manager" });
+      if (stage === "manager_to_sign" && r.managerId === me) out.push({ r, action: "Sign as Department Manager" });
+      if (r.signFlow && r.explanationSubmittedAt && isHr && !r.explHrReceivedAt) out.push({ r, action: "Receive the written explanation (HR)" });
+      if (r.explanationSubmittedAt && r.managerId === me && !r.explMgrReceivedAt) out.push({ r, action: "Receive the written explanation" });
+      if (r.explanationSubmittedAt && r.issuedBy === me && takesAssessment(r, hrIds) && !assessments.some((a) => a.recordId === r.id))
+        out.push({ r, action: "Assess the explanation and recommend an action to HR" });
+      const a = isHr ? assessments.find((x) => x.recordId === r.id) : undefined;
+      if (a) out.push({ r, action: `Issue the Notice of Sanction — head recommends ${a.recommendation}` });
+      if (isHr && r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id))
+        out.push({ r, action: "Issue the Notice of Sanction (tardiness)" });
+    }
+    return out.sort((x, y) => deptLabel(deptOf(x.r.employeeId)).localeCompare(deptLabel(deptOf(y.r.employeeId))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deptOf/deptLabel read allEmployees
+  }, [disciplinaryRecords, currentEmployee, isHr, assessments, hrIds, allEmployees]);
   const mode: DisciplineModalMode = canManage ? "manage" : "view";
 
   const emptyForm = { employeeId: "", type: "nte" as DisciplinaryType, description: "", date: today, requiresExplanation: true, responseDue: addDays(today, NTE_RESPONSE_DAYS) };
@@ -203,7 +249,7 @@ export default function DisciplinePage() {
             )}
             {recommended > 0 && (
               <div>
-                <span className="font-medium text-[var(--text-primary)]">{recommended} record{recommended === 1 ? " has" : "s have"} the Department Head&rsquo;s recommended action.</span> Open the record to read the head&rsquo;s assessment of the explanation, then decide the action.
+                <span className="font-medium text-[var(--text-primary)]">{recommended} record{recommended === 1 ? " has" : "s have"} the Department Head&rsquo;s recommended action.</span> Open the record to read the head&rsquo;s assessment, then issue the Notice of Sanction (or mark it resolved if no action is needed).
               </div>
             )}
             {excuses > 0 && (
@@ -221,7 +267,44 @@ export default function DisciplinePage() {
       })()}
       {showTardiness && <TardinessNteModal initialMonth={tardiness?.month} onClose={() => setShowTardiness(false)} />}
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      {myActions.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+            <ListChecks size={16} /> Needs your action ({myActions.length})
+          </div>
+          <div className="space-y-1.5">
+            {myActions.map(({ r, action }, i) => {
+              const emp = allEmployees.find((e) => e.id === r.employeeId);
+              return (
+                <div key={`${r.id}-${i}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="mr-2 rounded bg-[var(--gridline)]/50 px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]">{deptLabel(deptOf(r.employeeId))}</span>
+                    <span className="font-medium text-[var(--text-primary)]">{emp ? fullName(emp) : r.employeeId}</span>
+                    <span className="text-[var(--text-secondary)]">
+                      {" "}
+                      — {DISCIPLINARY_LABELS[r.type]}, {formatDate(r.date)}
+                    </span>
+                    <div className="text-xs font-medium text-[var(--series-1)]">{action}</div>
+                  </div>
+                  <button onClick={() => setOpenId(r.id)} className="rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+                    Open
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-xs" aria-label="Department">
+          <option value="">All departments</option>
+          {deptOptions.map((d) => (
+            <option key={d || "none"} value={d}>
+              {deptLabel(d)}
+            </option>
+          ))}
+        </select>
         <button
           onClick={() => setTypeFilter("all")}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium ${typeFilter === "all" ? "bg-[var(--series-1)] text-[var(--on-accent)]" : "border border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}
@@ -256,7 +339,13 @@ export default function DisciplinePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {groups.map(([dept, list]) => [
+                <tr key={`dept-${dept || "none"}`} className="border-b border-[var(--border-hairline)] bg-[var(--gridline)]/25">
+                  <td colSpan={7} className="px-4 py-2 text-xs font-semibold tracking-wide text-[var(--text-secondary)] uppercase">
+                    {deptLabel(dept)} <span className="font-normal normal-case">({list.length})</span>
+                  </td>
+                </tr>,
+                ...list.map((r) => {
                 const emp = allEmployees.find((e) => e.id === r.employeeId);
                 const resp = responseBadge(r, today);
                 return (
@@ -307,7 +396,8 @@ export default function DisciplinePage() {
                     </td>
                   </tr>
                 );
-              })}
+              }),
+              ])}
             </tbody>
           </table>
         </div>

@@ -434,6 +434,37 @@ function Body({ record, employees, mode }: { record: DisciplinaryRecord; employe
         />
       )}
 
+      {/* Notice of Sanction for a head-issued NTE / incident report: HR decides once the head has assessed the explanation. */}
+      {assessable && assessment !== undefined && (() => {
+        const nos = disciplinaryRecords.find((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id);
+        return (
+          <div className={section}>
+            <div className="mb-2 flex items-center gap-2 font-medium text-[var(--text-primary)]">
+              <Gavel size={16} /> Notice of Sanction
+            </div>
+            {nos ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[var(--text-secondary)]">
+                  Issued {formatDate(nos.date)} — {nos.noticeData?.kind === "sanction" ? nos.noticeData.sanction : ""}
+                  {nos.acknowledgedAt ? ` · received by the employee ${manilaDateTime(nos.acknowledgedAt)}` : " · waiting for the employee to sign as received"}
+                </span>
+                <button onClick={() => viewGenerated(nos, `Notice of Sanction${emp ? ` - ${fullName(emp)}` : ""}.pdf`)} className={btn}>
+                  <ExternalLink size={14} /> Open
+                </button>
+              </div>
+            ) : !assessment ? (
+              <div className="text-[var(--text-muted)]">Available once the Department Head has assessed the explanation and recommended an action.</div>
+            ) : r.status === "resolved" ? (
+              <div className="text-[var(--text-muted)]">This record was resolved without a Notice of Sanction.</div>
+            ) : mode === "manage" && isHrManager ? (
+              <SanctionForm nte={r} recommendation={{ action: assessment.recommendation, byId: assessment.assessorId, byName: assessment.assessorName }} onIssued={() => setError(null)} />
+            ) : (
+              <div className="text-[var(--text-muted)]">Waiting for HR to issue the Notice of Sanction.</div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Notice of Sanction (tardiness NTEs): HR decides once both have received the explanation. */}
       {r.noticeData?.kind === "tardiness" && mode !== "employee" && (() => {
         const nos = disciplinaryRecords.find((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id);
