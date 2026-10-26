@@ -71,6 +71,11 @@ export interface CompanyConfig {
   // 13th month pay counts the Cash Allowance (Other Allowance 1 in the
   // payroll) along with basic pay.
   thirteenthMonthCashAllowance?: boolean;
+  // Each cutoff's Other Allowance, by employee number, for the people whose
+  // amount is always the same. When an uploaded payroll file has no Other
+  // Allowance column, this much of the ALLOWANCE is Other Allowance and the
+  // rest is Cash Allowance (lib/payroll-import-lsmbiz.ts).
+  fixedOtherAllowance?: Record<string, number>;
   // People who sign in here with the same email and password as in another
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
   // match here, it's checked against `from`'s database and, if right, saved
@@ -205,6 +210,9 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     allowanceBreakdown: true,
     payrollExpenseByBranch: true,
     thirteenthMonthCashAllowance: true,
+    // From HR's Other Allowance list (January to October 2026): Doble,
+    // Gantalao, Gomez, Tomas.
+    fixedOtherAllowance: { "EMP-0007": 2000, "EMP-0229": 2000, "EMP-0012": 5000, "EMP-0039": 200 },
     orgChartPhotos: true,
   },
   daro: {

@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { cellScalar, normalizeName, toNumber } from "./attendance-import";
 import type { ParsedPayrollRow, ParsedPayrollWorkbook } from "./payroll-import";
 import type { Employee } from "./types";
+import { currentCompany } from "./companies";
 
 // ---------------------------------------------------------------------------
 // LSMBiz Credit Corp.'s own payroll workbook (e.g. "LSM MAIN PAYROLL_2 28
@@ -280,11 +281,15 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof employ
     // Daro pays its "Allowance" on top of Gross Salary, so it's kept out of
     // gross (which then matches the sheet) and added like an adjustment.
     const paidOnTop = format === "daro" ? n("allowance") : 0;
+    const { employee, similar } = findEmployee(rawName);
     // LSMBiz's ALLOWANCE is Cash Allowance + Other Allowance: from its own
-    // column, else from the two split columns. Without a split it's all Cash
-    // Allowance.
+    // column, else from the two split columns. Without either split column,
+    // the person's fixed Other Allowance (lib/companies.ts) is taken out of
+    // it and the rest is Cash Allowance.
     const allowance = cols.allowance !== undefined ? n("allowance") : n("otherAllowance1") + n("otherAllowance2");
-    const other2 = n("otherAllowance2");
+    const fixedOther = (employee && currentCompany().fixedOtherAllowance?.[employee.employeeNumber]) || 0;
+    const split = cols.otherAllowance1 !== undefined || cols.otherAllowance2 !== undefined;
+    const other2 = split ? n("otherAllowance2") : Math.min(fixedOther, Math.max(allowance, 0));
     const allowances = n("deMinimis") + allowance - paidOnTop;
     const grossSalary = n("basic") - n("late") + n("adjAllowance") + n("holiday") + n("vlsl") + allowances;
     // LSMBiz: De Minimis split into uniform, laundry and medical cash (each
@@ -297,7 +302,6 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof employ
     const laundry = round2(n("laundryRate") * n("days"));
     const medicalCash = round2(n("medicalRate") * n("days"));
     const splitDeMinimis = uniform + laundry + medicalCash <= n("deMinimis") + 0.005;
-    const { employee, similar } = findEmployee(rawName);
     rows.push({
       rowNumber: r,
       employeeNumber: employee?.employeeNumber ?? "",
