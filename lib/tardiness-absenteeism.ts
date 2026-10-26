@@ -1,3 +1,4 @@
+import { currentCompany } from "./companies";
 import type { AttendancePeriodRecord, Employee } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -39,13 +40,22 @@ export interface AbsenteeismRow {
   halfDays: AbsenteeismDay[];
 }
 
-export function buildTardinessRows(records: AttendancePeriodRecord[], employees: Employee[]): TardinessRow[] {
+// Fixed-rate employees whose lates this viewer may still see
+// (lib/companies.ts restrictedLates).
+export function extraLateEmployeeIds(viewerId: string | null | undefined): string[] {
+  const r = currentCompany().restrictedLates;
+  return r && viewerId && r.viewerIds.includes(viewerId) ? r.employeeIds : [];
+}
+
+// includeFixedRate: fixed-rate employees to keep (extraLateEmployeeIds).
+export function buildTardinessRows(records: AttendancePeriodRecord[], employees: Employee[], includeFixedRate: string[] = []): TardinessRow[] {
   const byEmployee = new Map<string, TardinessRow>();
   for (const rec of records) {
     if (!rec.lateInstances) continue;
     const employee = employees.find((e) => e.id === rec.employeeId);
-    // Fixed-rate (monthly) employees aren't held to tardiness / absenteeism.
-    if (!employee || employee.payrollType === "monthly") continue;
+    // Fixed-rate (monthly) employees aren't held to tardiness, except those
+    // this viewer is allowed to see.
+    if (!employee || (employee.payrollType === "monthly" && !includeFixedRate.includes(employee.id))) continue;
     // Days late by the grace period or more; a record without day details
     // keeps its count.
     const days = rec.lateDayDetails?.length ? rec.lateDayDetails.filter((d) => d.lateRawMinutes >= TARDINESS_GRACE_MINUTES) : null;

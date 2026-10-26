@@ -33,7 +33,7 @@ import {
   summarizePayroll,
 } from "@/lib/monthly-analytics";
 import { TardinessNteSection } from "@/components/dashboard/TardinessNteSection";
-import { buildAbsenteeismRows, buildTardinessRows, flaggedAbsenteeism, flaggedTardiness, TARDINESS_THRESHOLD, ABSENTEEISM_THRESHOLD } from "@/lib/tardiness-absenteeism";
+import { buildAbsenteeismRows, buildTardinessRows, extraLateEmployeeIds, flaggedAbsenteeism, flaggedTardiness, TARDINESS_THRESHOLD, ABSENTEEISM_THRESHOLD } from "@/lib/tardiness-absenteeism";
 import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import type { Employee } from "@/lib/types";
 import { useDepartmentVouchers } from "@/lib/use-department-vouchers";
@@ -95,7 +95,7 @@ export default function DashboardPage() {
 
   // Tardiness/absenteeism flags computed directly from every imported period
   // on file, independent of the monthly-analytics fact table used above.
-  const tardinessRows = useMemo(() => buildTardinessRows(attendancePeriodRecords, scoped), [attendancePeriodRecords, scoped]);
+  const tardinessRows = useMemo(() => buildTardinessRows(attendancePeriodRecords, scoped, extraLateEmployeeIds(currentEmployee?.id)), [attendancePeriodRecords, scoped, currentEmployee?.id]);
   const absenteeismRows = useMemo(() => buildAbsenteeismRows(attendancePeriodRecords, scoped), [attendancePeriodRecords, scoped]);
   const flaggedTardinessRows = flaggedTardiness(tardinessRows);
   const flaggedAbsenteeismRows = flaggedAbsenteeism(absenteeismRows);
