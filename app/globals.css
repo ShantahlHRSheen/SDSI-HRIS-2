@@ -44,39 +44,45 @@
 }
 
 /*
-  Daro Lending Corp. uses white-and-blue instead, and LSMBiz Credit Corp. its
-  own "Emerald Night" below. data-company is set on <html> before first paint
+  Daro Lending Corp. uses its own "Black & Sapphire", and LSMBiz Credit Corp.
+  its own "Emerald Night", below. data-company is set on <html> before first paint
   (see app/layout.tsx) only when one of them is the chosen company, so
   Shantahl keeps the tokens above.
 */
+/* Daro: Black & Sapphire — true black with a sapphire blue accent, off-white
+   text (not pure white) and no grid or glow, so it's easy on the eyes. */
 html[data-company="daro"] {
-  --surface-1: #ffffff;
-  --page-plane: #f2f6fc;
-  --text-primary: #0b1a33;
-  --text-secondary: #3b4c6b;
-  --text-muted: #6b7a94;
-  --gridline: #e7edf6;
-  --baseline: #cdd8e8;
-  --border-hairline: rgba(30, 110, 230, 0.16);
-  --accent: #1a73f0;
-  --accent-strong: #0b5ed7;
-  --accent-soft: rgba(26, 115, 240, 0.09);
-  --accent-glow: rgba(26, 115, 240, 0.28);
+  --surface-1: #111318;
+  --page-plane: #08090c;
+  --text-primary: #e6e8ec;
+  --text-secondary: #a9afbb;
+  --text-muted: #747b89;
+  --gridline: #1a1d24;
+  --baseline: #2a2e38;
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --accent: #3b74e0;
+  --accent-strong: #6a97ea;
+  --accent-soft: rgba(59, 116, 224, 0.16);
+  --accent-glow: rgba(59, 116, 224, 0.28);
   --on-accent: #ffffff;
-  --series-1: #1a73f0;
-  --series-2: #06b6d4;
-  --series-3: #f59e0b;
-  --series-4: #10b981;
-  --status-good: #16a34a;
-  --status-warning: #d97706;
-  --status-serious: #e11d48;
-  --status-critical: #dc2626;
-  --seq-100: #e8f1ff;
-  --seq-250: #c5dcff;
-  --seq-400: #8bb8ff;
-  --seq-450: #4d90f5;
-  --seq-550: #1a63d6;
-  --seq-700: #0b3d91;
+  --series-1: #3b74e0;
+  --series-2: #3fb6d3;
+  --series-3: #e0b85c;
+  --series-4: #55c08c;
+  --series-5: #9b8be6;
+  --series-6: #e07777;
+  --series-7: #da86b0;
+  --series-8: #e39a5e;
+  --status-good: #4fb985;
+  --status-warning: #dcae52;
+  --status-serious: #e47d8a;
+  --status-critical: #e06060;
+  --seq-100: #111a2c;
+  --seq-250: #172a4d;
+  --seq-400: #224785;
+  --seq-450: #3366c2;
+  --seq-550: #6a97ea;
+  --seq-700: #c3d4f5;
 }
 
 /* LSMBiz: Emerald Night, a black-green dark theme with emerald accents.
@@ -104,15 +110,9 @@ html[data-company="lsmbiz"] body {
     radial-gradient(ellipse 700px 500px at 100% 0%, rgba(52, 211, 153, 0.05), transparent 55%);
 }
 
-/* A soft light-blue wash, no grid: blue glows in the corners over a pale
-   blue page, staying put while the page scrolls. */
 html[data-company="daro"] body {
-  background-color: #e6effc;
-  background-image:
-    radial-gradient(ellipse 70% 60% at 0% 0%, rgba(147, 197, 253, 0.55), transparent 70%),
-    radial-gradient(ellipse 60% 55% at 100% 0%, rgba(165, 230, 250, 0.45), transparent 70%),
-    radial-gradient(ellipse 70% 60% at 100% 100%, rgba(191, 210, 255, 0.5), transparent 70%),
-    radial-gradient(ellipse 60% 60% at 0% 100%, rgba(186, 230, 253, 0.45), transparent 70%);
+  background-color: #08090c;
+  background-image: none;
 }
 
 body {
@@ -303,7 +303,7 @@ html[data-company="lsmbiz"] header {
   box-shadow: 0 6px 24px -12px rgba(16, 185, 129, 0.25);
 }
 html[data-company="daro"] header {
-  box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* LSMBiz Payroll Processing: the register's header and total rows and the
