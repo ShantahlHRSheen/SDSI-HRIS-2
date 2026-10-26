@@ -68,6 +68,9 @@ export interface CompanyConfig {
   // Payroll Expense Report groups payroll by branch instead of by division
   // (Business Units / Shared Services, which are Shantahl's).
   payrollExpenseByBranch?: boolean;
+  // 13th month pay counts the Cash Allowance (Other Allowance 1 in the
+  // payroll) along with basic pay.
+  thirteenthMonthCashAllowance?: boolean;
   // People who sign in here with the same email and password as in another
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
   // match here, it's checked against `from`'s database and, if right, saved
@@ -201,6 +204,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     payrollImportFormat: "lsmbiz",
     allowanceBreakdown: true,
     payrollExpenseByBranch: true,
+    thirteenthMonthCashAllowance: true,
     orgChartPhotos: true,
   },
   daro: {

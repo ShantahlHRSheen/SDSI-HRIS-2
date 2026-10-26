@@ -8,6 +8,7 @@ import { StatTile } from "@/components/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { formatCurrencyCompact, fullName, positionTitle } from "@/lib/helpers";
+import { currentCompany } from "@/lib/companies";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
 import { computePayrollForPeriod, type PayrollLine } from "@/lib/payroll";
 import { computeThirteenthMonth, emptyEntry, MONTH_NAMES, round2, sameSlip, toSlipData, type MonthFigures, type ThirteenthMonthEntry, type ThirteenthMonthRow } from "@/lib/thirteenth-month";
@@ -120,12 +121,13 @@ export default function ThirteenthMonthPayPage() {
 
   function exportCsv() {
     const csv = toCsv(
-      ["Employee", "Designation", ...MONTH_NAMES, "Gross Basic Pay", "13th Month", "Unused VL (days)", "Daily Rate", "Monetized VL", "Last Salary", "SSS", "PhilHealth", "Pag-IBIG", "Total"],
+      ["Employee", "Designation", ...MONTH_NAMES, "Gross Basic Pay", ...(WITH_CASH ? ["Cash Allowance"] : []), "13th Month", "Unused VL (days)", "Daily Rate", "Monetized VL", "Last Salary", "SSS", "PhilHealth", "Pag-IBIG", "Total"],
       rows.map((r) => [
         fullName(r.employee),
         r.designation,
         ...r.months.map((m) => m.net),
         r.grossBasic,
+        ...(WITH_CASH ? [r.cashAllowance ?? 0] : []),
         r.thirteenthMonth,
         r.vlDays,
         r.dailyRate,
@@ -238,6 +240,7 @@ export default function ThirteenthMonthPayPage() {
                     </th>
                   ))}
                   <th className={th}>Gross basic</th>
+                  {WITH_CASH && <th className={th}>Cash allowance</th>}
                   <th className={th}>13th month</th>
                   <th className={th}>Unused VL</th>
                   <th className={th}>Daily rate</th>
@@ -274,6 +277,7 @@ export default function ThirteenthMonthPayPage() {
                       </td>
                     ))}
                     <td className={td}>{peso(r.grossBasic)}</td>
+                    {WITH_CASH && <td className={td}>{peso(r.cashAllowance ?? 0)}</td>}
                     <td className={`${td} font-medium text-[var(--text-primary)]`}>{peso(r.thirteenthMonth)}</td>
                     <td className={td}>{r.vlDays}</td>
                     <td className={td}>{peso(r.dailyRate)}</td>
@@ -314,6 +318,7 @@ export default function ThirteenthMonthPayPage() {
                     </td>
                   ))}
                   <td className="tabular px-2 py-2 text-right">{peso(sum("grossBasic"))}</td>
+                  {WITH_CASH && <td className="tabular px-2 py-2 text-right">{peso(round2(rows.reduce((s, r) => s + (r.cashAllowance ?? 0), 0)))}</td>}
                   <td className="tabular px-2 py-2 text-right">{peso(sum("thirteenthMonth"))}</td>
                   <td />
                   <td />
@@ -403,7 +408,9 @@ export default function ThirteenthMonthPayPage() {
 
 // ---- Editing ----------------------------------------------------------------
 
-const KEYS: (keyof MonthFigures)[] = ["b1", "l1", "b2", "l2"];
+// LSMBiz counts the Cash Allowance in the 13th month (lib/thirteenth-month.ts).
+const WITH_CASH = !!currentCompany().thirteenthMonthCashAllowance;
+const KEYS: (keyof MonthFigures)[] = WITH_CASH ? ["b1", "l1", "b2", "l2", "c"] : ["b1", "l1", "b2", "l2"];
 const toNum = (s: string) => {
   const n = Number(s.replace(/,/g, "").trim());
   return s.trim() === "" || !Number.isFinite(n) ? null : round2(n);
@@ -423,7 +430,7 @@ function EditModal({
   onReset: () => Promise<boolean>;
 }) {
   const [designation, setDesignation] = useState(row.designation);
-  const [cells, setCells] = useState(() => row.months.map((m) => KEYS.map((k) => String(m[k]))));
+  const [cells, setCells] = useState(() => row.months.map((m) => KEYS.map((k) => String(m[k] ?? 0))));
   const [vlDays, setVlDays] = useState(String(row.vlDays));
   const [dailyRate, setDailyRate] = useState(String(row.dailyRate));
   const [extra, setExtra] = useState({ lastSalary: String(row.lastSalary), sss: String(row.sss), philhealth: String(row.philhealth), hdmf: String(row.hdmf) });
@@ -434,7 +441,8 @@ function EditModal({
     return round2(b1 - l1 + b2 - l2);
   };
   const gross = round2(cells.reduce((s, _, i) => s + netOf(i), 0));
-  const thirteenth = round2(gross / 12);
+  const cash = WITH_CASH ? round2(cells.reduce((s, c) => s + (toNum(c[4]) ?? 0), 0)) : 0;
+  const thirteenth = round2((gross + cash) / 12);
   const monetized = round2((toNum(vlDays) ?? 0) * (toNum(dailyRate) ?? 0));
   const total = round2(thirteenth + monetized + (toNum(extra.lastSalary) ?? 0) - (toNum(extra.sss) ?? 0) - (toNum(extra.philhealth) ?? 0) - (toNum(extra.hdmf) ?? 0));
 
@@ -445,7 +453,7 @@ function EditModal({
       const o: Partial<Record<keyof MonthFigures, number>> = {};
       KEYS.forEach((k, j) => {
         const v = toNum(c[j]) ?? 0;
-        if (Math.abs(v - row.monthsAuto[i][k]) >= 0.005) o[k] = v;
+        if (Math.abs(v - (row.monthsAuto[i][k] ?? 0)) >= 0.005) o[k] = v;
       });
       if (Object.keys(o).length) months[String(i + 1)] = o;
     });
@@ -501,7 +509,8 @@ function EditModal({
                 <th className="px-1 py-1 font-medium">Lates/Abs/UT</th>
                 <th className="px-1 py-1 font-medium">Basic (2nd)</th>
                 <th className="px-1 py-1 font-medium">Lates/Abs/UT</th>
-                <th className="px-1 py-1 font-medium">Net</th>
+                {WITH_CASH && <th className="px-1 py-1 font-medium">Cash allowance</th>}
+                <th className="px-1 py-1 font-medium">{WITH_CASH ? "Net basic" : "Net"}</th>
               </tr>
             </thead>
             <tbody>
@@ -511,11 +520,11 @@ function EditModal({
                   {KEYS.map((k, j) => (
                     <td key={k} className="px-1 py-0.5">
                       <input
-                        aria-label={`${m} ${["Basic 1st cutoff", "Lates 1st cutoff", "Basic 2nd cutoff", "Lates 2nd cutoff"][j]}`}
+                        aria-label={`${m} ${["Basic 1st cutoff", "Lates 1st cutoff", "Basic 2nd cutoff", "Lates 2nd cutoff", "Cash allowance"][j]}`}
                         value={cells[i][j]}
                         onChange={(e) => setCells((c) => c.map((r, ri) => (ri === i ? r.map((v, vj) => (vj === j ? e.target.value : v)) : r)))}
                         inputMode="decimal"
-                        className={`${input} ${Math.abs((toNum(cells[i][j]) ?? 0) - row.monthsAuto[i][k]) >= 0.005 ? "text-[var(--status-warning)]" : ""}`}
+                        className={`${input} ${Math.abs((toNum(cells[i][j]) ?? 0) - (row.monthsAuto[i][k] ?? 0)) >= 0.005 ? "text-[var(--status-warning)]" : ""}`}
                       />
                     </td>
                   ))}
@@ -523,11 +532,11 @@ function EditModal({
                 </tr>
               ))}
               <tr className="font-semibold text-[var(--text-primary)]">
-                <td className="px-1 py-1" colSpan={5}>
-                  Gross basic pay · 13th month (÷ 12)
+                <td className="px-1 py-1" colSpan={KEYS.length + 1}>
+                  {WITH_CASH ? "Gross basic pay + cash allowance · 13th month (÷ 12)" : "Gross basic pay · 13th month (÷ 12)"}
                 </td>
                 <td className="tabular px-1 py-1 text-right">
-                  {peso(gross)} · {peso(thirteenth)}
+                  {WITH_CASH ? `${peso(gross)} + ${peso(cash)}` : peso(gross)} · {peso(thirteenth)}
                 </td>
               </tr>
             </tbody>

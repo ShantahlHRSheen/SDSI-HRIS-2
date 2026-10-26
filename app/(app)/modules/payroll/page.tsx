@@ -715,7 +715,7 @@ function PayrollLineEditModal({
             <NumberField label="Medical cash allowance" value={form.medicalCashAllowance} onChange={(v) => setNum("medicalCashAllowance", v)} />
             <NumberField label={payrollLabel("supervisorAllowance", "Supervisor allowance")} value={form.supervisorAllowance} onChange={(v) => setNum("supervisorAllowance", v)} />
             {currentCompany().allowanceBreakdown && (
-              <NumberField label={payrollLabel("otherAllowance2", "Other allowance 2")} value={form.otherAllowance2 ?? 0} onChange={(v) => setNum("otherAllowance2", v)} />
+              <NumberField label={payrollLabel("otherAllowance2", "Other allowance")} value={form.otherAllowance2 ?? 0} onChange={(v) => setNum("otherAllowance2", v)} />
             )}
           </div>
         </FieldSection>

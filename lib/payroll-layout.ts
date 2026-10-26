@@ -113,7 +113,7 @@ function allowanceColumns(): PayrollColumn[] {
 // The allowances that make up netAllowances, for companies that list them
 // (allowanceBreakdown = LSMBiz): register column name, and name on the
 // payslip and edit form. LSMBiz has no travel or supervisor allowance; it
-// keeps Other Allowance 1 (the file's ALLOWANCE, less Other Allowance 2)
+// keeps its Cash Allowance (the file's ALLOWANCE, less Other Allowance)
 // and its uniform allowance in those two fields. `deMinimis`: part of the De Minimis total
 // shown on the payslip.
 export const ALLOWANCE_PARTS: { key: "dailyAllowance" | "supervisorAllowance" | "laundryAllowance" | "medicalCashAllowance" | "travelAllowance" | "otherAllowance2"; short: string; label: string; deMinimis: boolean }[] = [
@@ -121,8 +121,8 @@ export const ALLOWANCE_PARTS: { key: "dailyAllowance" | "supervisorAllowance" | 
   { key: "supervisorAllowance", short: "Uniform", label: "Uniform Allowance", deMinimis: true },
   { key: "laundryAllowance", short: "Laundry", label: "Laundry Allowance", deMinimis: true },
   { key: "medicalCashAllowance", short: "Medical", label: "Medical Cash Allowance", deMinimis: true },
-  { key: "travelAllowance", short: "Other Allow. 1", label: "Other Allowance 1", deMinimis: false },
-  { key: "otherAllowance2", short: "Other Allow. 2", label: "Other Allowance 2", deMinimis: false },
+  { key: "travelAllowance", short: "Cash Allow.", label: "Cash Allowance", deMinimis: false },
+  { key: "otherAllowance2", short: "Other Allow.", label: "Other Allowance", deMinimis: false },
 ];
 
 // Names for payroll figures on the payslip and in the edit form, where a
