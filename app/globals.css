@@ -44,11 +44,11 @@
 }
 
 /*
-  LSMBiz Credit Corp. and Daro Lending Corp. use white-and-blue instead.
-  data-company is set on <html> before first paint (see app/layout.tsx) only
-  when one of them is the chosen company, so Shantahl keeps the tokens above.
+  Daro Lending Corp. uses white-and-blue instead, and LSMBiz Credit Corp. its
+  own "Emerald Night" below. data-company is set on <html> before first paint
+  (see app/layout.tsx) only when one of them is the chosen company, so
+  Shantahl keeps the tokens above.
 */
-html[data-company="lsmbiz"],
 html[data-company="daro"] {
   --surface-1: #ffffff;
   --page-plane: #f2f6fc;
@@ -79,9 +79,33 @@ html[data-company="daro"] {
   --seq-700: #0b3d91;
 }
 
+/* LSMBiz: Emerald Night, a black-green dark theme with emerald accents.
+   Series, status and sequential colours come from :root (made for dark). */
+html[data-company="lsmbiz"] {
+  --surface-1: #111814;
+  --page-plane: #0b0f0d;
+  --text-primary: #e3ebe7;
+  --text-secondary: #a9b8b0;
+  --text-muted: #7d8f86;
+  --gridline: #1e2a24;
+  --baseline: #2a3a32;
+  --border-hairline: rgba(16, 185, 129, 0.16);
+  --accent: #10b981;
+  --accent-strong: #34d399;
+  --accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-glow: rgba(16, 185, 129, 0.32);
+  --on-accent: #04110b;
+}
+
+html[data-company="lsmbiz"] body {
+  background-color: #0b0f0d;
+  background-image:
+    radial-gradient(ellipse 900px 480px at 12% -8%, rgba(16, 185, 129, 0.08), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(52, 211, 153, 0.05), transparent 55%);
+}
+
 /* A soft light-blue wash, no grid: blue glows in the corners over a pale
    blue page, staying put while the page scrolls. */
-html[data-company="lsmbiz"] body,
 html[data-company="daro"] body {
   background-color: #e6effc;
   background-image:
@@ -275,19 +299,23 @@ body {
   padding: 0;
 }
 
-html[data-company="lsmbiz"] header,
+html[data-company="lsmbiz"] header {
+  box-shadow: 0 6px 24px -12px rgba(16, 185, 129, 0.25);
+}
 html[data-company="daro"] header {
   box-shadow: 0 6px 24px -12px rgba(26, 115, 240, 0.35);
 }
 
 /* LSMBiz Payroll Processing: the register's header and total rows and the
-   Employee column in light green. Solid colours, since those cells stay
+   Employee column in dark green. Solid colours, since those cells stay
    in place (sticky) while the table scrolls under them. */
 html[data-company="lsmbiz"] .payroll-register thead th,
-html[data-company="lsmbiz"] .payroll-register thead td,
+html[data-company="lsmbiz"] .payroll-register thead td {
+  background-color: #0f2a1f;
+}
 html[data-company="lsmbiz"] .payroll-register tfoot td {
-  background-color: #dff3dc;
+  background-color: #133526;
 }
 html[data-company="lsmbiz"] .payroll-register tbody td:first-child:not([colspan]) {
-  background-color: #eef9ec;
+  background-color: #0e1612;
 }
