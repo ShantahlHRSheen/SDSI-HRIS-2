@@ -92,13 +92,6 @@ export function ThirteenthMonthSlip({ row, signatures = {}, estimateAsOf }: { ro
             <td style={cell} colSpan={4} />
             <td style={num}>{money(row.grossBasic)}</td>
           </tr>
-          {row.cashAllowance !== undefined && (
-            <tr>
-              <td style={cell}>Cash Allowance</td>
-              <td style={cell} colSpan={4} />
-              <td style={num}>{money(row.cashAllowance)}</td>
-            </tr>
-          )}
           <tr>
             <td style={cell}>13th Month</td>
             <td style={cell} colSpan={4} />
