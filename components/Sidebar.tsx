@@ -8,7 +8,7 @@ import { X } from "lucide-react";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
-import { useHrUnreadCount } from "./messages/HrChat";
+import { useHrMessagesHidden, useHrUnreadCount } from "./messages/HrChat";
 import { useWorkforceBadges } from "./workforce/WorkforceBadges";
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
@@ -17,6 +17,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const roles = currentUser?.roles ?? [];
   const isHr = roles.includes("hr_admin");
   const unread = useHrUnreadCount();
+  const messagesHidden = useHrMessagesHidden();
   // New requests to act on / updates on one's own, per Workforce page.
   const workforce = useWorkforceBadges();
   const company = currentCompany();
@@ -38,7 +39,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-4">
         {NAV_SECTIONS.map((section) => {
-          const items = section.items.filter((item) => item.roles.some((r) => roles.includes(r)));
+          const items = section.items.filter((item) => item.roles.some((r) => roles.includes(r)) && !(item.href === "/messages" && messagesHidden));
           if (items.length === 0) return null;
           return (
             <div key={section.title} className="mb-4">

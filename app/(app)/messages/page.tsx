@@ -4,13 +4,23 @@ import { MessageCircle } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
-import { ChatThread, HrInbox } from "@/components/messages/HrChat";
+import { ChatThread, HrInbox, useHrMessagesHidden } from "@/components/messages/HrChat";
 
 // HR (hr_admin) gets the inbox of every employee's conversation; everyone
 // else gets their own private conversation with HR.
 export default function MessagesPage() {
   const { currentUser, isRealAccount } = useHris();
   const isHr = !!currentUser?.roles.includes("hr_admin");
+  const hidden = useHrMessagesHidden();
+
+  if (hidden) {
+    return (
+      <div>
+        <PageHeader title="HR Messages" subtitle="Private conversations with employees." />
+        <EmptyState icon={MessageCircle} title="Not available for your account" description="This company's HR Messages are handled by its own HR team." />
+      </div>
+    );
+  }
 
   if (!isRealAccount || !currentUser?.employeeId) {
     return (
