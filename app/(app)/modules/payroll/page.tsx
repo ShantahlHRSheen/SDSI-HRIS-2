@@ -528,6 +528,7 @@ function defaultOverrideForm(periodId: string, employeeId: string, overrides: Pa
     laundryAllowance: 0,
     medicalCashAllowance: 0,
     supervisorAllowance: 0,
+    otherAllowance2: 0,
     cashAdvance: 0,
     lsmBizLoan: 0,
     lsmCoopLoan: 0,
@@ -713,6 +714,9 @@ function PayrollLineEditModal({
             <NumberField label="Laundry allowance" value={form.laundryAllowance} onChange={(v) => setNum("laundryAllowance", v)} />
             <NumberField label="Medical cash allowance" value={form.medicalCashAllowance} onChange={(v) => setNum("medicalCashAllowance", v)} />
             <NumberField label={payrollLabel("supervisorAllowance", "Supervisor allowance")} value={form.supervisorAllowance} onChange={(v) => setNum("supervisorAllowance", v)} />
+            {currentCompany().allowanceBreakdown && (
+              <NumberField label={payrollLabel("otherAllowance2", "Other allowance 2")} value={form.otherAllowance2 ?? 0} onChange={(v) => setNum("otherAllowance2", v)} />
+            )}
           </div>
         </FieldSection>
 

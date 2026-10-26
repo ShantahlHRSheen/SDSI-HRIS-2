@@ -79,6 +79,7 @@ export interface PayrollLine {
   laundryAllowance: number;
   medicalCashAllowance: number;
   supervisorAllowance: number;
+  otherAllowance2: number;
   netAllowances: number;
 
   grossSalary: number;
@@ -144,6 +145,7 @@ const emptyOverride: Omit<PayrollLineOverride, "id" | "periodId" | "employeeId" 
   laundryAllowance: 0,
   medicalCashAllowance: 0,
   supervisorAllowance: 0,
+  otherAllowance2: 0,
   cashAdvance: 0,
   lsmBizLoan: 0,
   lsmCoopLoan: 0,
@@ -223,7 +225,7 @@ export function computePayrollForPeriod(
 
     const dailyAllowanceAuto = Math.round((employee.dailyAllowance ?? 0) * rec.daysWorked);
     const dailyAllowance = ov.dailyAllowanceOverride ?? dailyAllowanceAuto;
-    const netAllowances = dailyAllowance + ov.travelAllowance + ov.laundryAllowance + ov.medicalCashAllowance + ov.supervisorAllowance + a("allowance");
+    const netAllowances = dailyAllowance + ov.travelAllowance + ov.laundryAllowance + ov.medicalCashAllowance + ov.supervisorAllowance + ov.otherAllowance2 + a("allowance");
 
     const grossSalary = basicSalaryTotal + netAllowances;
 
@@ -318,6 +320,7 @@ export function computePayrollForPeriod(
       laundryAllowance: ov.laundryAllowance,
       medicalCashAllowance: ov.medicalCashAllowance,
       supervisorAllowance: ov.supervisorAllowance,
+      otherAllowance2: ov.otherAllowance2,
       netAllowances,
       grossSalary,
       cashAdvance,
@@ -399,6 +402,7 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     laundryAllowance: summary.laundryAllowance ?? 0,
     medicalCashAllowance: summary.medicalCashAllowance ?? 0,
     supervisorAllowance: summary.supervisorAllowance ?? 0,
+    otherAllowance2: summary.otherAllowance2 ?? 0,
     netAllowances: summary.netAllowances ?? 0,
     grossSalary: summary.grossSalary ?? 0,
     cashAdvance: summary.cashAdvance ?? 0,

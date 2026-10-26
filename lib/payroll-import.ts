@@ -71,7 +71,7 @@ export interface ParsedPayrollRow {
   values: Record<Exclude<ColumnKey, "employee" | "payrollType">, number>;
   // Part of netAllowances the file breaks out (LSMBiz); the rest stays the
   // daily allowance.
-  allowances?: { travel: number; laundry: number; medicalCash: number; supervisor: number };
+  allowances?: { travel: number; laundry: number; medicalCash: number; supervisor: number; other2: number };
 }
 
 export interface ParsedPayrollWorkbook {
@@ -270,11 +270,12 @@ export function buildPayrollImportPreview(
       otHoursOverride: null,
       otPayOverride: v.otPay,
       // The allowance total, less what the file breaks out (if anything).
-      dailyAllowanceOverride: v.netAllowances - (split ? split.travel + split.laundry + split.medicalCash + split.supervisor : 0),
+      dailyAllowanceOverride: v.netAllowances - (split ? split.travel + split.laundry + split.medicalCash + split.supervisor + split.other2 : 0),
       travelAllowance: split?.travel ?? 0,
       laundryAllowance: split?.laundry ?? 0,
       medicalCashAllowance: split?.medicalCash ?? 0,
       supervisorAllowance: split?.supervisor ?? 0,
+      otherAllowance2: split?.other2 ?? 0,
       sssContributionOverride: v.sss,
       sssWispOverride: v.sssWisp,
       philHealthContributionOverride: v.philHealth,
