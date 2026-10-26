@@ -35,6 +35,8 @@ type Field =
   | "laundryRate"
   | "medicalRate"
   | "allowance"
+  | "otherAllowance1"
+  | "otherAllowance2"
   | "gross"
   | "cashAdvance"
   | "caBalance"
@@ -77,6 +79,9 @@ const HEADERS: Record<string, Field> = {
   "medical cash allowance": "medicalRate",
   // LSM ADM: the ALLOWANCES sheet's net allowances, paid with the payslip.
   allowance: "allowance",
+  // LSMBiz: ALLOWANCE split in two, when the sheet has the columns.
+  "other allowance 1": "otherAllowance1",
+  "other allowance 2": "otherAllowance2",
   "gross salary": "gross",
   ca: "cashAdvance",
   // Unpaid cash advance carried from the last payroll; part of Total Advances.
@@ -272,12 +277,16 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof employ
     // Daro pays its "Allowance" on top of Gross Salary, so it's kept out of
     // gross (which then matches the sheet) and added like an adjustment.
     const paidOnTop = format === "daro" ? n("allowance") : 0;
-    const allowances = n("deMinimis") + n("allowance") - paidOnTop;
+    // LSMBiz's ALLOWANCE is Other Allowance 1 + 2: from its own column, else
+    // from the two split columns. Without a split it's all Other Allowance 1.
+    const allowance = cols.allowance !== undefined ? n("allowance") : n("otherAllowance1") + n("otherAllowance2");
+    const other2 = n("otherAllowance2");
+    const allowances = n("deMinimis") + allowance - paidOnTop;
     const grossSalary = n("basic") - n("late") + n("adjAllowance") + n("holiday") + n("vlsl") + allowances;
     // LSMBiz: De Minimis split into uniform, laundry and medical cash (each
     // per-day rate × days) and rice (the rest, which stays the daily
-    // allowance); ALLOWANCE is its Additional Allowance. LSMBiz has no
-    // travel or supervisor allowance, so those slots hold Additional and
+    // allowance); ALLOWANCE is its Other Allowance 1 + 2. LSMBiz has no
+    // travel or supervisor allowance, so those slots hold Other Allowance 1 and
     // Uniform (named so in lib/payroll-layout.ts).
     const round2 = (x: number) => Math.round(x * 100) / 100;
     const uniform = round2(n("uniformRate") * n("days"));
@@ -293,8 +302,8 @@ function readSheet(ws: ExcelJS.Worksheet, findEmployee: ReturnType<typeof employ
       allowances:
         format === "lsmbiz"
           ? splitDeMinimis
-            ? { travel: n("allowance"), laundry, medicalCash, supervisor: uniform }
-            : { travel: n("allowance"), laundry: 0, medicalCash: 0, supervisor: 0 }
+            ? { travel: allowance - other2, laundry, medicalCash, supervisor: uniform, other2 }
+            : { travel: allowance - other2, laundry: 0, medicalCash: 0, supervisor: 0, other2 }
           : undefined,
       values: {
         daysWorking: n("days"),

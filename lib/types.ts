@@ -612,6 +612,9 @@ export interface PayrollLineOverride {
   laundryAllowance: number;
   medicalCashAllowance: number;
   supervisorAllowance: number;
+  // LSMBiz: Other Allowance 2 (the additional part of its Other Allowance;
+  // travelAllowance holds Other Allowance 1). 0 elsewhere.
+  otherAllowance2: number;
   cashAdvance: number;
   lsmBizLoan: number;
   lsmCoopLoan: number;

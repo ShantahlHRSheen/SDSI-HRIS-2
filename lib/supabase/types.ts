@@ -320,6 +320,8 @@ export type PayrollLineOverrideRow = {
   laundry_allowance: number;
   medical_cash_allowance: number;
   supervisor_allowance: number;
+  // LSMBiz only (supabase/migrate_lsmbiz_other_allowance_2.sql).
+  other_allowance_2?: number;
   cash_advance: number;
   lsm_biz_loan: number;
   lsm_coop_loan: number;

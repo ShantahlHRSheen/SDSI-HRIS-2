@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./client";
+import { currentCompany } from "@/lib/companies";
 import type {
   AnnouncementRow,
   AttendanceCorrectionRequestRow,
@@ -1081,6 +1082,7 @@ function toPayrollLineOverride(r: PayrollLineOverrideRow): PayrollLineOverride {
     laundryAllowance: r.laundry_allowance,
     medicalCashAllowance: r.medical_cash_allowance,
     supervisorAllowance: r.supervisor_allowance,
+    otherAllowance2: r.other_allowance_2 ?? 0,
     cashAdvance: r.cash_advance,
     lsmBizLoan: r.lsm_biz_loan,
     lsmCoopLoan: r.lsm_coop_loan,
@@ -1119,6 +1121,8 @@ function payrollLineOverrideToRow(
     laundry_allowance: input.laundryAllowance,
     medical_cash_allowance: input.medicalCashAllowance,
     supervisor_allowance: input.supervisorAllowance,
+    // Only LSMBiz's database has this column.
+    ...(currentCompany().allowanceBreakdown ? { other_allowance_2: input.otherAllowance2 } : {}),
     cash_advance: input.cashAdvance,
     lsm_biz_loan: input.lsmBizLoan,
     lsm_coop_loan: input.lsmCoopLoan,
