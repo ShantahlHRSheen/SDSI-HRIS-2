@@ -378,7 +378,7 @@ export default function DisciplinePage() {
                     <td className="px-4 py-2.5">
                       {r.status === "resolved" ? (
                         <Badge tone="good">Resolved</Badge>
-                      ) : canManage ? (
+                      ) : isHr ? (
                         <button
                           onClick={() => setDisciplinaryStatus(r.id, "resolved")}
                           className="rounded-lg border border-[var(--border-hairline)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
