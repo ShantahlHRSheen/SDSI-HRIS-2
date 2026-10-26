@@ -94,6 +94,9 @@ export interface CompanyConfig {
   // Pag-IBIG Multi-Purpose Loan form (lib/mpl-pdf.ts): the employer's part —
   // the authorized signatory (employee id), Pag-IBIG employer ID and the
   // business address as the form splits it.
+  // Approvers whose leave-form approval is titled by their position instead
+  // of "Department Head" (employee id → title).
+  approverTitles?: Record<string, string>;
   // Fixed-rate employees are left out of the Tardiness Report, except these
   // (employee ids), whose lates only the listed viewers (employee ids) see.
   restrictedLates?: { employeeIds: string[]; viewerIds: string[] };
@@ -126,6 +129,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       contact: "09051733206 / 044-960-0126",
       email: "shantahlhr@gmail.com",
     },
+    // Sheilah Magdadaro approves Sheena, Joan Mariette, Maricris and Marlyn's leave.
+    approverTitles: { "emp-004": "Vice Chairperson" },
     // Marlyn Leonardo, John Paul Michael Papa, Ronald Lugtu — seen by Lowel
     // and Sheilah Magdadaro and Sheena Evangelista.
     restrictedLates: { employeeIds: ["emp-045", "emp-038", "emp-037"], viewerIds: ["emp-001", "emp-004", "emp-012"] },

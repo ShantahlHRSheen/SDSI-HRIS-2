@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PenLine, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { currentCompany } from "@/lib/companies";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { leaveDaysBetween } from "@/lib/helpers";
@@ -337,7 +338,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
               <div className={ro}>{details?.department || "—"}</div>
             </div>
             <div>
-              <div className={lbl}>Department head</div>
+              <div className={lbl}>{(currentEmployee?.supervisorId && currentCompany().approverTitles?.[currentEmployee.supervisorId]) || "Department head"}</div>
               <div className={ro}>{details?.departmentHead || "— (HR will approve)"}</div>
             </div>
           </div>
