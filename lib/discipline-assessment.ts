@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "./supabase/client";
 import { SANCTION_CHOICES } from "./nte-tardiness";
+import { responseStage } from "./discipline";
 import type { DisciplinaryRecord } from "./types";
 
 // The Department Head's assessment of a written explanation
@@ -52,4 +53,33 @@ export async function fetchAssessments(): Promise<DisciplineAssessment[]> {
 export async function saveAssessment(recordId: string, comment: string, recommendation: string): Promise<void> {
   const { error } = await client().rpc("discipline_assess", { p_record: recordId, p_comment: comment, p_recommendation: recommendation });
   if (error) throw new Error(/discipline_assess/.test(error.message) && /find|exist|schema/.test(error.message) ? SETUP : error.message);
+}
+
+// What the signed-in person has to do on the disciplinary records they can
+// see (the Discipline page's and the dashboard's "Needs your action").
+export function disciplineActions(
+  records: DisciplinaryRecord[],
+  me: string | undefined,
+  isHr: boolean,
+  assessments: DisciplineAssessment[],
+  hrIds: Set<string>,
+): { r: DisciplinaryRecord; action: string }[] {
+  if (!me) return [];
+  const out: { r: DisciplinaryRecord; action: string }[] = [];
+  for (const r of records) {
+    if (r.withdrawnAt || r.status === "resolved" || r.employeeId === me) continue;
+    const stage = responseStage(r);
+    if (isHr && stage === "hr_to_sign") out.push({ r, action: "Sign as HR Manager" });
+    if (stage === "branch_to_sign" && r.branchManagerId === me) out.push({ r, action: "Sign as Branch Manager" });
+    if (stage === "manager_to_sign" && r.managerId === me) out.push({ r, action: "Sign as Department Manager" });
+    if (r.signFlow && r.explanationSubmittedAt && isHr && !r.explHrReceivedAt) out.push({ r, action: "Receive the written explanation (HR)" });
+    if (r.explanationSubmittedAt && r.managerId === me && !r.explMgrReceivedAt) out.push({ r, action: "Receive the written explanation" });
+    if (r.explanationSubmittedAt && r.issuedBy === me && takesAssessment(r, hrIds) && !assessments.some((a) => a.recordId === r.id))
+      out.push({ r, action: "Assess the explanation and recommend an action to HR" });
+    const a = isHr ? assessments.find((x) => x.recordId === r.id) : undefined;
+    if (a) out.push({ r, action: `Issue the Notice of Sanction — head recommends ${a.recommendation}` });
+    if (isHr && r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !records.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id))
+      out.push({ r, action: "Issue the Notice of Sanction (tardiness)" });
+  }
+  return out;
 }

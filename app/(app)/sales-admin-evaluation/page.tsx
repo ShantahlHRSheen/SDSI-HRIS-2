@@ -11,7 +11,7 @@ import { Badge } from "@/components/Badge";
 import { departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import { effectiveJobPerformanceEvaluatorId } from "@/lib/performance-eval";
 import type { Employee } from "@/lib/types";
-import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, reopenSaePart, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
+import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, reopenSaePart, saeMyTurn, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import {
   HeadPartModal,
   HrPartModal,
@@ -44,13 +44,7 @@ export default function SalesAdminEvaluationPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const opened = items?.find((x) => x.id === open?.id) ?? null;
 
-  const myTurn = (e: SalesAdminEvaluation): "hr" | "head" | "recommend" | null => {
-    if (e.status === "open" && isHr && !e.hrSignedAt) return "hr";
-    if (e.status === "open" && e.headId === me && !e.headSignedAt) return "head";
-    if (e.status === "open" && e.head2Id === me && !e.head2SignedAt) return "head";
-    if ((e.status === "vc" && e.vcId === me) || (e.status === "chairman" && e.chairmanId === me)) return "recommend";
-    return null;
-  };
+  const myTurn = (e: SalesAdminEvaluation) => saeMyTurn(e, me, isHr);
   const [search, setSearch] = useState("");
   const [purposeFilter, setPurposeFilter] = useState("");
   const list = (items ?? []).filter(

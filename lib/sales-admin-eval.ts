@@ -190,6 +190,15 @@ export function saeStatusLabel(e: SalesAdminEvaluation): { label: string; tone: 
   return { label: `Waiting for ${waiting.join(" and ")}`, tone: "warning" };
 }
 
+// What the signed-in person has to do on an evaluation, if anything.
+export function saeMyTurn(e: SalesAdminEvaluation, me: string | undefined, isHr: boolean): "hr" | "head" | "recommend" | null {
+  if (e.status === "open" && isHr && !e.hrSignedAt) return "hr";
+  if (me && e.status === "open" && e.headId === me && !e.headSignedAt) return "head";
+  if (me && e.status === "open" && e.head2Id === me && !e.head2SignedAt) return "head";
+  if (me && ((e.status === "vc" && e.vcId === me) || (e.status === "chairman" && e.chairmanId === me))) return "recommend";
+  return null;
+}
+
 // "2 years, 3 months" from the date hired to `asOf` (YYYY-MM-DD).
 export function lengthOfService(dateHired: string | null | undefined, asOf: string): string {
   if (!dateHired) return "—";

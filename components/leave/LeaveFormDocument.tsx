@@ -1,5 +1,6 @@
 import { currentCompany } from "@/lib/companies";
 import { BranchApprovalBlock } from "@/components/forms/BranchApproval";
+import { LsmbizLeaveFormDocument } from "@/components/leave/LsmbizLeaveFormDocument";
 import { HEAD_DAY_FIELDS, LEAVE_CATEGORIES, defaultHeadDays, type LeaveForm } from "@/lib/leave-form";
 import type { LeaveFormSigner } from "@/lib/supabase/leave-forms";
 import { DaroLeaveFormDocument } from "./DaroLeaveFormDocument";
@@ -32,7 +33,8 @@ function Signature({ url }: { url?: string }) {
 export type LeaveFormDocData = Omit<LeaveForm, "submittedAt"> & { submittedAt: string | null; startDate: string; endDate: string; days: number };
 
 export function LeaveFormDocument({ form, signatures = {} }: { form: LeaveFormDocData; signatures?: Partial<Record<LeaveFormSigner, string>> }) {
-  // Daro prints its own form layout.
+  // LSMBiz and Daro print their own form layouts.
+  if (currentCompany().leaveFormLayout === "lsmbiz") return <LsmbizLeaveFormDocument form={form} signatures={signatures} />;
   if (currentCompany().leaveFormLayout === "daro") return <DaroLeaveFormDocument form={form} signatures={signatures} />;
   const cell: React.CSSProperties = { border: line, padding: "4px 8px", fontSize: "9.5pt", verticalAlign: "top" };
   const head: React.CSSProperties = { ...cell, ...exact, background: "#e8e8e8", fontWeight: 700, textAlign: "center", letterSpacing: "0.5px" };

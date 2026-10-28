@@ -122,7 +122,8 @@ export function PrepareMplModal({ item, onClose, onChanged }: { item: MplRequest
   const cfg = company.pagibigMpl;
   const employee = employees.find((e) => e.id === item.employeeId);
   const people = useMemo(() => employees.filter((e) => e.status === "active" || e.status === "on_leave").sort((a, b) => fullName(a).localeCompare(fullName(b))), [employees]);
-  const [signatoryId, setSignatoryId] = useState(cfg?.signatoryId && cfg.signatoryId !== item.employeeId ? cfg.signatoryId : "");
+  // The company's authorized signatory signs every form, their own included.
+  const [signatoryId, setSignatoryId] = useState(cfg?.signatoryId ?? "");
   const signer = employees.find((e) => e.id === signatoryId);
   const [data, setData] = useState<MplData | null>(() =>
     employee
@@ -294,7 +295,7 @@ export function PrepareMplModal({ item, onClose, onChanged }: { item: MplRequest
               <select value={signatoryId} onChange={(e) => pickSignatory(e.target.value)} className={input}>
                 <option value="">Choose…</option>
                 {people
-                  .filter((e) => e.id !== item.employeeId)
+                  .filter((e) => e.id !== item.employeeId || e.id === cfg?.signatoryId)
                   .map((e) => (
                     <option key={e.id} value={e.id}>
                       {fullName(e)}

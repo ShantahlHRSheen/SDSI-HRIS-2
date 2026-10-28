@@ -97,11 +97,13 @@ export interface CompanyConfig {
   // Approvers whose leave-form approval is titled by their position instead
   // of "Department Head" (employee id → title).
   approverTitles?: Record<string, string>;
-  // The leave form follows this company's own Word form
-  // (components/leave/DaroLeaveFormDocument.tsx): its leave types, the
-  // Supervisor's and Branch Head's approvals, and HR's certification with a
-  // recommendation (supabase/migrate_phase66_leave_form_hr_recommendation.sql).
-  leaveFormLayout?: "daro";
+  // The leave form's printed layout; the standard APPLICATION FOR LEAVE if
+  // unset. "lsmbiz": LSMBiz's Employee's Leave Application Form
+  // (components/leave/LsmbizLeaveFormDocument.tsx). "daro": Daro's own form
+  // (components/leave/DaroLeaveFormDocument.tsx) with its four leave types,
+  // the Supervisor's and Branch Head's approvals, and HR's certification with
+  // a recommendation (supabase/migrate_phase66_leave_form_hr_recommendation.sql).
+  leaveFormLayout?: "lsmbiz" | "daro";
   // Fixed-rate employees are left out of the Tardiness Report, except these
   // (employee ids), whose lates only the listed viewers (employee ids) see.
   restrictedLates?: { employeeIds: string[]; viewerIds: string[] };
@@ -262,6 +264,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Gantalao, Gomez, Tomas.
     fixedOtherAllowance: { "EMP-0007": 2000, "EMP-0229": 2000, "EMP-0012": 5000, "EMP-0039": 200 },
     orgChartPhotos: true,
+    leaveFormLayout: "lsmbiz",
   },
   daro: {
     id: "daro",

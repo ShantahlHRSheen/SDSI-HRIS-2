@@ -7,6 +7,7 @@ import { AlarmClockOff, Cake, CalendarX2, Clock3, Info, UserMinus, UserPlus } fr
 import { useHris } from "@/lib/store";
 import { TODAY } from "@/lib/mock-data";
 import { PageHeader } from "@/components/PageHeader";
+import { NeedsYourAction } from "@/components/dashboard/NeedsYourAction";
 import { StatTile } from "@/components/StatTile";
 import { Badge } from "@/components/Badge";
 import { HBarChart } from "@/components/charts/HBarChart";
@@ -154,6 +155,7 @@ export default function DashboardPage() {
         title={variant === "team" ? `Team Dashboard — ${currentEmployee ? branchName(currentEmployee.branchId) : ""}` : "Executive Dashboard"}
         subtitle={`As of ${formatDate(TODAY)} · Company-wide unless noted`}
       />
+      <NeedsYourAction />
 
       {/* --- Monthly Employer Payroll Expense -------------------------------- */}
       <section className="mt-6">
@@ -376,6 +378,9 @@ function PersonalDashboard({ employees, announcements }: { employees: Employee[]
   return (
     <div>
       <PageHeader title={`Welcome, ${currentUser?.name?.split(" ")[0]}`} subtitle="Your personal HRIS snapshot" />
+      <div className="mb-4">
+        <NeedsYourAction />
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 lg:col-span-1">
           <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">My profile</div>

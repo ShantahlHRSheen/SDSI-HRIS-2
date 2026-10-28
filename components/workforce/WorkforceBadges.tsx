@@ -66,11 +66,19 @@ export function useMarkWorkforceSeen(kind: WorkforceKind) {
 
 const latest = (...times: (string | null | undefined)[]) => times.filter((t): t is string => !!t).sort().pop() ?? "";
 
-export function useWorkforceBadges(): Record<string, number> {
-  const { isRealAccount, currentEmployee, currentUser, employees, leaveRequests, overtimeRequests, correctionRequests } = useHris();
+type Forms = { leave: LeaveForm[]; ot: OvertimeForm[]; corr: CorrectionForm[]; travel: Awaited<ReturnType<typeof fetchTravelAllowances>> };
+
+// A request waiting for the signed-in person: whose it is (employee id).
+export interface WorkforceActionItem {
+  id: string;
+  employeeId: string;
+}
+
+// The Workforce forms, refreshed every minute and when a page is opened.
+function useWorkforceForms(): { forms: Forms; seenTick: number } {
+  const { isRealAccount, currentEmployee } = useHris();
   const me = currentEmployee?.id;
-  const isHr = !!currentUser?.roles.includes("hr_admin");
-  const [forms, setForms] = useState<{ leave: LeaveForm[]; ot: OvertimeForm[]; corr: CorrectionForm[]; travel: Awaited<ReturnType<typeof fetchTravelAllowances>> }>({ leave: [], ot: [], corr: [], travel: [] });
+  const [forms, setForms] = useState<Forms>({ leave: [], ot: [], corr: [], travel: [] });
   const [seenTick, setSeenTick] = useState(0);
 
   const load = useCallback(() => {
@@ -97,20 +105,76 @@ export function useWorkforceBadges(): Record<string, number> {
     };
   }, [load]);
 
-  if (!isRealAccount || !me) return {};
-  void seenTick;
+  return { forms, seenTick };
+}
 
+function workforceActions(
+  forms: Forms,
+  me: string,
+  isHr: boolean,
+  employees: ReturnType<typeof useHris>["employees"],
+  requests: { leave: ReturnType<typeof useHris>["leaveRequests"]; ot: ReturnType<typeof useHris>["overtimeRequests"]; corr: ReturnType<typeof useHris>["correctionRequests"] },
+): Record<WorkforceKind, WorkforceActionItem[]> {
   const headCan = (f: { employeeId: string; departmentHeadId: string | null }) => f.employeeId !== me && (f.departmentHeadId ? f.departmentHeadId === me : isHr);
   // Requests filed without an online form (older ones): the supervisor or HR decides.
   const supervises = (employeeId: string) => isHr || employees.find((e) => e.id === employeeId)?.supervisorId === me;
-  const legacy = <R extends { id: string; employeeId: string; status: string }>(rows: R[], formIds: Set<string>) =>
-    rows.filter((r) => r.status === "pending" && r.employeeId !== me && !formIds.has(r.id) && supervises(r.employeeId)).length;
+  const legacy = <R extends { id: string; employeeId: string; status: string }>(rows: R[], formIds: Set<string>): WorkforceActionItem[] =>
+    rows.filter((r) => r.status === "pending" && r.employeeId !== me && !formIds.has(r.id) && supervises(r.employeeId)).map((r) => ({ id: r.id, employeeId: r.employeeId }));
+
+  const leaveFormIds = new Set(forms.leave.flatMap((f) => [f.leaveRequestId, ...(f.unpaidRequestId ? [f.unpaidRequestId] : [])]));
+  const leave = [
+    ...forms.leave
+      .filter((f) => canBranch(f, me) || (formStage(f) === "waiting_head" && headCan(f)) || (isHr && formStage(f) === "waiting_hr" && f.employeeId !== me))
+      .map((f) => ({ id: f.leaveRequestId, employeeId: f.employeeId })),
+    ...legacy(requests.leave, leaveFormIds),
+  ];
+  const otFormIds = new Set(forms.ot.map((f) => f.overtimeRequestId));
+  const ot = [
+    ...forms.ot
+      .filter(
+        (f) =>
+          canBranch(f, me) ||
+          (otStage(f) === "waiting_head" && headCan(f)) ||
+          (isHr && otStage(f) === "waiting_hr" && f.employeeId !== me) ||
+          (otStage(f) === "returned" && f.employeeId === me),
+      )
+      .map((f) => ({ id: f.overtimeRequestId, employeeId: f.employeeId })),
+    ...legacy(requests.ot, otFormIds),
+  ];
+  const corrFormIds = new Set(forms.corr.map((f) => f.correctionRequestId));
+  const corr = [
+    ...forms.corr
+      .filter((f) => canBranch(f, me) || (correctionStage(f) === "waiting_head" && headCan(f)) || (isHr && correctionStage(f) === "waiting_hr" && f.employeeId !== me))
+      .map((f) => ({ id: f.correctionRequestId, employeeId: f.employeeId })),
+    ...legacy(requests.corr, corrFormIds),
+  ];
+  const travel = forms.travel
+    .filter((t) => canApproveTravel(t, me, isHr) || (isHr && travelStage(t) === "waiting_hr" && t.employeeId !== me))
+    .map((t) => ({ id: t.id, employeeId: t.employeeId }));
+  return { leave, ot, corr, travel };
+}
+
+// What's waiting for the signed-in person on each Workforce page.
+export function useWorkforceActions(): Record<WorkforceKind, WorkforceActionItem[]> | null {
+  const { isRealAccount, currentEmployee, currentUser, employees, leaveRequests, overtimeRequests, correctionRequests } = useHris();
+  const { forms } = useWorkforceForms();
+  const me = currentEmployee?.id;
+  if (!isRealAccount || !me) return null;
+  return workforceActions(forms, me, !!currentUser?.roles.includes("hr_admin"), employees, { leave: leaveRequests, ot: overtimeRequests, corr: correctionRequests });
+}
+
+export function useWorkforceBadges(): Record<string, number> {
+  const { isRealAccount, currentEmployee, currentUser, employees, leaveRequests, overtimeRequests, correctionRequests } = useHris();
+  const me = currentEmployee?.id;
+  const isHr = !!currentUser?.roles.includes("hr_admin");
+  const { forms, seenTick } = useWorkforceForms();
+  if (!isRealAccount || !me) return {};
+  void seenTick;
+  const actions = workforceActions(forms, me, isHr, employees, { leave: leaveRequests, ot: overtimeRequests, corr: correctionRequests });
 
   // Leave
   const leaveFormIds = new Set(forms.leave.flatMap((f) => [f.leaveRequestId, ...(f.unpaidRequestId ? [f.unpaidRequestId] : [])]));
-  const leaveAction =
-    forms.leave.filter((f) => canBranch(f, me) || (formStage(f) === "waiting_head" && headCan(f)) || (isHr && formStage(f) === "waiting_hr" && f.employeeId !== me)).length +
-    legacy(leaveRequests, leaveFormIds);
+  const leaveAction = actions.leave.length;
   const leaveSeen = readSeen("leave", me);
   const leaveUpdates =
     forms.leave.filter((f) => f.employeeId === me && latest(f.branchSignedAt, f.headSignedAt, f.receivedAt) > leaveSeen).length +
@@ -118,14 +182,7 @@ export function useWorkforceBadges(): Record<string, number> {
 
   // Overtime
   const otFormIds = new Set(forms.ot.map((f) => f.overtimeRequestId));
-  const otAction =
-    forms.ot.filter(
-      (f) =>
-        canBranch(f, me) ||
-        (otStage(f) === "waiting_head" && headCan(f)) ||
-        (isHr && otStage(f) === "waiting_hr" && f.employeeId !== me) ||
-        (otStage(f) === "returned" && f.employeeId === me),
-    ).length + legacy(overtimeRequests, otFormIds);
+  const otAction = actions.ot.length;
   const otSeen = readSeen("ot", me);
   const otUpdates =
     forms.ot.filter((f) => f.employeeId === me && otStage(f) !== "returned" && latest(f.branchSignedAt, f.headSignedAt, f.hrSignedAt) > otSeen).length +
@@ -133,16 +190,14 @@ export function useWorkforceBadges(): Record<string, number> {
 
   // Attendance corrections
   const corrFormIds = new Set(forms.corr.map((f) => f.correctionRequestId));
-  const corrAction =
-    forms.corr.filter((f) => canBranch(f, me) || (correctionStage(f) === "waiting_head" && headCan(f)) || (isHr && correctionStage(f) === "waiting_hr" && f.employeeId !== me)).length +
-    legacy(correctionRequests, corrFormIds);
+  const corrAction = actions.corr.length;
   const corrSeen = readSeen("corr", me);
   const corrUpdates =
     forms.corr.filter((f) => f.employeeId === me && latest(f.branchSignedAt, f.headSignedAt, f.receivedAt) > corrSeen).length +
     correctionRequests.filter((r) => r.employeeId === me && !corrFormIds.has(r.id) && r.decidedAt && r.decidedAt > corrSeen).length;
 
   // Travel allowance
-  const travelAction = forms.travel.filter((t) => canApproveTravel(t, me, isHr) || (isHr && travelStage(t) === "waiting_hr" && t.employeeId !== me)).length;
+  const travelAction = actions.travel.length;
   const travelSeen = readSeen("travel", me);
   const travelUpdates = forms.travel.filter((t) => t.employeeId === me && latest(t.headSignedAt, t.receivedAt) > travelSeen).length;
 
