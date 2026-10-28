@@ -24,6 +24,13 @@ function DocHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
+// An earnings or deductions line, left off the payslip when its amount is
+// zero. Negative amounts (lates, undertime) are still shown.
+function PayslipAmount({ label, value }: { label: string; value: number }) {
+  if (Math.abs(value || 0) < 0.005) return null;
+  return <FormAmountRow label={label} value={value} />;
+}
+
 // adjustments: this employee's salary adjustments for the period. They are
 // listed only when they add up to the adjustment amount already in this
 // payslip, so an older payslip never shows notes for changes it doesn't include.
@@ -46,44 +53,41 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
         </FormSection>
 
         <FormSection title="Earnings">
-          <FormAmountRow label="Basic Pay" value={line.basicPay} />
-          <FormAmountRow label={payrollLabel("latesUndertime", "Late Deduction")} value={-line.latesUndertime || 0} />
-          <FormAmountRow label="Undertime Deduction" value={-line.undertimeDeduction || 0} />
+          <PayslipAmount label="Basic Pay" value={line.basicPay} />
+          <PayslipAmount label={payrollLabel("latesUndertime", "Late Deduction")} value={-line.latesUndertime || 0} />
+          <PayslipAmount label="Undertime Deduction" value={-line.undertimeDeduction || 0} />
           {currentCompany().allowanceBreakdown ? (
             <>
-              {ALLOWANCE_PARTS.filter((p) => p.deMinimis).map((p) => (
-                <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />
-              ))}
-              <FormAmountRow label="Total Rice, Uniform, Laundry & Medical" value={ALLOWANCE_PARTS.filter((p) => p.deMinimis).reduce((t, p) => t + line[p.key], 0)} bold />
+              <PayslipAmount label="De Minimis" value={ALLOWANCE_PARTS.filter((p) => p.deMinimis).reduce((t, p) => t + line[p.key], 0)} />
               {ALLOWANCE_PARTS.filter((p) => !p.deMinimis).map((p) => (
-                <FormAmountRow key={p.key} label={p.label} value={line[p.key]} />
+                <PayslipAmount key={p.key} label={p.label} value={line[p.key]} />
               ))}
             </>
           ) : (
-            <FormAmountRow label={payrollLabel("netAllowances", "Net Allowances")} value={line.netAllowances} />
+            <PayslipAmount label={payrollLabel("netAllowances", "Net Allowances")} value={line.netAllowances} />
           )}
-          <FormAmountRow label={payrollLabel("otPay", "Overtime Pay")} value={line.otPay} />
-          <FormAmountRow label="Holiday Pay" value={line.holidayPay} />
-          <FormAmountRow label="Sick Leave Pay" value={line.slPay} />
-          <FormAmountRow label={payrollLabel("vlPay", "Vacation Leave Pay")} value={line.vlPay} />
-          <FormAmountRow label={payrollLabel("adjustmentAdd", "Adjustment (Add)")} value={line.adjustmentAdd} />
+          <PayslipAmount label={payrollLabel("otPay", "Overtime Pay")} value={line.otPay} />
+          <PayslipAmount label="Holiday Pay" value={line.holidayPay} />
+          <PayslipAmount label="Sick Leave Pay" value={line.slPay} />
+          <PayslipAmount label={payrollLabel("vlPay", "Vacation Leave Pay")} value={line.vlPay} />
+          <PayslipAmount label={payrollLabel("adjustmentAdd", "Adjustment (Add)")} value={line.adjustmentAdd} />
           <FormAmountRow label="Gross Pay" value={line.grossSalary + line.adjustmentAdd} bold />
         </FormSection>
 
         <FormSection title="Deductions">
-          <FormAmountRow label="Cash Advance" value={line.cashAdvance} />
-          <FormAmountRow label={payrollLabel("lsmBizLoan", "LSM Biz Loan")} value={line.lsmBizLoan} />
-          <FormAmountRow label={payrollLabel("lsmCoopLoan", "LSM Coop Loan")} value={line.lsmCoopLoan} />
-          <FormAmountRow label="Shortage Deduction" value={line.shortages} />
-          <FormAmountRow label="SSS Contribution" value={line.sssContribution} />
-          <FormAmountRow label="SSS WISP" value={line.sssWisp} />
-          <FormAmountRow label="SSS Loan" value={line.sssLoan} />
-          <FormAmountRow label="PhilHealth Contribution" value={line.philHealthContribution} />
-          <FormAmountRow label="Pag-IBIG (HDMF) Contribution" value={line.hdmfContribution} />
-          <FormAmountRow label="Pag-IBIG (HDMF) Loan" value={line.hdmfLoan} />
-          <FormAmountRow label="Pag-IBIG (HDMF) MP2 Savings" value={line.hdmfMp2Savings} />
-          <FormAmountRow label="Withholding Tax" value={line.withholdingTax} />
-          <FormAmountRow label={payrollLabel("adjustmentDeduct", "Adjustment (Deduct)")} value={line.adjustmentDeduct} />
+          <PayslipAmount label="Cash Advance" value={line.cashAdvance} />
+          <PayslipAmount label={payrollLabel("lsmBizLoan", "LSM Biz Loan")} value={line.lsmBizLoan} />
+          <PayslipAmount label={payrollLabel("lsmCoopLoan", "LSM Coop Loan")} value={line.lsmCoopLoan} />
+          <PayslipAmount label="Shortage Deduction" value={line.shortages} />
+          <PayslipAmount label="SSS Contribution" value={line.sssContribution} />
+          <PayslipAmount label="SSS WISP" value={line.sssWisp} />
+          <PayslipAmount label="SSS Loan" value={line.sssLoan} />
+          <PayslipAmount label="PhilHealth Contribution" value={line.philHealthContribution} />
+          <PayslipAmount label="Pag-IBIG (HDMF) Contribution" value={line.hdmfContribution} />
+          <PayslipAmount label="Pag-IBIG (HDMF) Loan" value={line.hdmfLoan} />
+          <PayslipAmount label="Pag-IBIG (HDMF) MP2 Savings" value={line.hdmfMp2Savings} />
+          <PayslipAmount label="Withholding Tax" value={line.withholdingTax} />
+          <PayslipAmount label={payrollLabel("adjustmentDeduct", "Adjustment (Deduct)")} value={line.adjustmentDeduct} />
           <FormAmountRow label="Total Deductions" value={line.totalDeductionsOtherThanMandatories + line.totalMandatories + line.adjustmentDeduct} bold />
         </FormSection>
 
