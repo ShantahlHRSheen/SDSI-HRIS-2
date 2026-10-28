@@ -69,6 +69,7 @@ export default function EvaluationsPage() {
   } = useHris();
   const [statusFilter, setStatusFilter] = useState<"all" | EvaluationStatus>("all");
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
   const [showManageEvaluators, setShowManageEvaluators] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
@@ -97,11 +98,20 @@ export default function EvaluationsPage() {
   }, [evaluations, statusFilter, visibleEmployeeIds]);
 
   // Employees a "New evaluation" can be started for.
+  // Active employees only (on leave counts as active).
   const evaluableEmployees = useMemo(() => {
-    if (isHr) return employees;
+    const active = employees.filter((e) => e.status === "active" || e.status === "on_leave");
+    if (isHr) return active;
     if (!currentEmployee) return [];
-    return employees.filter((e) => effectiveJobPerformanceEvaluatorId(e) === currentEmployee.id);
+    return active.filter((e) => effectiveJobPerformanceEvaluatorId(e) === currentEmployee.id);
   }, [employees, isHr, currentEmployee]);
+  const pickerMatches = useMemo(() => {
+    const q = pickerSearch.trim().toLowerCase();
+    if (!q) return evaluableEmployees;
+    return evaluableEmployees.filter((e) =>
+      [e.firstName, e.middleName, e.lastName, e.nickname, e.employeeNumber, positionTitle(e.positionId)].some((x) => x?.toLowerCase().includes(q)),
+    );
+  }, [evaluableEmployees, pickerSearch]);
 
   function canEditBehaviorFor(): boolean {
     return isHr;
@@ -275,12 +285,23 @@ export default function EvaluationsPage() {
       )}
 
       {/* --- Employee picker for "New evaluation" ---------------------------- */}
-      <Modal open={showPicker} onClose={() => setShowPicker(false)} title="Start a new evaluation">
+      <Modal open={showPicker} onClose={() => (setShowPicker(false), setPickerSearch(""))} title="Start a new evaluation">
+        {evaluableEmployees.length > 0 && (
+          <input
+            autoFocus
+            value={pickerSearch}
+            onChange={(ev) => setPickerSearch(ev.target.value)}
+            placeholder="Search name, employee no. or position…"
+            className="mb-2 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm"
+          />
+        )}
         <div className="space-y-1">
           {evaluableEmployees.length === 0 ? (
             <div className="py-4 text-center text-sm text-[var(--text-muted)]">No employees are assigned to you to evaluate.</div>
+          ) : pickerMatches.length === 0 ? (
+            <div className="py-4 text-center text-sm text-[var(--text-muted)]">No active employee matches “{pickerSearch}”.</div>
           ) : (
-            evaluableEmployees.map((e) => (
+            pickerMatches.map((e) => (
               <button
                 key={e.id}
                 onClick={() => startOrOpen(e.id)}
