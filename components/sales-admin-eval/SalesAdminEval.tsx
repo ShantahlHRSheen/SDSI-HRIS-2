@@ -17,13 +17,14 @@ import {
   saeScores,
   saeSignatures,
   saveHeadPart,
+  saeHeads,
   saveHrPart,
   SAE_BEHAVIOR,
   SAE_BEHAVIOR_KRA,
-  SAE_JOB,
   SAE_OVERALL,
   SAE_SCALE,
-  SAE_WEIGHTS,
+  jobItems,
+  saeWeights,
   emptyHeadPart,
   emptyHrPart,
   type Rating,
@@ -33,13 +34,25 @@ import {
 } from "@/lib/sales-admin-eval";
 
 export const primary = "flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40";
-export const secondary = "flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40";
+export const secondary =
+  "flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40";
 export const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
 const label = "mb-1 block text-xs font-medium text-[var(--text-secondary)]";
 
 export const saeConfig = () => {
   const c = currentCompany().salesAdminEval;
-  return c ?? { headId: "", vcId: "", chairmanId: "", headTitle: "Department Head", vcTitle: "Vice Chairperson", chairmanTitle: "Chairman", passMark: 90, positionPrefix: "" };
+  return (
+    c ?? {
+      headId: "",
+      vcId: "",
+      chairmanId: "",
+      headTitle: "Department Head",
+      vcTitle: "Vice Chairperson",
+      chairmanTitle: "Chairman",
+      passMark: 90,
+      positionPrefix: "",
+    }
+  );
 };
 
 export function useSalesAdminEvaluations() {
@@ -108,21 +121,24 @@ function Overall({ value, onChange, disabled }: { value: string; onChange: (v: s
 const fmt = (n: number) => n.toFixed(2);
 const peso = (n: number) => `₱${(Number(n) || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function ScoreSummary({ e, hr, head }: { e: SalesAdminEvaluation; hr?: SaeHrPart | null; head?: SaeHeadPart | null }) {
+export function ScoreSummary({ e, hr }: { e: SalesAdminEvaluation; hr?: SaeHrPart | null }) {
   const cfg = saeConfig();
-  const s = saeScores(hr ?? e.hr, head ?? e.head, cfg.passMark);
+  const s = saeScores(e.form, hr ?? e.hr, saeHeads(e), cfg.passMark);
+  const w = saeWeights(e.form);
   const cell = "rounded-lg bg-[var(--gridline)]/25 px-3 py-2";
   return (
-    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+    <div className={`grid grid-cols-2 gap-2 text-xs ${w.sales ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
       <div className={cell}>
-        Behavior ({SAE_WEIGHTS.behavior}) <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.behavior)}</div>
+        Behavior ({w.behavior}) <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.behavior)}</div>
       </div>
       <div className={cell}>
-        Job Performance ({SAE_WEIGHTS.job}) <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.job)}</div>
+        Job Performance ({w.job}) <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.job)}</div>
       </div>
-      <div className={cell}>
-        Sales ({SAE_WEIGHTS.sales}) <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.sales)}</div>
-      </div>
+      {w.sales > 0 && (
+        <div className={cell}>
+          Sales ({w.sales}) <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.sales)}</div>
+        </div>
+      )}
       <div className={cell}>
         Actual score <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.total)}</div>
       </div>
@@ -140,19 +156,28 @@ export function ScoreSummary({ e, hr, head }: { e: SalesAdminEvaluation; hr?: Sa
 
 export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation; onClose: () => void; onChanged: () => void }) {
   const { currentEmployee } = useHris();
-  const [part, setPart] = useState<SaeHrPart>(() => ({ ...emptyHrPart(), ...e.hr, behavior: SAE_BEHAVIOR.map((_, i) => e.hr?.behavior?.[i] ?? null) }));
+  const [part, setPart] = useState<SaeHrPart>(() => ({
+    ...emptyHrPart(),
+    ...e.hr,
+    behavior: SAE_BEHAVIOR.map((_, i) => e.hr?.behavior?.[i] ?? null),
+  }));
   const [hasSignature, setHasSignature] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof SaeHrPart>(k: K, v: SaeHrPart[K]) => setPart((p) => ({ ...p, [k]: v }));
-  const ready = part.behavior.every((x) => x !== null) && part.sales.some((m) => monthSalesScore(m) !== null) && !!part.overall && !!part.recommendation.trim();
+  const w = saeWeights(e.form);
+  const withSales = w.sales > 0;
+  const ready = part.behavior.every((x) => x !== null) && (!withSales || part.sales.some((m) => monthSalesScore(m) !== null)) && !!part.overall && !!part.recommendation.trim();
 
   async function save(sign: boolean) {
     if (!currentEmployee) return;
     setBusy(sign ? "sign" : "save");
     setError(null);
     try {
-      const clean = { ...part, sales: part.sales.filter((m) => m.month.trim() || m.ads || m.gross) };
+      const clean = {
+        ...part,
+        sales: withSales ? part.sales.filter((m) => m.month.trim() || m.ads || m.gross) : [],
+      };
       await saveHrPart(e.id, clean, sign ? currentEmployee.id : null);
       onChanged();
       onClose();
@@ -164,12 +189,12 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
   }
 
   return (
-    <Modal open wide onClose={() => !busy && onClose()} title={`HR's part — ${e.employeeName}`}>
+    <Modal open wide onClose={() => !busy && onClose()} title={`HR's part — ${e.employeeName} (${e.purpose})`}>
       <div className="space-y-5 text-sm">
         <ScaleLegend />
         <div>
           <div className="mb-2 font-medium text-[var(--text-primary)]">
-            Behavior ({SAE_WEIGHTS.behavior}%) — {SAE_BEHAVIOR_KRA}
+            Behavior ({w.behavior}%) — {SAE_BEHAVIOR_KRA}
           </div>
           <div className="space-y-1.5">
             {SAE_BEHAVIOR.map((item, i) => (
@@ -177,59 +202,84 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
                 <span className="text-[var(--text-secondary)]">
                   {i + 1}. {item}
                 </span>
-                <RatingPicker value={part.behavior[i]} onChange={(v) => set("behavior", part.behavior.map((x, j) => (j === i ? v : x)))} />
+                <RatingPicker
+                  value={part.behavior[i]}
+                  onChange={(v) =>
+                    set(
+                      "behavior",
+                      part.behavior.map((x, j) => (j === i ? v : x)),
+                    )
+                  }
+                />
               </div>
             ))}
           </div>
         </div>
 
-        <div>
-          <div className="mb-1 font-medium text-[var(--text-primary)]">Sales ({SAE_WEIGHTS.sales}%)</div>
-          <p className="mb-2 text-xs text-[var(--text-muted)]">Required sales are 3× the ads spent. Each month scores gross ÷ required × 80, at most 80; the Sales score is the average of the months.</p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-xs">
-              <thead className="text-[var(--text-muted)]">
-                <tr>
-                  <th className="px-1 py-1 text-left font-medium">Month</th>
-                  <th className="px-1 py-1 text-right font-medium">Ads spent</th>
-                  <th className="px-1 py-1 text-right font-medium">Required (3×)</th>
-                  <th className="px-1 py-1 text-right font-medium">Gross sales</th>
-                  <th className="px-1 py-1 text-right font-medium">Score</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {part.sales.map((m, i) => {
-                  const upd = (patch: Partial<typeof m>) => set("sales", part.sales.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-                  const score = monthSalesScore(m);
-                  return (
-                    <tr key={i}>
-                      <td className="px-1 py-1">
-                        <input value={m.month} onChange={(ev) => upd({ month: ev.target.value })} placeholder="e.g. July 2026" className={input} maxLength={40} />
-                      </td>
-                      <td className="px-1 py-1">
-                        <input type="number" min={0} step="0.01" value={m.ads || ""} onChange={(ev) => upd({ ads: Number(ev.target.value) || 0 })} className={`${input} text-right`} />
-                      </td>
-                      <td className="tabular px-1 py-1 text-right text-[var(--text-secondary)]">{peso(requiredSales(m))}</td>
-                      <td className="px-1 py-1">
-                        <input type="number" min={0} step="0.01" value={m.gross || ""} onChange={(ev) => upd({ gross: Number(ev.target.value) || 0 })} className={`${input} text-right`} />
-                      </td>
-                      <td className="tabular px-1 py-1 text-right font-semibold text-[var(--text-primary)]">{score === null ? "—" : fmt(score)}</td>
-                      <td className="px-1 py-1 text-right">
-                        <button onClick={() => set("sales", part.sales.filter((_, j) => j !== i))} className="rounded p-1 text-[var(--text-muted)] hover:text-[var(--status-critical)]" aria-label="Remove month">
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {withSales && (
+          <div>
+            <div className="mb-1 font-medium text-[var(--text-primary)]">Sales ({w.sales}%)</div>
+            <p className="mb-2 text-xs text-[var(--text-muted)]">
+              Required sales are 3× the ads spent. Each month scores gross ÷ required × 80, at most 80; the Sales score is the average of the months.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-xs">
+                <thead className="text-[var(--text-muted)]">
+                  <tr>
+                    <th className="px-1 py-1 text-left font-medium">Month</th>
+                    <th className="px-1 py-1 text-right font-medium">Ads spent</th>
+                    <th className="px-1 py-1 text-right font-medium">Required (3×)</th>
+                    <th className="px-1 py-1 text-right font-medium">Gross sales</th>
+                    <th className="px-1 py-1 text-right font-medium">Score</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {part.sales.map((m, i) => {
+                    const upd = (patch: Partial<typeof m>) =>
+                      set(
+                        "sales",
+                        part.sales.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+                      );
+                    const score = monthSalesScore(m);
+                    return (
+                      <tr key={i}>
+                        <td className="px-1 py-1">
+                          <input value={m.month} onChange={(ev) => upd({ month: ev.target.value })} placeholder="e.g. July 2026" className={input} maxLength={40} />
+                        </td>
+                        <td className="px-1 py-1">
+                          <input type="number" min={0} step="0.01" value={m.ads || ""} onChange={(ev) => upd({ ads: Number(ev.target.value) || 0 })} className={`${input} text-right`} />
+                        </td>
+                        <td className="tabular px-1 py-1 text-right text-[var(--text-secondary)]">{peso(requiredSales(m))}</td>
+                        <td className="px-1 py-1">
+                          <input type="number" min={0} step="0.01" value={m.gross || ""} onChange={(ev) => upd({ gross: Number(ev.target.value) || 0 })} className={`${input} text-right`} />
+                        </td>
+                        <td className="tabular px-1 py-1 text-right font-semibold text-[var(--text-primary)]">{score === null ? "—" : fmt(score)}</td>
+                        <td className="px-1 py-1 text-right">
+                          <button
+                            onClick={() =>
+                              set(
+                                "sales",
+                                part.sales.filter((_, j) => j !== i),
+                              )
+                            }
+                            className="rounded p-1 text-[var(--text-muted)] hover:text-[var(--status-critical)]"
+                            aria-label="Remove month"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <button onClick={() => set("sales", [...part.sales, { month: "", ads: 0, gross: 0 }])} disabled={part.sales.length >= 24} className={`${secondary} mt-2`}>
+              <Plus size={14} /> Add a month
+            </button>
           </div>
-          <button onClick={() => set("sales", [...part.sales, { month: "", ads: 0, gross: 0 }])} disabled={part.sales.length >= 24} className={`${secondary} mt-2`}>
-            <Plus size={14} /> Add a month
-          </button>
-        </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -267,7 +317,15 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
 
 export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation; onClose: () => void; onChanged: () => void }) {
   const { currentEmployee } = useHris();
-  const [part, setPart] = useState<SaeHeadPart>(() => ({ ...emptyHeadPart(), ...e.head, job: SAE_JOB.map((_, i) => e.head?.job?.[i] ?? null) }));
+  const items = jobItems(e.form);
+  // The caller's own part: the first or the second head's.
+  const slot = e.headId === currentEmployee?.id ? "head" : "head2";
+  const mine = slot === "head" ? e.head : e.head2;
+  const [part, setPart] = useState<SaeHeadPart>(() => ({
+    ...emptyHeadPart(e.form),
+    ...mine,
+    job: items.map((_, i) => mine?.job?.[i] ?? null),
+  }));
   const [hasSignature, setHasSignature] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +337,7 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
     setBusy(sign ? "sign" : "save");
     setError(null);
     try {
-      await saveHeadPart(e.id, part, sign ? currentEmployee.id : null);
+      await saveHeadPart(e.id, slot, part, sign ? currentEmployee.id : null);
       onChanged();
       onClose();
     } catch (err) {
@@ -290,20 +348,30 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
   }
 
   return (
-    <Modal open wide onClose={() => !busy && onClose()} title={`Job Performance — ${e.employeeName}`}>
+    <Modal open wide onClose={() => !busy && onClose()} title={`Job Performance — ${e.employeeName} (${e.purpose})`}>
       <div className="space-y-5 text-sm">
         <p className="text-[var(--text-secondary)]">
-          As the Department Head, rate {e.employeeName}&rsquo;s job performance, then give your overall rating, comment and recommendation. HR rates the Behavior and enters the sales.
+          As the Department Head, rate {e.employeeName}&rsquo;s job performance, then give your overall rating, comment and recommendation. HR rates the Behavior
+          {e.form === "sales_admin" ? " and enters the sales" : ""}.
+          {e.head2Id && ` ${slot === "head" ? e.head2Name || "The other head" : e.headName || "The other head"} also rates Job Performance; your ratings are averaged.`}
         </p>
         <ScaleLegend />
         <div className="space-y-1.5">
-          {SAE_JOB.map((j, i) => (
+          {items.map((j, i) => (
             <div key={i} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1 hover:bg-[var(--gridline)]/20">
               <span>
                 <span className="font-medium text-[var(--text-primary)]">{j.kra}</span>
                 <span className="block text-xs text-[var(--text-secondary)]">{j.objective}</span>
               </span>
-              <RatingPicker value={part.job[i]} onChange={(v) => set("job", part.job.map((x, k) => (k === i ? v : x)))} />
+              <RatingPicker
+                value={part.job[i]}
+                onChange={(v) =>
+                  set(
+                    "job",
+                    part.job.map((x, k) => (k === i ? v : x)),
+                  )
+                }
+              />
             </div>
           ))}
         </div>
@@ -393,6 +461,16 @@ export function Recommendations({ e }: { e: SalesAdminEvaluation }) {
   const rows: [string, string | null | undefined, string | null | undefined, string | null][] = [
     [`HR${e.hrName ? ` (${e.hrName})` : ""}`, e.hr?.overall, [e.hr?.recommendation, e.hr?.comment].filter(Boolean).join(" — "), e.hrSignedAt],
     [`${cfg.headTitle}${e.headName ? ` (${e.headName})` : ""}`, e.head?.overall, [e.head?.recommendation, e.head?.comment].filter(Boolean).join(" — "), e.headSignedAt],
+    ...(e.head2Id
+      ? [
+          [
+            `${cfg.headTitle}${e.head2Name ? ` (${e.head2Name})` : ""}`,
+            e.head2?.overall,
+            [e.head2?.recommendation, e.head2?.comment].filter(Boolean).join(" — "),
+            e.head2SignedAt,
+          ] as [string, string | null | undefined, string | null | undefined, string | null],
+        ]
+      : []),
     [`${cfg.vcTitle}${e.vcName ? ` (${e.vcName})` : ""}`, null, e.vcRecommendation, e.vcSignedAt],
     [`${cfg.chairmanTitle}${e.chairmanName ? ` (${e.chairmanName})` : ""}`, null, e.chairmanRecommendation, e.chairmanSignedAt],
   ];
@@ -436,12 +514,17 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
         letterhead: await loadHrLetterhead(),
         signatures: await saeSignatures(e),
         head: { name: e.headName ?? "", title: cfg.headTitle },
+        head2: e.head2Id ? { name: e.head2Name ?? "", title: cfg.headTitle } : null,
         hr: { name: e.hrName ?? "", title: "HR Manager" },
         vc: { name: e.vcName ?? "", title: cfg.vcTitle },
         chairman: { name: e.chairmanName ?? "", title: cfg.chairmanTitle },
       });
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
-      setViewer({ url, name: `Sales Admin Evaluation - ${e.employeeName}.pdf`, kind: "pdf" });
+      setViewer({
+        url,
+        name: `${e.form === "general" ? "Performance Evaluation" : "Sales Admin Evaluation"} - ${e.purpose} - ${e.employeeName}.pdf`,
+        kind: "pdf",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't open the form.");
     } finally {
@@ -451,7 +534,11 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
 
   return (
     <>
-      <button onClick={open} disabled={busy} className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-50">
+      <button
+        onClick={open}
+        disabled={busy}
+        className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-50"
+      >
         {busy ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} View / print
       </button>
       {error && <div className="text-[11px] text-[var(--status-critical)]">{error}</div>}

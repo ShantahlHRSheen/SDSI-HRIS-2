@@ -8,7 +8,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
-import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, reopenSaePart, saeStatusLabel, SAE_WEIGHTS, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
+import { effectiveJobPerformanceEvaluatorId } from "@/lib/performance-eval";
+import type { Employee } from "@/lib/types";
+import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, reopenSaePart, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import {
   HeadPartModal,
   HrPartModal,
@@ -23,10 +25,10 @@ import {
   ViewSaeButton,
 } from "@/components/sales-admin-eval/SalesAdminEval";
 
-// Sales Admin Evaluation for Regularization: HR starts it and rates
-// Behavior and the sales; the Department Head rates Job Performance; the
-// Vice Chairperson and the Chairman recommend. Seen by HR, Upper
-// Management and the head named on it.
+// Employee evaluation (Monthly, Year-end, for Regularization): HR starts it
+// and rates Behavior (and the sales, on the Sales Admin form); the
+// Department Head rates Job Performance; the Vice Chairperson and the
+// Chairman recommend. Seen by HR, Upper Management and the head named on it.
 export default function SalesAdminEvaluationPage() {
   const { currentUser, currentEmployee, employees, isRealAccount } = useHris();
   const { items, error, reload } = useSalesAdminEvaluations();
@@ -43,11 +45,16 @@ export default function SalesAdminEvaluationPage() {
   const myTurn = (e: SalesAdminEvaluation): "hr" | "head" | "recommend" | null => {
     if (e.status === "open" && isHr && !e.hrSignedAt) return "hr";
     if (e.status === "open" && e.headId === me && !e.headSignedAt) return "head";
+    if (e.status === "open" && e.head2Id === me && !e.head2SignedAt) return "head";
     if ((e.status === "vc" && e.vcId === me) || (e.status === "chairman" && e.chairmanId === me)) return "recommend";
     return null;
   };
-  const list = items ?? [];
-  const mine = list.filter((e) => myTurn(e));
+  const [search, setSearch] = useState("");
+  const [purposeFilter, setPurposeFilter] = useState("");
+  const list = (items ?? []).filter(
+    (e) => (!purposeFilter || e.purpose === purposeFilter) && (!search.trim() || e.employeeName.toLowerCase().includes(search.trim().toLowerCase())),
+  );
+  const mine = (items ?? []).filter((e) => myTurn(e));
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -65,7 +72,7 @@ export default function SalesAdminEvaluationPage() {
   if (!isRealAccount) {
     return (
       <div>
-        <PageHeader title="Sales Admin Evaluation" subtitle="Evaluation for regularization." />
+        <PageHeader title="Employee Evaluation" subtitle="Monthly, year-end and regularization evaluations." />
         <EmptyState icon={ClipboardList} title="Not available in the demo" description="Sign in with your employee account." />
       </div>
     );
@@ -76,8 +83,8 @@ export default function SalesAdminEvaluationPage() {
   return (
     <div>
       <PageHeader
-        title="Sales Admin Evaluation"
-        subtitle={`Evaluation for regularization: Behavior (${SAE_WEIGHTS.behavior}%) by HR, Job Performance (${SAE_WEIGHTS.job}%) by the Department Head, Sales (${SAE_WEIGHTS.sales}%). Passing score ${cfg.passMark}.`}
+        title="Employee Evaluation"
+        subtitle={`Monthly, year-end and regularization evaluations. HR rates Behavior, the Department Head rates Job Performance, then the Vice Chairperson and the Chairman recommend. Sales Admins: Behavior ${SAE_WEIGHTS.behavior}% + Job Performance ${SAE_WEIGHTS.job}% + Sales ${SAE_WEIGHTS.sales}%; other employees: Behavior ${SAE_WEIGHTS_GENERAL.behavior}% + Job Performance ${SAE_WEIGHTS_GENERAL.job}%. Passing score ${cfg.passMark}.`}
         actions={
           isHr && (
             <button onClick={() => setCreating(true)} className={primary}>
@@ -98,7 +105,7 @@ export default function SalesAdminEvaluationPage() {
                 <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
                   <div>
                     <span className="font-medium text-[var(--text-primary)]">{e.employeeName}</span>
-                    <span className="text-[var(--text-secondary)]"> — {e.period || "Evaluation"}</span>
+                    <span className="text-[var(--text-secondary)]"> — {[e.purpose, e.period].filter(Boolean).join(" ")}</span>
                   </div>
                   <button onClick={() => setOpen({ id: e.id, as })} className={primary}>
                     {actionLabel[as]}
@@ -115,6 +122,17 @@ export default function SalesAdminEvaluationPage() {
           <Loader2 size={14} className="animate-spin" /> Loading…
         </div>
       )}
+      {!!items?.length && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" className={`${input} max-w-xs`} />
+          <select value={purposeFilter} onChange={(e) => setPurposeFilter(e.target.value)} className={`${input} max-w-xs`}>
+            <option value="">All purposes</option>
+            {SAE_PURPOSES.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {items && !list.length && (
         <EmptyState icon={ClipboardList} title="No evaluations yet" description={isHr ? "Start one with New evaluation." : "Evaluations you take part in show here."} />
       )}
@@ -128,7 +146,7 @@ export default function SalesAdminEvaluationPage() {
                 <div>
                   <div className="font-medium text-[var(--text-primary)]">{e.employeeName}</div>
                   <div className="text-xs text-[var(--text-muted)]">
-                    {[e.period, e.hr?.employee?.position, `started ${formatDate(e.createdAt)}`].filter(Boolean).join(" · ")}
+                    {[[e.purpose, e.period].filter(Boolean).join(" "), e.hr?.employee?.position, e.form === "sales_admin" ? "Sales Admin form" : null, `started ${formatDate(e.createdAt)}`].filter(Boolean).join(" · ")}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -137,6 +155,11 @@ export default function SalesAdminEvaluationPage() {
                   {isHr && (e.status === "open" || e.status === "vc") && e.hrSignedAt && (
                     <button onClick={() => act(() => reopenSaePart(e.id, "hr"))} disabled={busy} className={secondary} title="Unlock HR's part to edit it">
                       <RotateCcw size={13} /> Edit HR&rsquo;s part
+                    </button>
+                  )}
+                  {isHr && (e.status === "open" || e.status === "vc") && e.head2SignedAt && (
+                    <button onClick={() => act(() => reopenSaePart(e.id, "head2"))} disabled={busy} className={secondary} title={`Send ${e.head2Name ?? "the second head"}'s part back to be redone`}>
+                      <RotateCcw size={13} /> Return {e.head2Name?.split(" ")[0] ?? "2nd head"}&rsquo;s part
                     </button>
                   )}
                   {isHr && (e.status === "open" || e.status === "vc") && e.headSignedAt && (
@@ -190,15 +213,44 @@ export default function SalesAdminEvaluationPage() {
 function NewEvaluationModal({ employees, onClose, onCreated }: { employees: ReturnType<typeof useHris>["employees"]; onClose: () => void; onCreated: (id: string) => void }) {
   const cfg = saeConfig();
   const active = useMemo(() => employees.filter((e) => e.status === "active" || e.status === "on_leave").sort((a, b) => fullName(a).localeCompare(fullName(b))), [employees]);
-  const [allPositions, setAllPositions] = useState(false);
-  const shown = active.filter((e) => allPositions || !cfg.positionPrefix || e.positionId.startsWith(cfg.positionPrefix));
+  const isSalesAdmin = (e: Employee) => !!cfg.positionPrefix && e.positionId.startsWith(cfg.positionPrefix);
+  const [form, setForm] = useState<SaeForm>("general");
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const shown = active
+    .filter((e) => (form === "sales_admin" ? isSalesAdmin(e) : !isSalesAdmin(e)))
+    .filter((e) => !q || [e.firstName, e.middleName, e.lastName, e.nickname, e.employeeNumber, positionTitle(e.positionId)].some((x) => x?.toLowerCase().includes(q)));
   const [employeeId, setEmployeeId] = useState("");
-  const [period, setPeriod] = useState(`Evaluation for Regularization ${new Date().getFullYear()}`);
-  const [headId, setHeadId] = useState(cfg.headId);
+  const [purpose, setPurpose] = useState("Evaluation for Regularization");
+  const [period, setPeriod] = useState(String(new Date().getFullYear()));
+  const [headId, setHeadId] = useState("");
+  const [head2Id, setHead2Id] = useState("");
   const [vcId, setVcId] = useState(cfg.vcId);
   const [chairmanId, setChairmanId] = useState(cfg.chairmanId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The head defaults to the Sales Admins' head, or the employee's Job
+  // Performance evaluator / supervisor.
+  function choose(id: string) {
+    setEmployeeId(id);
+    const emp = active.find((e) => e.id === id);
+    setHeadId(form === "sales_admin" ? cfg.headId : (emp && effectiveJobPerformanceEvaluatorId(emp)) || "");
+    // Cebu: Mary Jane Pedrano also rates (not herself).
+    const second = emp ? cfg.secondHeads?.[emp.branchId] : undefined;
+    setHead2Id(second && second !== emp?.id ? second : "");
+  }
+  function chooseForm(f: SaeForm) {
+    setForm(f);
+    setEmployeeId("");
+    setHeadId("");
+    setHead2Id("");
+  }
+  function choosePurpose(p: string) {
+    setPurpose(p);
+    const now = new Date();
+    setPeriod(p === "Monthly Evaluation" ? now.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "Asia/Manila" }) : String(now.getFullYear()));
+  }
 
   async function create() {
     const emp = active.find((e) => e.id === employeeId);
@@ -209,8 +261,11 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
       const mi = emp.middleName?.trim() ? ` ${emp.middleName.trim().charAt(0)}.` : "";
       const id = await createSalesAdminEvaluation({
         employeeId,
+        form,
+        purpose,
         period,
         headId,
+        head2Id: head2Id || null,
         vcId,
         chairmanId,
         employee: {
@@ -240,24 +295,59 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
     </select>
   );
   const lbl = "mb-1 block text-xs font-medium text-[var(--text-secondary)]";
+  const w = form === "general" ? SAE_WEIGHTS_GENERAL : SAE_WEIGHTS;
 
   return (
-    <Modal open onClose={() => !busy && onClose()} title="New Sales Admin evaluation">
+    <Modal open onClose={() => !busy && onClose()} title="New evaluation">
       <div className="space-y-3 text-sm">
         <div>
-          <label className={lbl}>Employee</label>
-          {pick(employeeId, setEmployeeId, shown)}
-          <label className="mt-1 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-            <input type="checkbox" checked={allPositions} onChange={(e) => setAllPositions(e.target.checked)} /> Show all positions
-          </label>
+          <label className={lbl}>Form</label>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(SAE_FORMS) as SaeForm[])
+              .slice()
+              .reverse()
+              .map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => chooseForm(f)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm ${form === f ? "border-[var(--series-1)] bg-[var(--series-1)]/10 font-medium text-[var(--series-1)]" : "border-[var(--border-hairline)] text-[var(--text-secondary)]"}`}
+                >
+                  {SAE_FORMS[f].label}
+                </button>
+              ))}
+          </div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">
+            Behavior {w.behavior}% + Job Performance {w.job}%{w.sales ? ` + Sales ${w.sales}%` : ""}
+          </div>
         </div>
         <div>
-          <label className={lbl}>Title / period</label>
-          <input value={period} onChange={(e) => setPeriod(e.target.value)} maxLength={100} className={input} />
+          <label className={lbl}>Employee</label>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, employee no. or position…" className={`${input} mb-1.5`} />
+          {pick(employeeId, choose, shown)}
+          {q && !shown.length && <div className="mt-1 text-xs text-[var(--text-muted)]">No active employee matches “{search}”.</div>}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={lbl}>Purpose of evaluation</label>
+            <select value={purpose} onChange={(e) => choosePurpose(e.target.value)} className={input}>
+              {SAE_PURPOSES.map((p) => (
+                <option key={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>Period</label>
+            <input value={period} onChange={(e) => setPeriod(e.target.value)} maxLength={100} placeholder="e.g. October 2026 or 2026" className={input} />
+          </div>
         </div>
         <div>
           <label className={lbl}>Department Head (rates Job Performance)</label>
           {pick(headId, setHeadId)}
+        </div>
+        <div>
+          <label className={lbl}>Second Department Head (optional — also rates Job Performance; the two are averaged)</label>
+          {pick(head2Id, setHead2Id)}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -274,7 +364,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
           <button onClick={onClose} disabled={busy} className={secondary}>
             Cancel
           </button>
-          <button onClick={create} disabled={busy || !employeeId || !headId || !vcId || !chairmanId} className={primary}>
+          <button onClick={create} disabled={busy || !employeeId || !headId || !vcId || !chairmanId || head2Id === headId} className={primary}>
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Start
           </button>
         </div>

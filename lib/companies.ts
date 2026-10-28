@@ -107,7 +107,19 @@ export interface CompanyConfig {
   // the default Department Head, Vice Chairperson and Chairman (employee
   // ids, with their titles on the form), the pass mark, and the positions
   // evaluated (position id prefix).
-  salesAdminEval?: { headId: string; vcId: string; chairmanId: string; headTitle: string; vcTitle: string; chairmanTitle: string; passMark: number; positionPrefix: string };
+  // secondHeads: branches whose employees a second Department Head also
+  // rates (branch id → employee id), averaged with the first head.
+  salesAdminEval?: {
+    headId: string;
+    vcId: string;
+    chairmanId: string;
+    headTitle: string;
+    vcTitle: string;
+    chairmanTitle: string;
+    passMark: number;
+    positionPrefix: string;
+    secondHeads?: Record<string, string>;
+  };
   pagibigMpl?: {
     signatoryId: string;
     employerPagibigId: string;
@@ -148,6 +160,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       chairmanTitle: "Chairman of the Board",
       passMark: 90,
       positionPrefix: "ps-sales-admin",
+      // Cebu: Mary Jane Pedrano (Branch Manager) with Marlyn Leonardo.
+      secondHeads: { "br-ceb": "emp-060" },
     },
     pagibigMpl: {
       signatoryId: "emp-045", // Marlyn C. Leonardo, Operations Manager
