@@ -39,3 +39,9 @@ export function PrintStack({ children, onDone }: { children: React.ReactNode; on
 export function PrintPage({ children, form = false }: { children: React.ReactNode; form?: boolean }) {
   return <div className={form ? "print-stack-page print-stack-form" : "print-stack-page"}>{children}</div>;
 }
+
+// Two documents on one A4 sheet, one per half, with a dashed cut line
+// between them (payslips printed several at once).
+export function PrintHalfSheet({ children }: { children: React.ReactNode }) {
+  return <div className="print-stack-page print-stack-halves">{children}</div>;
+}

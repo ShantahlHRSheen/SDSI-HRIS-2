@@ -11,7 +11,23 @@ import { componentKind, componentLabel, netEffect, type SalaryAdjustment } from 
 // Signature block at the foot of every payslip.
 export const PAYSLIP_SIGNATORIES = withShownNames(currentCompany().payslipSignatories);
 
-function DocHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+function DocHeader({ title, subtitle, half = false }: { title: string; subtitle?: string; half?: boolean }) {
+  if (half)
+    return (
+      <div className="mb-5 flex items-end justify-between gap-4 border-b-2 border-[#0b0b0b] pb-2">
+        <div>
+          <div className="font-bold uppercase">{COMPANY_INFO.name}</div>
+          <div className="text-[#52514e]">{COMPANY_INFO.address}</div>
+          <div className="text-[#52514e]">
+            {COMPANY_INFO.phone} · {COMPANY_INFO.email}
+          </div>
+        </div>
+        <div className="text-right">
+          <h1 className="text-base font-bold">{title}</h1>
+          {subtitle && <div className="text-[#52514e]">{subtitle}</div>}
+        </div>
+      </div>
+    );
   return (
     <div className="mb-5 border-b-2 border-[#0b0b0b] pb-3">
       <div className="text-sm font-bold uppercase">{COMPANY_INFO.name}</div>
@@ -34,14 +50,28 @@ function PayslipAmount({ label, value }: { label: string; value: number }) {
 // adjustments: this employee's salary adjustments for the period. They are
 // listed only when they add up to the adjustment amount already in this
 // payslip, so an older payslip never shows notes for changes it doesn't include.
-export function PayslipDocument({ employee, period, line, adjustments = [] }: { employee: Employee; period: PayrollPeriod; line: PayrollLine; adjustments?: SalaryAdjustment[] }) {
+// half: laid out to fill half an A4 sheet (two payslips per page), with
+// earnings and deductions side by side.
+export function PayslipDocument({
+  employee,
+  period,
+  line,
+  adjustments = [],
+  half = false,
+}: {
+  employee: Employee;
+  period: PayrollPeriod;
+  line: PayrollLine;
+  adjustments?: SalaryAdjustment[];
+  half?: boolean;
+}) {
   const mine = adjustments.filter((a) => a.employeeId === employee.id && a.periodId === period.id);
   const mineNet = Math.round(mine.reduce((t, a) => t + netEffect(a), 0) * 100) / 100;
   const showItems = mine.length > 0 && Math.abs(mineNet - line.salaryAdjustmentNet) < 0.005;
   return (
     <FormShell>
-      <div className="payslip-compact">
-        <DocHeader title="Employee Payslip" subtitle={`Pay period: ${formatDate(period.start)} – ${formatDate(period.end)}`} />
+      <div className={half ? "payslip-compact payslip-half" : "payslip-compact"}>
+        <DocHeader title="Employee Payslip" subtitle={`Pay period: ${formatDate(period.start)} – ${formatDate(period.end)}`} half={half} />
 
         <FormSection title="Employee Information">
           <FormRow label="Employee ID" value={employee.employeeNumber} mono />
@@ -52,6 +82,7 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
           <FormRow label="Days working" value={line.daysWorking} mono />
         </FormSection>
 
+        <div className={half ? "grid grid-cols-2 items-start gap-x-4" : undefined}>
         <FormSection title="Earnings">
           <PayslipAmount label="Basic Pay" value={line.basicPay} />
           <PayslipAmount label={payrollLabel("latesUndertime", "Late Deduction")} value={-line.latesUndertime || 0} />
@@ -90,6 +121,7 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
           <PayslipAmount label={payrollLabel("adjustmentDeduct", "Adjustment (Deduct)")} value={line.adjustmentDeduct} />
           <FormAmountRow label="Total Deductions" value={line.totalDeductionsOtherThanMandatories + line.totalMandatories + line.adjustmentDeduct} bold />
         </FormSection>
+        </div>
 
         {(showItems || line.salaryAdjustmentNet !== 0) && (
           <FormSection title="Salary Adjustments (included above)">

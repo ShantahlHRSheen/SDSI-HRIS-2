@@ -279,6 +279,64 @@ body {
   html[data-company] .print-stack-form .payslip-compact .mt-8 {
     margin-top: 16px;
   }
+
+  /* Several payslips printed at once: two per A4 sheet, one per half,
+     with a dashed cut line between them. The sheet has its own @page
+     with no margins so each half is exactly 148.5mm tall. */
+  .print-stack-page.print-stack-halves {
+    page: payslip-halves;
+    padding: 0;
+  }
+  .print-half {
+    height: 148.5mm;
+    padding: 6mm 14mm 0;
+    overflow: hidden;
+    break-inside: avoid;
+  }
+  .print-half:first-child {
+    border-bottom: 1px dashed #9a9a96;
+  }
+  .print-half .payslip-half {
+    font-size: 11px;
+    line-height: 13px;
+  }
+  .print-half .payslip-half .divide-y > div {
+    padding-top: 1px;
+    padding-bottom: 1px;
+  }
+  .print-half .payslip-half .mb-1\.5 {
+    margin-bottom: 2px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    font-size: 10px;
+  }
+  .print-half .payslip-half .mb-4 {
+    margin-bottom: 5px;
+  }
+  .print-half .payslip-half .mb-5 {
+    margin-bottom: 6px;
+  }
+  .print-half .payslip-half .mt-8 {
+    margin-top: 6px;
+  }
+  .print-half .payslip-half .mt-4 {
+    margin-top: 5px;
+  }
+  .print-half .payslip-half .text-xs,
+  .print-half .payslip-half .text-\[11px\] {
+    font-size: 10px;
+    line-height: 12px;
+  }
+  /* Employee information in two columns. */
+  .print-half .payslip-half > :nth-child(2) .divide-y {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+  }
+  .print-half .payslip-half > :nth-child(2) .divide-y > div {
+    border-top-width: 0;
+    border-bottom: 1px solid #e1e0d9;
+  }
 }
 
 .print-stack {
@@ -290,6 +348,10 @@ body {
 @page print-stack {
   size: A4;
   margin: 0 0 14mm 0;
+}
+@page payslip-halves {
+  size: A4;
+  margin: 0;
 }
 /* Off-screen pages drawn for "Download PDF" (components/pdf): documents
    that sit in a bordered card on screen print flat on the page. */

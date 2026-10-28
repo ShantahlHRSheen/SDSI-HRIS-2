@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MyPayslipsView, PayslipPreviewModal } from "@/components/payroll/MyPayslipsView";
 import { AllVoucherSlips } from "@/components/payroll/AllVoucherSlips";
 import { PayslipDocument } from "@/components/payroll/PayslipDocument";
-import { PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
+import { PrintHalfSheet, PrintPage, PrintStack } from "@/components/vouchers/PrintStack";
 import { computePayrollForPeriod, payrollLineToSummary, summaryToPayrollLine, type PayrollLine } from "@/lib/payroll";
 import { branchName, departmentAllocationsForEmployee, departmentName, formatCurrencyCompact, formatDate, fullName } from "@/lib/helpers";
 import type { Employee, GeneratedPayslip, PayrollPeriod } from "@/lib/types";
@@ -139,6 +139,8 @@ function AdminView({
     .filter((e) => lineByEmployee.has(e.id))
     .sort((a, b) => branchName(a.branchId).localeCompare(branchName(b.branchId)) || fullName(a).localeCompare(fullName(b)));
 
+  const printingList = printing === "shown" ? shownPrintList : printList;
+
   const generatedForPeriod = new Set(generatedPayslips.filter((p) => p.periodId === period?.id).map((p) => p.employeeId));
   const history = generatedPayslips.slice().sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : -1));
 
@@ -184,7 +186,7 @@ function AdminView({
             <button
               onClick={() => setPrinting("shown")}
               disabled={!shownPrintList.length}
-              title="Print the payslips of everyone shown — choose a branch in the Branch filter to print that branch only. One per page."
+              title="Print the payslips of everyone shown — choose a branch in the Branch filter to print that branch only. Two per A4 page."
               className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
             >
               <Printer size={16} /> {branchId ? `Print all — ${branchName(branchId)}` : "Print all shown"} ({shownPrintList.length})
@@ -192,7 +194,7 @@ function AdminView({
             <button
               onClick={() => setPrinting("selected")}
               disabled={!printList.length}
-              title="Tick employees in the list, then print all their payslips at once — one per page."
+              title="Tick employees in the list, then print all their payslips at once — two per A4 page."
               className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
             >
               <Printer size={16} /> Print selected ({printList.length})
@@ -306,13 +308,30 @@ function AdminView({
       <PayslipPreviewModal preview={preview} onClose={() => setPreview(null)} />
       {printing && period && (
         <PrintStack onDone={stopPrinting}>
-          {(printing === "shown" ? shownPrintList : printList).map((emp) => (
-            <PrintPage key={emp.id} form>
-              <PayslipDocument employee={emp} period={period} line={lineByEmployee.get(emp.id)!} adjustments={salaryAdjustments} />
+          {printingList.length === 1 ? (
+            <PrintPage form>
+              <PayslipDocument employee={printingList[0]} period={period} line={lineByEmployee.get(printingList[0].id)!} adjustments={salaryAdjustments} />
             </PrintPage>
-          ))}
+          ) : (
+            // Two or more: two payslips per A4 sheet.
+            pairs(printingList).map((pair) => (
+              <PrintHalfSheet key={pair[0].id}>
+                {pair.map((emp) => (
+                  <div key={emp.id} className="print-half">
+                    <PayslipDocument employee={emp} period={period} line={lineByEmployee.get(emp.id)!} adjustments={salaryAdjustments} half />
+                  </div>
+                ))}
+              </PrintHalfSheet>
+            ))
+          )}
         </PrintStack>
       )}
     </div>
   );
+}
+
+function pairs<T>(items: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2));
+  return out;
 }
