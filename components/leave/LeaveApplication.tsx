@@ -12,14 +12,15 @@ import { balanceFor, checkLeaveRequest, todayInManila } from "@/lib/leave-policy
 import { prepareSignature } from "@/lib/id-images";
 import {
   HEAD_DAY_FIELDS,
-  LEAVE_CATEGORIES,
   PAID_CATEGORIES,
   defaultHeadDays,
   formFinal,
   formProgress,
   formStage,
   isSickCategory,
+  leaveCategoriesFor,
   leaveCredits,
+  supervisorTitle,
   type HeadDays,
   type LeaveCategory,
   type LeaveForm,
@@ -178,7 +179,9 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
   const [filedUnpaidId, setFiledUnpaidId] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
 
-  const category = LEAVE_CATEGORIES.find((c) => c.id === form.category)!;
+  // Daro's form has its own four types (lib/leave-form.ts).
+  const categories = leaveCategoriesFor(currentEmployee);
+  const category = categories.find((c) => c.id === form.category) ?? categories[0];
   const leaveType = leaveTypes.find((t) => t.id === category.leaveTypeId);
   // Working days, or calendar days for maternity leave.
   const businessDays = form.startDate && form.endDate && form.endDate >= form.startDate ? leaveDaysBetween(category.leaveTypeId, form.startDate, form.endDate) : 0;
@@ -358,7 +361,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
               <div className={ro}>{details?.department || "—"}</div>
             </div>
             <div>
-              <div className={lbl}>{(currentEmployee?.supervisorId && currentCompany().approverTitles?.[currentEmployee.supervisorId]) || "Department head"}</div>
+              <div className={lbl}>{(currentEmployee?.supervisorId && currentCompany().approverTitles?.[currentEmployee.supervisorId]) || supervisorTitle()}</div>
               <div className={ro}>{details?.departmentHead || "— (HR will approve)"}</div>
             </div>
           </div>
@@ -367,7 +370,7 @@ export function LeaveApplicationModal({ open, onClose, onFiled }: { open: boolea
           <div>
             <div className="mb-2 text-xs font-semibold tracking-wide text-[var(--text-primary)] uppercase">Details of application</div>
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {LEAVE_CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                   <input type="radio" name="lf-category" checked={form.category === c.id} onChange={() => setForm((f) => ({ ...f, category: c.id }))} />
                   {c.label}
@@ -533,6 +536,8 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
   const stage = formStage(form);
   const canHead = canHeadForm(form, me, isHr);
   const canReceive = isHr && stage === "waiting_hr" && form.employeeId !== me;
+  // Daro's Human Resource Certification: HR recommends Approved / Disapproved.
+  const hrRecommends = currentCompany().leaveFormLayout === "daro";
   const doc: LeaveFormDocData = {
     ...form,
     startDate: request?.startDate ?? "",
@@ -565,7 +570,7 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
     setError(null);
     try {
       await signLeaveForm(form.leaveRequestId, me, "hr");
-      await receiveLeaveForm(form.leaveRequestId);
+      await receiveLeaveForm(form.leaveRequestId, hrRecommends && decision ? { decision, reason } : undefined);
       await reloadRequests();
       onChanged();
       loadSigs();
@@ -606,8 +611,9 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
 
         {canHead && (
           <div className="space-y-3 rounded-lg border border-[var(--border-hairline)] p-3">
-            <div className="text-sm font-semibold text-[var(--text-primary)]">Department Head&rsquo;s approval</div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{supervisorTitle()}&rsquo;s approval</div>
+            {/* Daro's form has no days-by-kind breakdown. */}
+            <div className={currentCompany().leaveFormLayout === "daro" ? "hidden" : "grid grid-cols-1 gap-2 sm:grid-cols-2"}>
               {HEAD_DAY_FIELDS.map((f) => (
                 <label key={f.id} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   <input
@@ -653,11 +659,30 @@ export function LeaveFormModal({ form, request, onClose, onChanged }: { form: Le
 
         {canReceive && (
           <div className="space-y-3 rounded-lg border border-[var(--border-hairline)] p-3">
-            <div className="text-sm font-semibold text-[var(--text-primary)]">Receive (HR Manager)</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{hrRecommends ? "Human Resource Certification" : "Receive (HR Manager)"}</div>
+            {hrRecommends && (
+              <>
+                <div className="flex flex-wrap gap-4 text-sm text-[var(--text-secondary)]">
+                  <span>Recommendation:</span>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="lf-hr-decision" checked={decision === "approved"} onChange={() => setDecision("approved")} /> Approved
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="lf-hr-decision" checked={decision === "disapproved"} onChange={() => setDecision("disapproved")} /> Disapproved
+                  </label>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]" htmlFor="lf-hr-reason">
+                    {decision === "disapproved" ? "Disapproved due to (required)" : "Remarks (optional)"}
+                  </label>
+                  <input id="lf-hr-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} className={input} />
+                </div>
+              </>
+            )}
             <MySignature onChange={setHasSignature} />
             {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
             <div className="flex justify-end">
-              <button onClick={receive} disabled={busy || !hasSignature} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
+              <button onClick={receive} disabled={busy || !hasSignature || (hrRecommends && (!decision || (decision === "disapproved" && !reason.trim())))} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
                 {busy ? "Receiving…" : "Sign & receive"}
               </button>
             </div>

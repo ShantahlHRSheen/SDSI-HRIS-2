@@ -1,4 +1,5 @@
-import type { LeaveRequest, LeaveType } from "./types";
+import type { Employee, LeaveRequest, LeaveType } from "./types";
+import { currentCompany } from "./companies";
 import { balanceFor } from "./leave-policy";
 import { branchDisapproved, waitingBranch, type BranchApproval } from "./branch-approval";
 
@@ -26,6 +27,22 @@ export const LEAVE_CATEGORIES: { id: LeaveCategory; label: string; leaveTypeId: 
   { id: "bereavement_with_pay", label: "Bereavement with Pay", leaveTypeId: "lt-bl" },
   { id: "bereavement_without_pay", label: "Bereavement without Pay", leaveTypeId: "lt-lwop" },
 ];
+
+// Daro's form has four types: Vacation, Sick, Maternity/Paternity, Absent.
+// Maternity/Paternity is filed as Paternity Leave for a male employee.
+export function leaveCategoriesFor(employee: Pick<Employee, "gender"> | null | undefined): { id: LeaveCategory; label: string; leaveTypeId: string }[] {
+  if (currentCompany().leaveFormLayout !== "daro") return LEAVE_CATEGORIES;
+  return [
+    { id: "vacation_with_pay", label: "Vacation", leaveTypeId: "lt-vl" },
+    { id: "sick_with_pay", label: "Sick", leaveTypeId: "lt-sl" },
+    { id: "maternity", label: "Maternity/Paternity", leaveTypeId: employee?.gender === "Male" ? "lt-pl" : "lt-ml" },
+    { id: "absent_without_pay", label: "Absent", leaveTypeId: "lt-lwop" },
+  ];
+}
+
+// The approver the leave form goes to (the employee's supervisor): Daro's
+// form calls them the Supervisor.
+export const supervisorTitle = () => (currentCompany().leaveFormLayout === "daro" ? "Supervisor" : "Department Head");
 
 // The categories paid from leave credits. When the credits run short, the
 // rest of the days are filed as Leave Without Pay on the same form
@@ -115,6 +132,9 @@ export interface LeaveForm extends BranchApproval {
   receivedBy: string | null;
   receivedName: string | null;
   receivedAt: string | null;
+  // HR's recommendation when receiving (Daro's form; null elsewhere).
+  hrDecision?: "approved" | "disapproved" | null;
+  hrReason?: string | null;
 }
 
 export type LeaveFormStage = "waiting_branch" | "branch_disapproved" | "waiting_head" | "waiting_hr" | "received";
@@ -133,7 +153,8 @@ export function formProgress(f: LeaveForm): { label: string; tone: "warning" | "
   if (waitingBranch(f)) return { label: `Waiting for branch approval (${f.branchApprover})`, tone: "warning" };
   if (branchDisapproved(f)) return { label: "Disapproved by the branch approver", tone: "critical" };
   const decision = f.headDecision === "approved" ? "Approved" : "Disapproved";
+  if (f.receivedAt && f.hrDecision) return { label: `${decision} · HR: ${f.hrDecision === "approved" ? "Approved" : "Disapproved"}`, tone: f.headDecision === "approved" && f.hrDecision === "approved" ? "good" : "critical" };
   if (f.receivedAt) return { label: `${decision} · Received by HR`, tone: f.headDecision === "approved" ? "good" : "critical" };
-  if (f.headDecision) return { label: `${decision} by Department Head · Waiting for HR`, tone: f.headDecision === "approved" ? "info" : "critical" };
-  return { label: "Waiting for Department Head approval", tone: "warning" };
+  if (f.headDecision) return { label: `${decision} by ${supervisorTitle()} · Waiting for HR`, tone: f.headDecision === "approved" ? "info" : "critical" };
+  return { label: `Waiting for ${supervisorTitle()} approval`, tone: "warning" };
 }
