@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ClipboardList, Loader2, Plus, RotateCcw, Settings2, Trash2 } from "lucide-react";
+import { ManageEvaluatorsModal } from "@/components/sales-admin-eval/ManageEvaluators";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -30,12 +31,13 @@ import {
 // Department Head rates Job Performance; the Vice Chairperson and the
 // Chairman recommend. Seen by HR, Upper Management and the head named on it.
 export default function SalesAdminEvaluationPage() {
-  const { currentUser, currentEmployee, employees, isRealAccount } = useHris();
+  const { currentUser, currentEmployee, employees, isRealAccount, updateEmployee } = useHris();
   const { items, error, reload } = useSalesAdminEvaluations();
   const isHr = !!currentUser?.roles.includes("hr_admin");
   const me = currentEmployee?.id;
   const cfg = saeConfig();
   const [creating, setCreating] = useState(false);
+  const [managing, setManaging] = useState(false);
   const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" } | null>(null);
   const [deleting, setDeleting] = useState<SalesAdminEvaluation | null>(null);
   const [busy, setBusy] = useState(false);
@@ -72,7 +74,7 @@ export default function SalesAdminEvaluationPage() {
   if (!isRealAccount) {
     return (
       <div>
-        <PageHeader title="Employee Evaluation" subtitle="Monthly, year-end and regularization evaluations." />
+        <PageHeader title="Performance Evaluations" subtitle="Monthly, year-end and regularization evaluations." />
         <EmptyState icon={ClipboardList} title="Not available in the demo" description="Sign in with your employee account." />
       </div>
     );
@@ -83,13 +85,18 @@ export default function SalesAdminEvaluationPage() {
   return (
     <div>
       <PageHeader
-        title="Employee Evaluation"
+        title="Performance Evaluations"
         subtitle={`Monthly, year-end and regularization evaluations. HR rates Behavior, the Department Head rates Job Performance, then the Vice Chairperson and the Chairman recommend. Sales Admins: Behavior ${SAE_WEIGHTS.behavior}% + Job Performance ${SAE_WEIGHTS.job}% + Sales ${SAE_WEIGHTS.sales}%; other employees: Behavior ${SAE_WEIGHTS_GENERAL.behavior}% + Job Performance ${SAE_WEIGHTS_GENERAL.job}%. Passing score ${cfg.passMark}.`}
         actions={
           isHr && (
-            <button onClick={() => setCreating(true)} className={primary}>
-              <Plus size={16} /> New evaluation
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setManaging(true)} className={secondary}>
+                <Settings2 size={16} /> Manage evaluators
+              </button>
+              <button onClick={() => setCreating(true)} className={primary}>
+                <Plus size={16} /> New evaluation
+              </button>
+            </div>
           )
         }
       />
@@ -183,6 +190,7 @@ export default function SalesAdminEvaluationPage() {
         })}
       </div>
 
+      {isHr && <ManageEvaluatorsModal open={managing} onClose={() => setManaging(false)} employees={employees} updateEmployee={updateEmployee} />}
       {creating && <NewEvaluationModal employees={employees} onClose={() => setCreating(false)} onCreated={async (id) => (await reload(), setCreating(false), setOpen({ id, as: "hr" }))} />}
       {opened && open?.as === "hr" && <HrPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {opened && open?.as === "head" && <HeadPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
