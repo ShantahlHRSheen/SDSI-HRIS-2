@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PenLine, Printer } from "lucide-react";
+import { PenLine, Printer, Signature } from "lucide-react";
+import { SignaturePadModal } from "@/components/forms/SignaturePad";
 import { useHris } from "@/lib/store";
 import { currentCompany } from "@/lib/companies";
 import { Modal } from "@/components/Modal";
@@ -86,7 +87,15 @@ export function MySignature({ onChange }: { onChange?: (hasSignature: boolean) =
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [drawing, setDrawing] = useState(false);
   useEffect(() => onChange?.(!!url), [url, onChange]);
+
+  async function saveDrawn(png: Blob) {
+    if (!currentEmployee) return;
+    setError(null);
+    await saveMySignature(currentEmployee.id, await prepareSignature(png));
+    reload();
+  }
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -122,10 +131,21 @@ export function MySignature({ onChange }: { onChange?: (hasSignature: boolean) =
           disabled={busy}
           className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
         >
-          <PenLine size={14} /> {busy ? "Saving…" : url ? "Replace signature" : "Upload signature"}
+          <PenLine size={14} /> {busy ? "Saving…" : url ? "Upload new photo" : "Upload signature"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setDrawing(true)}
+          disabled={busy}
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+        >
+          <Signature size={14} /> {url ? "Draw new signature" : "Draw signature"}
         </button>
       </div>
-      <div className="mt-1.5 text-[11px] text-[var(--text-muted)]">A photo of your signature on white paper — the background is removed automatically. It&rsquo;s saved for the next forms you sign.</div>
+      <div className="mt-1.5 text-[11px] text-[var(--text-muted)]">
+        Draw it here, or upload a photo of your signature on white paper — the background is removed automatically. It&rsquo;s saved for the next forms you sign.
+      </div>
+      {drawing && <SignaturePadModal onClose={() => setDrawing(false)} onSave={saveDrawn} />}
       {error && <div className="mt-1 text-xs text-[var(--status-critical)]">{error}</div>}
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pick} />
     </div>
