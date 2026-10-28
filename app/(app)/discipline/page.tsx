@@ -189,6 +189,39 @@ export default function DisciplinePage() {
         }
       />
 
+      {myActions.length > 0 ? (
+        <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+            <ListChecks size={16} /> Needs your action ({myActions.length})
+          </div>
+          <div className="space-y-1.5">
+            {myActions.map(({ r, action }, i) => {
+              const emp = allEmployees.find((e) => e.id === r.employeeId);
+              return (
+                <div key={`${r.id}-${i}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="mr-2 rounded bg-[var(--gridline)]/50 px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]">{deptLabel(deptOf(r.employeeId))}</span>
+                    <span className="font-medium text-[var(--text-primary)]">{emp ? fullName(emp) : r.employeeId}</span>
+                    <span className="text-[var(--text-secondary)]">
+                      {" "}
+                      — {DISCIPLINARY_LABELS[r.type]}, {formatDate(r.date)}
+                    </span>
+                    <div className="text-xs font-medium text-[var(--series-1)]">{action}</div>
+                  </div>
+                  <button onClick={() => setOpenId(r.id)} className="rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+                    Open
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : isHr && !(tardiness && tardiness.pending > 0) ? (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+          <ListChecks size={16} className="text-[var(--status-good)]" /> Nothing in Discipline is waiting for you.
+        </div>
+      ) : null}
+
       {tardiness && tardiness.pending > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--status-warning)]/40 p-3 text-sm" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
           <AlarmClock size={18} className="shrink-0 text-[var(--status-warning)]" />
@@ -214,7 +247,7 @@ export default function DisciplinePage() {
         const waiting = disciplinaryRecords.filter((r) => r.signFlow && !r.hrSignedAt && !r.withdrawnAt).length;
         const toReceive = disciplinaryRecords.filter((r) => r.signFlow && r.explanationSubmittedAt && !r.explHrReceivedAt).length;
         const toSanction = disciplinaryRecords.filter(
-          (r) => r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id),
+          (r) => r.status !== "resolved" && !r.withdrawnAt && r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id),
         ).length;
         const excuses = disciplinaryRecords.filter((r) => (r.excuseRequests ?? []).some((x) => x.status === "pending")).length;
         const recommended = disciplinaryRecords.filter((r) => r.status !== "resolved" && assessments.some((a) => a.recordId === r.id)).length;
@@ -249,35 +282,6 @@ export default function DisciplinePage() {
         ) : null;
       })()}
       {showTardiness && <TardinessNteModal initialMonth={tardiness?.month} onClose={() => setShowTardiness(false)} />}
-
-      {myActions.length > 0 && (
-        <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
-            <ListChecks size={16} /> Needs your action ({myActions.length})
-          </div>
-          <div className="space-y-1.5">
-            {myActions.map(({ r, action }, i) => {
-              const emp = allEmployees.find((e) => e.id === r.employeeId);
-              return (
-                <div key={`${r.id}-${i}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <span className="mr-2 rounded bg-[var(--gridline)]/50 px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]">{deptLabel(deptOf(r.employeeId))}</span>
-                    <span className="font-medium text-[var(--text-primary)]">{emp ? fullName(emp) : r.employeeId}</span>
-                    <span className="text-[var(--text-secondary)]">
-                      {" "}
-                      — {DISCIPLINARY_LABELS[r.type]}, {formatDate(r.date)}
-                    </span>
-                    <div className="text-xs font-medium text-[var(--series-1)]">{action}</div>
-                  </div>
-                  <button onClick={() => setOpenId(r.id)} className="rounded-lg bg-[var(--series-1)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
-                    Open
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-xs" aria-label="Department">
