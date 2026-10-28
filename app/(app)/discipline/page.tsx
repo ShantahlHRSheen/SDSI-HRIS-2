@@ -11,11 +11,11 @@ import { DisciplineRecordModal, type DisciplineModalMode } from "@/components/di
 import { departmentName, formatDate, fullName, positionTitle, scopeEmployeesForViewer } from "@/lib/helpers";
 import { DISCIPLINARY_LABELS } from "@/lib/types";
 import type { DisciplinaryType } from "@/lib/types";
-import { DISCIPLINE_TYPE_TONE, NTE_RESPONSE_DAYS, addDays, responseBadge, responseStage } from "@/lib/discipline";
+import { DISCIPLINE_TYPE_TONE, NTE_RESPONSE_DAYS, addDays, responseBadge } from "@/lib/discipline";
 import { todayInManila } from "@/lib/leave-policy";
 import { TardinessNteModal } from "@/components/discipline/TardinessNteModal";
 import { completeMonths, issuedTardinessNte, monthLabel, tardinessNteCandidates } from "@/lib/nte-tardiness";
-import { fetchAssessments, takesAssessment, type DisciplineAssessment } from "@/lib/discipline-assessment";
+import { disciplineActions, fetchAssessments, takesAssessment, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 const field = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
 
@@ -100,24 +100,7 @@ export default function DisciplinePage() {
 
   // What the signed-in person has to do, across every record they can see.
   const myActions = useMemo(() => {
-    const me = currentEmployee?.id;
-    if (!me) return [];
-    const out: { r: (typeof disciplinaryRecords)[number]; action: string }[] = [];
-    for (const r of disciplinaryRecords) {
-      if (r.withdrawnAt || r.status === "resolved" || r.employeeId === me) continue;
-      const stage = responseStage(r);
-      if (isHr && stage === "hr_to_sign") out.push({ r, action: "Sign as HR Manager" });
-      if (stage === "branch_to_sign" && r.branchManagerId === me) out.push({ r, action: "Sign as Branch Manager" });
-      if (stage === "manager_to_sign" && r.managerId === me) out.push({ r, action: "Sign as Department Manager" });
-      if (r.signFlow && r.explanationSubmittedAt && isHr && !r.explHrReceivedAt) out.push({ r, action: "Receive the written explanation (HR)" });
-      if (r.explanationSubmittedAt && r.managerId === me && !r.explMgrReceivedAt) out.push({ r, action: "Receive the written explanation" });
-      if (r.explanationSubmittedAt && r.issuedBy === me && takesAssessment(r, hrIds) && !assessments.some((a) => a.recordId === r.id))
-        out.push({ r, action: "Assess the explanation and recommend an action to HR" });
-      const a = isHr ? assessments.find((x) => x.recordId === r.id) : undefined;
-      if (a) out.push({ r, action: `Issue the Notice of Sanction — head recommends ${a.recommendation}` });
-      if (isHr && r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !disciplinaryRecords.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id))
-        out.push({ r, action: "Issue the Notice of Sanction (tardiness)" });
-    }
+    const out = disciplineActions(disciplinaryRecords, currentEmployee?.id, isHr, assessments, hrIds);
     return out.sort((x, y) => deptLabel(deptOf(x.r.employeeId)).localeCompare(deptLabel(deptOf(y.r.employeeId))));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deptOf/deptLabel read allEmployees
   }, [disciplinaryRecords, currentEmployee, isHr, assessments, hrIds, allEmployees]);
