@@ -23,7 +23,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   // New requests to act on / updates on one's own, per Workforce page.
   const workforce = useWorkforceBadges();
   const company = currentCompany();
-  // Heads named on an evaluation see Employee Evaluation without the roles.
+  // Heads named on an evaluation see Performance Evaluations without the roles.
   const [isHead, setIsHead] = useState(false);
   const meId = currentEmployee?.id;
   const needsCheck = !!meId && !roles.some((r) => r === "hr_admin" || r === "upper_management" || r === "dept_head");
