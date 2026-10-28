@@ -51,6 +51,8 @@ const toForm = (r: Row): LeaveForm => ({
   receivedBy: (r.received_by as string | null) ?? null,
   receivedName: (r.received_name as string | null) ?? null,
   receivedAt: (r.received_at as string | null) ?? null,
+  hrDecision: (r.hr_decision as LeaveForm["hrDecision"]) ?? null,
+  hrReason: (r.hr_reason as string | null) ?? null,
 });
 
 // Every form the signed-in user may see. Throws the set-up message if the
@@ -169,8 +171,13 @@ export async function decideLeaveForm(leaveRequestId: string, decision: "approve
   if (error) throw new Error(friendly(error.message));
 }
 
-export async function receiveLeaveForm(leaveRequestId: string): Promise<void> {
-  const { error } = await client().rpc("leave_form_receive", { p_request: leaveRequestId });
+// recommendation: HR's Approved / Disapproved on Daro's form
+// (supabase/migrate_phase66_leave_form_hr_recommendation.sql).
+export async function receiveLeaveForm(leaveRequestId: string, recommendation?: { decision: "approved" | "disapproved"; reason: string }): Promise<void> {
+  const { error } = await client().rpc(
+    "leave_form_receive",
+    recommendation ? { p_request: leaveRequestId, p_decision: recommendation.decision, p_reason: recommendation.reason } : { p_request: leaveRequestId },
+  );
   if (error) throw new Error(friendly(error.message));
 }
 

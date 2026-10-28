@@ -16,7 +16,7 @@ import { formatDate, fullName, leaveDaysBetween } from "@/lib/helpers";
 import { balanceFor, checkLeaveRequest, isSemiannual, paidLeaveEligibleFrom, todayInManila } from "@/lib/leave-policy";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_RETENTION_DAYS, KIND_LABEL, LeaveDocuments, prepareUpload, requiredKinds, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
 import { LeaveApplicationModal, LeaveFormModal, FormProgress, canHeadForm, useLeaveForms } from "@/components/leave/LeaveApplication";
-import { LEAVE_CATEGORIES, formStage, type LeaveForm } from "@/lib/leave-form";
+import { formStage, leaveCategoriesFor, type LeaveForm } from "@/lib/leave-form";
 import type { LeaveAttachmentKind, LeaveRequest, RequestStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
@@ -517,7 +517,7 @@ function FormQueue({ title, forms, requestById, action, onOpen }: { title: strin
                 <span className="font-medium text-[var(--text-primary)]">{f.employeeName}</span>
                 <span className="text-[var(--text-secondary)]">
                   {" "}
-                  — {LEAVE_CATEGORIES.find((c) => c.id === f.category)?.label}
+                  — {leaveCategoriesFor(null).find((c) => c.id === f.category)?.label}
                   {r ? `, ${formatDate(r.startDate)}–${formatDate(r.endDate)} (${r.days}d)` : ""}
                 </span>
                 <div className="mt-1">
