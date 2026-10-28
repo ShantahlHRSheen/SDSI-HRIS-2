@@ -97,6 +97,10 @@ export interface CompanyConfig {
   // Approvers whose leave-form approval is titled by their position instead
   // of "Department Head" (employee id → title).
   approverTitles?: Record<string, string>;
+  // The leave form's printed layout: "lsmbiz" is LSMBiz's Employee's Leave
+  // Application Form (components/leave/LsmbizLeaveFormDocument.tsx); the
+  // standard APPLICATION FOR LEAVE if unset.
+  leaveFormLayout?: "lsmbiz";
   // Fixed-rate employees are left out of the Tardiness Report, except these
   // (employee ids), whose lates only the listed viewers (employee ids) see.
   restrictedLates?: { employeeIds: string[]; viewerIds: string[] };
@@ -257,6 +261,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Gantalao, Gomez, Tomas.
     fixedOtherAllowance: { "EMP-0007": 2000, "EMP-0229": 2000, "EMP-0012": 5000, "EMP-0039": 200 },
     orgChartPhotos: true,
+    leaveFormLayout: "lsmbiz",
   },
   daro: {
     id: "daro",
