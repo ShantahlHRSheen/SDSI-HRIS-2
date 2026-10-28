@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf } from "@/lib/co-supervisor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PenLine, Printer, Signature } from "lucide-react";
 import { SignaturePadModal } from "@/components/forms/SignaturePad";
@@ -510,7 +511,7 @@ export function FormProgress({ form }: { form: LeaveForm }) {
 // Can the signed-in user fill in the department head's part of this form?
 export function canHeadForm(form: LeaveForm, me: string | undefined, isHrManager: boolean): boolean {
   if (!me || form.employeeId === me || formStage(form) !== "waiting_head") return false;
-  return form.departmentHeadId ? form.departmentHeadId === me : isHrManager;
+  return form.departmentHeadId ? form.departmentHeadId === me || isSecondSupervisorOf(form.employeeId, me) : isHrManager;
 }
 
 // Render with key={form.leaveRequestId} so each form starts afresh.

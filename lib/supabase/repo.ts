@@ -320,6 +320,8 @@ function toEmployee(r: EmployeeRow): Employee {
     departmentId: r.department_id,
     positionId: r.position_id,
     supervisorId: r.supervisor_id,
+    // supabase/migrate_phase67_co_supervisor.sql — absent until it's run.
+    coSupervisorId: r.co_supervisor_id,
     jobPerformanceEvaluatorId: r.job_performance_evaluator_id,
     employmentStatus: r.employment_status,
     dateHired: r.date_hired,
@@ -362,6 +364,7 @@ function employeeToRow(e: Partial<Omit<Employee, "id" | "employeeNumber">>): Par
   if (e.departmentId !== undefined) row.department_id = e.departmentId;
   if (e.positionId !== undefined) row.position_id = e.positionId;
   if (e.supervisorId !== undefined) row.supervisor_id = e.supervisorId;
+  if (e.coSupervisorId !== undefined) row.co_supervisor_id = e.coSupervisorId;
   if (e.jobPerformanceEvaluatorId !== undefined) row.job_performance_evaluator_id = e.jobPerformanceEvaluatorId;
   if (e.employmentStatus !== undefined) row.employment_status = e.employmentStatus;
   if (e.dateHired !== undefined) row.date_hired = e.dateHired;

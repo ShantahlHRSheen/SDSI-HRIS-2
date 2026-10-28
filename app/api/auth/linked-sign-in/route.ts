@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 async function adoptLinkedPassword(request: Request): Promise<Response> {
   const companyId = companyFromRequest(request);
   const linked = COMPANIES[companyId].linkedSignIn;
-  if (!linked) return failed();
+  if (!linked?.length) return failed();
 
   const body = (await request.json().catch(() => ({}))) as { email?: unknown; password?: unknown };
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -39,13 +39,15 @@ async function adoptLinkedPassword(request: Request): Promise<Response> {
     .from("employees")
     .select("id, user_id, employee_number, status")
     .ilike("email", email.replace(/[\\%_]/g, (c) => `\\${c}`))
-    .in("employee_number", linked.employeeNumbers)
+    .in("employee_number", linked.flatMap((l) => l.employeeNumbers))
     .maybeSingle();
   if (!employee || employee.status === "resigned" || employee.status === "terminated") return failed();
 
   // Check the password against the other company's database, on a throwaway
   // client. Signing out "local" ends only this check's session, not theirs.
-  const source = COMPANIES[linked.from];
+  const from = linked.find((l) => l.employeeNumbers.includes(employee.employee_number))?.from;
+  if (!from) return failed();
+  const source = COMPANIES[from];
   if (!source.supabaseUrl || !source.supabaseAnonKey) return failed();
   const verifier = createClient(source.supabaseUrl, source.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: verified, error: verifyError } = await verifier.auth.signInWithPassword({ email, password });

@@ -162,6 +162,9 @@ export interface Employee {
   departmentId: string;
   positionId: string;
   supervisorId: string | null;
+  // A second supervisor who approves like the first (lib/co-supervisor.ts).
+  // Undefined where the database doesn't have the column yet.
+  coSupervisorId?: string | null;
   // Who evaluates this employee's Job Performance KPIs (Performance
   // Evaluations) — assigned by HR, independent of the org-chart supervisor.
   // Optional/undefined means "not explicitly assigned yet"; falls back to

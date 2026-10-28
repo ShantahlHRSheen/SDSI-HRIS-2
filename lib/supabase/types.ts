@@ -105,6 +105,8 @@ export type EmployeeRow = {
   department_id: string;
   position_id: string;
   supervisor_id: string | null;
+  // supabase/migrate_phase67_co_supervisor.sql
+  co_supervisor_id?: string | null;
   job_performance_evaluator_id: string | null;
   employment_status: "regular" | "probationary" | "trainee" | "project_based" | "freelance" | "consultant" | "intern" | "unassigned";
   date_hired: string | null;

@@ -9,6 +9,7 @@ import {
   type LeaveType,
   type OvertimeRequest,
 } from "./types";
+import { supervises } from "./co-supervisor";
 import { TODAY, daysBetween } from "./mock-data";
 import { fullName } from "./helpers";
 
@@ -34,7 +35,7 @@ function canDecide(currentUser: DemoUser | null, currentEmployeeId: string | und
   // Upper Management only decides on the people they supervise.
   if (currentUser.roles.includes("hr_admin")) return true;
   const target = employees.find((e) => e.id === targetEmployeeId);
-  return !!target && target.supervisorId === currentEmployeeId;
+  return supervises(target, currentEmployeeId);
 }
 
 export function relativeTime(dateStr: string): string {
