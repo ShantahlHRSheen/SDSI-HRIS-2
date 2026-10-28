@@ -471,7 +471,7 @@ export function Recommendations({ e }: { e: SalesAdminEvaluation }) {
           ] as [string, string | null | undefined, string | null | undefined, string | null],
         ]
       : []),
-    [`${cfg.vcTitle}${e.vcName ? ` (${e.vcName})` : ""}`, null, e.vcRecommendation, e.vcSignedAt],
+    ...(e.vcId || e.vcSignedAt ? [[`${cfg.vcTitle}${e.vcName ? ` (${e.vcName})` : ""}`, null, e.vcRecommendation, e.vcSignedAt] as [string, null, string | null, string | null]] : []),
     [`${cfg.chairmanTitle}${e.chairmanName ? ` (${e.chairmanName})` : ""}`, null, e.chairmanRecommendation, e.chairmanSignedAt],
   ];
   return (

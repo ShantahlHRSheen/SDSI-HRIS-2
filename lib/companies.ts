@@ -119,6 +119,8 @@ export interface CompanyConfig {
     passMark: number;
     positionPrefix: string;
     secondHeads?: Record<string, string>;
+    // Forms that skip the Vice Chairperson's recommendation.
+    noVcForms?: string[];
   };
   pagibigMpl?: {
     signatoryId: string;
@@ -162,6 +164,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       positionPrefix: "ps-sales-admin",
       // Cebu: Mary Jane Pedrano (Branch Manager) with Marlyn Leonardo.
       secondHeads: { "br-ceb": "emp-060" },
+      // Sales Admin: HR and the head, then the Chairman.
+      noVcForms: ["sales_admin"],
     },
     pagibigMpl: {
       signatoryId: "emp-045", // Marlyn C. Leonardo, Operations Manager

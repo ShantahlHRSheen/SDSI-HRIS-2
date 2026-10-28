@@ -86,7 +86,7 @@ export default function SalesAdminEvaluationPage() {
     <div>
       <PageHeader
         title="Performance Evaluations"
-        subtitle={`Monthly, year-end and regularization evaluations. HR rates Behavior, the Department Head rates Job Performance, then the Vice Chairperson and the Chairman recommend. Sales Admins: Behavior ${SAE_WEIGHTS.behavior}% + Job Performance ${SAE_WEIGHTS.job}% + Sales ${SAE_WEIGHTS.sales}%; other employees: Behavior ${SAE_WEIGHTS_GENERAL.behavior}% + Job Performance ${SAE_WEIGHTS_GENERAL.job}%. Passing score ${cfg.passMark}.`}
+        subtitle={`Monthly, year-end and regularization evaluations. HR rates Behavior, the Department Head rates Job Performance, then the Vice Chairperson (not on the Sales Admin form) and the Chairman recommend. Sales Admins: Behavior ${SAE_WEIGHTS.behavior}% + Job Performance ${SAE_WEIGHTS.job}% + Sales ${SAE_WEIGHTS.sales}%; other employees: Behavior ${SAE_WEIGHTS_GENERAL.behavior}% + Job Performance ${SAE_WEIGHTS_GENERAL.job}%. Passing score ${cfg.passMark}.`}
         actions={
           isHr && (
             <div className="flex flex-wrap gap-2">
@@ -233,7 +233,8 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
   const [period, setPeriod] = useState(String(new Date().getFullYear()));
   const [headId, setHeadId] = useState("");
   const [head2Id, setHead2Id] = useState("");
-  const [vcId, setVcId] = useState(cfg.vcId);
+  const vcFor = (f: SaeForm) => (cfg.noVcForms?.includes(f) ? "" : cfg.vcId);
+  const [vcId, setVcId] = useState(vcFor("general"));
   const [chairmanId, setChairmanId] = useState(cfg.chairmanId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +251,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
   }
   function chooseForm(f: SaeForm) {
     setForm(f);
+    setVcId(vcFor(f));
     setEmployeeId("");
     setHeadId("");
     setHead2Id("");
@@ -274,7 +276,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
         period,
         headId,
         head2Id: head2Id || null,
-        vcId,
+        vcId: vcId || null,
         chairmanId,
         employee: {
           name: `${emp.firstName}${mi} ${emp.lastName}`,
@@ -292,9 +294,9 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
     }
   }
 
-  const pick = (value: string, onChange: (v: string) => void, list = active) => (
+  const pick = (value: string, onChange: (v: string) => void, list = active, empty = "Choose…") => (
     <select value={value} onChange={(e) => onChange(e.target.value)} className={input}>
-      <option value="">Choose…</option>
+      <option value="">{empty}</option>
       {list.map((e) => (
         <option key={e.id} value={e.id}>
           {fullName(e)} — {positionTitle(e.positionId)}
@@ -359,8 +361,8 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className={lbl}>{cfg.vcTitle}</label>
-            {pick(vcId, setVcId)}
+            <label className={lbl}>{cfg.vcTitle} (optional)</label>
+            {pick(vcId, setVcId, active, "None — straight to the Chairman")}
           </div>
           <div>
             <label className={lbl}>{cfg.chairmanTitle}</label>
@@ -372,7 +374,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
           <button onClick={onClose} disabled={busy} className={secondary}>
             Cancel
           </button>
-          <button onClick={create} disabled={busy || !employeeId || !headId || !vcId || !chairmanId || head2Id === headId} className={primary}>
+          <button onClick={create} disabled={busy || !employeeId || !headId || !chairmanId || head2Id === headId} className={primary}>
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Start
           </button>
         </div>

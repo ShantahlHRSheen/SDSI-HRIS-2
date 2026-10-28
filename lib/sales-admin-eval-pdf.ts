@@ -463,7 +463,8 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
     signBlock(W - M - 110, y - 2, who, s, at, "Signature");
     y -= 78;
   };
-  recommendation("VICE CHAIRPERSON'S RECOMMENDATION", "vc", input.vc, e.vcRecommendation, e.vcSignedAt);
+  // No Vice Chairperson on the Sales Admin form.
+  if (e.vcId || e.vcSignedAt) recommendation("VICE CHAIRPERSON'S RECOMMENDATION", "vc", input.vc, e.vcRecommendation, e.vcSignedAt);
   recommendation("CHAIRMAN'S RECOMMENDATION", "chairman", input.chairman, e.chairmanRecommendation, e.chairmanSignedAt);
 
   return doc.save();
