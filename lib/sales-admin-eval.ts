@@ -270,7 +270,7 @@ export async function createSalesAdminEvaluation(input: {
   period: string;
   headId: string;
   head2Id: string | null;
-  vcId: string;
+  vcId: string | null; // none: straight to the Chairman
   chairmanId: string;
   employee: SaeEmployeeInfo;
 }): Promise<string> {
@@ -280,7 +280,7 @@ export async function createSalesAdminEvaluation(input: {
     p_employee: input.employeeId,
     p_period: input.period,
     p_head: input.headId,
-    p_vc: input.vcId,
+    p_vc: input.vcId || null,
     p_chairman: input.chairmanId,
     p_form: input.form,
     p_purpose: input.purpose,
