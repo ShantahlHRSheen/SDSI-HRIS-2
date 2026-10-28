@@ -4,7 +4,9 @@ import { isSupabaseConfigured } from "@/lib/supabase/auth";
 import { currentCompany } from "@/lib/companies";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { isEvaluationHead } from "@/lib/sales-admin-eval";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
@@ -21,6 +23,14 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   // New requests to act on / updates on one's own, per Workforce page.
   const workforce = useWorkforceBadges();
   const company = currentCompany();
+  // Heads named on an evaluation see Employee Evaluation without the roles.
+  const [isHead, setIsHead] = useState(false);
+  const meId = currentEmployee?.id;
+  const needsCheck = !!meId && !roles.some((r) => r === "hr_admin" || r === "upper_management" || r === "dept_head");
+  useEffect(() => {
+    if (needsCheck && meId && isSupabaseConfigured()) isEvaluationHead(meId).then(setIsHead, () => setIsHead(false));
+  }, [needsCheck, meId]);
+  const evaluationHead = !!meId && (meId === company.salesAdminEval?.headId || isHead);
 
   const content = (
     <div className="flex h-full flex-col">
@@ -41,7 +51,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
         {NAV_SECTIONS.map((section) => {
           const items = section.items.filter(
             (item) =>
-              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && !!currentEmployee && currentEmployee.id === company.salesAdminEval?.headId)) &&
+              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead)) &&
               !(item.href === "/messages" && messagesHidden),
           );
           if (items.length === 0) return null;
