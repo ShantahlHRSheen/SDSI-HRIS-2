@@ -103,6 +103,11 @@ export interface CompanyConfig {
   // Accounts (employee numbers) that don't get this company's HR Messages:
   // no menu item, unread badge or inbox, even with HR access.
   hrMessagesHiddenFrom?: string[];
+  // Sales Admin Evaluation for Regularization (lib/sales-admin-eval.ts):
+  // the default Department Head, Vice Chairperson and Chairman (employee
+  // ids, with their titles on the form), the pass mark, and the positions
+  // evaluated (position id prefix).
+  salesAdminEval?: { headId: string; vcId: string; chairmanId: string; headTitle: string; vcTitle: string; chairmanTitle: string; passMark: number; positionPrefix: string };
   pagibigMpl?: {
     signatoryId: string;
     employerPagibigId: string;
@@ -134,6 +139,16 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Marlyn Leonardo, John Paul Michael Papa, Ronald Lugtu — seen by Lowel
     // and Sheilah Magdadaro and Sheena Evangelista.
     restrictedLates: { employeeIds: ["emp-045", "emp-038", "emp-037"], viewerIds: ["emp-001", "emp-004", "emp-012"] },
+    salesAdminEval: {
+      headId: "emp-027", // Michelle Ignacio
+      vcId: "emp-004", // Sheilah A. Magdadaro
+      chairmanId: "emp-001", // Lowel B. Magdadaro
+      headTitle: "Department Head",
+      vcTitle: "Vice Chairperson",
+      chairmanTitle: "Chairman of the Board",
+      passMark: 90,
+      positionPrefix: "ps-sales-admin",
+    },
     pagibigMpl: {
       signatoryId: "emp-045", // Marlyn C. Leonardo, Operations Manager
       employerPagibigId: "208844580009",

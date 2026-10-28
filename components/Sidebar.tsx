@@ -12,7 +12,7 @@ import { useHrMessagesHidden, useHrUnreadCount } from "./messages/HrChat";
 import { useWorkforceBadges } from "./workforce/WorkforceBadges";
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
-  const { currentUser } = useHris();
+  const { currentUser, currentEmployee } = useHris();
   const pathname = usePathname();
   const roles = currentUser?.roles ?? [];
   const isHr = roles.includes("hr_admin");
@@ -39,7 +39,11 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-4">
         {NAV_SECTIONS.map((section) => {
-          const items = section.items.filter((item) => item.roles.some((r) => roles.includes(r)) && !(item.href === "/messages" && messagesHidden));
+          const items = section.items.filter(
+            (item) =>
+              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && !!currentEmployee && currentEmployee.id === company.salesAdminEval?.headId)) &&
+              !(item.href === "/messages" && messagesHidden),
+          );
           if (items.length === 0) return null;
           return (
             <div key={section.title} className="mb-4">
