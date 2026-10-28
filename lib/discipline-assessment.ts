@@ -80,6 +80,18 @@ export function disciplineActions(
     if (a) out.push({ r, action: `Issue the Notice of Sanction — head recommends ${a.recommendation}` });
     if (isHr && r.noticeData?.kind === "tardiness" && r.explHrReceivedAt && r.explMgrReceivedAt && !records.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id))
       out.push({ r, action: "Issue the Notice of Sanction (tardiness)" });
+    // HR's own NTEs / incident reports: once explained, HR decides.
+    if (
+      isHr &&
+      !r.signFlow &&
+      (r.type === "nte" || r.type === "incident_report") &&
+      r.explanationSubmittedAt &&
+      hrIds.has(r.issuedBy) &&
+      !a &&
+      !records.some((x) => x.noticeData?.kind === "sanction" && x.noticeData.nteId === r.id)
+    )
+      out.push({ r, action: "Review the explanation — issue a Notice of Decision or mark resolved" });
+    if (isHr && (r.excuseRequests ?? []).some((x) => x.status === "pending")) out.push({ r, action: "Accept or decline the late days a manager asked to excuse" });
   }
   return out;
 }
