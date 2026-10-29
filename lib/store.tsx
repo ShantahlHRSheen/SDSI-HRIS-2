@@ -8,6 +8,7 @@ import { fetchLeaveCreditAdjustments } from "./supabase/leave-credits";
 import { getSupabaseClient } from "./supabase/client";
 import { reportSaveError } from "./save-errors";
 import { companyStorageKey, currentCompany } from "./companies";
+import { registerSecondSupervisors } from "./co-supervisor";
 import { getInitialSession, isSupabaseConfigured, signInWithPassword as supabaseSignInWithPassword, signOutSupabase, watchAuthState } from "./supabase/auth";
 import {
   decideCorrectionRequestRow,
@@ -229,6 +230,8 @@ interface HrisContextShape {
   logout: () => void;
 
   employees: Employee[];
+  // Admin-only accounts (lib/companies.ts adminAccountNumbers), for approver pickers.
+  adminAccounts: Employee[];
   evaluations: PerformanceEvaluation[];
   disciplinaryRecords: DisciplinaryRecord[];
   auditLogs: AuditLog[];
@@ -635,6 +638,15 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     const hidden = currentCompany().adminAccountNumbers;
     return hidden?.length ? state.employees.filter((e) => !hidden.includes(e.employeeNumber)) : state.employees;
   }, [state.employees]);
+  // Admin-only accounts can still supervise or approve (e.g. an LSM Area
+  // Manager for a Daro branch), so the Supervisor and branch approver
+  // pickers list them too.
+  const adminAccounts = useMemo(() => {
+    const hidden = currentCompany().adminAccountNumbers;
+    return hidden?.length ? state.employees.filter((e) => hidden.includes(e.employeeNumber)) : [];
+  }, [state.employees]);
+  // Second supervisors, for the "can approve" checks (lib/co-supervisor.ts).
+  useMemo(() => registerSecondSupervisors(state.employees), [state.employees]);
   const currentEmployee = useMemo(
     () => (currentUser ? state.employees.find((e) => e.id === currentUser.employeeId) ?? null : null),
     [currentUser, state.employees],
@@ -1876,6 +1888,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     loginWithSupabase,
     logout,
     employees: visibleEmployees,
+    adminAccounts,
     employeeDepartmentAllocations: state.employeeDepartmentAllocations,
     evaluations: state.evaluations,
     disciplinaryRecords: state.disciplinaryRecords,

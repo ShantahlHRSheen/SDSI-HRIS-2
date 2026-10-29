@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf } from "@/lib/co-supervisor";
 import { companyStorageKey } from "@/lib/companies";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer } from "lucide-react";
@@ -53,7 +54,7 @@ export function OtProgress({ form }: { form: OvertimeForm }) {
 
 export function canHeadOt(form: OvertimeForm, me: string | undefined, isHrManager: boolean): boolean {
   if (!me || form.employeeId === me || otStage(form) !== "waiting_head") return false;
-  return form.departmentHeadId ? form.departmentHeadId === me : isHrManager;
+  return form.departmentHeadId ? form.departmentHeadId === me || isSecondSupervisorOf(form.employeeId, me) : isHrManager;
 }
 
 // The regular schedule last entered, remembered in this browser.

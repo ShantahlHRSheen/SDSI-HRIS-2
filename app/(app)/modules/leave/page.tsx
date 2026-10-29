@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf, supervises } from "@/lib/co-supervisor";
 import { Fragment, useMemo, useState } from "react";
 import { CutoffHeaderRow, CutoffSelect, cutoffOf, cutoffsIn } from "@/lib/cutoff";
 import { CalendarPlus, CalendarRange, Check, FileText, Trash2, X } from "lucide-react";
@@ -80,7 +81,7 @@ export default function LeaveManagementPage() {
     if (!currentEmployee) return false;
     if (isHrManager) return true;
     const target = employees.find((e) => e.id === employeeId);
-    return !!target && target.supervisorId === currentEmployee.id;
+    return supervises(target, currentEmployee.id);
   }
 
   // Remaining credits for the current period (half-year for VL/SL, year for
@@ -101,11 +102,11 @@ export default function LeaveManagementPage() {
   const pendingForMe = leaveRequests.filter((r) => r.status === "pending" && r.employeeId !== currentEmployee?.id && !formByRequest.has(r.id) && canDecide(r.employeeId));
 
   // Forms of the people the user supervises (whatever the user's role).
-  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
+  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || isSecondSupervisorOf(f.employeeId, currentEmployee?.id) || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
 
   const teamRequests = useMemo(() => {
     if (isHrOrUpper || !isDeptHead || !currentEmployee) return [];
-    const teamIds = new Set(employees.filter((e) => e.supervisorId === currentEmployee.id).map((e) => e.id));
+    const teamIds = new Set(employees.filter((e) => supervises(e, currentEmployee.id)).map((e) => e.id));
     return leaveRequests.filter((r) => teamIds.has(r.employeeId)).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));
   }, [isHrOrUpper, isDeptHead, currentEmployee, employees, leaveRequests]);
 

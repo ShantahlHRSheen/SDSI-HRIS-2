@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf } from "@/lib/co-supervisor";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
@@ -51,7 +52,7 @@ export function CorrectionProgress({ form }: { form: CorrectionForm }) {
 
 export function canHeadCorrection(form: CorrectionForm, me: string | undefined, isHrManager: boolean): boolean {
   if (!me || form.employeeId === me || correctionStage(form) !== "waiting_head") return false;
-  return form.departmentHeadId ? form.departmentHeadId === me : isHrManager;
+  return form.departmentHeadId ? form.departmentHeadId === me || isSecondSupervisorOf(form.employeeId, me) : isHrManager;
 }
 
 // Time in / out the correction asks for, by type.

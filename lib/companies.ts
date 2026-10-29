@@ -80,7 +80,8 @@ export interface CompanyConfig {
   // company's HRIS (app/api/auth/linked-sign-in): when their password doesn't
   // match here, it's checked against `from`'s database and, if right, saved
   // here too. Listed by employee number in this company.
-  linkedSignIn?: { from: CompanyId; employeeNumbers: string[] };
+  // One entry per company the people come from.
+  linkedSignIn?: { from: CompanyId; employeeNumbers: string[] }[];
   // Org Chart shows photos of the company's own chart that HR uploads,
   // instead of one drawn from the 201 files.
   orgChartPhotos?: boolean;
@@ -104,6 +105,9 @@ export interface CompanyConfig {
   // the Supervisor's and Branch Head's approvals, and HR's certification with
   // a recommendation (supabase/migrate_phase66_leave_form_hr_recommendation.sql).
   leaveFormLayout?: "lsmbiz" | "daro";
+  // Employees can have a second supervisor who approves like the first
+  // (supabase/migrate_phase67_co_supervisor.sql; shown in Edit employee).
+  secondSupervisor?: boolean;
   // Fixed-rate employees are left out of the Tardiness Report, except these
   // (employee ids), whose lates only the listed viewers (employee ids) see.
   restrictedLates?: { employeeIds: string[]; viewerIds: string[] };
@@ -300,17 +304,24 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Admin-only accounts, not on Daro's roster: Sheena Evangelista (LSM
     // Group HR, see supabase/daro-first-admin.sql) and Maricris Barlinan
     // (approves payroll; supabase/daro-payroll-signatories.sql).
-    adminAccountNumbers: ["ADMIN-01", "ADMIN-02"],
+    adminAccountNumbers: ["ADMIN-01", "ADMIN-02", "ADMIN-03", "ADMIN-04"],
     // Daro's HR handles its own HR Messages; Sheena (ADMIN-01) doesn't see them.
     hrMessagesHiddenFrom: ["ADMIN-01"],
     // Lowel and Sheilah Magdadaro and Maricris Barlinan use their Shantahl sign-in.
-    linkedSignIn: { from: "sdsi", employeeNumbers: ["EMP-0001", "EMP-0002", "ADMIN-02"] },
+    // Jonifer Doble (ADMIN-03) and Raymond Gantalao (ADMIN-04), the LSM Area
+    // Managers for HO-Tarlac and Bulacan, use their LSMBiz sign-in.
+    linkedSignIn: [
+      { from: "sdsi", employeeNumbers: ["EMP-0001", "EMP-0002", "ADMIN-02"] },
+      { from: "lsmbiz", employeeNumbers: ["ADMIN-03", "ADMIN-04"] },
+    ],
     // HR uploads photos of Daro's own org chart, like LSMBiz.
     // One sheet per branch (BULACAN, CABANATUAN, HO-TARLAC) in the LSMBiz
     // workbook layout, with Daro's own columns — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "daro",
     payrollLayout: "daro",
     // Monthly DTR, one sheet per branch: IN | OUT | IN | OUT per employee.
+    // Head Office: two Credit Supervisors both approve.
+    secondSupervisor: true,
     leaveFormLayout: "daro",
     attendanceImportFormat: "daro",
     orgChartPhotos: true,

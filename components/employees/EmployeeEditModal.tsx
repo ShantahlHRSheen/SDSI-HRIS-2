@@ -1,5 +1,6 @@
 "use client";
 
+import { currentCompany } from "@/lib/companies";
 import { useRef, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useHris } from "@/lib/store";
@@ -68,7 +69,7 @@ export function EmployeeEditModal({
   onClose: () => void;
   onSave: (data: EmployeeFormData) => void;
 }) {
-  const { branches, departments, positions, employeeDepartmentAllocations, setEmployeeDepartmentAllocations } = useHris();
+  const { branches, departments, positions, employeeDepartmentAllocations, setEmployeeDepartmentAllocations, adminAccounts } = useHris();
   const submitted = useRef(false);
   const [form, setForm] = useState<EmployeeFormData>(() => defaultForm(employee, branches[0]?.id ?? "", departments[0]?.id ?? "", positions[0]?.id ?? ""));
   const [allocRows, setAllocRows] = useState<{ departmentId: string; percent: number }[]>(() =>
@@ -81,6 +82,8 @@ export function EmployeeEditModal({
 
   const positionsForDept = positions.filter((p) => p.departmentId === form.departmentId);
   const otherEmployees = employees.filter((e) => e.id !== employee?.id);
+  // Supervisors can include admin-only accounts (e.g. an LSM Area Manager).
+  const supervisorOptions = [{ value: "", label: "None" }, ...[...otherEmployees, ...adminAccounts.filter((e) => e.id !== employee?.id)].map((e) => ({ value: e.id, label: fullName(e) }))];
   const allocTotal = allocRows.reduce((s, r) => s + r.percent, 0);
   const allocValid = allocRows.length === 0 || Math.round(allocTotal) === 100;
 
@@ -169,12 +172,10 @@ export function EmployeeEditModal({
               options={departments.map((d) => ({ value: d.id, label: d.name }))}
             />
             <SelectField label="Position" value={form.positionId} onChange={(v) => set("positionId", v)} options={positionsForDept.map((p) => ({ value: p.id, label: p.title }))} />
-            <SelectField
-              label="Supervisor"
-              value={form.supervisorId ?? ""}
-              onChange={(v) => set("supervisorId", v || null)}
-              options={[{ value: "", label: "None" }, ...otherEmployees.map((e) => ({ value: e.id, label: fullName(e) }))]}
-            />
+            <SelectField label="Supervisor" value={form.supervisorId ?? ""} onChange={(v) => set("supervisorId", v || null)} options={supervisorOptions} />
+            {currentCompany().secondSupervisor && (
+              <SelectField label="Second supervisor (also approves)" value={form.coSupervisorId ?? ""} onChange={(v) => set("coSupervisorId", v || null)} options={supervisorOptions} />
+            )}
             <SelectField label="Employment status" value={form.employmentStatus} onChange={(v) => set("employmentStatus", v as EmploymentStatus)} options={EMPLOYMENT_STATUSES} />
             <SelectField label="Lifecycle status" value={form.status} onChange={(v) => set("status", v as EmployeeLifecycleStatus)} options={LIFECYCLE_STATUSES} />
             <DateField label="Date hired" value={form.dateHired ?? ""} onChange={(v) => set("dateHired", v || null)} />

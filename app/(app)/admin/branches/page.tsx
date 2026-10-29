@@ -6,7 +6,9 @@ import type { Branch } from "@/lib/types";
 import { fullName } from "@/lib/helpers";
 
 export default function BranchesAdminPage() {
-  const { branches, employees, addBranch, updateBranch, removeBranch } = useHris();
+  const { branches, employees: listed, adminAccounts, addBranch, updateBranch, removeBranch } = useHris();
+  // Admin-only accounts can be branch approvers too (e.g. an LSM Area Manager).
+  const employees = [...listed, ...adminAccounts];
   const active = employees.filter((e) => e.status !== "resigned" && e.status !== "terminated").sort((a, b) => fullName(a).localeCompare(fullName(b)));
   const nameOf = (id: string | null | undefined) => {
     const e = id ? employees.find((x) => x.id === id) : undefined;

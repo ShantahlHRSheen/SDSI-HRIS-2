@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf, supervises } from "@/lib/co-supervisor";
 import { Fragment, useMemo, useState } from "react";
 import { CutoffHeaderRow, CutoffSelect, cutoffOf, cutoffsIn } from "@/lib/cutoff";
 import { Check, Clock, FileText, Trash2, X } from "lucide-react";
@@ -40,7 +41,7 @@ export default function OvertimePage() {
   const formsToSign = forms.filter((f) => canBranch(f, currentEmployee?.id) || canHeadOt(f, currentEmployee?.id, isHrManager));
   const formsToVerify = isHrManager ? forms.filter((f) => otStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
   const toClarify = forms.filter((f) => f.employeeId === currentEmployee?.id && otStage(f) === "returned");
-  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
+  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || isSecondSupervisorOf(f.employeeId, currentEmployee?.id) || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
   // HR Manager: delete an overtime request (with its form).
   const [deleting, setDeleting] = useState<OvertimeRequest | null>(null);
@@ -74,7 +75,7 @@ export default function OvertimePage() {
     if (!currentEmployee) return false;
     if (currentUser?.roles.includes("hr_admin")) return true;
     const target = employees.find((e) => e.id === employeeId);
-    return !!target && target.supervisorId === currentEmployee.id;
+    return supervises(target, currentEmployee.id);
   }
 
   const myRequests = overtimeRequests.filter((r) => r.employeeId === currentEmployee?.id).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));

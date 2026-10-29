@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf, supervises } from "@/lib/co-supervisor";
 import { useApplyApprovedCorrections } from "@/components/attendance/useApplyApprovedCorrections";
 import { Fragment, useMemo, useState } from "react";
 import { CutoffHeaderRow, CutoffSelect, cutoffOf, cutoffsIn } from "@/lib/cutoff";
@@ -41,7 +42,7 @@ export default function AttendanceCorrectionsPage() {
   // To sign as branch approver or as department head.
   const formsToSign = forms.filter((f) => canBranch(f, currentEmployee?.id) || canHeadCorrection(f, currentEmployee?.id, isHrManager));
   const formsToReceive = isHrManager ? forms.filter((f) => correctionStage(f) === "waiting_hr" && f.employeeId !== currentEmployee?.id) : [];
-  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
+  const teamForms = forms.filter((f) => (f.departmentHeadId === currentEmployee?.id || isSecondSupervisorOf(f.employeeId, currentEmployee?.id) || f.branchApproverId === currentEmployee?.id) && f.employeeId !== currentEmployee?.id);
   const [showFile, setShowFile] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -61,7 +62,7 @@ export default function AttendanceCorrectionsPage() {
     if (!currentEmployee) return false;
     if (currentUser?.roles.includes("hr_admin")) return true;
     const target = employees.find((e) => e.id === employeeId);
-    return !!target && target.supervisorId === currentEmployee.id;
+    return supervises(target, currentEmployee.id);
   }
 
   const myRequests = correctionRequests.filter((r) => r.employeeId === currentEmployee?.id).sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1));

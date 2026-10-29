@@ -1,5 +1,6 @@
 "use client";
 
+import { supervises } from "@/lib/co-supervisor";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -41,7 +42,7 @@ export default function EmployeeProfilePage() {
   }
 
   const supervisor = employees.find((e) => e.id === employee.supervisorId);
-  const directReports = employees.filter((e) => e.supervisorId === employee.id);
+  const directReports = employees.filter((e) => supervises(e, employee.id));
   const empEvals = evaluations.filter((e) => e.employeeId === employee.id);
   const empDiscipline = disciplinaryRecords.filter((d) => d.employeeId === employee.id);
   const govIds = employeeGovIds(employee);

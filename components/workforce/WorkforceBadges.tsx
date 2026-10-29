@@ -1,5 +1,6 @@
 "use client";
 
+import { isSecondSupervisorOf, supervises } from "@/lib/co-supervisor";
 import { useCallback, useEffect, useState } from "react";
 import { useHris } from "@/lib/store";
 import { companyStorageKey } from "@/lib/companies";
@@ -115,11 +116,11 @@ function workforceActions(
   employees: ReturnType<typeof useHris>["employees"],
   requests: { leave: ReturnType<typeof useHris>["leaveRequests"]; ot: ReturnType<typeof useHris>["overtimeRequests"]; corr: ReturnType<typeof useHris>["correctionRequests"] },
 ): Record<WorkforceKind, WorkforceActionItem[]> {
-  const headCan = (f: { employeeId: string; departmentHeadId: string | null }) => f.employeeId !== me && (f.departmentHeadId ? f.departmentHeadId === me : isHr);
+  const headCan = (f: { employeeId: string; departmentHeadId: string | null }) => f.employeeId !== me && (f.departmentHeadId ? f.departmentHeadId === me || isSecondSupervisorOf(f.employeeId, me) : isHr);
   // Requests filed without an online form (older ones): the supervisor or HR decides.
-  const supervises = (employeeId: string) => isHr || employees.find((e) => e.id === employeeId)?.supervisorId === me;
+  const supervisesEmployee = (employeeId: string) => isHr || supervises(employees.find((e) => e.id === employeeId), me);
   const legacy = <R extends { id: string; employeeId: string; status: string }>(rows: R[], formIds: Set<string>): WorkforceActionItem[] =>
-    rows.filter((r) => r.status === "pending" && r.employeeId !== me && !formIds.has(r.id) && supervises(r.employeeId)).map((r) => ({ id: r.id, employeeId: r.employeeId }));
+    rows.filter((r) => r.status === "pending" && r.employeeId !== me && !formIds.has(r.id) && supervisesEmployee(r.employeeId)).map((r) => ({ id: r.id, employeeId: r.employeeId }));
 
   const leaveFormIds = new Set(forms.leave.flatMap((f) => [f.leaveRequestId, ...(f.unpaidRequestId ? [f.unpaidRequestId] : [])]));
   const leave = [
