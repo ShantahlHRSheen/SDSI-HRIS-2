@@ -47,6 +47,9 @@ const toForm = (r: Row): CorrectionForm => ({
   headSignedAt: (r.head_signed_at as string | null) ?? null,
   receivedName: (r.received_name as string | null) ?? null,
   receivedAt: (r.received_at as string | null) ?? null,
+  editedAt: (r.edited_at as string | null) ?? null,
+  editCount: Number(r.edit_count ?? 0),
+  editHistory: Array.isArray(r.edit_history) ? (r.edit_history as CorrectionForm["editHistory"]) : [],
 });
 
 export async function fetchCorrectionForms(): Promise<CorrectionForm[]> {
@@ -95,6 +98,20 @@ export async function submitCorrectionForm(requestId: string, employeeId: string
   // Already submitted (a retry after a dropped connection): nothing to do.
   if (error && /duplicate key|already exists/i.test(error.message)) return;
   if (error) throw new Error(/row-level security/i.test(error.message) ? "Couldn't submit the form — sign it first." : friendly(error.message));
+}
+
+// The employee changes their form before the Department Head signs it
+// (supabase/migrate_phase67_correction_form_edit.sql).
+export async function editCorrectionForm(requestId: string, input: CorrectionFormInput): Promise<void> {
+  const { error } = await client().rpc("correction_form_edit", {
+    p_request: requestId,
+    p_date: input.date,
+    p_type: input.type,
+    p_time_in: input.timeIn || null,
+    p_time_out: input.timeOut || null,
+    p_reason: input.reason,
+  });
+  if (error) throw new Error(/correction_form_edit/.test(error.message) && /find|exist|schema/.test(error.message) ? "Editing isn't set up yet — ask HR to run the latest database update." : friendly(error.message));
 }
 
 export async function decideCorrectionForm(requestId: string, decision: "approved" | "disapproved", reason: string): Promise<void> {

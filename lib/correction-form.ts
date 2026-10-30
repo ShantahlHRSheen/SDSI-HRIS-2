@@ -35,7 +35,27 @@ export interface CorrectionForm extends BranchApproval {
   headSignedAt: string | null;
   receivedName: string | null;
   receivedAt: string | null;
+  // The employee's edits before the Department Head signed (phase 67):
+  // when last edited, how many times, and the earlier versions.
+  editedAt?: string | null;
+  editCount?: number;
+  editHistory?: CorrectionVersion[];
 }
+
+export interface CorrectionVersion {
+  replacedAt: string;
+  date: string;
+  type: CorrectionType;
+  timeIn: string | null;
+  timeOut: string | null;
+  reason: string;
+}
+
+// The employee can still change the form: not yet signed by the Department
+// Head, and not disapproved by the branch approver.
+export const correctionEditable = (f: CorrectionForm) => !f.headDecision && f.branchDecision !== "disapproved";
+
+export const correctionTypeLabel = (t: CorrectionType) => CORRECTION_TYPES.find((x) => x.id === t)?.label ?? t;
 
 export type CorrectionFormStage = "waiting_branch" | "branch_disapproved" | "waiting_head" | "waiting_hr" | "received";
 

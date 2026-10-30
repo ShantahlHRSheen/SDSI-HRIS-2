@@ -2,17 +2,18 @@
 
 import { isSecondSupervisorOf } from "@/lib/co-supervisor";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Printer } from "lucide-react";
+import { Pencil, Printer } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { Badge } from "@/components/Badge";
 import { todayInManila } from "@/lib/leave-policy";
-import { CORRECTION_TYPES, correctionProgress, correctionStage, type CorrectionForm, type CorrectionType } from "@/lib/correction-form";
+import { CORRECTION_TYPES, correctionEditable, correctionProgress, correctionStage, correctionTypeLabel, timeLabel, type CorrectionForm, type CorrectionType } from "@/lib/correction-form";
 import { fetchMyLeaveFormDetails, type LeaveFormSigner } from "@/lib/supabase/leave-forms";
 import {
   correctionFormExists,
   correctionFormSignatureUrls,
   decideCorrectionForm,
+  editCorrectionForm,
   fetchCorrectionForms,
   receiveCorrectionForm,
   signCorrectionForm,
@@ -47,7 +48,104 @@ export function useCorrectionForms() {
 
 export function CorrectionProgress({ form }: { form: CorrectionForm }) {
   const p = correctionProgress(form);
-  return <Badge tone={p.tone}>{p.label}</Badge>;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Badge tone={p.tone}>{p.label}</Badge>
+      {form.editedAt && <Badge tone="muted">Edited by employee</Badge>}
+    </span>
+  );
+}
+
+const editedOn = (at: string) => new Date(at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+// The note that the employee changed the form, with the earlier versions.
+export function CorrectionEditNote({ form }: { form: CorrectionForm }) {
+  const [open, setOpen] = useState(false);
+  if (!form.editedAt) return null;
+  const n = form.editCount ?? 1;
+  const versions = [...(form.editHistory ?? [])].reverse();
+  return (
+    <div className="rounded-lg border border-[var(--status-warning)]/40 px-3 py-2 text-xs text-[var(--text-secondary)]" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, transparent)" }}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span>
+          <span className="font-semibold text-[var(--text-primary)]">Edited by the employee</span> — last on {editedOn(form.editedAt)}
+          {n > 1 ? ` (${n} edits)` : ""}. The form shows the current version.
+        </span>
+        {versions.length > 0 && (
+          <button onClick={() => setOpen((v) => !v)} className="text-[var(--series-1)] hover:underline">
+            {open ? "Hide earlier versions" : `Show earlier version${versions.length > 1 ? "s" : ""}`}
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {versions.map((v, i) => (
+            <div key={i} className="rounded-md bg-[var(--surface-1)] px-2.5 py-1.5">
+              <div className="text-[var(--text-muted)]">Before the edit on {editedOn(v.replacedAt)}</div>
+              <div className="text-[var(--text-primary)]">
+                {v.date} · {correctionTypeLabel(v.type)} · in {timeLabel(v.timeIn) || "—"} · out {timeLabel(v.timeOut) || "—"}
+              </div>
+              <div className="whitespace-pre-wrap">{v.reason}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The employee changes their form before the Department Head signs it.
+function CorrectionEditPanel({ form, onClose, onSaved }: { form: CorrectionForm; onClose: () => void; onSaved: () => Promise<void> }) {
+  const today = useMemo(() => todayInManila(), []);
+  const [draft, setDraft] = useState<CorrectionFormInput>({
+    date: form.correctionDate,
+    type: form.correctionType,
+    timeIn: form.timeIn ?? "",
+    timeOut: form.timeOut ?? "",
+    reason: form.reason,
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const missing = correctionMissing(draft, today);
+
+  async function save() {
+    if (missing) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await editCorrectionForm(form.correctionRequestId, {
+        ...draft,
+        timeIn: needsIn(draft.type) ? draft.timeIn : "",
+        timeOut: needsOut(draft.type) ? draft.timeOut : "",
+      });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save the changes.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-[var(--series-1)]/40 p-3">
+      <div className="text-sm font-semibold text-[var(--text-primary)]">Edit your request</div>
+      <div className="text-xs text-[var(--text-muted)]">
+        You can change it until your Department Head signs. Your approvers will see a note that you edited it, and the earlier version.
+        {form.branchDecision === "approved" ? " It goes back to the branch approver for approval." : ""}
+      </div>
+      <CorrectionFields form={draft} setForm={setDraft} today={today} idPrefix="ac-edit" />
+      {(error || missing) && <div className={`text-xs ${error ? "text-[var(--status-critical)]" : "text-[var(--text-muted)]"}`}>{error ?? missing}</div>}
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} disabled={busy} className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+          Cancel
+        </button>
+        <button onClick={save} disabled={busy || !!missing} className="rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
+          {busy ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function canHeadCorrection(form: CorrectionForm, me: string | undefined, isHrManager: boolean): boolean {
@@ -58,6 +156,93 @@ export function canHeadCorrection(form: CorrectionForm, me: string | undefined, 
 // Time in / out the correction asks for, by type.
 const needsIn = (t: CorrectionType) => t !== "missed_out";
 const needsOut = (t: CorrectionType) => t !== "missed_in";
+
+// ---- The correction details (filing and editing) ----------------------------------
+
+export function CorrectionFields({
+  form,
+  setForm,
+  today,
+  idPrefix = "ac",
+}: {
+  form: CorrectionFormInput;
+  setForm: React.Dispatch<React.SetStateAction<CorrectionFormInput>>;
+  today: string;
+  idPrefix?: string;
+}) {
+  const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
+  const lbl = "mb-1 block text-xs font-medium text-[var(--text-secondary)]";
+  const timeIn = needsIn(form.type) ? form.timeIn : "";
+  const timeOut = needsOut(form.type) ? form.timeOut : "";
+  return (
+    <>
+          <div>
+            <label className={lbl} htmlFor={`${idPrefix}-date`}>
+              Date to be corrected
+            </label>
+            <input id={`${idPrefix}-date`} type="date" max={today} value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={input} />
+          </div>
+          <div>
+            <div className={lbl}>Correction needed</div>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {CORRECTION_TYPES.map((t) => (
+                <label key={t.id} className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+                  <input type="radio" name={`${idPrefix}-type`} checked={form.type === t.id} onChange={() => setForm((f) => ({ ...f, type: t.id }))} /> {t.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl} htmlFor={`${idPrefix}-in`}>
+                Correct time in
+              </label>
+              <input id={`${idPrefix}-in`} type="time" value={timeIn} disabled={!needsIn(form.type)} onChange={(e) => setForm((f) => ({ ...f, timeIn: e.target.value }))} className={`${input} disabled:opacity-40`} />
+            </div>
+            <div>
+              <label className={lbl} htmlFor={`${idPrefix}-out`}>
+                Correct time out
+              </label>
+              <input id={`${idPrefix}-out`} type="time" value={timeOut} disabled={!needsOut(form.type)} onChange={(e) => setForm((f) => ({ ...f, timeOut: e.target.value }))} className={`${input} disabled:opacity-40`} />
+            </div>
+          </div>
+          <div>
+            <label className={lbl} htmlFor={`${idPrefix}-reason`}>
+              Reason / explanation
+            </label>
+            <textarea
+              id={`${idPrefix}-reason`}
+              value={form.reason}
+              onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+              rows={3}
+              maxLength={1000}
+              placeholder="Explain the discrepancy (missed punch, wrong shift, device failure, etc.)…"
+              className={input}
+            />
+          </div>
+
+    </>
+  );
+}
+
+// What a correction still lacks before it can be submitted, or null.
+export function correctionMissing(form: CorrectionFormInput, today: string): string | null {
+  const timeIn = needsIn(form.type) ? form.timeIn : "";
+  const timeOut = needsOut(form.type) ? form.timeOut : "";
+  return !form.date
+    ? "Enter the date to be corrected."
+    : form.date > today
+      ? "The date can't be in the future."
+      : (form.type === "missed_in" || form.type === "missed_both") && !timeIn
+        ? "Enter the correct time in."
+        : (form.type === "missed_out" || form.type === "missed_both") && !timeOut
+          ? "Enter the correct time out."
+          : !timeIn && !timeOut
+            ? "Enter the correct time in and / or time out."
+            : !form.reason.trim()
+              ? "Enter the reason / explanation."
+              : null;
+}
 
 // ---- Filing (employee) ------------------------------------------------------------
 
@@ -78,21 +263,7 @@ export function CorrectionApplicationModal({ open, onClose, onDone }: { open: bo
   const timeOut = needsOut(form.type) ? form.timeOut : "";
 
   // A missed punch needs that time; the other kinds need at least one time.
-  const missing = !form.date
-    ? "Enter the date to be corrected."
-    : form.date > today
-      ? "The date can't be in the future."
-      : (form.type === "missed_in" || form.type === "missed_both") && !timeIn
-        ? "Enter the correct time in."
-        : (form.type === "missed_out" || form.type === "missed_both") && !timeOut
-          ? "Enter the correct time out."
-          : !timeIn && !timeOut
-            ? "Enter the correct time in and / or time out."
-            : !form.reason.trim()
-              ? "Enter the reason / explanation."
-              : !hasSignature
-                ? "Upload your signature to sign the form."
-                : null;
+  const missing = correctionMissing(form, today) ?? (!hasSignature ? "Upload your signature to sign the form." : null);
 
   async function submit() {
     if (!currentEmployee || missing) return;
@@ -146,7 +317,6 @@ export function CorrectionApplicationModal({ open, onClose, onDone }: { open: bo
       }
     : null;
 
-  const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
   const lbl = "mb-1 block text-xs font-medium text-[var(--text-secondary)]";
   const ro = "rounded-lg bg-[var(--gridline)]/30 px-3 py-2 text-sm text-[var(--text-primary)]";
 
@@ -191,50 +361,7 @@ export function CorrectionApplicationModal({ open, onClose, onDone }: { open: bo
           </div>
 
           <div className="text-xs font-semibold tracking-wide text-[var(--text-primary)] uppercase">Correction details</div>
-          <div>
-            <label className={lbl} htmlFor="ac-date">
-              Date to be corrected
-            </label>
-            <input id="ac-date" type="date" max={today} value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={input} />
-          </div>
-          <div>
-            <div className={lbl}>Correction needed</div>
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {CORRECTION_TYPES.map((t) => (
-                <label key={t.id} className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                  <input type="radio" name="ac-type" checked={form.type === t.id} onChange={() => setForm((f) => ({ ...f, type: t.id }))} /> {t.label}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lbl} htmlFor="ac-in">
-                Correct time in
-              </label>
-              <input id="ac-in" type="time" value={timeIn} disabled={!needsIn(form.type)} onChange={(e) => setForm((f) => ({ ...f, timeIn: e.target.value }))} className={`${input} disabled:opacity-40`} />
-            </div>
-            <div>
-              <label className={lbl} htmlFor="ac-out">
-                Correct time out
-              </label>
-              <input id="ac-out" type="time" value={timeOut} disabled={!needsOut(form.type)} onChange={(e) => setForm((f) => ({ ...f, timeOut: e.target.value }))} className={`${input} disabled:opacity-40`} />
-            </div>
-          </div>
-          <div>
-            <label className={lbl} htmlFor="ac-reason">
-              Reason / explanation
-            </label>
-            <textarea
-              id="ac-reason"
-              value={form.reason}
-              onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-              rows={3}
-              maxLength={1000}
-              placeholder="Explain the discrepancy (missed punch, wrong shift, device failure, etc.)…"
-              className={input}
-            />
-          </div>
+          <CorrectionFields form={form} setForm={setForm} today={today} />
 
           <MySignature onChange={setHasSignature} />
           <div className="text-xs text-[var(--text-muted)]">Submitting signs the form with your signature (Employee&rsquo;s signature over printed name). Your department head and HR will see it.</div>
@@ -274,6 +401,8 @@ export function CorrectionFormModal({ form, onClose, onChanged }: { form: Correc
   const stage = correctionStage(form);
   const canHead = canHeadCorrection(form, me, isHr);
   const canReceive = isHr && stage === "waiting_hr" && form.employeeId !== me;
+  const canEdit = !!me && form.employeeId === me && correctionEditable(form);
+  const [editing, setEditing] = useState(false);
   const [decision, setDecision] = useState<"approved" | "disapproved" | null>(null);
   const [reason, setReason] = useState("");
   const [hasSignature, setHasSignature] = useState(false);
@@ -320,6 +449,11 @@ export function CorrectionFormModal({ form, onClose, onChanged }: { form: Correc
         <div className="flex flex-wrap items-center gap-2">
           <CorrectionProgress form={form} />
           <div className="ml-auto flex items-start gap-2">
+            {canEdit && !editing && (
+              <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--series-1)]/60 px-3 py-1.5 text-sm font-medium text-[var(--series-1)] hover:bg-[var(--series-1)]/10">
+                <Pencil size={14} /> Edit request
+              </button>
+            )}
             <button onClick={() => setPrinting(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
               <Printer size={14} /> Print
             </button>
@@ -330,6 +464,17 @@ export function CorrectionFormModal({ form, onClose, onChanged }: { form: Correc
             </DownloadPdfButton>
           </div>
         </div>
+        <CorrectionEditNote form={form} />
+        {editing && (
+          <CorrectionEditPanel
+            form={form}
+            onClose={() => setEditing(false)}
+            onSaved={async () => {
+              await reloadRequests();
+              onChanged();
+            }}
+          />
+        )}
         <div className="overflow-x-auto rounded-lg bg-white p-4">
           <div className="min-w-[560px]">
             <CorrectionFormDocument form={form} signatures={sigs} />
