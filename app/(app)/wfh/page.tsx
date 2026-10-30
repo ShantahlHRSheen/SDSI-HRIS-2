@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { WfhTracker } from "@/components/wfh/WfhTracker";
 import { WfhDayLog, WfhSchedules } from "@/components/wfh/WfhReview";
 import { WfhLive } from "@/components/wfh/WfhLive";
+import { WfhCutoffLog } from "@/components/wfh/WfhCutoffLog";
 import { todayInManila } from "@/lib/leave-policy";
 import { fetchWfhDay, fetchWfhSchedules, type WfhEvent, type WfhSchedule, type WfhSession } from "@/lib/wfh";
 
@@ -71,6 +72,13 @@ export default function WfhPage() {
             <input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} className="rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-xs" />
           </div>
           <WfhDayLog date={date} schedules={schedules} employees={employees} sessions={day.sessions} events={day.events} meId={me} onChanged={load} />
+        </div>
+      )}
+
+      {schedules && (mine || others.length > 0 || isHr) && (
+        <div className="mb-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+          <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">{mine && !others.length ? "My log per cut-off" : "Log per cut-off"}</div>
+          <WfhCutoffLog schedules={schedules} employees={employees} today={today} />
         </div>
       )}
 
