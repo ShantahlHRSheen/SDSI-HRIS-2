@@ -98,6 +98,12 @@ export function CorrectionFormDocument({ form, signatures = {} }: { form: Correc
       </p>
       <p style={{ ...row, whiteSpace: "pre-wrap", paddingLeft: "12px" }}>{form.reason}</p>
       <Signature url={signatures.applicant} name={form.employeeName} caption="Employee’s signature over printed name" date={form.submittedAt} />
+      {form.editedAt && (
+        <p style={{ ...row, fontSize: "8.5pt", fontStyle: "italic", color: "#555" }}>
+          Edited by the employee on {new Date(form.editedAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+          {(form.editCount ?? 1) > 1 ? ` (${form.editCount} edits)` : ""}, before the Department Head&rsquo;s approval.
+        </p>
+      )}
 
       <BranchApprovalBlock form={form} signature={signatures.branch} />
       {rule}
