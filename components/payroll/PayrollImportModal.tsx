@@ -124,9 +124,9 @@ export function PayrollImportModal({
 
         {preview.rounded.count > 0 && (
           <Notice tone="neutral" title={`Net Pay rounded in the file (${preview.rounded.count})`}>
-            The file&rsquo;s Net Pay is rounded (up to 5 centavos) for {preview.rounded.count} employee(s). The difference is saved as each one&rsquo;s &ldquo;Net pay rounding&rdquo; (
-            {preview.rounded.total >= 0 ? "+" : "−"}
-            {formatCurrency(Math.abs(preview.rounded.total))} in all), so the HRIS shows the same Net Pay as the file.
+            The file&rsquo;s Net Pay is rounded (up to 5 centavos) for {preview.rounded.count} employee(s). The HRIS keeps the exact amount — Gross Salary less deductions, to the centavo
+            ({preview.rounded.total >= 0 ? "+" : "−"}
+            {formatCurrency(Math.abs(preview.rounded.total))} in all against the file&rsquo;s Net Pay).
           </Notice>
         )}
 
