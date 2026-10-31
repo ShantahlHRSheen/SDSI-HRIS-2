@@ -95,9 +95,8 @@ export interface CompanyConfig {
   // Pag-IBIG Multi-Purpose Loan form (lib/mpl-pdf.ts): the employer's part —
   // the authorized signatory (employee id), Pag-IBIG employer ID and the
   // business address as the form splits it.
-  // A payroll import whose Net Pay is rounded (up to 5 centavos off) saves
-  // the difference as the line's net pay rounding, so the HRIS matches what
-  // was paid (needs payroll_line_overrides.net_rounding, phase 68).
+  // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
+  // flagged; the HRIS keeps the exact net pay (lib/payroll-import.ts).
   payrollNetRounding?: boolean;
   // Approvers whose leave-form approval is titled by their position instead
   // of "Department Head" (employee id → title).

@@ -153,7 +153,8 @@ export interface PayrollImportPreview {
   inconsistent: { parsed: ParsedPayrollRow; reason: string }[];
   // Imported, but the app's recomputed net pay differs from the file's.
   netMismatches: PayrollImportMatch[];
-  // Rows whose file Net Pay is rounded: how many, and the net rounding saved.
+  // Rows whose file Net Pay is rounded (the HRIS keeps the exact amount):
+  // how many, and exact − file in all.
   rounded: { count: number; total: number };
   replacing: number;
   missingFromFile: Employee[];
@@ -163,8 +164,8 @@ export interface PayrollImportPreview {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const close = (a: number, b: number) => Math.abs(a - b) < 0.05;
 // A payroll file may round Net Pay (e.g. to the nearest 10 centavos): up to
-// 5 centavos off is taken as rounding and saved as the line's net pay
-// rounding, so the HRIS shows the Net Pay that was paid.
+// 5 centavos off is taken as rounding, not a mismatch. The HRIS keeps the
+// exact amount (Gross Salary − deductions, to the centavo).
 const MAX_ROUNDING = 0.05;
 const isRounding = (a: number, b: number) => Math.abs(a - b) <= MAX_ROUNDING + 1e-9;
 
@@ -309,10 +310,7 @@ export function buildPayrollImportPreview(
       [{ ...override, id: "preview", periodId: period.id, employeeId: employee.id, updatedBy: "", updatedAt: "" }],
       [], // compare against the file alone — no salary adjustments
     );
-    const computed = line?.netPay ?? 0;
-    const rounding = round2(v.netPay - computed);
-    if (rounding && roundingOn && isRounding(computed, v.netPay)) override.netRounding = rounding;
-    matched.push({ parsed: row, employee, matchedByName: !byNum, attendance, override, computedNetPay: round2(computed + (override.netRounding ?? 0)) });
+    matched.push({ parsed: row, employee, matchedByName: !byNum, attendance, override, computedNetPay: line?.netPay ?? 0 });
   }
 
   const matchedIds = new Set(matched.map((m) => m.employee.id));
@@ -322,15 +320,21 @@ export function buildPayrollImportPreview(
     unmatched,
     duplicates,
     inconsistent,
-    netMismatches: matched.filter((m) => !close(m.computedNetPay, m.parsed.values.netPay)),
-    rounded: {
-      count: matched.filter((m) => m.override.netRounding).length,
-      total: round2(matched.reduce((t, m) => t + (m.override.netRounding ?? 0), 0)),
-    },
+    netMismatches: matched.filter((m) => (roundingOn ? !isRounding(m.computedNetPay, m.parsed.values.netPay) : !close(m.computedNetPay, m.parsed.values.netPay))),
+    rounded: roundingOn
+      ? {
+          count: matched.filter((m) => round2(m.parsed.values.netPay - m.computedNetPay) !== 0 && isRounding(m.computedNetPay, m.parsed.values.netPay)).length,
+          total: round2(matched.reduce((t, m) => t + (m.computedNetPay - m.parsed.values.netPay), 0)),
+        }
+      : { count: 0, total: 0 },
     replacing: matched.filter((m) => attendanceByEmp.has(m.employee.id) || overrideEmpIds.has(m.employee.id)).length,
     missingFromFile: employees.filter((e) => e.status === "active" && !matchedIds.has(e.id)),
     totals: matched.reduce(
-      (t, m) => ({ gross: t.gross + m.parsed.values.grossSalary, deductions: t.deductions + (m.parsed.values.grossSalary + m.parsed.values.adjustmentAdd - m.parsed.values.netPay), net: t.net + m.parsed.values.netPay }),
+      // Net as the HRIS will have it (exact; a rounded file Net Pay isn't kept).
+      (t, m) => {
+        const net = roundingOn ? m.computedNetPay : m.parsed.values.netPay;
+        return { gross: t.gross + m.parsed.values.grossSalary, deductions: t.deductions + (m.parsed.values.grossSalary + m.parsed.values.adjustmentAdd - net), net: t.net + net };
+      },
       { gross: 0, deductions: 0, net: 0 },
     ),
   };
