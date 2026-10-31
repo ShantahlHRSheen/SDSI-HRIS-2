@@ -95,6 +95,19 @@ export interface CompanyConfig {
   // Pag-IBIG Multi-Purpose Loan form (lib/mpl-pdf.ts): the employer's part —
   // the authorized signatory (employee id), Pag-IBIG employer ID and the
   // business address as the form splits it.
+  // Regularization (lib/regularization.ts): who signs the contract for the
+  // employer (employee id, title), the employer's address and where it's
+  // signed, the notice's header lines, and the daily de minimis allowances
+  // HR starts from.
+  regularization?: {
+    employerName: string;
+    signatoryId: string;
+    signatoryTitle: string;
+    employerAddress: string;
+    place: string;
+    headerLines: string[];
+    allowances: { label: string; amount: number }[];
+  };
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
   // flagged; the HRIS keeps the exact net pay (lib/payroll-import.ts).
   payrollNetRounding?: boolean;
@@ -165,6 +178,19 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Sheilah Magdadaro approves Sheena, Joan Mariette, Maricris and Marlyn's leave.
     approverTitles: { "emp-004": "Vice Chairperson" },
     payrollNetRounding: true,
+    regularization: {
+      employerName: "SHANTAHL DIRECT SALES, INC.",
+      signatoryId: "emp-001", // Lowel B. Magdadaro
+      signatoryTitle: "Chairman",
+      employerAddress: "LSM Business Hub, 109 Apo St., Mabini Homesite, Cabanatuan City, Nueva Ecija",
+      place: "Cabanatuan City, Nueva Ecija, Philippines",
+      headerLines: ["LSM Business Hub, 109 Apo St., Mabini Homesite", "Cabanatuan City, Nueva Ecija", "Tel. No. (044) 960-0126"],
+      allowances: [
+        { label: "Uniform Allowance", amount: 10 },
+        { label: "Laundry Allowance", amount: 10 },
+        { label: "Medical Cash Allowance", amount: 2 },
+      ],
+    },
     // Marlyn Leonardo, John Paul Michael Papa, Ronald Lugtu — seen by Lowel
     // and Sheilah Magdadaro and Sheena Evangelista.
     restrictedLates: { employeeIds: ["emp-045", "emp-038", "emp-037"], viewerIds: ["emp-001", "emp-004", "emp-012"] },
