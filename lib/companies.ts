@@ -95,6 +95,10 @@ export interface CompanyConfig {
   // Pag-IBIG Multi-Purpose Loan form (lib/mpl-pdf.ts): the employer's part —
   // the authorized signatory (employee id), Pag-IBIG employer ID and the
   // business address as the form splits it.
+  // A payroll import whose Net Pay is rounded (up to 5 centavos off) saves
+  // the difference as the line's net pay rounding, so the HRIS matches what
+  // was paid (needs payroll_line_overrides.net_rounding, phase 68).
+  payrollNetRounding?: boolean;
   // Approvers whose leave-form approval is titled by their position instead
   // of "Department Head" (employee id → title).
   approverTitles?: Record<string, string>;
@@ -161,6 +165,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     },
     // Sheilah Magdadaro approves Sheena, Joan Mariette, Maricris and Marlyn's leave.
     approverTitles: { "emp-004": "Vice Chairperson" },
+    payrollNetRounding: true,
     // Marlyn Leonardo, John Paul Michael Papa, Ronald Lugtu — seen by Lowel
     // and Sheilah Magdadaro and Sheena Evangelista.
     restrictedLates: { employeeIds: ["emp-045", "emp-038", "emp-037"], viewerIds: ["emp-001", "emp-004", "emp-012"] },

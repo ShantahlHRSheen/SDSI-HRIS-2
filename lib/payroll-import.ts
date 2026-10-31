@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { cellScalar, normalizeName, toNumber } from "./attendance-import";
 import { computePayrollForPeriod } from "./payroll";
+import { currentCompany } from "./companies";
 import type { AttendancePeriodRecord, Employee, PayrollLineOverride, PayrollPeriod } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,8 @@ export interface PayrollImportPreview {
   inconsistent: { parsed: ParsedPayrollRow; reason: string }[];
   // Imported, but the app's recomputed net pay differs from the file's.
   netMismatches: PayrollImportMatch[];
+  // Rows whose file Net Pay is rounded: how many, and the net rounding saved.
+  rounded: { count: number; total: number };
   replacing: number;
   missingFromFile: Employee[];
   totals: { gross: number; deductions: number; net: number };
@@ -159,8 +162,13 @@ export interface PayrollImportPreview {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const close = (a: number, b: number) => Math.abs(a - b) < 0.05;
+// A payroll file may round Net Pay (e.g. to the nearest 10 centavos): up to
+// 5 centavos off is taken as rounding and saved as the line's net pay
+// rounding, so the HRIS shows the Net Pay that was paid.
+const MAX_ROUNDING = 0.05;
+const isRounding = (a: number, b: number) => Math.abs(a - b) <= MAX_ROUNDING + 1e-9;
 
-function checkRow(v: ParsedPayrollRow["values"]): string | null {
+function checkRow(v: ParsedPayrollRow["values"], roundingOn: boolean): string | null {
   const earnings = v.basicPay - v.lateDeduction - v.undertimeDeduction + v.holidayPay + v.vlPay + v.slPay + v.otPay + v.netAllowances;
   const deductions =
     v.sss + v.sssWisp + v.philHealth + v.hdmf + v.withholdingTax + v.cashAdvance + v.lsmBizLoan + v.lsmCoopLoan + v.shortages + v.sssLoan + v.hdmfLoan + v.hdmfMp2;
@@ -170,7 +178,7 @@ function checkRow(v: ParsedPayrollRow["values"]): string | null {
     return `deductions add up to ${round2(deductions)}, but Total Deduction says ${v.totalDeduction}`;
   }
   const expectedNet = v.grossSalary + v.adjustmentAdd - deductions - v.adjustmentDeduct;
-  if (!close(expectedNet, v.netPay)) {
+  if (roundingOn ? !isRounding(expectedNet, v.netPay) : !close(expectedNet, v.netPay)) {
     if (v.adjustmentDeduct && close(expectedNet + v.adjustmentDeduct, v.netPay)) {
       return `Net Pay in the file doesn't subtract its Adjustment (Deduction) of ${v.adjustmentDeduct} — the system will, giving ${round2(expectedNet)}`;
     }
@@ -205,6 +213,7 @@ export function buildPayrollImportPreview(
   const attendanceByEmp = new Map(existingAttendance.filter((r) => r.periodId === period.id).map((r) => [r.employeeId, r]));
   const overrideEmpIds = new Set(existingOverrides.filter((o) => o.periodId === period.id).map((o) => o.employeeId));
 
+  const roundingOn = !!currentCompany().payrollNetRounding;
   const matched: PayrollImportMatch[] = [];
   const unmatched: ParsedPayrollRow[] = [];
   const duplicates: ParsedPayrollRow[] = [];
@@ -228,7 +237,7 @@ export function buildPayrollImportPreview(
     }
     seen.add(employee.id);
 
-    const problem = checkRow(row.values);
+    const problem = checkRow(row.values, roundingOn);
     if (problem) inconsistent.push({ parsed: row, reason: problem });
 
     const v = row.values;
@@ -300,7 +309,10 @@ export function buildPayrollImportPreview(
       [{ ...override, id: "preview", periodId: period.id, employeeId: employee.id, updatedBy: "", updatedAt: "" }],
       [], // compare against the file alone — no salary adjustments
     );
-    matched.push({ parsed: row, employee, matchedByName: !byNum, attendance, override, computedNetPay: line?.netPay ?? 0 });
+    const computed = line?.netPay ?? 0;
+    const rounding = round2(v.netPay - computed);
+    if (rounding && roundingOn && isRounding(computed, v.netPay)) override.netRounding = rounding;
+    matched.push({ parsed: row, employee, matchedByName: !byNum, attendance, override, computedNetPay: round2(computed + (override.netRounding ?? 0)) });
   }
 
   const matchedIds = new Set(matched.map((m) => m.employee.id));
@@ -311,6 +323,10 @@ export function buildPayrollImportPreview(
     duplicates,
     inconsistent,
     netMismatches: matched.filter((m) => !close(m.computedNetPay, m.parsed.values.netPay)),
+    rounded: {
+      count: matched.filter((m) => m.override.netRounding).length,
+      total: round2(matched.reduce((t, m) => t + (m.override.netRounding ?? 0), 0)),
+    },
     replacing: matched.filter((m) => attendanceByEmp.has(m.employee.id) || overrideEmpIds.has(m.employee.id)).length,
     missingFromFile: employees.filter((e) => e.status === "active" && !matchedIds.has(e.id)),
     totals: matched.reduce(

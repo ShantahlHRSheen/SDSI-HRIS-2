@@ -771,6 +771,8 @@ function PayrollLineEditModal({
           <div className="grid grid-cols-2 gap-3">
             <NumberField label={payrollLabel("adjustmentAdd", "Adjustment (add)")} value={form.adjustmentAdd} onChange={(v) => setNum("adjustmentAdd", v)} />
             <NumberField label={payrollLabel("adjustmentDeduct", "Adjustment (deduct)")} value={form.adjustmentDeduct} onChange={(v) => setNum("adjustmentDeduct", v)} />
+            {/* Set by a payroll import whose Net Pay is rounded (a few centavos, + or −). */}
+            {!!form.netRounding && <NumberField label="Net pay rounding" value={form.netRounding} onChange={(v) => setNum("netRounding", v)} />}
           </div>
         </FieldSection>
 
