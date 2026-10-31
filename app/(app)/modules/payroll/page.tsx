@@ -11,7 +11,7 @@ import { Badge, type BadgeTone } from "@/components/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import Link from "next/link";
-import { branchName, formatCurrencyCompact, formatDate, fullName, positionTitle } from "@/lib/helpers";
+import { branchName, formatCurrency, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import { payrollByBranch, payrollColumns, payrollLabel, payrollLeadColumn } from "@/lib/payroll-layout";
 import { computePayrollForPeriod, payrollLineToSummary, summarizePayrollLines, type PayrollLine } from "@/lib/payroll";
 import { toCsv, downloadCsv } from "@/lib/monthly-analytics";
@@ -279,7 +279,7 @@ export default function PayrollProcessingPage() {
       <td className="px-3 py-2"></td>
       {columns.map((c, i) => (
         <td key={c.key} className="tabular whitespace-nowrap px-3 py-2">
-          {c.style === "count" ? totals[i] : formatCurrencyCompact(totals[i])}
+          {c.style === "count" ? totals[i] : formatCurrency(totals[i])}
         </td>
       ))}
       <td className="px-3 py-2"></td>
@@ -399,9 +399,9 @@ export default function PayrollProcessingPage() {
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Employees covered" value={lines.length.toString()} />
-            <StatTile label="Gross pay" value={formatCurrencyCompact(summary.grossPay)} />
-            <StatTile label="Total deductions" value={formatCurrencyCompact(summary.totalDeductions)} />
-            <StatTile label="Net pay" value={formatCurrencyCompact(summary.netPay)} />
+            <StatTile label="Gross pay" value={formatCurrency(summary.grossPay)} />
+            <StatTile label="Total deductions" value={formatCurrency(summary.totalDeductions)} />
+            <StatTile label="Net pay" value={formatCurrency(summary.netPay)} />
           </div>
 
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -446,7 +446,7 @@ export default function PayrollProcessingPage() {
                             {emp ? fullName(emp) : l.employeeId}
                             {l.salaryAdjustmentNet !== 0 && (
                               <span title="Includes a salary adjustment (see Vouchers → Salary adjustments)" className="ml-1.5 inline-block rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
-                                ADJ {l.salaryAdjustmentNet > 0 ? "+" : "−"}{formatCurrencyCompact(Math.abs(l.salaryAdjustmentNet))}
+                                ADJ {l.salaryAdjustmentNet > 0 ? "+" : "−"}{formatCurrency(Math.abs(l.salaryAdjustmentNet))}
                               </span>
                             )}
                           </td>
@@ -455,11 +455,11 @@ export default function PayrollProcessingPage() {
                           </td>
                           {columns.map((c) => {
                             const v = c.value(l);
-                            if (c.style === "deduct") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--status-critical)]">{v ? `-${formatCurrencyCompact(v)}` : "—"}</td>;
-                            if (c.style === "strong") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrencyCompact(v)}</td>;
+                            if (c.style === "deduct") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--status-critical)]">{v ? `-${formatCurrency(v)}` : "—"}</td>;
+                            if (c.style === "strong") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 font-medium text-[var(--text-primary)]">{formatCurrency(v)}</td>;
                             if (c.style === "count") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{v}</td>;
-                            if (c.style === "dash") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{v ? formatCurrencyCompact(v) : "—"}</td>;
-                            return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{formatCurrencyCompact(v)}</td>;
+                            if (c.style === "dash") return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{v ? formatCurrency(v) : "—"}</td>;
+                            return <td key={c.key} className="tabular whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{formatCurrency(v)}</td>;
                           })}
                           <td className="px-3 py-2">
                             {(() => {
@@ -844,7 +844,7 @@ function OverrideField({ label, auto, value, onChange }: { label: string; auto: 
         />
       ) : (
         <div className="w-full rounded-lg border border-dashed border-[var(--border-hairline)] bg-[var(--gridline)]/20 px-3 py-2 text-sm text-[var(--text-muted)]">
-          {formatCurrencyCompact(auto)} (auto)
+          {formatCurrency(auto)} (auto)
         </div>
       )}
     </div>
