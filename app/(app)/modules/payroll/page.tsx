@@ -19,6 +19,7 @@ import { buildPayrollImportPreview, guessPeriodFromName, parsePayrollWorkbook, t
 import { currentCompany } from "@/lib/companies";
 import { parseLsmbizPayrollWorkbook } from "@/lib/payroll-import-lsmbiz";
 import { PayrollImportModal } from "@/components/payroll/PayrollImportModal";
+import { PayrollNotesPanel, usePayrollNotes } from "@/components/payroll/PayrollNotes";
 import { MissingPeriodsBanner } from "@/components/payroll/MissingPeriodsBanner";
 import type { Employee, PayrollLineOverride, PayrollPeriodStatus } from "@/lib/types";
 
@@ -49,6 +50,9 @@ export default function PayrollProcessingPage() {
   const canManage = currentUser?.roles.some((r) => ["hr_admin", "payroll_officer"].includes(r));
 
   const { period, periodId, setPeriodId } = useSelectedPayrollPeriod();
+  // Notes on cut-offs (null: not set up for this company).
+  const { notes: payrollNotes, reload: reloadNotes } = usePayrollNotes();
+  const openNotesFor = (employeeId: string) => (payrollNotes ?? []).filter((n) => period && n.cutoffEnd === period.end && n.employeeId === employeeId && !n.doneAt);
   const [editing, setEditing] = useState<Employee | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -397,6 +401,7 @@ export default function PayrollProcessingPage() {
         <EmptyState icon={Wallet} title="No payroll periods configured" description="Add a payroll period in System Administration to begin processing." />
       ) : (
         <>
+          {payrollNotes && <PayrollNotesPanel period={period} periods={payrollPeriods} employees={employees} notes={payrollNotes} canManage={!!canManage} onChanged={reloadNotes} />}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Employees covered" value={lines.length.toString()} />
             <StatTile label="Gross pay" value={formatCurrency(summary.grossPay)} />
@@ -444,6 +449,16 @@ export default function PayrollProcessingPage() {
                         <tr key={l.employeeId} className="border-b border-[var(--gridline)] last:border-0">
                           <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface-1)] shadow-[inset_-1px_0_0_var(--border-hairline)] px-3 py-2 text-[var(--text-primary)]">
                             {emp ? fullName(emp) : l.employeeId}
+                            {openNotesFor(l.employeeId).length > 0 && (
+                              <span
+                                title={openNotesFor(l.employeeId)
+                                  .map((n) => `• ${n.note}`)
+                                  .join("\n")}
+                                className="ml-1.5 inline-block cursor-help rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]"
+                              >
+                                NOTE
+                              </span>
+                            )}
                             {l.salaryAdjustmentNet !== 0 && (
                               <span title="Includes a salary adjustment (see Vouchers → Salary adjustments)" className="ml-1.5 inline-block rounded bg-[var(--status-warning)]/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-[var(--status-warning)]">
                                 ADJ {l.salaryAdjustmentNet > 0 ? "+" : "−"}{formatCurrency(Math.abs(l.salaryAdjustmentNet))}
