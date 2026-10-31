@@ -8,6 +8,7 @@ import { useWorkforceActions, WORKFORCE_PATHS, type WorkforceKind } from "@/comp
 import { fetchSalesAdminEvaluations, saeMyTurn, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import { fetchMplRequests, type MplRequest } from "@/lib/mpl";
 import { fetchCoeRequests, type CoeRequest } from "@/lib/coe";
+import { fetchRegularizations, type Regularization } from "@/lib/regularization";
 import { disciplineActions, fetchAssessments, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 // The dashboard's "Needs your action": everything waiting for the signed-in
@@ -36,6 +37,7 @@ export function NeedsYourAction() {
   const [mpl, setMpl] = useState<MplRequest[]>([]);
   const [coe, setCoe] = useState<CoeRequest[]>([]);
   const [assessments, setAssessments] = useState<DisciplineAssessment[]>([]);
+  const [regs, setRegs] = useState<Regularization[]>([]);
 
   const load = useCallback(() => {
     if (!isRealAccount || !me) return;
@@ -44,6 +46,7 @@ export function NeedsYourAction() {
     fetchMplRequests().then(setMpl, () => setMpl([]));
     if (isHr) fetchCoeRequests().then(setCoe, () => setCoe([]));
     fetchAssessments().then(setAssessments, () => setAssessments([]));
+    fetchRegularizations().then(setRegs, () => setRegs([]));
   }, [isRealAccount, me, isHr]);
   useEffect(() => {
     load();
@@ -109,6 +112,21 @@ export function NeedsYourAction() {
   const coePending = isHr ? coe.filter((r) => r.status === "pending") : [];
   if (coePending.length)
     cards.push({ key: "coe", title: "Certificate of Employment", summary: `${plural(coePending.length, "COE request")} to sign`, names: coePending.map((r) => r.employeeName), href: "/coe", button: "Sign" });
+
+  const regMine = regs.filter((r) => (r.status === "chairman" && r.signatoryId === me) || (r.status === "employee" && r.employeeId === me) || (isHr && r.status === "hr"));
+  if (regMine.length) {
+    const sign = regMine.filter((r) => r.status === "chairman").length;
+    const receive = regMine.filter((r) => r.status === "employee").length;
+    const drafts = regMine.filter((r) => r.status === "hr").length;
+    cards.push({
+      key: "reg",
+      title: "Regularization",
+      summary: [sign && `${plural(sign, "contract")} to sign`, receive && "Your regularization to receive", drafts && `${plural(drafts, "draft")} to send`].filter(Boolean).join(" · "),
+      names: regMine.map((r) => r.employeeName),
+      href: "/regularization",
+      button: sign || receive ? "Sign" : "Open",
+    });
+  }
 
   const discipline = disciplineActions(disciplinaryRecords, me, isHr, assessments, hrIds);
   if (discipline.length)
