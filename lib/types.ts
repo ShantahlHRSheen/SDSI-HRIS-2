@@ -629,6 +629,9 @@ export interface PayrollLineOverride {
   hdmfMp2Savings: number;
   adjustmentAdd: number;
   adjustmentDeduct: number;
+  // Added to the net pay so it matches what was paid when the payroll file
+  // rounds Net Pay (e.g. to the nearest 10 centavos); a few centavos, + or −.
+  netRounding?: number;
   sssContributionOverride: number | null;
   sssWispOverride: number | null;
   philHealthContributionOverride: number | null;

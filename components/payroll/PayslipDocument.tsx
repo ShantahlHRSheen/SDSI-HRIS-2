@@ -115,6 +115,7 @@ export function PayslipDocument({ employee, period, line, adjustments = [] }: { 
         )}
 
         <FormSection title="Net Pay">
+          <PayslipAmount label="Net pay rounding" value={line.netRounding ?? 0} />
           <FormAmountRow label="Net Pay" value={line.netPay} bold />
         </FormSection>
 

@@ -109,6 +109,8 @@ export interface PayrollLine {
   // --- Adjustments + net -------------------------------------------------
   adjustmentAdd: number;
   adjustmentDeduct: number;
+  // Rounds the net pay to what was paid (see PayrollLineOverride.netRounding).
+  netRounding: number;
   // Net effect of this period's salary adjustments (already included in the
   // figures above); non-zero means the payslip lists them.
   salaryAdjustmentNet: number;
@@ -266,7 +268,8 @@ export function computePayrollForPeriod(
     const totalDeductionsOtherThanMandatories = cashAdvance + ov.lsmBizLoan + ov.lsmCoopLoan + shortages + withholdingTax + sssLoan + hdmfLoan + ov.hdmfMp2Savings;
     const totalMandatories = sssContribution + sssWisp + hdmfContribution + philHealthContribution;
 
-    const netPay = grossSalary + adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - adjustmentDeduct;
+    const netRounding = ov.netRounding ?? 0;
+    const netPay = grossSalary + adjustmentAdd - totalDeductionsOtherThanMandatories - totalMandatories - adjustmentDeduct + netRounding;
 
     // Employer shares follow what the employee actually contributes (the
     // share on file, else the table): SSS / WISP employer = 2 × employee
@@ -343,6 +346,7 @@ export function computePayrollForPeriod(
       totalMandatories,
       adjustmentAdd,
       adjustmentDeduct,
+      netRounding,
       salaryAdjustmentNet: Math.round(salaryAdjustmentNet * 100) / 100,
       netPay,
       employerSSS,
@@ -425,6 +429,7 @@ export function summaryToPayrollLine(summary: Record<string, number>, employeeId
     totalMandatories: summary.totalMandatories ?? 0,
     adjustmentAdd: summary.adjustmentAdd ?? 0,
     adjustmentDeduct: summary.adjustmentDeduct ?? 0,
+    netRounding: summary.netRounding ?? 0,
     salaryAdjustmentNet: summary.salaryAdjustmentNet ?? 0,
     netPay: summary.netPay ?? 0,
     employerSSS: summary.employerSSS ?? 0,

@@ -1076,7 +1076,12 @@ export async function importAttendancePeriodRecordsRows(
 
 // ---- Payroll line overrides --------------------------------------------------------
 
+// Whether this database has payroll_line_overrides.net_rounding (seen on a
+// loaded row), so a rounding can be cleared back to 0.
+let netRoundingColumn = false;
+
 function toPayrollLineOverride(r: PayrollLineOverrideRow): PayrollLineOverride {
+  if (r.net_rounding !== undefined) netRoundingColumn = true;
   return {
     id: r.id,
     periodId: r.period_id,
@@ -1095,6 +1100,7 @@ function toPayrollLineOverride(r: PayrollLineOverrideRow): PayrollLineOverride {
     hdmfMp2Savings: r.hdmf_mp2_savings,
     adjustmentAdd: r.adjustment_add,
     adjustmentDeduct: r.adjustment_deduct,
+    netRounding: Number(r.net_rounding ?? 0),
     sssContributionOverride: r.sss_contribution_override,
     sssWispOverride: r.sss_wisp_override,
     philHealthContributionOverride: r.philhealth_contribution_override,
@@ -1135,6 +1141,9 @@ function payrollLineOverrideToRow(
     hdmf_mp2_savings: input.hdmfMp2Savings,
     adjustment_add: input.adjustmentAdd,
     adjustment_deduct: input.adjustmentDeduct,
+    // Net pay rounding (migrate_phase68): sent only when there is some, so a
+    // database without the column (LSMBiz) is unaffected.
+    ...(input.netRounding ? { net_rounding: input.netRounding } : netRoundingColumn ? { net_rounding: 0 } : {}),
     sss_contribution_override: input.sssContributionOverride,
     sss_wisp_override: input.sssWispOverride,
     philhealth_contribution_override: input.philHealthContributionOverride,

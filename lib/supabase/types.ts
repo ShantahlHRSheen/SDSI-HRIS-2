@@ -333,6 +333,7 @@ export type PayrollLineOverrideRow = {
   hdmf_mp2_savings: number;
   adjustment_add: number;
   adjustment_deduct: number;
+  net_rounding?: number;
   sss_contribution_override: number | null;
   sss_wisp_override: number | null;
   philhealth_contribution_override: number | null;
