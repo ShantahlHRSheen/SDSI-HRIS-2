@@ -14,6 +14,31 @@ import { describeDay, fetchWfhDay, hm, isoWeekday, scheduledMinutes, summarize, 
 const time = (iso: string) => new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 const dayLabel = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 
+// The 1–15 and 16–end half-months up to `today`, newest first.
+function recentHalfMonths(today: string, count: number): { id: string; start: string; end: string }[] {
+  const out: { id: string; start: string; end: string }[] = [];
+  let y = Number(today.slice(0, 4));
+  let m = Number(today.slice(5, 7));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  while (out.length < count) {
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const ym = `${y}-${pad(m)}`;
+    for (const [a, b] of [
+      [16, last],
+      [1, 15],
+    ]) {
+      const start = `${ym}-${pad(a)}`;
+      if (start <= today && out.length < count) out.push({ id: `half-${start}`, start, end: `${ym}-${pad(b)}` });
+    }
+    m -= 1;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+  }
+  return out;
+}
+
 function datesBetween(from: string, to: string): string[] {
   const out: string[] = [];
   for (let t = new Date(`${from}T00:00:00Z`); t.toISOString().slice(0, 10) <= to; t.setUTCDate(t.getUTCDate() + 1)) out.push(t.toISOString().slice(0, 10));
@@ -31,7 +56,13 @@ interface DayRow {
 
 export function WfhCutoffLog({ schedules, employees, today }: { schedules: WfhSchedule[]; employees: Employee[]; today: string }) {
   const { payrollPeriods } = useHris();
-  const periods = useMemo(() => [...payrollPeriods].filter((p) => p.start <= today).sort((a, b) => b.start.localeCompare(a.start)), [payrollPeriods, today]);
+  // The payroll cut-offs, plus the regular 1–15 / 16–end ones of the last
+  // few months — so a cut-off payroll hasn't set up yet still has its log.
+  const periods = useMemo(() => {
+    const out = payrollPeriods.filter((p) => p.start <= today).map((p) => ({ id: p.id, start: p.start, end: p.end }));
+    for (const c of recentHalfMonths(today, 12)) if (!out.some((p) => p.start <= c.end && c.start <= p.end)) out.push(c);
+    return out.sort((a, b) => b.start.localeCompare(a.start));
+  }, [payrollPeriods, today]);
   const [periodId, setPeriodId] = useState("");
   const period = periods.find((p) => p.id === periodId) ?? periods.find((p) => p.start <= today && today <= p.end) ?? periods[0];
   // Loaded per cut-off; another cut-off's data shows as loading.
