@@ -147,6 +147,15 @@ export async function buildCasePdf(c: ConfidentialCase, companyName: string): Pr
     }
   }
 
+  // ---- Written explanations ------------------------------------------------------
+  if (c.explanations.length) {
+    heading("Written Explanations");
+    table(
+      [["Name", "Requested", "Signed explanation"], ...c.explanations.map((x) => [x.name, x.requestedOn ? longDate(x.requestedOn) : "-", x.receivedOn ? `Received ${longDate(x.receivedOn)}` : "Awaiting"])],
+      [200, 130, W - 2 * M - 330],
+    );
+  }
+
   // ---- Actions -------------------------------------------------------------------
   if (c.actions.length) {
     heading("Actions Taken and Next Steps");

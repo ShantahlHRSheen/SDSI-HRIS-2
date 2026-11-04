@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Download, FileText, Loader2, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, FileText, Loader2, Paperclip, Plus, Trash2, Upload, X } from "lucide-react";
+import { todayInManila } from "@/lib/leave-policy";
 import { Badge } from "@/components/Badge";
 import { FileViewer, canView, viewerKind, type ViewerFile } from "@/components/FileViewer";
 import { currentCompany } from "@/lib/companies";
@@ -16,6 +17,7 @@ import {
   removeCaseFile,
   textBlocks,
   uploadCaseFile,
+  uploadSignedExplanation,
   type CaseInput,
   type CaseSection,
   type CaseStatus,
@@ -156,6 +158,103 @@ export function DownloadCaseButton({ c }: { c: ConfidentialCase }) {
   );
 }
 
+// ---- Written explanations ------------------------------------------------------------
+
+// Who was asked to explain, and their signed explanation once HR uploads it.
+export function CaseExplanations({ c, canManage, onChanged }: { c: ConfidentialCase; canManage: boolean; onChanged: () => void }) {
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<ViewerFile | null>(null);
+  const pick = useRef<HTMLInputElement>(null);
+  const [target, setTarget] = useState<number | null>(null);
+  if (!c.explanations.length) return null;
+  const received = c.explanations.filter((x) => x.receivedOn).length;
+
+  async function upload(i: number, file: File) {
+    setBusy(i);
+    setError(null);
+    try {
+      await uploadSignedExplanation(c, i, file, todayInManila());
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't upload.");
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function open(path: string, name: string) {
+    const url = await caseFileUrl(path);
+    if (canView(name)) setViewer({ url, name, kind: viewerKind(name) });
+    else window.open(url, "_blank", "noopener");
+  }
+
+  return (
+    <section>
+      <h3 className="mb-1.5 text-sm font-semibold text-[var(--text-primary)]">
+        Written Explanations ({received} of {c.explanations.length} received)
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr className="bg-[var(--gridline)]/25 text-left">
+              <th className="border border-[var(--border-hairline)] px-2.5 py-1.5 font-semibold">Name</th>
+              <th className="border border-[var(--border-hairline)] px-2.5 py-1.5 font-semibold">Requested</th>
+              <th className="border border-[var(--border-hairline)] px-2.5 py-1.5 font-semibold">Signed explanation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {c.explanations.map((x, i) => (
+              <tr key={i}>
+                <td className="border border-[var(--border-hairline)] px-2.5 py-1.5 text-[var(--text-primary)]">{x.name}</td>
+                <td className="border border-[var(--border-hairline)] px-2.5 py-1.5 text-[var(--text-secondary)]">{x.requestedOn ? formatDate(x.requestedOn) : "—"}</td>
+                <td className="border border-[var(--border-hairline)] px-2.5 py-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {x.receivedOn && x.path ? (
+                      <>
+                        <span className="font-medium text-[var(--status-good)]">Received {formatDate(x.receivedOn)}</span>
+                        <button onClick={() => open(x.path, x.fileName)} className="flex items-center gap-1 text-[var(--series-1)] hover:underline">
+                          <FileText size={12} /> {x.fileName}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[var(--status-warning)]">Awaiting</span>
+                    )}
+                    {canManage && (
+                      <button
+                        onClick={() => {
+                          setTarget(i);
+                          pick.current?.click();
+                        }}
+                        disabled={busy !== null}
+                        className={`${small} ml-auto`}
+                      >
+                        {busy === i ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {x.path ? "Replace" : "Upload signed explanation"}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {error && <div className="mt-1 text-xs text-[var(--status-critical)]">{error}</div>}
+      <input
+        ref={pick}
+        type="file"
+        accept={CASE_FILE_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f && target !== null) upload(target, f);
+        }}
+      />
+      {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
+    </section>
+  );
+}
+
 // ---- Attachments ----------------------------------------------------------------------
 
 export function CaseFiles({ caseId, canManage }: { caseId: string; canManage: boolean }) {
@@ -226,7 +325,10 @@ export function CaseFiles({ caseId, canManage }: { caseId: string; canManage: bo
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
-          if (f) run(() => uploadCaseFile(caseId, f));
+          if (f)
+            run(async () => {
+              await uploadCaseFile(caseId, f);
+            });
         }}
       />
       {viewer && <FileViewer file={viewer} onClose={() => setViewer(null)} />}
@@ -367,6 +469,38 @@ export function CaseEditor({ value, onChange }: { value: CaseInput; onChange: (v
         </div>
         <button onClick={() => set("actions", [...value.actions, { text: "", done: false }])} className={`${small} mt-2`}>
           <Plus size={12} /> Add an action
+        </button>
+      </div>
+
+      <div>
+        <div className="mb-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">Written explanations requested</div>
+        <p className="mb-2 text-xs text-[var(--text-muted)]">Who was asked to explain. Upload each signed explanation from the case page once you receive it.</p>
+        <div className="space-y-1.5">
+          {value.explanations.map((x, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input value={x.name} onChange={(e) => set("explanations", value.explanations.map((y, j) => (j === i ? { ...y, name: e.target.value } : y)))} placeholder="Name" className={input} />
+              <input
+                type="date"
+                value={x.requestedOn}
+                onChange={(e) => set("explanations", value.explanations.map((y, j) => (j === i ? { ...y, requestedOn: e.target.value } : y)))}
+                className={`${input} w-44 shrink-0`}
+                aria-label="Requested on"
+              />
+              <span className={`w-28 shrink-0 text-xs ${x.receivedOn ? "text-[var(--status-good)]" : "text-[var(--status-warning)]"}`}>{x.receivedOn ? `Received ${formatDate(x.receivedOn)}` : "Awaiting"}</span>
+              <button
+                onClick={() => set("explanations", value.explanations.filter((_, j) => j !== i))}
+                disabled={!!x.path}
+                title={x.path ? "Has an uploaded explanation" : "Remove"}
+                className="rounded p-2 text-[var(--text-muted)] hover:text-[var(--status-critical)] disabled:opacity-30"
+                aria-label="Remove"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => set("explanations", [...value.explanations, { name: "", requestedOn: value.caseDate, receivedOn: "", path: "", fileName: "" }])} className={`${small} mt-2`}>
+          <Plus size={12} /> Add a person
         </button>
       </div>
 

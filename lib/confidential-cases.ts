@@ -34,6 +34,14 @@ export interface CaseAction {
   text: string;
   done: boolean;
 }
+// A written explanation asked of someone; HR uploads the signed one.
+export interface CaseExplanation {
+  name: string;
+  requestedOn: string; // YYYY-MM-DD, or ""
+  receivedOn: string; // YYYY-MM-DD once the signed explanation is in
+  path: string; // the uploaded file, in the case's folder
+  fileName: string;
+}
 export interface CaseSignoff {
   label: string; // "Prepared by" / "Noted by"
   title: string; // "HR Manager"
@@ -49,6 +57,7 @@ export interface ConfidentialCase {
   sections: CaseSection[];
   actions: CaseAction[];
   signoff: CaseSignoff[];
+  explanations: CaseExplanation[];
   createdByName: string;
   createdAt: string;
   updatedByName: string | null;
@@ -79,6 +88,7 @@ export function blankCase(today: string): CaseInput {
       { heading: "Initial Observations", kind: "text", body: "", rows: [] },
     ],
     actions: [],
+    explanations: [],
     signoff: [
       { label: "Prepared by", title: "HR Manager" },
       { label: "Noted by", title: "Vice Chairperson" },
@@ -138,6 +148,7 @@ const toCase = (r: Row): ConfidentialCase => ({
   sections: (r.sections as CaseSection[]) ?? [],
   actions: (r.actions as CaseAction[]) ?? [],
   signoff: (r.signoff as CaseSignoff[]) ?? [],
+  explanations: Array.isArray(r.explanations) ? (r.explanations as CaseExplanation[]) : [],
   createdByName: String(r.created_by_name ?? ""),
   createdAt: String(r.created_at ?? ""),
   updatedByName: (r.updated_by_name as string | null) ?? null,
@@ -152,6 +163,7 @@ const toRow = (c: CaseInput): Row => ({
   sections: c.sections,
   actions: c.actions,
   signoff: c.signoff,
+  explanations: c.explanations,
 });
 
 export async function fetchConfidentialCases(): Promise<ConfidentialCase[]> {
@@ -197,11 +209,26 @@ export async function caseFiles(id: string): Promise<CaseFile[]> {
 
 export const CASE_FILE_ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx";
 
-export async function uploadCaseFile(id: string, file: File): Promise<void> {
+// Uploads a file to the case's folder; returns its path.
+export async function uploadCaseFile(id: string, file: File): Promise<string> {
   if (file.size > 10 * 1024 * 1024) throw new Error("Files up to 10 MB.");
   const safe = file.name.replace(/[^A-Za-z0-9._ -]+/g, "_").slice(-120);
-  const { error } = await files().upload(`${id}/${Date.now()}-${safe}`, file, { contentType: file.type || undefined });
+  const path = `${id}/${Date.now()}-${safe}`;
+  const { error } = await files().upload(path, file, { contentType: file.type || undefined });
   if (error) throw new Error(/mime|type/i.test(error.message) ? "PDF, Word, Excel or image files only." : friendly(error.message));
+  return path;
+}
+
+// HR uploads someone's signed explanation: the file goes in the case's
+// folder and the explanation is marked received today.
+export async function uploadSignedExplanation(c: ConfidentialCase, index: number, file: File, today: string): Promise<void> {
+  const path = await uploadCaseFile(c.id, file);
+  const explanations = c.explanations.map((x, i) => (i === index ? { ...x, path, fileName: file.name, receivedOn: today } : x));
+  const { error } = await table().update({ explanations }).eq("id", c.id);
+  if (error) {
+    await files().remove([path]);
+    throw new Error(friendly(error.message));
+  }
 }
 
 export async function removeCaseFile(path: string): Promise<void> {
