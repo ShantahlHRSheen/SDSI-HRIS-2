@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { isEvaluationHead } from "@/lib/sales-admin-eval";
+import { canSeeConfidential } from "@/lib/confidential-cases";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
@@ -51,7 +52,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
         {NAV_SECTIONS.map((section) => {
           const items = section.items.filter(
             (item) =>
-              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead)) &&
+              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead) || (item.href === "/confidential-cases" && canSeeConfidential(roles, meId))) &&
               !(item.href === "/messages" && messagesHidden),
           );
           if (items.length === 0) return null;
