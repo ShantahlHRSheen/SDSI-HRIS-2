@@ -108,6 +108,9 @@ export interface CompanyConfig {
     headerLines: string[];
     allowances: { label: string; amount: number }[];
   };
+  // Confidential Cases (lib/confidential-cases.ts) are seen by HR and these
+  // employees (ids) — kept in step with confidential_case_viewers (phase 71).
+  confidentialViewerIds?: string[];
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
   // flagged; the HRIS keeps the exact net pay (lib/payroll-import.ts).
   payrollNetRounding?: boolean;
@@ -178,6 +181,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Sheilah Magdadaro approves Sheena, Joan Mariette, Maricris and Marlyn's leave.
     approverTitles: { "emp-004": "Vice Chairperson" },
     payrollNetRounding: true,
+    // Lowel B. Magdadaro (Chairman), Sheilah A. Magdadaro (Vice Chairperson).
+    confidentialViewerIds: ["emp-001", "emp-004"],
     regularization: {
       employerName: "SHANTAHL DIRECT SALES, INC.",
       signatoryId: "emp-001", // Lowel B. Magdadaro

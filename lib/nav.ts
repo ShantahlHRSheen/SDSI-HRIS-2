@@ -41,6 +41,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Travel Allowance", href: "/modules/travel", roles: ALL_ROLES, built: true },
       // Also shown to anyone named as a head on an evaluation (components/Sidebar.tsx).
       { label: "Performance Evaluations", href: "/sales-admin-evaluation", roles: ["hr_admin", "upper_management", "dept_head"], built: true },
+      // Also shown to the company's confidential viewers (components/Sidebar.tsx).
+      { label: "Confidential Cases", href: "/confidential-cases", roles: ["hr_admin"], built: true },
       { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
       { label: "My Notices", href: "/my-notices", roles: ALL_ROLES, built: true },
       { label: "Certificate of Employment", href: "/coe", roles: ALL_ROLES, built: true },
