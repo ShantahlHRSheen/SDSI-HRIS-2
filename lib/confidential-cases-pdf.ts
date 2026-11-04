@@ -175,8 +175,9 @@ export async function buildCasePdf(c: ConfidentialCase, companyName: string): Pr
 
   // ---- Sign-off ------------------------------------------------------------------
   if (c.signoff.length) {
+    // The heading stays with the lines.
+    ensure(120);
     heading("Sign-off");
-    ensure(80);
     const cw = (W - 2 * M) / c.signoff.length;
     c.signoff.forEach((s, i) => {
       const x = M + i * cw + 6;
