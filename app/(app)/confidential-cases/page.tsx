@@ -119,7 +119,7 @@ export default function ConfidentialCasesPage() {
       {draft ? (
         <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
           <div className="mb-4 text-base font-semibold text-[var(--text-primary)]">{draft.id ? "Edit case report" : "New case report"}</div>
-          <CaseEditor value={draft.value} onChange={(value) => setDraft({ ...draft, value })} />
+          <CaseEditor value={draft.value} onChange={(value) => setDraft({ ...draft, value })} caseId={draft.id ?? undefined} />
           {draft.id && (
             <div className="mt-5">
               <CaseFiles caseId={draft.id} canManage />

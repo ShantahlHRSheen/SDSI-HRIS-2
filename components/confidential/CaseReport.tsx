@@ -338,8 +338,13 @@ export function CaseFiles({ caseId, canManage }: { caseId: string; canManage: bo
 
 // ---- HR: writing a case -----------------------------------------------------------------
 
-export function CaseEditor({ value, onChange }: { value: CaseInput; onChange: (v: CaseInput) => void }) {
+export function CaseEditor({ value, onChange, caseId }: { value: CaseInput; onChange: (v: CaseInput) => void; caseId?: string }) {
   const set = <K extends keyof CaseInput>(k: K, v: CaseInput[K]) => onChange({ ...value, [k]: v });
+  // The case's attached files, to pick someone's signed explanation from.
+  const [attached, setAttached] = useState<CaseFile[]>([]);
+  useEffect(() => {
+    if (caseId) caseFiles(caseId).then(setAttached, () => setAttached([]));
+  }, [caseId]);
   const setSection = (i: number, patch: Partial<CaseSection>) => set("sections", value.sections.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const move = <T,>(list: T[], i: number, d: number) => {
     const out = [...list];
@@ -474,7 +479,9 @@ export function CaseEditor({ value, onChange }: { value: CaseInput; onChange: (v
 
       <div>
         <div className="mb-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">Written explanations requested</div>
-        <p className="mb-2 text-xs text-[var(--text-muted)]">Who was asked to explain. Upload each signed explanation from the case page once you receive it.</p>
+        <p className="mb-2 text-xs text-[var(--text-muted)]">
+          Who was asked to explain. Upload a signed explanation on the case page (Written Explanations), or attach it below and pick it here.
+        </p>
         <div className="space-y-1.5">
           {value.explanations.map((x, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -486,10 +493,36 @@ export function CaseEditor({ value, onChange }: { value: CaseInput; onChange: (v
                 className={`${input} w-44 shrink-0`}
                 aria-label="Requested on"
               />
-              <span className={`w-28 shrink-0 text-xs ${x.receivedOn ? "text-[var(--status-good)]" : "text-[var(--status-warning)]"}`}>{x.receivedOn ? `Received ${formatDate(x.receivedOn)}` : "Awaiting"}</span>
+              {attached.length > 0 ? (
+                <select
+                  value={x.path}
+                  onChange={(e) => {
+                    const f = attached.find((a) => a.path === e.target.value);
+                    set(
+                      "explanations",
+                      value.explanations.map((y, j) =>
+                        j === i ? (f ? { ...y, path: f.path, fileName: f.name, receivedOn: y.receivedOn || todayInManila() } : { ...y, path: "", fileName: "", receivedOn: "" }) : y,
+                      ),
+                    );
+                  }}
+                  // Pick up files attached since the form opened.
+                  onFocus={() => caseId && caseFiles(caseId).then(setAttached, () => undefined)}
+                  className={`${input} w-60 shrink-0`}
+                  aria-label="Signed explanation"
+                >
+                  <option value="">Awaiting — no file yet</option>
+                  {attached.map((f) => (
+                    <option key={f.path} value={f.path}>
+                      Received: {f.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className={`w-28 shrink-0 text-xs ${x.receivedOn ? "text-[var(--status-good)]" : "text-[var(--status-warning)]"}`}>{x.receivedOn ? `Received ${formatDate(x.receivedOn)}` : "Awaiting"}</span>
+              )}
               <button
                 onClick={() => set("explanations", value.explanations.filter((_, j) => j !== i))}
-                disabled={!!x.path}
+                disabled={!!x.path && !attached.length}
                 title={x.path ? "Has an uploaded explanation" : "Remove"}
                 className="rounded p-2 text-[var(--text-muted)] hover:text-[var(--status-critical)] disabled:opacity-30"
                 aria-label="Remove"
