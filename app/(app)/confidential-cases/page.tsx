@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { formatDate } from "@/lib/helpers";
 import { todayInManila } from "@/lib/leave-policy";
-import { CaseEditor, CaseFiles, CaseStatusBadge, CaseView, DownloadCaseButton } from "@/components/confidential/CaseReport";
+import { CaseEditor, CaseExplanations, CaseFiles, CaseStatusBadge, CaseView, DownloadCaseButton } from "@/components/confidential/CaseReport";
 import {
   CASE_STATUS,
   blankCase,
@@ -183,7 +183,7 @@ export default function ConfidentialCasesPage() {
                         onClick={() =>
                           setDraft({
                             id: selected.id,
-                            value: { title: selected.title, caseDate: selected.caseDate, status: selected.status, summary: selected.summary, details: selected.details, sections: selected.sections, actions: selected.actions, signoff: selected.signoff },
+                            value: { title: selected.title, caseDate: selected.caseDate, status: selected.status, summary: selected.summary, details: selected.details, sections: selected.sections, actions: selected.actions, signoff: selected.signoff, explanations: selected.explanations },
                           })
                         }
                         className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
@@ -197,6 +197,9 @@ export default function ConfidentialCasesPage() {
                   )}
                 </div>
                 <CaseView c={selected} />
+                <div className="mt-5">
+                  <CaseExplanations key={`x-${selected.id}`} c={selected} canManage={isHr} onChanged={load} />
+                </div>
                 <div className="mt-5">
                   <CaseFiles key={selected.id} caseId={selected.id} canManage={isHr} />
                 </div>
