@@ -244,6 +244,21 @@ export async function fetchRecordings(meetingIds: string[]): Promise<Recording[]
   return ((data as Row[]) ?? []).map(toRecording);
 }
 
+// Deletes a recording: its parts, then its row (the recorder, the host, or HR — phase 77).
+export async function deleteRecording(rec: Recording): Promise<void> {
+  const { data: list, error } = await recordings().list(rec.path, { limit: 1000 });
+  fail(error);
+  const names = (list ?? []).filter((o) => o.id).map((o) => `${rec.path}/${o.name}`);
+  if (names.length) {
+    const { data: removed, error: rmErr } = await recordings().remove(names);
+    fail(rmErr);
+    if ((removed ?? []).length < names.length) throw new Error("You can't delete this recording — only the person who recorded it, the meeting's host or HR can.");
+  }
+  const { data, error: dErr } = await db().from("meeting_recordings").delete().eq("id", rec.id).select("id");
+  fail(dErr);
+  if (!(data as Row[] | null)?.length) throw new Error("You can't delete this recording — only the person who recorded it, the meeting's host or HR can.");
+}
+
 // Downloads the parts in order and joins them into one file.
 export async function loadRecording(rec: Recording, onProgress?: (done: number, total: number) => void): Promise<Blob> {
   const { data: list, error } = await recordings().list(rec.path, { limit: 1000, sortBy: { column: "name", order: "asc" } });
