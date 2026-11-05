@@ -24,6 +24,7 @@ import {
   Landmark,
   LayoutDashboard,
   Megaphone,
+  MessageSquareText,
   MessagesSquare,
   Network,
   Receipt,
@@ -41,6 +42,7 @@ import {
 export const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
   "/bulletin": Megaphone,
+  "/chat": MessageSquareText,
   "/messages": MessagesSquare,
   "/id-card": IdCard,
   "/employees": Users,
