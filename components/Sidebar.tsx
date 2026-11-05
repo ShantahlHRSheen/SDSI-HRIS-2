@@ -14,6 +14,8 @@ import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
 import { useHrMessagesHidden, useHrUnreadCount } from "./messages/HrChat";
 import { useWorkforceBadges } from "./workforce/WorkforceBadges";
+import { useChat } from "./chat/ChatProvider";
+import { chatEnabled } from "@/lib/chat";
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
   const { currentUser, currentEmployee } = useHris();
@@ -24,6 +26,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
   const messagesHidden = useHrMessagesHidden();
   // New requests to act on / updates on one's own, per Workforce page.
   const workforce = useWorkforceBadges();
+  const chatUnread = useChat()?.unreadTotal ?? 0;
   const company = currentCompany();
   // Heads named on an evaluation see Performance Evaluations without the roles.
   const [isHead, setIsHead] = useState(false);
@@ -54,7 +57,8 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
           const items = section.items.filter(
             (item) =>
               (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead) || (item.href === "/confidential-cases" && canSeeConfidential(roles, meId))) &&
-              !(item.href === "/messages" && messagesHidden),
+              !(item.href === "/messages" && messagesHidden) &&
+              !(item.href === "/chat" && !chatEnabled()),
           );
           if (items.length === 0) return null;
           return (
@@ -86,6 +90,9 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                       {!item.built && <Badge tone="muted">Preview</Badge>}
                       {item.href === "/messages" && unread > 0 && (
                         <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${unread} unread`}>{unread}</span>
+                      )}
+                      {item.href === "/chat" && chatUnread > 0 && (
+                        <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${chatUnread} unread`}>{chatUnread}</span>
                       )}
                       {(workforce[item.href] ?? 0) > 0 && (
                         <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${workforce[item.href]} new`}>{workforce[item.href]}</span>
