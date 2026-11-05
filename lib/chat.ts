@@ -179,7 +179,8 @@ const MESSAGE_COLS = "id, conversation_id, sender_id, kind, body, attachments, m
 
 // The newest page, or the page before `before` (oldest first).
 export async function fetchMessages(conversationId: string, before?: string): Promise<ChatMessage[]> {
-  let q = db().from("messages").select(MESSAGE_COLS).eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(PAGE_SIZE);
+  // Same-moment ties (a call message and its notes summary): the call first.
+  let q = db().from("messages").select(MESSAGE_COLS).eq("conversation_id", conversationId).order("created_at", { ascending: false }).order("kind", { ascending: false }).limit(PAGE_SIZE);
   if (before) q = q.lt("created_at", before);
   const { data, error } = await q;
   fail(error);
