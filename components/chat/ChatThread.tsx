@@ -2,7 +2,9 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { ArrowLeft, Download, FileText, Loader2, Paperclip, Phone, Send, Settings2, Smile, Trash2, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, FileText, Loader2, Paperclip, Phone, Send, Settings2, Smile, Trash2, Upload, Video, X } from "lucide-react";
+import { createMeeting, sendToUser } from "@/lib/meetings";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { reportSaveError } from "@/lib/save-errors";
 import { canView, FileViewer, saveFile, type ViewerFile } from "@/components/FileViewer";
@@ -91,6 +93,8 @@ export function ChatThread({ conversation, onBack, onSettings }: { conversation:
   const [dragging, setDragging] = useState(false);
   const [typing, setTyping] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
+  const [calling, setCalling] = useState(false);
+  const router = useRouter();
 
   const scroller = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -346,6 +350,22 @@ export function ChatThread({ conversation, onBack, onSettings }: { conversation:
     }
   }
 
+  // ---- Calls ------------------------------------------------------------------------
+
+  async function startCall(media: "audio" | "video") {
+    if (calling) return;
+    setCalling(true);
+    try {
+      const m = await createMeeting(isGroup ? title : "Call", id, media);
+      const others = conversation.members.filter((x) => x.employeeId !== me).map((x) => x.employeeId);
+      await Promise.all(others.map((o) => sendToUser(o, { type: "invite", meetingId: m.id, code: m.code, media, conversationId: id, from: me, title: isGroup ? title : "Call" })));
+      router.push(`/meetings/${m.code}?join=1`);
+    } catch (e) {
+      reportSaveError("Couldn't start the call", e);
+      setCalling(false);
+    }
+  }
+
   // ---- Seen -------------------------------------------------------------------------
 
   const myLast = useMemo(() => [...(messages ?? [])].reverse().find((m) => m.senderId === me && m.kind !== "system"), [messages, me]);
@@ -395,6 +415,24 @@ export function ChatThread({ conversation, onBack, onSettings }: { conversation:
           <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{title}</div>
           <div className="truncate text-xs text-[var(--text-muted)]">{subtitle}</div>
         </div>
+        <button
+          onClick={() => startCall("audio")}
+          disabled={calling || conversation.members.length < 2}
+          className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+          aria-label="Voice call"
+          title="Voice call"
+        >
+          <Phone size={18} />
+        </button>
+        <button
+          onClick={() => startCall("video")}
+          disabled={calling || conversation.members.length < 2}
+          className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40 disabled:opacity-40"
+          aria-label="Video call"
+          title="Video call"
+        >
+          <Video size={18} />
+        </button>
         <button
           onClick={onSettings}
           className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"

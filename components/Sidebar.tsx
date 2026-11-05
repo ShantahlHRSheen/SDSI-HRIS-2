@@ -58,7 +58,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
             (item) =>
               (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead) || (item.href === "/confidential-cases" && canSeeConfidential(roles, meId))) &&
               !(item.href === "/messages" && messagesHidden) &&
-              !(item.href === "/chat" && !chatEnabled()),
+              !((item.href === "/chat" || item.href === "/meetings") && !chatEnabled()),
           );
           if (items.length === 0) return null;
           return (

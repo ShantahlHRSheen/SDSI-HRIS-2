@@ -17,6 +17,8 @@ import {
   type ChatPerson,
   type Conversation,
 } from "@/lib/chat";
+import { sendToUser, type CallSignal } from "@/lib/meetings";
+import { IncomingCall, type IncomingInvite } from "@/components/meetings/IncomingCall";
 
 // Messages state shared by every page: who's online (Presence on
 // company:presence), my conversations and unread counts (refreshed from my
@@ -40,7 +42,13 @@ interface ChatState {
   setActiveId: (id: string | null) => void;
   notifications: NotificationPermission | "unsupported";
   enableNotifications: () => void;
+  // The meeting this tab is in (no ringing for it).
+  setInMeeting: (id: string | null) => void;
 }
+
+// Call answers (decline) reach the caller's meeting room as this window event.
+export const CALL_EVENT = "hris-call-signal";
+const RING_MS = 45_000;
 
 const Ctx = createContext<ChatState | null>(null);
 export const useChat = () => useContext(Ctx);
@@ -63,6 +71,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported",
   );
   const activeRef = useRef<string | null>(null);
+  const [incoming, setIncoming] = useState<IncomingInvite | null>(null);
+  const inMeeting = useRef<string | null>(null);
+  const setInMeeting = useCallback((id: string | null) => {
+    inMeeting.current = id;
+  }, []);
   useEffect(() => {
     activeRef.current = activeId;
   }, [activeId]);
@@ -157,6 +170,35 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [me, router],
   );
 
+  const onCall = useCallback(
+    (sig: CallSignal) => {
+      if (sig.type === "invite") {
+        if (sig.from === me || inMeeting.current === sig.meetingId) return;
+        setIncoming(sig);
+        if ("Notification" in window && Notification.permission === "granted" && document.visibilityState !== "visible") {
+          const caller = peopleRef.current.get(sig.from);
+          const n = new Notification(`Incoming ${sig.media === "video" ? "video" : "voice"} call`, { body: caller ? `${caller.firstName} ${caller.lastName}` : sig.title, tag: `call-${sig.meetingId}`, icon: currentCompany().logo, requireInteraction: true });
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
+        }
+      } else if (sig.type === "cancel") {
+        setIncoming((cur) => (cur?.meetingId === sig.meetingId ? null : cur));
+      } else {
+        window.dispatchEvent(new CustomEvent(CALL_EVENT, { detail: sig }));
+      }
+    },
+    [me],
+  );
+
+  // Unanswered calls stop ringing.
+  useEffect(() => {
+    if (!incoming) return;
+    const t = window.setTimeout(() => setIncoming(null), RING_MS);
+    return () => window.clearTimeout(t);
+  }, [incoming]);
+
   // Realtime: presence and my own channel.
   useEffect(() => {
     if (!enabled) return;
@@ -180,6 +222,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           const p = payload as { op?: string; conversationId?: string; messageId?: string; senderId?: string };
           if (p.op === "INSERT" && p.senderId && p.senderId !== me && p.conversationId && p.messageId) notify(p.conversationId, p.messageId);
         })
+        .on("broadcast", { event: "call" }, ({ payload }) => onCall(payload as CallSignal))
         .subscribe();
     })().catch(() => {});
     return () => {
@@ -187,7 +230,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (presence) client.removeChannel(presence);
       if (mine) client.removeChannel(mine);
     };
-  }, [enabled, me, reloadSoon, notify]);
+  }, [enabled, me, reloadSoon, notify, onCall]);
 
   const patch = useCallback((id: string, fn: (c: Conversation) => Conversation) => {
     setConversations((cur) => cur?.map((c) => (c.id === id ? fn(c) : c)) ?? cur);
@@ -217,6 +260,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setActiveId,
     notifications,
     enableNotifications,
+    setInMeeting,
   };
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      {incoming && (
+        <IncomingCall
+          invite={incoming}
+          caller={people.get(incoming.from)}
+          photo={photo(incoming.from)}
+          onAccept={() => {
+            setIncoming(null);
+            router.push(`/meetings/${incoming.code}?join=1`);
+          }}
+          onDecline={() => {
+            sendToUser(incoming.from, { type: "decline", meetingId: incoming.meetingId, from: me });
+            setIncoming(null);
+          }}
+        />
+      )}
+    </Ctx.Provider>
+  );
 }
