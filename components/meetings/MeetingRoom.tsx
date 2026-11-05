@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { useHris } from "@/lib/store";
 import { reportSaveError } from "@/lib/save-errors";
 import { personName } from "@/lib/chat";
 import { MeshRoom, type LinkQuality, type MemberState, type RemotePeer } from "@/lib/mesh";
@@ -114,8 +115,8 @@ async function getCam(deviceId: string | undefined, people: number): Promise<Med
 }
 
 function QualityIcon({ q, size = 14 }: { q: LinkQuality; size?: number }) {
-  const label = q === "good" ? "Good connection" : q === "fair" ? "Fair connection" : q === "poor" ? "Weak connection" : "Connecting…";
-  const color = q === "good" ? "var(--status-good)" : q === "fair" ? "var(--status-warning)" : q === "poor" ? "var(--status-critical)" : "var(--text-muted)";
+  const label = q === "good" ? "Good connection" : q === "fair" ? "Fair connection" : q === "poor" ? "Weak connection" : q === "failed" ? "Can't connect" : "Connecting…";
+  const color = q === "good" ? "var(--status-good)" : q === "fair" ? "var(--status-warning)" : q === "poor" || q === "failed" ? "var(--status-critical)" : "var(--text-muted)";
   const Icon = q === "good" ? Signal : q === "fair" ? SignalMedium : SignalLow;
   return (
     <span title={label} aria-label={label} style={{ color }} className="inline-flex">
@@ -205,6 +206,7 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
   const people: Map<string, { firstName: string; lastName: string }> = chat?.people ?? NO_PEOPLE;
   const photo: (id: string | null | undefined) => string | null = chat?.photo ?? noPhoto;
   const setInMeeting = chat?.setInMeeting ?? noop;
+  const myEmployee = useHris().currentEmployee;
   const router = useRouter();
   const nameOf = useCallback((id: string | null | undefined) => (id === me && guest ? guest.name : personName(people.get(id ?? ""))), [people, me, guest]);
 
@@ -326,7 +328,8 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
       const { data } = await getSupabaseClient().auth.getSession();
       tokenRef.current = data.session?.access_token ?? null;
       const ice = await iceServers();
-      const r = new MeshRoom(id, me, nameOf(me), ice, refresh, (event, payload) => {
+      const myName = guest ? guest.name : people.has(me) ? nameOf(me) : myEmployee ? `${myEmployee.firstName} ${myEmployee.lastName}`.trim() : "";
+      const r = new MeshRoom(id, me, myName, ice, refresh, (event, payload) => {
         if (event === "reaction") {
           const rid = Date.now() + Math.random();
           setReactions((cur) => [...cur, { id: rid, sid: String(payload.from), emoji: String(payload.emoji) }]);
@@ -482,12 +485,12 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
 
   const tiles: Tile[] = useMemo(() => {
     if (!snap) return [];
-    const mine: Tile = { key: room?.sid ?? "me", employeeId: me, name: nameOf(me), stream: snap.local, videoId: snap.localVideoId, state: snap.me, quality: snap.quality, isMe: true };
+    const mine: Tile = { key: room?.sid ?? "me", employeeId: me, name: people.has(me) || guest ? nameOf(me) : snap.me.name || nameOf(me), stream: snap.local, videoId: snap.localVideoId, state: snap.me, quality: snap.quality, isMe: true };
     return [
       mine,
-      ...snap.remotes.map((r) => ({ key: r.sid, employeeId: r.state.employeeId, name: r.state.name || nameOf(r.state.employeeId), stream: r.stream, videoId: r.stream.getVideoTracks()[0]?.id ?? null, state: r.state, quality: r.quality, isMe: false })),
+      ...snap.remotes.map((r) => ({ key: r.sid, employeeId: r.state.employeeId, name: people.has(r.state.employeeId) ? nameOf(r.state.employeeId) : r.state.name && r.state.name !== "Former member" ? r.state.name : r.state.employeeId.startsWith("guest:") ? "Guest" : "Co-worker", stream: r.stream, videoId: r.stream.getVideoTracks()[0]?.id ?? null, state: r.state, quality: r.quality, isMe: false })),
     ];
-  }, [snap, room, me, nameOf]);
+  }, [snap, room, me, nameOf, people, guest]);
 
   const speaking = useSpeakers(tiles.map((t) => ({ key: t.key, stream: t.stream, audioId: t.stream.getAudioTracks()[0]?.id ?? null })));
   const screenTile = tiles.find((t) => t.state.screen && t.state.cam);
@@ -773,14 +776,21 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 
   const renderTile = (t: Tile, big: boolean) => {
-    const camOn = t.state.cam && !!t.videoId;
+    const linked = t.isMe || (t.quality !== "connecting" && t.quality !== "failed");
+    const camOn = t.state.cam && !!t.videoId && linked;
     const myReactions = reactions.filter((r) => r.sid === t.key);
     return (
       <div key={t.key} className={`relative overflow-hidden rounded-xl bg-[#16201e] ${speaking === t.key ? "ring-2 ring-[var(--series-1)]" : ""} ${big ? "h-full" : "aspect-video"}`}>
         <VideoEl stream={t.stream} videoId={t.videoId} muted={t.isMe} mirror={t.isMe && !t.state.screen} hidden={!camOn} contain={t.state.screen} remote={!t.isMe} />
         {!camOn && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <ChatAvatar name={t.name} url={photo(t.employeeId)} size={big ? 96 : 64} />
+            <div className="flex flex-col items-center gap-2 px-3 text-center">
+              <ChatAvatar name={t.name} url={photo(t.employeeId)} size={big ? 96 : 64} />
+              {t.quality === "connecting" && !t.isMe && <span className="text-xs text-white/60">Connecting…</span>}
+              {t.quality === "failed" && !t.isMe && (
+                <span className="max-w-[16rem] text-xs text-[var(--status-warning)]">Can&rsquo;t connect to {t.name.split(" ")[0]} — your networks block a direct call. The call relay (SETUP.md) fixes this.</span>
+              )}
+            </div>
           </div>
         )}
         <div className="absolute inset-x-2 bottom-2 flex items-center gap-1.5">
@@ -1084,7 +1094,7 @@ function PipGrid({ tiles, speaking, photo, count }: { tiles: Tile[]; speaking: s
       {tiles.length === 0 && <div style={{ margin: "auto", fontSize: 13, opacity: 0.7 }}>No one else is here yet.</div>}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 6, flex: 1, alignContent: "start", overflow: "auto" }}>
         {tiles.map((t) => {
-          const camOn = t.state.cam && !!t.videoId;
+          const camOn = t.state.cam && !!t.videoId && t.quality !== "connecting" && t.quality !== "failed";
           const url = photo(t.employeeId);
           return (
             <div key={t.key} style={{ position: "relative", aspectRatio: "4 / 3", background: "#16201e", borderRadius: 8, overflow: "hidden", boxShadow: speaking === t.key ? "0 0 0 2px #2fe0a6" : "none" }}>

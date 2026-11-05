@@ -25,7 +25,7 @@ export interface MemberState {
   rec: boolean;
   joinedAt: number;
 }
-export type LinkQuality = "good" | "fair" | "poor" | "connecting";
+export type LinkQuality = "good" | "fair" | "poor" | "connecting" | "failed";
 
 export interface RemotePeer {
   sid: string;
@@ -137,7 +137,7 @@ export class MeshRoom {
   myQuality(): LinkQuality {
     const qs = [...this.peers.values()].map((p) => p.quality);
     if (!qs.length) return "good";
-    if (qs.includes("poor")) return "poor";
+    if (qs.includes("poor") || qs.includes("failed")) return "poor";
     if (qs.includes("fair")) return "fair";
     if (qs.every((q) => q === "connecting")) return "connecting";
     return "good";
@@ -227,9 +227,11 @@ export class MeshRoom {
       }
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "connected" && peer.quality === "connecting") peer.quality = "good";
+      if (pc.connectionState === "connected" && (peer.quality === "connecting" || peer.quality === "failed")) peer.quality = "good";
       if (pc.connectionState === "failed" && peer.initiator) pc.restartIce();
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") peer.quality = "poor";
+      // "failed": the two networks can't reach each other directly (a TURN relay fixes it).
+      if (pc.connectionState === "failed") peer.quality = "failed";
+      if (pc.connectionState === "disconnected") peer.quality = "poor";
       this.onChange();
     };
 
