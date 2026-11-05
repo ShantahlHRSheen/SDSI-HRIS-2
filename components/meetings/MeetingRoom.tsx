@@ -66,6 +66,8 @@ import { ChatAvatar } from "@/components/chat/ChatAvatar";
 import { PeoplePicker } from "@/components/chat/ChatModals";
 import { Modal } from "@/components/Modal";
 import type { CallSignal } from "@/lib/meetings";
+import { decideGuest, fetchGuests, type MeetingGuest } from "@/lib/meetings";
+import { endGuestPass, type GuestPass } from "@/lib/meeting-guest";
 
 const RING_MS = 45_000;
 const REACTIONS = ["👍", "👏", "😂", "❤️", "🎉", "😮"];
@@ -187,11 +189,21 @@ function useSpeakers(entries: { key: string; stream: MediaStream; audioId: strin
   return active;
 }
 
-export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolean }) {
-  const chat = useChat()!;
-  const { me, people, photo, setInMeeting } = chat;
+const NO_PEOPLE = new Map();
+const noPhoto = () => null;
+const noop = () => {};
+
+// guest: someone without an HRIS account, admitted from the waiting room
+// (phase 79) — they see and hear the meeting, but not its notes, chat or
+// recordings, and can't record or invite.
+export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin: boolean; guest?: { pass: GuestPass; name: string } }) {
+  const chat = useChat();
+  const me = guest ? `guest:${guest.pass.userId}` : chat?.me ?? "";
+  const people: Map<string, { firstName: string; lastName: string }> = chat?.people ?? NO_PEOPLE;
+  const photo: (id: string | null | undefined) => string | null = chat?.photo ?? noPhoto;
+  const setInMeeting = chat?.setInMeeting ?? noop;
   const router = useRouter();
-  const nameOf = useCallback((id: string | null | undefined) => personName(people.get(id ?? "")), [people]);
+  const nameOf = useCallback((id: string | null | undefined) => (id === me && guest ? guest.name : personName(people.get(id ?? ""))), [people, me, guest]);
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -213,6 +225,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
   const [notice, setNotice] = useState<string | null>(null);
   const [declined, setDeclined] = useState<string[]>([]);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [guests, setGuests] = useState<MeetingGuest[]>([]);
   const [now, setNow] = useState(() => Date.now());
   // Lobby choices and preview.
   const [wantMic, setWantMic] = useState(true);
@@ -236,6 +249,14 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
 
   useEffect(() => {
     let live = true;
+    if (guest) {
+      const t = window.setTimeout(() => {
+        const at = new Date().toISOString();
+        setMeeting({ id: guest.pass.meetingId, code, title: guest.pass.title, hostId: null, conversationId: null, kind: "meeting", createdAt: at, startedAt: at, endedAt: null, participants: [] });
+        setPhase("lobby");
+      }, 0);
+      return () => window.clearTimeout(t);
+    }
     fetchMeetingByCode(code).then(
       (m) => {
         if (!live) return;
@@ -255,7 +276,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
     return () => {
       live = false;
     };
-  }, [code, autoJoin]);
+  }, [code, autoJoin, guest]);
 
   // Lobby preview.
   useEffect(() => {
@@ -291,15 +312,15 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
   const join = useCallback(async () => {
     setPhase("joining");
     try {
-      const id = await joinMeeting(code);
-      const m = (await fetchMeetingByCode(code)) ?? meetingRef.current;
+      const id = guest ? guest.pass.meetingId : await joinMeeting(code);
+      const m = guest ? meetingRef.current : ((await fetchMeetingByCode(code)) ?? meetingRef.current);
       if (!m) throw new Error("No meeting has that code.");
       setMeeting(m);
       setInMeeting(id);
       const { data } = await getSupabaseClient().auth.getSession();
       tokenRef.current = data.session?.access_token ?? null;
       const ice = await iceServers();
-      const r = new MeshRoom(id, me, ice, refresh, (event, payload) => {
+      const r = new MeshRoom(id, me, nameOf(me), ice, refresh, (event, payload) => {
         if (event === "reaction") {
           const rid = Date.now() + Math.random();
           setReactions((cur) => [...cur, { id: rid, sid: String(payload.from), emoji: String(payload.emoji) }]);
@@ -308,6 +329,9 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
           const p = payload as { op: string; note: Record<string, unknown> };
           const n = toNote(p.note);
           setNotes((cur) => (p.op === "DELETE" ? cur.filter((x) => x.id !== n.id) : cur.some((x) => x.id === n.id) ? cur.map((x) => (x.id === n.id ? n : x)) : [...cur, n]));
+        } else if (event === "guest") {
+          const g = (payload as { guest: { userId: string; name: string; status: MeetingGuest["status"] } }).guest;
+          setGuests((cur) => [...cur.filter((x) => x.userId !== g.userId), g]);
         } else if (event === "ended") {
           finish(true);
         }
@@ -324,7 +348,10 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
       await r.publishState({ mic: !!mic, cam: !!cam });
       if (wantMic && !mic) setNotice("Your microphone isn't available — check the browser's permission for this site.");
       if (wantCam && !cam) setNotice("Your camera isn't available — check the browser's permission for this site.");
-      fetchNotes(id).then(setNotes, () => {});
+      if (!guest) {
+        fetchNotes(id).then(setNotes, () => {});
+        fetchGuests(id).then(setGuests, () => {});
+      }
       navigator.mediaDevices.enumerateDevices().then(setDevices, () => {});
       setPhase("in");
     } catch (e) {
@@ -333,7 +360,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
     }
     // finish is stable for the life of the room
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, me, refresh, setInMeeting, wantMic, wantCam, micId, camId, preview]);
+  }, [code, me, guest, nameOf, refresh, setInMeeting, wantMic, wantCam, micId, camId, preview]);
 
   useEffect(() => {
     if (phase === "joining" && !roomRef.current) {
@@ -374,7 +401,8 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
     r?.leave();
     roomRef.current = null;
     setInMeeting(null);
-    if (m) await leaveMeeting(m.id).catch(() => {});
+    if (guest) endGuestPass();
+    else if (m) await leaveMeeting(m.id).catch(() => {});
     setPhase("ended");
     if (ended) setNotice("The meeting has ended.");
   }
@@ -382,7 +410,8 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
   useEffect(() => {
     const onHide = () => {
       const m = meetingRef.current;
-      if (m && roomRef.current && !leftRef.current && tokenRef.current) leaveMeetingOnUnload(m.id, tokenRef.current);
+      if (guest && !leftRef.current) endGuestPass();
+      else if (m && roomRef.current && !leftRef.current && tokenRef.current) leaveMeetingOnUnload(m.id, tokenRef.current);
     };
     window.addEventListener("pagehide", onHide);
     return () => {
@@ -393,11 +422,12 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
         recorderRef.current?.stop();
         roomRef.current.leave();
         const m = meetingRef.current;
-        if (m) leaveMeeting(m.id).catch(() => {});
+        if (guest) endGuestPass();
+        else if (m) leaveMeeting(m.id).catch(() => {});
         setInMeeting(null);
       }
     };
-  }, [setInMeeting]);
+  }, [setInMeeting, guest]);
 
   // ---- Calling (a call from a chat, before anyone answers) ---------------------------
 
@@ -447,7 +477,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
     const mine: Tile = { key: room?.sid ?? "me", employeeId: me, name: nameOf(me), stream: snap.local, videoId: snap.localVideoId, state: snap.me, quality: snap.quality, isMe: true };
     return [
       mine,
-      ...snap.remotes.map((r) => ({ key: r.sid, employeeId: r.state.employeeId, name: nameOf(r.state.employeeId), stream: r.stream, videoId: r.stream.getVideoTracks()[0]?.id ?? null, state: r.state, quality: r.quality, isMe: false })),
+      ...snap.remotes.map((r) => ({ key: r.sid, employeeId: r.state.employeeId, name: r.state.name || nameOf(r.state.employeeId), stream: r.stream, videoId: r.stream.getVideoTracks()[0]?.id ?? null, state: r.state, quality: r.quality, isMe: false })),
     ];
   }, [snap, room, me, nameOf]);
 
@@ -568,6 +598,19 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
     }
   }
 
+  async function decide(g: MeetingGuest, admit: boolean) {
+    const m = meetingRef.current;
+    if (!m) return;
+    setGuests((cur) => cur.map((x) => (x.userId === g.userId ? { ...x, status: admit ? "admitted" : "denied" } : x)));
+    try {
+      await decideGuest(m.id, g.userId, admit);
+    } catch (e) {
+      setGuests((cur) => cur.map((x) => (x.userId === g.userId ? g : x)));
+      reportSaveError(admit ? "Couldn't admit the guest" : "Couldn't deny the guest", e);
+    }
+  }
+  const waiting = guests.filter((g) => g.status === "waiting");
+
   // ---- Inviting ---------------------------------------------------------------------
 
   function ring(ids: string[]) {
@@ -617,7 +660,8 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
               <Download size={16} /> Download the recording
             </button>
           )}
-          <div className="mt-2 flex gap-2">
+          {guest && <div className="text-sm text-white/70">Thank you for joining. You can close this tab now.</div>}
+          <div className={`mt-2 flex gap-2 ${guest ? "hidden" : ""}`}>
             <button onClick={() => router.push(backHref)} className="rounded-lg bg-[var(--series-1)] px-4 py-2 text-sm font-medium text-[var(--on-accent)]">
               {meeting?.conversationId ? "Back to the chat" : "Back to Meetings"}
             </button>
@@ -670,9 +714,11 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
               <button onClick={() => setPhase("joining")} className="flex-1 rounded-lg bg-[var(--series-1)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)]">
                 Join now
               </button>
-              <button onClick={() => router.push(backHref)} className="rounded-lg border border-white/20 px-4 py-2.5 text-sm text-white hover:bg-white/10">
-                Cancel
-              </button>
+              {!guest && (
+                <button onClick={() => router.push(backHref)} className="rounded-lg border border-white/20 px-4 py-2.5 text-sm text-white hover:bg-white/10">
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -757,13 +803,15 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
             </button>
           </div>
         </div>
-        <button
-          onClick={() => setInviteOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)]"
-          title="Invite people to this meeting"
-        >
-          <UserPlus size={14} /> Invite
-        </button>
+        {!guest && (
+          <button
+            onClick={() => setInviteOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)]"
+            title="Invite people to this meeting"
+          >
+            <UserPlus size={14} /> Invite
+          </button>
+        )}
         <span className="flex items-center gap-1 text-xs text-white/70" title="Your connection">
           <QualityIcon q={snap?.quality ?? "connecting"} /> {snap?.quality === "poor" ? "Weak connection" : snap?.quality === "fair" ? "Fair connection" : snap?.quality === "connecting" ? "Connecting…" : "Good connection"}
         </span>
@@ -773,6 +821,21 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
           <Circle size={10} className="animate-pulse fill-white" /> Recording{recordingBy.isMe ? " — you started it" : ` — started by ${recordingBy.name}`}. Everyone in the meeting is recorded.
         </div>
       )}
+      {!guest &&
+        waiting.map((g) => (
+          <div key={g.userId} className="mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--series-1)]/90 px-3 py-1.5 text-xs font-medium text-[var(--on-accent)] sm:mx-4" role="status">
+            <UserPlus size={14} />
+            <span className="flex-1">
+              {g.name} <span className="opacity-80">(guest, no HRIS account)</span> wants to join
+            </span>
+            <button onClick={() => decide(g, false)} className="rounded-md bg-black/20 px-2.5 py-1 hover:bg-black/30">
+              Deny
+            </button>
+            <button onClick={() => decide(g, true)} className="rounded-md bg-white px-2.5 py-1 font-semibold text-black hover:bg-white/90">
+              Admit
+            </button>
+          </div>
+        ))}
       {count > BIG_MEETING && (
         <div className="mx-3 mb-2 rounded-lg bg-[var(--status-warning)]/90 px-3 py-1.5 text-xs text-black sm:mx-4">
           With more than {BIG_MEETING} people, video may be choppy. Turning cameras off helps.
@@ -833,7 +896,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
         {panel && (
           <aside className="fixed inset-x-0 bottom-20 top-24 z-10 mx-3 flex flex-col overflow-hidden rounded-xl bg-[var(--surface-1)] sm:static sm:mx-0 sm:w-80 sm:shrink-0">
             <div className="flex items-center border-b border-[var(--border-hairline)] text-sm">
-              {(["people", "notes", "chat"] as const).map((p) => (
+              {(guest ? (["people"] as const) : (["people", "notes", "chat"] as const)).map((p) => (
                 <button key={p} onClick={() => setPanel(p)} className={`flex-1 px-2 py-2.5 font-medium capitalize ${panel === p ? "border-b-2 border-[var(--series-1)] text-[var(--series-1)]" : "text-[var(--text-secondary)]"}`}>
                   {p === "people" ? `People (${count})` : p}
                 </button>
@@ -850,7 +913,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
                 hostId={meeting?.hostId ?? null}
                 away={(meeting?.participants ?? []).map((p) => p.employeeId).filter((id) => !tiles.some((t) => t.employeeId === id))}
                 nameOf={nameOf}
-                onInvite={() => setInviteOpen(true)}
+                onInvite={guest ? undefined : () => setInviteOpen(true)}
                 onRing={(id) => {
                   ring([id]);
                   setNotice(`Ringing ${nameOf(id)}…`);
@@ -893,6 +956,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
             </div>
           )}
         </div>
+        {!guest && (
         <RoundBtn
           on={!recorder}
           active={!!recorder}
@@ -901,6 +965,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
           icon={recorder ? Square : Circle}
           disabled={recBusy || (!!recordingBy && !recorder)}
         />
+        )}
         <div className="relative">
           <RoundBtn
             on
@@ -922,8 +987,8 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
           )}
         </div>
         <RoundBtn on={panel !== "people"} active={panel === "people"} onClick={() => setPanel(panel === "people" ? null : "people")} label="People" icon={Users} />
-        <RoundBtn on={panel !== "notes"} active={panel === "notes"} onClick={() => setPanel(panel === "notes" ? null : "notes")} label="Notes" icon={NotebookPen} />
-        <RoundBtn on={panel !== "chat"} active={panel === "chat"} onClick={() => setPanel(panel === "chat" ? null : "chat")} label="Chat" icon={MessageSquare} />
+        {!guest && <RoundBtn on={panel !== "notes"} active={panel === "notes"} onClick={() => setPanel(panel === "notes" ? null : "notes")} label="Notes" icon={NotebookPen} />}
+        {!guest && <RoundBtn on={panel !== "chat"} active={panel === "chat"} onClick={() => setPanel(panel === "chat" ? null : "chat")} label="Chat" icon={MessageSquare} />}
         <button onClick={() => finish(false)} className="flex h-11 items-center gap-1.5 rounded-full bg-[var(--status-critical)] px-4 text-sm font-semibold text-white" aria-label="Leave">
           <PhoneOff size={18} /> Leave
         </button>
@@ -1059,13 +1124,13 @@ function PeoplePanel({
   hostId: string | null;
   away: string[];
   nameOf: (id: string) => string;
-  onInvite: () => void;
+  onInvite?: () => void;
   onRing: (id: string) => void;
 }) {
   const sorted = [...tiles].sort((a, b) => Number(b.state.hand) - Number(a.state.hand));
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="border-b border-[var(--gridline)] p-2">
+      <div className={`border-b border-[var(--gridline)] p-2 ${onInvite ? "" : "hidden"}`}>
         <button onClick={onInvite} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--series-1)] py-2 text-sm font-medium text-[var(--on-accent)]">
           <UserPlus size={15} /> Invite people
         </button>
@@ -1080,7 +1145,7 @@ function PeoplePanel({
               {t.name}
               {t.isMe ? " (you)" : ""}
             </span>
-            <span className="text-xs text-[var(--text-muted)]">{t.employeeId === hostId ? "Host" : "Participant"}</span>
+            <span className="text-xs text-[var(--text-muted)]">{t.employeeId === hostId ? "Host" : t.employeeId.startsWith("guest:") ? "Guest" : "Participant"}</span>
           </span>
           {t.state.hand && <Labeled label="Hand raised" className="text-[var(--status-warning)]" icon={Hand} />}
           {t.state.mic ? <Labeled label="Mic on" className="text-[var(--text-secondary)]" icon={Mic} /> : <Labeled label="Muted" className="text-[var(--status-critical)]" icon={MicOff} />}

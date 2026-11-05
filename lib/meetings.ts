@@ -137,6 +137,23 @@ export async function inviteToMeeting(id: string, members: string[]): Promise<nu
   return Number(data ?? 0);
 }
 
+// ---- Guests (phase 79) ------------------------------------------------------------------
+
+export interface MeetingGuest {
+  userId: string;
+  name: string;
+  status: "waiting" | "admitted" | "denied" | "left";
+}
+export async function fetchGuests(meetingId: string): Promise<MeetingGuest[]> {
+  const { data, error } = await db().from("meeting_guests").select("user_id, name, status").eq("meeting_id", meetingId);
+  if (error) return []; // phase 79 not run yet
+  return ((data as Row[]) ?? []).map((r) => ({ userId: String(r.user_id), name: String(r.name), status: r.status as MeetingGuest["status"] }));
+}
+export async function decideGuest(meetingId: string, userId: string, admit: boolean): Promise<void> {
+  const { error } = await db().rpc("meeting_guest_decide", { p_meeting: meetingId, p_guest: userId, p_admit: admit });
+  fail(error);
+}
+
 export async function endMeeting(id: string): Promise<void> {
   const { error } = await db().rpc("meeting_end", { p_meeting: id });
   fail(error);
