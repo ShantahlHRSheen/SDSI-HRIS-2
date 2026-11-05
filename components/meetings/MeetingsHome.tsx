@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Copy, Download, Film, Loader2, LogIn, Phone, Plus, Video } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, Film, Loader2, LogIn, Phone, Plus, Trash2, Video } from "lucide-react";
+import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { reportSaveError } from "@/lib/save-errors";
 import { fileSize, personName } from "@/lib/chat";
 import {
   createMeeting,
+  deleteRecording,
   downloadText,
   fetchMyMeetings,
   fetchNotes,
@@ -33,6 +35,7 @@ function duration(m: Meeting): string {
 
 export function MeetingsHome() {
   const { me, people, photo } = useChat()!;
+  const isHr = !!useHris().currentUser?.roles.includes("hr_admin");
   const router = useRouter();
   const [meetings, setMeetings] = useState<Meeting[] | null>(null);
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -226,7 +229,14 @@ export function MeetingsHome() {
                           <div className="mb-1 text-xs font-semibold text-[var(--text-primary)] uppercase">Recordings</div>
                           <div className="space-y-2">
                             {recs.map((r) => (
-                              <RecordingItem key={r.id} rec={r} title={m.title} by={personName(people.get(r.recordedBy ?? ""))} mine={r.recordedBy === me} />
+                              <RecordingItem
+                                key={r.id}
+                                rec={r}
+                                title={m.title}
+                                by={personName(people.get(r.recordedBy ?? ""))}
+                                canDelete={r.recordedBy === me || m.hostId === me || isHr}
+                                onDeleted={() => setRecordings((cur) => cur.filter((x) => x.id !== r.id))}
+                              />
                             ))}
                           </div>
                           <p className="mt-1 text-[11px] text-[var(--text-muted)]">Recordings are deleted automatically after 60 days.</p>
@@ -244,9 +254,20 @@ export function MeetingsHome() {
   );
 }
 
-function RecordingItem({ rec, title, by }: { rec: Recording; title: string; by: string; mine: boolean }) {
+function RecordingItem({ rec, title, by, canDelete, onDeleted }: { rec: Recording; title: string; by: string; canDelete: boolean; onDeleted: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  async function remove() {
+    if (!window.confirm(`Delete this recording of "${title}" for everyone? This can't be undone.`)) return;
+    setProgress("Deleting…");
+    try {
+      await deleteRecording(rec);
+      onDeleted();
+    } catch (e) {
+      reportSaveError("Couldn't delete the recording", e);
+      setProgress(null);
+    }
+  }
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
   async function load(): Promise<string | null> {
     if (url) return url;
@@ -289,6 +310,16 @@ function RecordingItem({ rec, title, by }: { rec: Recording; title: string; by: 
         <button onClick={download} disabled={!!progress} className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] px-2.5 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--gridline)]/40">
           <Download size={12} /> Download
         </button>
+        {canDelete && (
+          <button
+            onClick={remove}
+            disabled={!!progress}
+            className="flex items-center gap-1 rounded-lg border border-[var(--status-critical)]/50 px-2.5 py-1 text-xs text-[var(--status-critical)] hover:bg-[var(--status-critical)]/10"
+            aria-label="Delete recording"
+          >
+            <Trash2 size={12} /> Delete
+          </button>
+        )}
       </div>
       {progress && (
         <div className="mt-1 flex items-center gap-1 text-xs text-[var(--text-muted)]">
