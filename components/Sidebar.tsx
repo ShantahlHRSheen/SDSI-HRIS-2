@@ -9,6 +9,7 @@ import { X } from "lucide-react";
 import { isEvaluationHead } from "@/lib/sales-admin-eval";
 import { canSeeConfidential } from "@/lib/confidential-cases";
 import { NAV_SECTIONS } from "@/lib/nav";
+import { NAV_ICONS } from "./navIcons";
 import { useHris } from "@/lib/store";
 import { Badge } from "./Badge";
 import { useHrMessagesHidden, useHrUnreadCount } from "./messages/HrChat";
@@ -75,7 +76,13 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
                           : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50"
                       }`}
                     >
-                      <span>{item.href === "/messages" && isHr ? "HR Messages" : item.label}</span>
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        {(() => {
+                          const Icon = NAV_ICONS[item.href];
+                          return Icon ? <Icon size={16} className="shrink-0 opacity-80" aria-hidden /> : null;
+                        })()}
+                        <span className="truncate">{item.href === "/messages" && isHr ? "HR Messages" : item.label}</span>
+                      </span>
                       {!item.built && <Badge tone="muted">Preview</Badge>}
                       {item.href === "/messages" && unread > 0 && (
                         <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${unread} unread`}>{unread}</span>
