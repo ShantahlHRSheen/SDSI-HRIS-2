@@ -19,7 +19,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Wait for the saved sign-in check before sending anyone to the sign-in
   // page — otherwise a refresh or a direct link bounces to the dashboard.
   useEffect(() => {
-    if (ready && !authPending && !currentUser) router.replace("/");
+    if (ready && !authPending && !currentUser) {
+      // Come back here after signing in (e.g. a meeting link).
+      const here = window.location.pathname + window.location.search;
+      router.replace(here && here !== "/dashboard" ? `/?next=${encodeURIComponent(here)}` : "/");
+    }
   }, [ready, authPending, currentUser, router]);
 
   if (!ready || !currentUser) {

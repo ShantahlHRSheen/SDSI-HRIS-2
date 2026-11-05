@@ -1,17 +1,34 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { LogIn } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { ROLE_LABELS } from "@/lib/types";
 import { Badge } from "@/components/Badge";
 import { isSupabaseConfigured } from "@/lib/supabase/auth";
-import { COMPANIES, COMPANY_ORDER, GROUP_NAME, chooseCompany, companyMissingSetup, currentCompany, isCompanyReady } from "@/lib/companies";
+import { COMPANIES, COMPANY_ORDER, GROUP_NAME, chooseCompany, companyMissingSetup, currentCompany, currentCompanyId, isCompanyId, isCompanyReady } from "@/lib/companies";
 
-export default function LoginPage() {
+// Where to go after signing in: the page a link was for (?next=/meetings/…),
+// only within the HRIS; otherwise the dashboard.
+function safeNext(next: string | null): string {
+  const n = next ?? "";
+  return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : "/dashboard";
+}
+
+export default function LoginPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPage />
+    </Suspense>
+  );
+}
+
+function LoginPage() {
   const { ready, currentUser, login, loginWithSupabase, demoUsers } = useHris();
   const router = useRouter();
+  const next = safeNext(useSearchParams().get("next"));
+  const nextPage = () => next;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,12 +39,22 @@ export default function LoginPage() {
   const company = ready ? currentCompany() : COMPANIES.sdsi;
 
   useEffect(() => {
-    if (ready && currentUser) router.replace("/dashboard");
-  }, [ready, currentUser, router]);
+    if (ready && currentUser) router.replace(next);
+  }, [ready, currentUser, router, next]);
+
+  // A link for another company's HRIS (…?co=sdsi): switch to that company first.
+  useEffect(() => {
+    if (!ready) return;
+    const co = new URLSearchParams(next.split("?")[1] ?? "").get("co");
+    if (co && isCompanyId(co) && isCompanyReady(co) && co !== currentCompanyId()) {
+      chooseCompany(co);
+      window.location.reload();
+    }
+  }, [ready, next]);
 
   function signInAs(userId: string) {
     login(userId);
-    router.push("/dashboard");
+    router.push(nextPage());
   }
 
   async function handleEmailLogin(e: React.FormEvent) {
@@ -44,7 +71,7 @@ export default function LoginPage() {
       setAuthError(/invalid login credentials/i.test(error) ? "Email or password is incorrect. Check the password carefully — it is case-sensitive (capital and small letters must match)." : error);
       return;
     }
-    router.push("/dashboard");
+    router.push(nextPage());
   }
 
   return (
@@ -101,6 +128,12 @@ export default function LoginPage() {
             })}
           </div>
         </div>
+      )}
+
+      {ready && nextPage().startsWith("/meetings/") && (
+        <p className="mb-4 max-w-sm rounded-lg border border-[var(--series-1)]/40 bg-[var(--series-1)]/10 px-3 py-2 text-center text-sm text-[var(--text-primary)]">
+          Sign in to join the meeting — you&rsquo;ll go straight to it.
+        </p>
       )}
 
       {ready && supabaseConfigured && (

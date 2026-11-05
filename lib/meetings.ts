@@ -159,7 +159,7 @@ export function parseMeetingCode(input: string): string | null {
   const m = /([0-9a-z]{3}-[0-9a-z]{4}-[0-9a-z]{3})/i.exec(input.trim());
   return m ? m[1].toLowerCase() : null;
 }
-export const meetingLink = (code: string) => `${typeof window !== "undefined" ? window.location.origin : ""}/meetings/${code}`;
+export const meetingLink = (code: string) => `${typeof window !== "undefined" ? window.location.origin : ""}/meetings/${code}?co=${currentCompany().id}`;
 
 // ---- Notes ----------------------------------------------------------------------------
 
