@@ -18,8 +18,8 @@
 --     channels; realtime.messages policies authorize the channels —
 --     chat:<conversation id>, meeting:<meeting id>, user:<employee id>,
 --     company:presence.
---   * Storage: chat-files (attachments, 100 MB) and meeting-recordings
---     (2 GB), both private; chat-avatars (chat photos, 2 MB, any employee
+--   * Storage: chat-files (attachments, 50 MB) and meeting-recordings
+--     (in 50 MB parts, phase 75), both private; chat-avatars (chat photos, 2 MB, any employee
 --     of the company can view).
 --   * chat_settings.recording_retention_days (60): recordings older than
 --     this are deleted by the purge-recordings Edge Function (phase 74
@@ -785,16 +785,16 @@ create policy "chat settings read" on chat_settings for select to authenticated
   using (app_is_company_member());
 
 -- ---- Storage --------------------------------------------------------------------------
---   chat-files          <conversation id>/<file>       100 MB
---   meeting-recordings  <meeting id>/<file>            2 GB
+--   chat-files          <conversation id>/<file>       50 MB
+--   meeting-recordings  <meeting id>/<recording id>/<part>   50 MB a part (phase 75)
 --   chat-avatars        <employee id>/<file>           2 MB, images
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('chat-files', 'chat-files', false, 104857600, null)
+values ('chat-files', 'chat-files', false, 52428800, null)
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('meeting-recordings', 'meeting-recordings', false, 2147483648, array['video/webm', 'video/mp4', 'audio/webm'])
+values ('meeting-recordings', 'meeting-recordings', false, 52428800, array['video/webm', 'video/mp4', 'audio/webm'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
