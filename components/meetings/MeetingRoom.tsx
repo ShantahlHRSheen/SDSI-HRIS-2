@@ -24,6 +24,7 @@ import {
   SmilePlus,
   Square,
   Trash2,
+  UserPlus,
   Users,
   Video,
   VideoOff,
@@ -43,6 +44,7 @@ import {
   fetchMeetingByCode,
   fetchNotes,
   iceServers,
+  inviteToMeeting,
   isLive,
   joinMeeting,
   leaveMeeting,
@@ -61,6 +63,8 @@ import {
 } from "@/lib/meetings";
 import { CALL_EVENT, useChat } from "@/components/chat/ChatProvider";
 import { ChatAvatar } from "@/components/chat/ChatAvatar";
+import { PeoplePicker } from "@/components/chat/ChatModals";
+import { Modal } from "@/components/Modal";
 import type { CallSignal } from "@/lib/meetings";
 
 const RING_MS = 45_000;
@@ -208,6 +212,7 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
   const [saving, setSaving] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [declined, setDeclined] = useState<string[]>([]);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   // Lobby choices and preview.
   const [wantMic, setWantMic] = useState(true);
@@ -563,6 +568,24 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
     }
   }
 
+  // ---- Inviting ---------------------------------------------------------------------
+
+  function ring(ids: string[]) {
+    const m = meetingRef.current;
+    if (!m) return;
+    for (const id of ids) sendToUser(id, { type: "invite", kind: "meeting", meetingId: m.id, code: m.code, media: "video", conversationId: m.conversationId ?? "", from: me, title: m.title });
+  }
+
+  async function invite(ids: string[]) {
+    const m = meetingRef.current;
+    if (!m || !ids.length) return;
+    await inviteToMeeting(m.id, ids);
+    ring(ids);
+    const fresh = await fetchMeetingByCode(code).catch(() => null);
+    if (fresh) setMeeting(fresh);
+    setNotice(`Invited ${ids.length === 1 ? nameOf(ids[0]) : `${ids.length} people`} — their HRIS is ringing.`);
+  }
+
   // ---- Screens other than the room -----------------------------------------------------
 
   const backHref = meeting?.conversationId ? `/chat?c=${meeting.conversationId}` : "/meetings";
@@ -709,6 +732,16 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
 
   return (
     <Shell>
+      {inviteOpen && meeting && (
+        <InviteModal
+          meeting={meeting}
+          code={code}
+          exclude={[me, ...meeting.participants.map((p) => p.employeeId)]}
+          onClose={() => setInviteOpen(false)}
+          onInvite={invite}
+          onCopied={() => setNotice("Meeting link copied — paste it in a chat, email or text.")}
+        />
+      )}
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-white sm:px-4">
         <div className="min-w-0 flex-1">
@@ -724,6 +757,13 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
             </button>
           </div>
         </div>
+        <button
+          onClick={() => setInviteOpen(true)}
+          className="flex items-center gap-1.5 rounded-lg bg-[var(--series-1)] px-3 py-1.5 text-xs font-semibold text-[var(--on-accent)]"
+          title="Invite people to this meeting"
+        >
+          <UserPlus size={14} /> Invite
+        </button>
         <span className="flex items-center gap-1 text-xs text-white/70" title="Your connection">
           <QualityIcon q={snap?.quality ?? "connecting"} /> {snap?.quality === "poor" ? "Weak connection" : snap?.quality === "fair" ? "Fair connection" : snap?.quality === "connecting" ? "Connecting…" : "Good connection"}
         </span>
@@ -802,7 +842,21 @@ export function MeetingRoom({ code, autoJoin }: { code: string; autoJoin: boolea
                 <X size={16} />
               </button>
             </div>
-            {panel === "people" && <PeoplePanel tiles={tiles} speaking={speaking} photo={photo} hostId={meeting?.hostId ?? null} />}
+            {panel === "people" && (
+              <PeoplePanel
+                tiles={tiles}
+                speaking={speaking}
+                photo={photo}
+                hostId={meeting?.hostId ?? null}
+                away={(meeting?.participants ?? []).map((p) => p.employeeId).filter((id) => !tiles.some((t) => t.employeeId === id))}
+                nameOf={nameOf}
+                onInvite={() => setInviteOpen(true)}
+                onRing={(id) => {
+                  ring([id]);
+                  setNotice(`Ringing ${nameOf(id)}…`);
+                }}
+              />
+            )}
             {panel === "notes" && meeting && (
               <NotesPanel meeting={meeting} me={me} amHost={amHost} notes={notes.filter((n) => n.kind !== "chat")} nameOf={nameOf} onAdded={(n) => setNotes((cur) => (cur.some((x) => x.id === n.id) ? cur.map((x) => (x.id === n.id ? n : x)) : [...cur, n]))} />
             )}
@@ -947,10 +1001,75 @@ function DeviceSelect({ label, list, value, onChange, dark = true }: { label: st
   );
 }
 
-function PeoplePanel({ tiles, speaking, photo, hostId }: { tiles: Tile[]; speaking: string | null; photo: (id: string) => string | null; hostId: string | null }) {
+function InviteModal({ meeting, code, exclude, onClose, onInvite, onCopied }: { meeting: Meeting; code: string; exclude: string[]; onClose: () => void; onInvite: (ids: string[]) => Promise<void>; onCopied: () => void }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  async function send() {
+    if (!selected.length || busy) return;
+    setBusy(true);
+    try {
+      await onInvite(selected);
+      onClose();
+    } catch (e) {
+      reportSaveError("Couldn't invite them", e);
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal open onClose={onClose} title={`Invite to "${meeting.title}"`}>
+      <p className="mb-3 text-sm text-[var(--text-secondary)]">Pick co-workers — their HRIS rings with an invite, and the meeting shows on their Meetings page.</p>
+      <PeoplePicker exclude={exclude} selected={selected} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))} />
+      <div className="mt-3 flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm">
+        <span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">{meetingLink(code)}</span>
+        <button
+          onClick={() => navigator.clipboard.writeText(meetingLink(code)).then(() => {
+            onCopied();
+            onClose();
+          })}
+          className="flex shrink-0 items-center gap-1 text-[var(--series-1)] hover:underline"
+        >
+          <Copy size={14} /> Copy link
+        </button>
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <button onClick={onClose} className="rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+          Cancel
+        </button>
+        <button onClick={send} disabled={!selected.length || busy} className="rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-40">
+          {busy ? "Inviting…" : `Invite${selected.length ? ` (${selected.length})` : ""}`}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function PeoplePanel({
+  tiles,
+  speaking,
+  photo,
+  hostId,
+  away,
+  nameOf,
+  onInvite,
+  onRing,
+}: {
+  tiles: Tile[];
+  speaking: string | null;
+  photo: (id: string) => string | null;
+  hostId: string | null;
+  away: string[];
+  nameOf: (id: string) => string;
+  onInvite: () => void;
+  onRing: (id: string) => void;
+}) {
   const sorted = [...tiles].sort((a, b) => Number(b.state.hand) - Number(a.state.hand));
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="border-b border-[var(--gridline)] p-2">
+        <button onClick={onInvite} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--series-1)] py-2 text-sm font-medium text-[var(--on-accent)]">
+          <UserPlus size={15} /> Invite people
+        </button>
+      </div>
       {sorted.map((t) => (
         <div key={t.key} className="flex items-center gap-2.5 border-b border-[var(--gridline)] px-3 py-2">
           <span className={`rounded-full ${speaking === t.key ? "ring-2 ring-[var(--series-1)]" : ""}`}>
@@ -969,6 +1088,20 @@ function PeoplePanel({ tiles, speaking, photo, hostId }: { tiles: Tile[]; speaki
           <QualityIcon q={t.quality} />
         </div>
       ))}
+      {away.length > 0 && (
+        <>
+          <div className="px-3 pt-3 pb-1 text-[11px] font-semibold text-[var(--text-muted)] uppercase">Invited · not here</div>
+          {away.map((id) => (
+            <div key={id} className="flex items-center gap-2.5 border-b border-[var(--gridline)] px-3 py-2 opacity-80">
+              <ChatAvatar name={nameOf(id)} url={photo(id)} size={32} />
+              <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-secondary)]">{nameOf(id)}</span>
+              <button onClick={() => onRing(id)} className="rounded-lg border border-[var(--border-hairline)] px-2 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--gridline)]/40">
+                Ring again
+              </button>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

@@ -25,7 +25,7 @@ const primary = `${btn} bg-[var(--series-1)] text-[var(--on-accent)]`;
 const secondary = `${btn} border border-[var(--border-hairline)] text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40`;
 
 // Search the company's employees; pick one or several.
-function PeoplePicker({ exclude, selected, onToggle, single = false }: { exclude: string[]; selected: string[]; onToggle: (id: string) => void; single?: boolean }) {
+export function PeoplePicker({ exclude, selected, onToggle, single = false }: { exclude: string[]; selected: string[]; onToggle: (id: string) => void; single?: boolean }) {
   const { directory, photo, online } = useChat()!;
   const [q, setQ] = useState("");
   const list = useMemo(() => {

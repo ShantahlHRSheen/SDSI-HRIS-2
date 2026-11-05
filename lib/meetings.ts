@@ -130,6 +130,13 @@ export async function leaveMeetingOnUnload(id: string, accessToken: string) {
   }).catch(() => {});
 }
 
+// Adds co-workers to a meeting (phase 78) so they can see it, join and be rung.
+export async function inviteToMeeting(id: string, members: string[]): Promise<number> {
+  const { data, error } = await db().rpc("meeting_invite", { p_meeting: id, p_members: members });
+  fail(error);
+  return Number(data ?? 0);
+}
+
 export async function endMeeting(id: string): Promise<void> {
   const { error } = await db().rpc("meeting_end", { p_meeting: id });
   fail(error);
@@ -280,7 +287,7 @@ export async function loadRecording(rec: Recording, onProgress?: (done: number, 
 // broadcast endpoint; the policies let you reach people you share a chat with.
 
 export type CallSignal =
-  | { type: "invite"; meetingId: string; code: string; media: "audio" | "video"; conversationId: string; from: string; title: string }
+  | { type: "invite"; meetingId: string; code: string; media: "audio" | "video"; conversationId: string; from: string; title: string; kind?: "call" | "meeting" }
   | { type: "cancel"; meetingId: string; from: string }
   | { type: "decline"; meetingId: string; from: string }
   | { type: "answered"; meetingId: string; from: string };
