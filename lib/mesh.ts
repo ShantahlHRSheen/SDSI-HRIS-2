@@ -16,7 +16,8 @@ import { qualityFor } from "./meetings";
 // covers the rare renegotiation (an ICE restart after a dropped connection).
 
 export interface MemberState {
-  employeeId: string;
+  employeeId: string; // "guest:<login id>" for a guest
+  name: string;
   mic: boolean;
   cam: boolean;
   screen: boolean;
@@ -69,11 +70,12 @@ export class MeshRoom {
   constructor(
     private meetingId: string,
     employeeId: string,
+    name: string,
     private ice: RTCIceServer[],
     private onChange: () => void,
     private onEvent: (event: string, payload: Record<string, unknown>) => void,
   ) {
-    this.state = { employeeId, mic: false, cam: false, screen: false, hand: false, rec: false, joinedAt: Date.now() };
+    this.state = { employeeId, name, mic: false, cam: false, screen: false, hand: false, rec: false, joinedAt: Date.now() };
   }
 
   // ---- Room ---------------------------------------------------------------------------
@@ -88,6 +90,7 @@ export class MeshRoom {
       .on("broadcast", { event: "signal" }, ({ payload }) => this.onSignal(payload as Signal))
       .on("broadcast", { event: "reaction" }, ({ payload }) => this.onEvent("reaction", payload as Record<string, unknown>))
       .on("broadcast", { event: "note" }, ({ payload }) => this.onEvent("note", payload as Record<string, unknown>))
+      .on("broadcast", { event: "guest" }, ({ payload }) => this.onEvent("guest", payload as Record<string, unknown>))
       .on("broadcast", { event: "ended" }, ({ payload }) => this.onEvent("ended", payload as Record<string, unknown>));
     await new Promise<void>((resolve, reject) => {
       const t = window.setTimeout(() => reject(new Error("Couldn't connect to the meeting. Check your internet and try again.")), 15000);

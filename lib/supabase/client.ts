@@ -16,7 +16,15 @@ import { currentCompany } from "../companies";
 // ever talks to the company chosen at sign-in (lib/companies.ts).
 const cached = new Map<string, SupabaseClient<Database>>();
 
+// A meeting guest (lib/meeting-guest.ts) uses its own short-lived client,
+// never saved in the browser, while it's in a meeting.
+let override: SupabaseClient<Database> | null = null;
+export function setGuestClient(client: SupabaseClient<Database> | null) {
+  override = client;
+}
+
 export function getSupabaseClient(): SupabaseClient<Database> {
+  if (override) return override;
   const company = currentCompany();
   const hit = cached.get(company.id);
   if (hit) return hit;

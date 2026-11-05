@@ -1,5 +1,6 @@
 // turn-credentials: short-lived TURN credentials for calls and meetings, from
-// Cloudflare Realtime TURN. Only signed-in employees of the company get them.
+// Cloudflare Realtime TURN. Only signed-in employees of the company, and guests
+// admitted to a live meeting, get them.
 //
 // Deploy:  supabase functions deploy turn-credentials
 // Secrets: supabase secrets set CLOUDFLARE_TURN_KEY_ID=<TURN key ID> CLOUDFLARE_TURN_API_TOKEN=<API token>
@@ -31,7 +32,9 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   });
   const { data: member, error: mErr } = await userClient.rpc("app_is_company_member");
-  if (mErr || member !== true) return json({ error: "Only the company's employees can make calls." }, 403);
+  // Guests admitted to a live meeting (phase 79) may use the relay too.
+  const guest = member === true ? null : await userClient.rpc("app_is_admitted_guest");
+  if (mErr || (member !== true && guest?.data !== true)) return json({ error: "Only the company's employees and admitted guests can make calls." }, 403);
 
   const keyId = Deno.env.get("CLOUDFLARE_TURN_KEY_ID");
   const token = Deno.env.get("CLOUDFLARE_TURN_API_TOKEN");

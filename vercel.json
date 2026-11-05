@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/purge-leave-attachments",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/purge-meeting-guests",
+      "schedule": "40 19 * * *"
     }
   ]
 }

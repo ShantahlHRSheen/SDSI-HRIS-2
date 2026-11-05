@@ -22,7 +22,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (ready && !authPending && !currentUser) {
       // Come back here after signing in (e.g. a meeting link).
       const here = window.location.pathname + window.location.search;
-      router.replace(here && here !== "/dashboard" ? `/?next=${encodeURIComponent(here)}` : "/");
+      // A meeting link: sign in, or join as a guest (app/join).
+      const meeting = /^\/meetings\/([0-9a-z]{3}-[0-9a-z]{4}-[0-9a-z]{3})/i.exec(window.location.pathname);
+      if (meeting) router.replace(`/join/${meeting[1]}${window.location.search}`);
+      else router.replace(here && here !== "/dashboard" ? `/?next=${encodeURIComponent(here)}` : "/");
     }
   }, [ready, authPending, currentUser, router]);
 
