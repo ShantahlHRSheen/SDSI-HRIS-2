@@ -282,7 +282,7 @@ export function messagePreview(m: ChatMessage | null, me: string, people: Map<st
 export function callLabel(m: ChatMessage): string {
   const video = m.meta.media === "video";
   const secs = Number(m.meta.durationSec ?? 0);
-  if (!secs) return video ? "Missed video call" : "Missed call";
+  if (m.meta.missed || !secs) return video ? "Missed video call" : "Missed call";
   const mins = Math.max(1, Math.round(secs / 60));
   return `${video ? "Video call" : "Call"} ended · ${mins} min`;
 }
