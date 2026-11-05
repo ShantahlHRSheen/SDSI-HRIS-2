@@ -13,6 +13,7 @@ export interface IncomingInvite {
   conversationId: string;
   from: string;
   title: string;
+  kind?: "call" | "meeting";
 }
 
 // The incoming-call popup, with a ringtone, shown on any page.
@@ -30,13 +31,13 @@ export function IncomingCall({ invite, caller, photo, onAccept, onDecline }: { i
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{name}</div>
           <div className="truncate text-xs text-[var(--text-secondary)]">
-            Incoming {video ? "video" : "voice"} call{group ? ` · ${group}` : ""}
+            {invite.kind === "meeting" ? `Invites you to join "${invite.title}"` : `Incoming ${video ? "video" : "voice"} call${group ? ` · ${group}` : ""}`}
           </div>
         </div>
         <button onClick={onDecline} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--status-critical)] text-white" aria-label="Decline" title="Decline">
           <PhoneOff size={20} />
         </button>
-        <button onClick={onAccept} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--status-good)] text-white" aria-label="Accept" title="Accept">
+        <button onClick={onAccept} className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--status-good)] text-white" aria-label={invite.kind === "meeting" ? "Join" : "Accept"} title={invite.kind === "meeting" ? "Join" : "Accept"}>
           {video ? <Video size={20} /> : <Phone size={20} />}
         </button>
       </div>

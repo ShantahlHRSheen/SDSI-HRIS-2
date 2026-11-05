@@ -177,7 +177,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setIncoming(sig);
         if ("Notification" in window && Notification.permission === "granted" && document.visibilityState !== "visible") {
           const caller = peopleRef.current.get(sig.from);
-          const n = new Notification(`Incoming ${sig.media === "video" ? "video" : "voice"} call`, { body: caller ? `${caller.firstName} ${caller.lastName}` : sig.title, tag: `call-${sig.meetingId}`, icon: currentCompany().logo, requireInteraction: true });
+          const n = new Notification(sig.kind === "meeting" ? `Meeting invite: ${sig.title}` : `Incoming ${sig.media === "video" ? "video" : "voice"} call`, { body: caller ? `${caller.firstName} ${caller.lastName}` : sig.title, tag: `call-${sig.meetingId}`, icon: currentCompany().logo, requireInteraction: true });
           n.onclick = () => {
             window.focus();
             n.close();
@@ -272,7 +272,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           photo={photo(incoming.from)}
           onAccept={() => {
             setIncoming(null);
-            router.push(`/meetings/${incoming.code}?join=1`);
+            router.push(`/meetings/${incoming.code}${incoming.kind === "meeting" ? "" : "?join=1"}`);
           }}
           onDecline={() => {
             sendToUser(incoming.from, { type: "decline", meetingId: incoming.meetingId, from: me });
