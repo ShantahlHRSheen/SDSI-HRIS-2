@@ -137,6 +137,43 @@ export async function inviteToMeeting(id: string, members: string[]): Promise<nu
   return Number(data ?? 0);
 }
 
+// ---- HR's call and meeting log (phase 80) -------------------------------------------------
+
+export interface LogRow {
+  id: string;
+  kind: MeetingKind;
+  title: string;
+  chatKind: "direct" | "group" | null;
+  chatName: string | null;
+  hostId: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationSec: number | null;
+  joined: { employeeId: string; joinedAt: string; leftAt: string | null }[];
+  invited: number;
+  guests: string[];
+  recorded: boolean;
+}
+export async function fetchHrLog(fromIso: string, toIso: string): Promise<LogRow[]> {
+  const { data, error } = await db().rpc("hr_meeting_log", { p_from: fromIso, p_to: toIso });
+  fail(error);
+  return ((data as Row[]) ?? []).map((r) => ({
+    id: String(r.id),
+    kind: r.kind as MeetingKind,
+    title: String(r.title ?? ""),
+    chatKind: (r.chat_kind as "direct" | "group" | null) ?? null,
+    chatName: (r.chat_name as string | null) ?? null,
+    hostId: (r.host_id as string | null) ?? null,
+    startedAt: String(r.started_at),
+    endedAt: (r.ended_at as string | null) ?? null,
+    durationSec: r.duration_sec == null ? null : Number(r.duration_sec),
+    joined: (r.joined as LogRow["joined"]) ?? [],
+    invited: Number(r.invited ?? 0),
+    guests: (r.guests as string[]) ?? [],
+    recorded: !!r.recorded,
+  }));
+}
+
 // ---- Guests (phase 79) ------------------------------------------------------------------
 
 export interface MeetingGuest {
