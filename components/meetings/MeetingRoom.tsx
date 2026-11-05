@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -16,6 +17,7 @@ import {
   MonitorUp,
   MonitorX,
   NotebookPen,
+  PictureInPicture2,
   PhoneOff,
   Settings,
   Signal,
@@ -122,7 +124,7 @@ function QualityIcon({ q, size = 14 }: { q: LinkQuality; size?: number }) {
   );
 }
 
-function VideoEl({ stream, videoId, muted, mirror, hidden, contain }: { stream: MediaStream; videoId: string | null; muted: boolean; mirror: boolean; hidden: boolean; contain: boolean }) {
+function VideoEl({ stream, videoId, muted, mirror, hidden, contain, remote }: { stream: MediaStream; videoId: string | null; muted: boolean; mirror: boolean; hidden: boolean; contain: boolean; remote?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -136,6 +138,7 @@ function VideoEl({ stream, videoId, muted, mirror, hidden, contain }: { stream: 
       autoPlay
       playsInline
       muted={muted}
+      data-remote={remote && !hidden ? "1" : undefined}
       className={`absolute inset-0 h-full w-full ${contain ? "object-contain" : "object-cover"} ${mirror ? "-scale-x-100" : ""} ${hidden ? "invisible" : ""}`}
     />
   );
@@ -226,6 +229,9 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
   const [declined, setDeclined] = useState<string[]>([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [guests, setGuests] = useState<MeetingGuest[]>([]);
+  // The pop-out window with everyone's cameras (Document Picture-in-Picture).
+  const [pipWin, setPipWin] = useState<Window | null>(null);
+  const pipRef = useRef<Window | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // Lobby choices and preview.
   const [wantMic, setWantMic] = useState(true);
@@ -398,6 +404,7 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
     if (m && m.kind !== "meeting" && !everJoinedRef.current) {
       for (const p of m.participants) if (p.employeeId !== me) sendToUser(p.employeeId, { type: "cancel", meetingId: m.id, from: me });
     }
+    pipRef.current?.close();
     r?.leave();
     roomRef.current = null;
     setInMeeting(null);
@@ -416,6 +423,7 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
     window.addEventListener("pagehide", onHide);
     return () => {
       window.removeEventListener("pagehide", onHide);
+      pipRef.current?.close();
       // Leaving the page (another menu item) leaves the meeting.
       if (roomRef.current && !leftRef.current) {
         leftRef.current = true;
@@ -598,6 +606,33 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
     }
   }
 
+  // A small window that stays on top of other tabs and apps — for seeing
+  // everyone while sharing another tab or window.
+  async function popOut() {
+    if (pipRef.current) return pipRef.current.focus();
+    const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
+    try {
+      if (dpip) {
+        const w = await dpip.requestWindow({ width: 340, height: 480 });
+        w.document.title = "Meeting cameras";
+        w.document.body.style.cssText = "margin:0;background:#0b1110;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;";
+        w.addEventListener("pagehide", () => {
+          pipRef.current = null;
+          setPipWin(null);
+        });
+        pipRef.current = w;
+        setPipWin(w);
+        return;
+      }
+      // Other browsers: one person's camera in the browser's own floating player.
+      const v = document.querySelector<HTMLVideoElement>("video[data-remote='1']");
+      if (v && document.pictureInPictureEnabled) await v.requestPictureInPicture();
+      else setNotice("This browser can't pop out cameras. Use Chrome or Edge on a computer.");
+    } catch {
+      setNotice("Couldn't pop out the cameras.");
+    }
+  }
+
   async function decide(g: MeetingGuest, admit: boolean) {
     const m = meetingRef.current;
     if (!m) return;
@@ -742,7 +777,7 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
     const myReactions = reactions.filter((r) => r.sid === t.key);
     return (
       <div key={t.key} className={`relative overflow-hidden rounded-xl bg-[#16201e] ${speaking === t.key ? "ring-2 ring-[var(--series-1)]" : ""} ${big ? "h-full" : "aspect-video"}`}>
-        <VideoEl stream={t.stream} videoId={t.videoId} muted={t.isMe} mirror={t.isMe && !t.state.screen} hidden={!camOn} contain={t.state.screen} />
+        <VideoEl stream={t.stream} videoId={t.videoId} muted={t.isMe} mirror={t.isMe && !t.state.screen} hidden={!camOn} contain={t.state.screen} remote={!t.isMe} />
         {!camOn && (
           <div className="absolute inset-0 flex items-center justify-center">
             <ChatAvatar name={t.name} url={photo(t.employeeId)} size={big ? 96 : 64} />
@@ -778,6 +813,7 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
 
   return (
     <Shell>
+      {pipWin && createPortal(<PipGrid tiles={tiles.filter((t) => !t.isMe)} speaking={speaking} photo={photo} count={count} />, pipWin.document.body)}
       {inviteOpen && meeting && (
         <InviteModal
           meeting={meeting}
@@ -836,6 +872,15 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
             </button>
           </div>
         ))}
+      {st?.screen && !pipWin && tiles.length > 1 && (
+        <div className="mx-3 mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs text-white sm:mx-4">
+          <PictureInPicture2 size={14} />
+          <span className="flex-1">Sharing another tab? Pop out the cameras to keep seeing everyone on top of it.</span>
+          <button onClick={popOut} className="rounded-md bg-[var(--series-1)] px-2.5 py-1 font-semibold text-[var(--on-accent)]">
+            Pop out cameras
+          </button>
+        </div>
+      )}
       {count > BIG_MEETING && (
         <div className="mx-3 mb-2 rounded-lg bg-[var(--status-warning)]/90 px-3 py-1.5 text-xs text-black sm:mx-4">
           With more than {BIG_MEETING} people, video may be choppy. Turning cameras off helps.
@@ -986,6 +1031,7 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
             </div>
           )}
         </div>
+        <RoundBtn on={!pipWin} active={!!pipWin} onClick={() => (pipWin ? pipWin.close() : popOut())} label={pipWin ? "Close the pop-out cameras" : "Pop out cameras"} icon={PictureInPicture2} />
         <RoundBtn on={panel !== "people"} active={panel === "people"} onClick={() => setPanel(panel === "people" ? null : "people")} label="People" icon={Users} />
         {!guest && <RoundBtn on={panel !== "notes"} active={panel === "notes"} onClick={() => setPanel(panel === "notes" ? null : "notes")} label="Notes" icon={NotebookPen} />}
         {!guest && <RoundBtn on={panel !== "chat"} active={panel === "chat"} onClick={() => setPanel(panel === "chat" ? null : "chat")} label="Chat" icon={MessageSquare} />}
@@ -1015,6 +1061,59 @@ export function MeetingRoom({ code, autoJoin, guest }: { code: string; autoJoin:
         )}
       </div>
     </Shell>
+  );
+}
+
+// The pop-out window's contents (another document, so plain inline styles).
+function PipVideo({ stream, videoId }: { stream: MediaStream; videoId: string | null }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.srcObject !== stream) v.srcObject = stream;
+    v.play().catch(() => {});
+  }, [stream, videoId]);
+  return <video ref={ref} autoPlay playsInline muted style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />;
+}
+
+function PipGrid({ tiles, speaking, photo, count }: { tiles: Tile[]; speaking: string | null; photo: (id: string | null | undefined) => string | null; count: number }) {
+  const cols = tiles.length <= 1 ? 1 : tiles.length <= 4 ? 2 : 3;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", boxSizing: "border-box", padding: 6, gap: 6 }}>
+      <div style={{ fontSize: 11, opacity: 0.7, padding: "0 2px" }}>{count} in the meeting · stays on top while you share</div>
+      {tiles.length === 0 && <div style={{ margin: "auto", fontSize: 13, opacity: 0.7 }}>No one else is here yet.</div>}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 6, flex: 1, alignContent: "start", overflow: "auto" }}>
+        {tiles.map((t) => {
+          const camOn = t.state.cam && !!t.videoId;
+          const url = photo(t.employeeId);
+          return (
+            <div key={t.key} style={{ position: "relative", aspectRatio: "4 / 3", background: "#16201e", borderRadius: 8, overflow: "hidden", boxShadow: speaking === t.key ? "0 0 0 2px #2fe0a6" : "none" }}>
+              {camOn ? (
+                <PipVideo stream={t.stream} videoId={t.videoId} />
+              ) : (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- signed chat photo
+                    <img src={url} alt="" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#1f5c4c", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>
+                      {t.name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ position: "absolute", left: 4, bottom: 4, right: 4, display: "flex", gap: 4, alignItems: "center" }}>
+                <span style={{ background: "rgba(0,0,0,.6)", borderRadius: 4, padding: "1px 5px", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {t.state.mic ? "" : "🔇 "}
+                  {t.state.hand ? "✋ " : ""}
+                  {t.name}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
