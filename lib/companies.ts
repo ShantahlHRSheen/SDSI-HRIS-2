@@ -111,6 +111,9 @@ export interface CompanyConfig {
   // Confidential Cases (lib/confidential-cases.ts) are seen by HR and these
   // employees (ids) — kept in step with confidential_case_viewers (phase 71).
   confidentialViewerIds?: string[];
+  // Hiring and Onboarding (phase 81): the final approver's title — the person
+  // is chosen by HR in the module's settings.
+  hiringApproverTitle?: string;
   // Messages and Meetings (/chat, /meetings — phase 73) are on for this company.
   chat?: boolean;
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
@@ -186,6 +189,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Lowel B. Magdadaro (Chairman), Sheilah A. Magdadaro (Vice Chairperson).
     confidentialViewerIds: ["emp-001", "emp-004"],
     chat: true,
+    hiringApproverTitle: "Vice Chairperson",
     regularization: {
       employerName: "SHANTAHL DIRECT SALES, INC.",
       signatoryId: "emp-001", // Lowel B. Magdadaro
@@ -256,6 +260,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
   },
   lsmbiz: {
     id: "lsmbiz",
+    hiringApproverTitle: "VP of Operations",
     name: "LSMBiz Credit Corporation",
     shortName: "LSMBiz",
     logo: "/brand/lsmbiz.png",
@@ -310,6 +315,7 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
   },
   daro: {
     id: "daro",
+    hiringApproverTitle: "VP of Operations",
     name: "Daro Lending Corporation",
     shortName: "Daro",
     logo: "/brand/daro.png",

@@ -51,6 +51,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Certificate of Employment", href: "/coe", roles: ALL_ROLES, built: true },
       { label: "Pag-IBIG Loan Form", href: "/pagibig-loan", roles: ALL_ROLES, built: true },
       { label: "Regularization", href: "/regularization", roles: ALL_ROLES, built: true },
+      // Also shown to anyone a hiring record is assigned to (components/Sidebar.tsx).
+      { label: "Hiring & Onboarding", href: "/hiring", roles: ["hr_admin"], built: true },
     ],
   },
   {
