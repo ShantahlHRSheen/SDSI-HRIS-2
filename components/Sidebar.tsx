@@ -16,6 +16,7 @@ import { useHrMessagesHidden, useHrUnreadCount } from "./messages/HrChat";
 import { useWorkforceBadges } from "./workforce/WorkforceBadges";
 import { useChat } from "./chat/ChatProvider";
 import { chatEnabled } from "@/lib/chat";
+import { hasHiringRecords } from "@/lib/hiring";
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
   const { currentUser, currentEmployee } = useHris();
@@ -36,6 +37,11 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     if (needsCheck && meId && isSupabaseConfigured()) isEvaluationHead(meId).then(setIsHead, () => setIsHead(false));
   }, [needsCheck, meId]);
   const evaluationHead = !!meId && (meId === company.salesAdminEval?.headId || isHead);
+  // Heads and the final approver see Hiring & Onboarding once a record is theirs.
+  const [hiring, setHiring] = useState(false);
+  useEffect(() => {
+    if (meId && !isHr && isSupabaseConfigured()) hasHiringRecords().then(setHiring, () => setHiring(false));
+  }, [meId, isHr]);
 
   const content = (
     <div className="flex h-full flex-col">
@@ -56,7 +62,7 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
         {NAV_SECTIONS.map((section) => {
           const items = section.items.filter(
             (item) =>
-              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead) || (item.href === "/confidential-cases" && canSeeConfidential(roles, meId))) &&
+              (item.roles.some((r) => roles.includes(r)) || (item.href === "/sales-admin-evaluation" && evaluationHead) || (item.href === "/confidential-cases" && canSeeConfidential(roles, meId)) || (item.href === "/hiring" && hiring)) &&
               !(item.href === "/messages" && messagesHidden) &&
               !((item.href === "/chat" || item.href === "/meetings") && !chatEnabled()),
           );
