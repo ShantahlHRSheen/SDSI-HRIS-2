@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site/SiteShell";
 import { NewsCard, PageBanner, newsDate } from "@/components/site/NewsCard";
+import { NewsGallery } from "@/components/site/NewsGallery";
 import { COMPANIES, isCompanyId } from "@/lib/companies";
 import { getNews, listNews } from "@/lib/server/site";
 
@@ -44,6 +45,7 @@ export default async function NewsArticlePage({ params }: Props) {
         {n.summary && <p className="mt-3 text-lg leading-relaxed text-[var(--text-secondary)]">{n.summary}</p>}
         {n.cover && <img src={n.cover} alt="" className="mt-6 w-full rounded-lg object-cover" />}
         <div className="mt-6 text-base leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">{n.body}</div>
+        <NewsGallery photos={n.photos} title={n.title} />
         <Link href="/news" className="mt-10 inline-block text-sm font-semibold text-[#0b6b45] hover:underline">
           ← Back to the Newsroom
         </Link>

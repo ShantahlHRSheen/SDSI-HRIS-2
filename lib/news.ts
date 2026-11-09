@@ -12,10 +12,11 @@ export interface NewsPost {
   summary: string;
   body: string;
   coverPath: string | null;
+  photoPaths: string[]; // up to 10, the article's gallery (phase 89)
   publishedOn: string | null;
   updatedAt: string;
 }
-export type NewsPatch = Partial<Pick<NewsPost, "status" | "title" | "summary" | "body" | "coverPath" | "publishedOn">>;
+export type NewsPatch = Partial<Pick<NewsPost, "status" | "title" | "summary" | "body" | "coverPath" | "photoPaths" | "publishedOn">>;
 
 type Row = Record<string, unknown>;
 const db = () => getSupabaseClient() as unknown as SupabaseClient;
@@ -30,11 +31,12 @@ const toPost = (r: Row): NewsPost => ({
   summary: String(r.summary ?? ""),
   body: String(r.body ?? ""),
   coverPath: (r.cover_path as string | null) ?? null,
+  photoPaths: Array.isArray(r.photo_paths) ? (r.photo_paths as string[]) : [],
   publishedOn: (r.published_on as string | null) ?? null,
   updatedAt: String(r.updated_at ?? ""),
 });
 const toRow = (p: NewsPatch): Row => {
-  const m: Record<keyof NewsPatch, string> = { status: "status", title: "title", summary: "summary", body: "body", coverPath: "cover_path", publishedOn: "published_on" };
+  const m: Record<keyof NewsPatch, string> = { status: "status", title: "title", summary: "summary", body: "body", coverPath: "cover_path", photoPaths: "photo_paths", publishedOn: "published_on" };
   return Object.fromEntries(
     Object.entries(p)
       .filter(([k]) => k in m)
@@ -57,11 +59,13 @@ export async function updateNewsPost(id: string, p: NewsPatch): Promise<void> {
   fail(error);
 }
 export async function deleteNewsPost(p: NewsPost): Promise<void> {
-  if (p.coverPath) await media().remove([p.coverPath]);
+  const files = [p.coverPath, ...p.photoPaths].filter((x): x is string => !!x);
+  if (files.length) await media().remove(files);
   const { error } = await db().from("news_posts").delete().eq("id", p.id);
   fail(error);
 }
 
+export const MAX_NEWS_PHOTOS = 10;
 export const COVER_ACCEPT = "image/jpeg,image/png,image/webp";
 export async function uploadCover(file: File): Promise<string> {
   return uploadImage(file, "news");
