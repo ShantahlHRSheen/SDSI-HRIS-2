@@ -118,6 +118,9 @@ export interface CompanyConfig {
   // the form's colors (title bars, accent line) with the company logo.
   requisitionApproverTitle?: string;
   formTheme?: { deep: string; mid: string; accent: string };
+  // Slides at the top of the company's own website (the text is in the
+  // pictures; alt repeats it for screen readers and search).
+  siteSlides?: { src: string; alt: string }[];
   // Messages and Meetings (/chat, /meetings — phase 73) are on for this company.
   chat?: boolean;
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
@@ -196,6 +199,13 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     hiringApproverTitle: "Vice Chairperson",
     requisitionApproverTitle: "Vice Chairperson",
     formTheme: { deep: "#0b3d2a", mid: "#1f7a5c", accent: "#7cc9a0" },
+    // From shantahl.net/home.
+    siteSlides: [
+      { src: "/brand/shantahl-slides/1-welcome.jpg", alt: "Welcome to Shantahl. Shantahl is swiftly growing as a global direct selling company powered by dropshipping, committed to enhancing lives worldwide with premier organic health and wellness products." },
+      { src: "/brand/shantahl-slides/2-business.jpg", alt: "Start your Shantahl Business effortlessly with our automated dropshipping system. Even from the comfort of your home, you can engage in the dropshipping business. We provide high quality products for you to offer, eliminating the need for inventory management. We handle the shipping of your clients' orders." },
+      { src: "/brand/shantahl-slides/3-global.jpg", alt: "Our dropshipping services cater to a global audience, not just limited to the Philippines. We've expanded our operations to Dubai, Taiwan, Hong Kong, and are soon to launch in more countries." },
+      { src: "/brand/shantahl-slides/4-awards.jpg", alt: "The company, along with its Founder & CEO, has been honored with numerous awards." },
+    ],
     regularization: {
       employerName: "SHANTAHL DIRECT SALES, INC.",
       signatoryId: "emp-001", // Lowel B. Magdadaro
