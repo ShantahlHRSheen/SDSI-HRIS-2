@@ -24,6 +24,7 @@ import {
 } from "@/lib/careers";
 import { EDUCATION, fetchRequisitions, type Requisition } from "@/lib/requisition";
 import { fetchExams, type Exam } from "@/lib/exams";
+import { publicLink } from "@/lib/site-domains";
 import { COVER_ACCEPT, coverUrl, removeCover, uploadImage } from "@/lib/news";
 
 /* eslint-disable @next/next/no-img-element -- photos from the company-media bucket */
@@ -323,7 +324,7 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
           <button
             type="button"
             onClick={() => {
-              void navigator.clipboard?.writeText(new URL(careersUrl(co, job.id), window.location.origin).toString());
+              void navigator.clipboard?.writeText(publicLink(co, careersUrl(co, job.id), window.location.origin));
             }}
             className={secondary}
             title="Copy the link to share on Facebook or job sites"

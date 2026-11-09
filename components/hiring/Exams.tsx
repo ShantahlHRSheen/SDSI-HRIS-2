@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { reportSaveError } from "@/lib/save-errors";
 import { currentCompanyId } from "@/lib/companies";
+import { publicLink } from "@/lib/site-domains";
 import { BAND, LIKERT, PSYCH_ITEMS, PSYCH_NOTE, TRAITS, band, type PsychResult, type Tone, type Trait } from "@/lib/psych";
 import {
   EXAM_STATUS,
@@ -270,7 +271,7 @@ export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isH
     setBusy(true);
     try {
       const token = pick === PSYCH ? await assignPsych(applicantId) : await assignExam(applicantId, pick);
-      setLink(new URL(examUrl(currentCompanyId(), token), window.location.origin).toString());
+      setLink(publicLink(currentCompanyId(), examUrl(currentCompanyId(), token), window.location.origin));
       setPick("");
       load();
     } catch (e) {

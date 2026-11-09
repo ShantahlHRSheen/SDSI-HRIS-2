@@ -92,7 +92,8 @@ export const RESUME_MAX_BYTES = 4 * 1024 * 1024;
 export const RESUME_ACCEPT = ".pdf,.doc,.docx,.jpg,.jpeg,.png";
 
 // Each company's own website: /shantahl, /lsmbiz, /daro.
-export const SITE_SLUG: Record<CompanyId, string> = { sdsi: "shantahl", lsmbiz: "lsmbiz", daro: "daro" };
+export { SITE_SLUG } from "./site-domains";
+import { SITE_SLUG } from "./site-domains";
 export const companyFromSlug = (slug: string): CompanyId | null => (Object.keys(SITE_SLUG) as CompanyId[]).find((k) => SITE_SLUG[k] === slug) ?? null;
 export const siteUrl = (co: CompanyId, page = "") => `/${SITE_SLUG[co]}${page ? `/${page}` : ""}`;
 export const careersUrl = (co: CompanyId, jobId?: string) => `${siteUrl(co, "careers")}${jobId ? `?job=${encodeURIComponent(jobId)}` : ""}`;
