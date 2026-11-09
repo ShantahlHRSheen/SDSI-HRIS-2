@@ -93,7 +93,7 @@ function JoinPage() {
 
         {mode === "choose" && (
           <div className="space-y-2">
-            <button onClick={() => router.push(`/?next=${encodeURIComponent(meetingPath)}`)} className="flex w-full items-center gap-3 rounded-lg bg-[var(--series-1)] px-3 py-3 text-left text-sm font-medium text-[var(--on-accent)]">
+            <button onClick={() => router.push(`/login?next=${encodeURIComponent(meetingPath)}`)} className="flex w-full items-center gap-3 rounded-lg bg-[var(--series-1)] px-3 py-3 text-left text-sm font-medium text-[var(--on-accent)]">
               <LogIn size={18} />
               <span>
                 I have an HRIS account

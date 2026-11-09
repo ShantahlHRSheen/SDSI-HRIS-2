@@ -319,3 +319,22 @@ html[data-company="lsmbiz"] .payroll-register tfoot td {
 html[data-company="lsmbiz"] .payroll-register tbody td:first-child:not([colspan]) {
   background-color: #0e1612;
 }
+
+/* The public website (/news, /careers): a light corporate look, whatever the
+   HRIS theme. Components inside read the same tokens. */
+.site {
+  --surface-1: #ffffff;
+  --page-plane: #f4f6f5;
+  --text-primary: #16211c;
+  --text-secondary: #46544d;
+  --text-muted: #6f7d76;
+  --gridline: #e7ece9;
+  --baseline: #d5ddd9;
+  --border-hairline: #dfe5e2;
+  --series-1: #0b6b45;
+  --on-accent: #ffffff;
+  --status-critical: #c62828;
+  color-scheme: light;
+  background: var(--page-plane);
+  color: var(--text-primary);
+}

@@ -33,6 +33,10 @@ export interface Applicant {
   branchId: string | null;
   departmentId: string | null;
   requisitionId: string | null;
+  // Applied on the careers page (phase 84).
+  source: "hr" | "online";
+  jobPostId: string | null;
+  coverLetter: string;
   shortlisted: boolean;
   hrInterviewAt: string | null;
   hrInterviewNotes: string;
@@ -150,6 +154,9 @@ const toApplicant = (r: Row): Applicant => ({
   branchId: (r.branch_id as string | null) ?? null,
   departmentId: (r.department_id as string | null) ?? null,
   requisitionId: (r.requisition_id as string | null) ?? null,
+  source: r.source === "online" ? "online" : "hr",
+  jobPostId: (r.job_post_id as string | null) ?? null,
+  coverLetter: String(r.cover_letter ?? ""),
   shortlisted: !!r.shortlisted,
   hrInterviewAt: (r.hr_interview_at as string | null) ?? null,
   hrInterviewNotes: String(r.hr_interview_notes ?? ""),

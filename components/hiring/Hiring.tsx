@@ -183,6 +183,7 @@ export function Hiring({ initialOpen = null }: { initialOpen?: string | null } =
               <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{a.name}</div>
               <div className="truncate text-xs text-[var(--text-muted)]">{[a.position, branchName(a.branchId), deptName(a.departmentId)].filter(Boolean).join(" · ") || "—"}</div>
             </div>
+            {a.source === "online" && <Badge tone="info">Applied online</Badge>}
             {needsMe(a, role) && <Badge tone="warning">Needs your action</Badge>}
             <Badge tone={STATUS_LABEL[a.status].tone}>{STATUS_LABEL[a.status].label}</Badge>
           </button>
@@ -540,6 +541,14 @@ function ApplicantDetail({ a, role, onBack, onChanged }: { a: Applicant; role: R
           <div>
             <div className="mb-2 text-xs font-semibold text-[var(--text-primary)] uppercase">A. Application information</div>
             <InfoFields v={v} set={(p) => setHr((c) => ({ ...c, ...p }))} disabled={!isHr} />
+            {a.source === "online" && (
+              <div className="mt-3 rounded-lg border border-[var(--border-hairline)] p-3 text-sm">
+                <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                  <Badge tone="info">Applied online</Badge> on {when(a.createdAt)} — agreed to the data privacy consent
+                </div>
+                {a.coverLetter ? <p className="whitespace-pre-wrap text-[var(--text-secondary)]">{a.coverLetter}</p> : <p className="text-xs text-[var(--text-muted)]">No message.</p>}
+              </div>
+            )}
           </div>
           <div>
             <div className="mb-2 flex items-center gap-3 text-xs font-semibold text-[var(--text-primary)] uppercase">

@@ -131,7 +131,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
                   className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40"
                   onClick={() => {
                     logout();
-                    router.push("/");
+                    router.push("/login");
                   }}
                 >
                   <LogOut size={16} /> {isRealAccount ? "Sign out" : "Switch demo user"}

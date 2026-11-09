@@ -8,7 +8,9 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "LSM Group of Companies HRIS",
     short_name: "LSM Group HRIS",
     description: "LSM Group of Companies Human Resource Information System",
-    start_url: "/",
+    // The installed app opens the sign-in page (straight to the dashboard
+    // when already signed in); "/" is the public company website.
+    start_url: "/login",
     scope: "/",
     display: "standalone",
     background_color: "#013825",
