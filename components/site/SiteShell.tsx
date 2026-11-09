@@ -1,34 +1,26 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { siteUrl } from "@/lib/careers";
+import { SITE_DOMAINS } from "@/lib/site-domains";
 import { COMPANIES, COMPANY_ORDER, GROUP_NAME, isCompanyReady } from "@/lib/companies";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
 
 // Every public page: header, the page, footer — in the light .site look.
-export function SiteShell({ children }: { children: React.ReactNode }) {
+// flush: no gap above the footer (the homepage ends with the dark sign-in).
+export function SiteShell({ children, flush = false }: { children: React.ReactNode; flush?: boolean }) {
   const companies = COMPANY_ORDER.filter(isCompanyReady);
   return (
     <div className="site flex min-h-full flex-1 flex-col">
       <SiteHeader />
       <div className="flex flex-1 flex-col">{children}</div>
-      <footer className="mt-12 bg-[#013825] text-white/85">
+      <footer className={`${flush ? "" : "mt-12 "}bg-[#013825] text-white/85`}>
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="text-base font-bold text-white">{GROUP_NAME}</div>
             <ul className="mt-3 space-y-1.5 text-sm">
               <li>
-                <Link href="/news" className="hover:text-white hover:underline">
-                  Newsroom
-                </Link>
-              </li>
-              <li>
-                <Link href="/careers" className="hover:text-white hover:underline">
-                  Careers
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="hover:text-white hover:underline">
+                <Link href="/#login" className="hover:text-white hover:underline">
                   Employee Login
                 </Link>
               </li>
@@ -38,7 +30,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             const c = COMPANIES[id];
             return (
               <div key={id} className="text-sm">
-                <Link href={siteUrl(id)} className="flex items-center gap-2 font-semibold text-white hover:underline">
+                <Link href={SITE_DOMAINS[id][0] ? `https://${SITE_DOMAINS[id][0]}` : siteUrl(id)} className="flex items-center gap-2 font-semibold text-white hover:underline">
                   <img src={c.logo} alt="" className="h-7 w-7 rounded-full bg-white object-contain" /> {c.name}
                 </Link>
                 {c.info.address && <p className="mt-2 text-white/70">{c.info.address}</p>}

@@ -338,3 +338,21 @@ html[data-company="lsmbiz"] .payroll-register tbody td:first-child:not([colspan]
   background: var(--page-plane);
   color: var(--text-primary);
 }
+
+/* The HRIS's own dark look inside the light public website (the employee
+   sign-in on the LSM Group homepage). */
+.hris-dark {
+  --surface-1: #0e1512;
+  --page-plane: #060908;
+  --text-primary: #ffffff;
+  --text-secondary: #b7c7bf;
+  --text-muted: #71847a;
+  --gridline: #16211b;
+  --border-hairline: rgba(120, 255, 195, 0.14);
+  --series-1: #2fe6a6;
+  --accent: #2fe6a6;
+  --on-accent: #052018;
+  --status-critical: #ef4444;
+  color-scheme: dark;
+  color: var(--text-primary);
+}
