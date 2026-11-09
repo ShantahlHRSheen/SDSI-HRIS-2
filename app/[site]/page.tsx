@@ -131,6 +131,7 @@ export default async function CompanyHome({ params }: Props) {
             <div className="grid gap-3 md:grid-cols-2">
               {jobs.slice(0, 6).map((j) => (
                 <Link key={j.id} href={careersUrl(co, j.id)} className="flex items-center gap-4 rounded-lg border border-[var(--border-hairline)] bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+                  {j.banner && <img src={j.banner} alt="" className="h-14 w-20 shrink-0 rounded-md bg-[#eef2f0] object-cover" />}
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold text-[var(--text-primary)]">{j.title}</div>
                     <div className="flex flex-wrap gap-x-3 text-xs text-[var(--text-muted)]">
