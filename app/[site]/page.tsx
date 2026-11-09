@@ -6,6 +6,7 @@ import { CompanyShell } from "@/components/site/CompanyShell";
 import { NewsCard } from "@/components/site/NewsCard";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { Products } from "@/components/site/Products";
+import { OurWebsites } from "@/components/site/OurWebsites";
 import { ShantahlAbout } from "@/components/site/about/ShantahlAbout";
 import { COMPANIES, isCompanyReady } from "@/lib/companies";
 import { careersUrl, companyFromSlug, jobTypeLabel, siteUrl } from "@/lib/careers";
@@ -174,6 +175,9 @@ export default async function CompanyHome({ params }: Props) {
           )}
         </div>
       </section>
+
+      {/* Our Websites */}
+      {!!c.siteLinks?.length && <OurWebsites links={c.siteLinks} t={t} />}
 
       {/* Contact */}
       <section className="mx-auto w-full max-w-6xl px-4 pt-14">
