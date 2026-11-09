@@ -1,4 +1,4 @@
-import { Globe, Headset, HeartHandshake, Megaphone, Quote, Sparkles, Store, Users } from "lucide-react";
+import { Eye, Globe, Headset, HeartHandshake, Megaphone, Quote, Sparkles, Store, Target, Users } from "lucide-react";
 
 // Shantahl's About Us (from HR's company write-up), as designed sections:
 // introduction, the founders' story and the name, the LSM Group, how the
@@ -62,6 +62,37 @@ export function ShantahlAbout({ t }: { t: Theme }) {
             <div className="text-sm text-white/70">The inspiration behind Shantahl</div>
           </figcaption>
         </figure>
+      </div>
+
+      {/* Vision and Mission */}
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--border-hairline)] bg-white px-6 py-10 shadow-sm sm:px-10">
+        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full opacity-[0.12]" style={{ background: t.mid }} />
+        <div className="pointer-events-none absolute -bottom-28 -left-20 h-64 w-64 rounded-full opacity-[0.08]" style={{ background: t.deep }} />
+        <h3 className="relative text-center text-3xl font-extrabold tracking-tight sm:text-4xl">
+          <span style={{ color: t.deep }}>Vision</span> <span className="text-[var(--text-muted)]">and</span> <span style={{ color: t.mid }}>Mission</span>
+        </h3>
+        <div className="mx-auto mt-3 h-1 w-14 rounded-full" style={{ background: t.mid }} />
+        <div className="relative mt-10 grid gap-6 md:grid-cols-2">
+          {(
+            [
+              ["Vision", <Eye key="v" size={26} />, "To cultivate a globally resonant brand built on trust and customer satisfaction."],
+              ["Mission", <Target key="m" size={26} />, "To offer aspiring entrepreneurs opportunities to grow and succeed in the direct selling and e-commerce industry."],
+            ] as const
+          ).map(([k, icon, text]) => (
+            <div key={k} className="relative flex flex-col rounded-2xl p-6 shadow-sm sm:p-7" style={{ background: `color-mix(in srgb, ${t.accent} 14%, white)` }}>
+              <div className="flex items-center">
+                <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-white shadow-md ring-4 ring-white" style={{ background: `linear-gradient(135deg, ${t.deep}, ${t.mid})` }}>
+                  {icon}
+                </span>
+                <span className="-ml-4 rounded-r-full py-2 pr-6 pl-7 text-sm font-bold tracking-[0.2em] text-white uppercase" style={{ background: `linear-gradient(90deg, ${t.deep}, ${t.mid})` }}>
+                  {k}
+                </span>
+              </div>
+              <p className="mt-5 text-lg leading-relaxed text-[var(--text-primary)]">{text}</p>
+              <div className="mt-5 h-0.5 w-12 rounded-full" style={{ background: t.mid }} />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* How we work */}

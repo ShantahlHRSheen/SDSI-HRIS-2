@@ -31,11 +31,12 @@ export default async function CompanyHome({ params }: Props) {
   const [p, jobs, news] = await Promise.all([getProfile(co), listJobs(co), listNews(co, 1, 3)]);
   const hero = mediaUrl(co, p?.heroPhotoPath);
   const founderPhoto = mediaUrl(co, p?.founderPhotoPath);
-  const pillars = [
+  // Shantahl's vision and mission are in its designed About Us.
+  const pillars = (co === "sdsi" ? [["Core values", p?.coreValues]] : [
     ["Mission", p?.mission],
     ["Vision", p?.vision],
     ["Core values", p?.coreValues],
-  ].filter(([, v]) => v) as [string, string][];
+  ]).filter(([, v]) => v) as [string, string][];
 
   return (
     <CompanyShell co={co}>
