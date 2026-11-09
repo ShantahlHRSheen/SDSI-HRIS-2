@@ -26,7 +26,7 @@ export default async function HomePage({ searchParams }: Props) {
   const site = (co: (typeof cos)[number]) => (SITE_DOMAINS[co][0] ? `https://${SITE_DOMAINS[co][0]}` : siteUrl(co));
 
   return (
-    <SiteShell flush>
+    <SiteShell>
       {/* Hero */}
       <section className="relative overflow-hidden bg-[#013825] text-white">
         <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(ellipse 60% 80% at 85% 20%, #2fbf7f 0%, transparent 60%), radial-gradient(ellipse 50% 60% at 10% 100%, #0b6b45 0%, transparent 70%)" }} />
@@ -56,6 +56,12 @@ export default async function HomePage({ searchParams }: Props) {
         </div>
       </section>
 
+      {/* Employee sign-in */}
+      <section id="login" className="scroll-mt-16">
+        <Suspense fallback={null}>
+          <EmployeeLogin embedded />
+        </Suspense>
+      </section>
       {/* Our companies: each one's own website */}
       <section id="companies" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14">
         <SectionHead title="Our Companies" />
@@ -83,12 +89,6 @@ export default async function HomePage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Employee sign-in */}
-      <section id="login" className="scroll-mt-16">
-        <Suspense fallback={null}>
-          <EmployeeLogin embedded />
-        </Suspense>
-      </section>
     </SiteShell>
   );
 }

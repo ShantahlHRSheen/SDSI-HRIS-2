@@ -91,7 +91,8 @@ export function EmployeeLogin({ embedded = false }: { embedded?: boolean }) {
       )}
       <div className="mb-6 flex flex-col items-center text-center">
         <h1 className="flex flex-col items-center gap-1">
-          <span className="text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{GROUP_NAME}</span>
+          {/* On the homepage the group's name is already above. */}
+          {!embedded && <span className="text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{GROUP_NAME}</span>}
           <span className="text-sm font-medium tracking-wide text-[var(--series-1)] uppercase">HRIS</span>
         </h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">Human Resource Information System</p>
