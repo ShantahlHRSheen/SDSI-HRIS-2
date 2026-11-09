@@ -41,6 +41,7 @@ export interface JobPost {
   closesOn: string | null;
   requisitionId: string | null;
   examId: string | null; // initial exam (phase 85)
+  psychScreening: boolean; // the Psychological screening too (phase 86)
   postedAt: string | null;
   updatedAt: string;
 }
@@ -137,6 +138,7 @@ export const toJob = (r: Row): JobPost => ({
   closesOn: (r.closes_on as string | null) ?? null,
   requisitionId: (r.requisition_id as string | null) ?? null,
   examId: (r.exam_id as string | null) ?? null,
+  psychScreening: !!r.psych_screening,
   postedAt: (r.posted_at as string | null) ?? null,
   updatedAt: String(r.updated_at ?? ""),
 });
@@ -155,10 +157,15 @@ const JOB_COLS = {
   closesOn: "closes_on",
   requisitionId: "requisition_id",
   examId: "exam_id",
+  psychScreening: "psych_screening",
 } as const;
 export type JobPatch = Partial<Pick<JobPost, keyof typeof JOB_COLS>>;
 const jobRow = (p: JobPatch): Row =>
-  Object.fromEntries(Object.entries(p).map(([k, v]) => [JOB_COLS[k as keyof typeof JOB_COLS], v === "" && /Id$|closesOn|employmentType/.test(k) ? null : v]));
+  Object.fromEntries(
+    Object.entries(p)
+      .filter(([k]) => k in JOB_COLS)
+      .map(([k, v]) => [JOB_COLS[k as keyof typeof JOB_COLS], v === "" && /Id$|closesOn|employmentType/.test(k) ? null : v]),
+  );
 
 export async function fetchProfile(): Promise<CompanyProfile> {
   const { data, error } = await db().from("company_profile").select("*").maybeSingle();

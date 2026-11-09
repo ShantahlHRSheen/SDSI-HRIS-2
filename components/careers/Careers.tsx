@@ -310,7 +310,7 @@ function ApplyForm({ co, job, onBack }: { co: CompanyId; job: PublicJob; onBack:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [examToken, setExamToken] = useState<string | null>(null);
+  const [links, setLinks] = useState<{ token: string; label: string; what: string }[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const fileError = useMemo(() => (file && file.size > RESUME_MAX_BYTES ? "Your resume is too large. Up to 4 MB, please." : null), [file]);
 
@@ -324,9 +324,12 @@ function ApplyForm({ co, job, onBack }: { co: CompanyId; job: PublicJob; onBack:
     form.set("jobId", job.id);
     try {
       const res = await fetch("/api/careers/apply", { method: "POST", body: form });
-      const body = (await res.json().catch(() => ({}))) as { error?: string; examToken?: string | null };
+      const body = (await res.json().catch(() => ({}))) as { error?: string; examToken?: string | null; psychToken?: string | null };
       if (!res.ok) throw new Error(body.error ?? "Your application couldn't be sent. Please try again.");
-      setExamToken(body.examToken ?? null);
+      setLinks([
+        ...(body.examToken ? [{ token: body.examToken, label: "Take the initial exam", what: "Initial exam" }] : []),
+        ...(body.psychToken ? [{ token: body.psychToken, label: "Take the psychological screening", what: "Psychological screening (about 10 minutes)" }] : []),
+      ]);
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Your application couldn't be sent. Please try again.");
@@ -340,16 +343,21 @@ function ApplyForm({ co, job, onBack }: { co: CompanyId; job: PublicJob; onBack:
       <div className="space-y-3 py-4 text-center">
         <CheckCircle2 size={44} className="mx-auto" style={{ color: t.mid }} />
         <p className="text-base font-semibold text-[var(--text-primary)]">Thank you — your application was sent!</p>
-        {examToken ? (
+        {links.length ? (
           <div className="space-y-3 rounded-lg border border-[var(--border-hairline)] p-4 text-left">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Next: the initial exam</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Next: {links.length > 1 ? "two short tests" : links[0].what.toLowerCase()}</p>
             <p className="text-sm text-[var(--text-secondary)]">
-              This job has a short exam. Take it now, or save the link below and take it within 7 days. The link is only for you — don&rsquo;t share it.
+              Take {links.length > 1 ? "them" : "it"} now, or save the link{links.length > 1 ? "s" : ""} below and take {links.length > 1 ? "them" : "it"} within 7 days. Each link is only for you — don&rsquo;t share it. Open each in a new tab.
             </p>
-            <a href={examUrl(co, examToken)} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: t.mid }}>
-              Take the exam now
-            </a>
-            <input readOnly value={typeof window === "undefined" ? "" : new URL(examUrl(co, examToken), window.location.origin).toString()} onFocus={(e) => e.currentTarget.select()} className={`${field} text-xs`} aria-label="Your exam link" />
+            {links.map((l) => (
+              <div key={l.token} className="space-y-1.5">
+                <div className="text-xs font-medium text-[var(--text-muted)]">{l.what}</div>
+                <a href={examUrl(co, l.token)} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: t.mid }}>
+                  {l.label}
+                </a>
+                <input readOnly value={typeof window === "undefined" ? "" : new URL(examUrl(co, l.token), window.location.origin).toString()} onFocus={(e) => e.currentTarget.select()} className={`${field} text-xs`} aria-label={`Your link: ${l.what}`} />
+              </div>
+            ))}
           </div>
         ) : (
           <p className="text-sm text-[var(--text-secondary)]">

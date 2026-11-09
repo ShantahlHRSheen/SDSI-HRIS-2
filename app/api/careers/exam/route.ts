@@ -2,6 +2,7 @@ import { isCompanyId, type CompanyId } from "@/lib/companies";
 import { cleanQuestions, type PublicExam } from "@/lib/exams";
 import { getAdminClient } from "@/lib/server/supabase-admin";
 import { hashToken, validToken } from "@/lib/server/exams";
+import { PSYCH_ITEMS, scorePsych } from "@/lib/psych";
 
 // Public: an applicant's initial exam from their secret link.
 //   GET  ?co=&t=                       — the exam (questions once started)
@@ -41,6 +42,7 @@ async function view(admin: ReturnType<typeof getAdminClient>, co: CompanyId, x: 
   const qs = cleanQuestions(x.questions);
   return {
     company: co,
+    kind: x.kind === "psych" ? "psych" : "exam",
     applicantName: String(a?.name ?? ""),
     position: String(a?.position ?? ""),
     status: x.status as PublicExam["status"],
@@ -91,6 +93,27 @@ export async function POST(request: Request) {
 
   if (body.action === "submit") {
     if (x.status !== "in_progress") return bad(x.status === "submitted" ? "You already sent your answers. Thank you!" : x.status === "expired" ? "The time for this exam has run out." : "Start the exam first.", 409);
+    const raw0 = body.answers && typeof body.answers === "object" ? (body.answers as Record<string, unknown>) : {};
+    if (x.kind === "psych") {
+      // All 30 statements, each 1–5; scored into the report for HR.
+      const answers: Record<string, number> = {};
+      for (const it of PSYCH_ITEMS) {
+        const n = Number(raw0[it.id]);
+        if (!Number.isInteger(n) || n < 1 || n > 5) return bad("Please answer all 30 statements.");
+        answers[it.id] = n;
+      }
+      const minutes = (Date.now() - new Date(String(x.started_at)).getTime()) / 60000;
+      const result = scorePsych(answers, minutes);
+      const { data, error } = await admin
+        .from("applicant_exams")
+        .update({ status: "submitted", answers, result, auto_score: result.overall, submitted_at: new Date().toISOString() })
+        .eq("id", x.id)
+        .eq("status", "in_progress")
+        .select("*")
+        .maybeSingle();
+      if (error || !data) return bad("Your answers couldn't be sent. Please try again.", 500);
+      return Response.json(await view(admin, co, data as Row), { headers: noStore });
+    }
     const qs = cleanQuestions(x.questions);
     const raw = body.answers && typeof body.answers === "object" ? (body.answers as Record<string, unknown>) : {};
     const answers: Record<string, number | string> = {};

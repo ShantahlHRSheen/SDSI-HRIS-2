@@ -6,9 +6,11 @@ import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { reportSaveError } from "@/lib/save-errors";
 import { currentCompanyId } from "@/lib/companies";
+import { BAND, LIKERT, PSYCH_ITEMS, PSYCH_NOTE, TRAITS, band, type PsychResult, type Tone, type Trait } from "@/lib/psych";
 import {
   EXAM_STATUS,
   assignExam,
+  assignPsych,
   cleanQuestions,
   createExam,
   deleteExam,
@@ -245,6 +247,9 @@ function ExamEditor({ exam, onClose, onSaved }: { exam: Exam | null; onClose: ()
 
 // ---- On an applicant's record -----------------------------------------------------------
 
+const PSYCH = "__psych";
+const TONE: Record<Tone, "good" | "warning" | "critical"> = { good: "good", warn: "warning", bad: "critical" };
+
 export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isHr: boolean }) {
   const [list, setList] = useState<ApplicantExam[] | null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -264,7 +269,7 @@ export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isH
     if (!pick) return;
     setBusy(true);
     try {
-      const token = await assignExam(applicantId, pick);
+      const token = pick === PSYCH ? await assignPsych(applicantId) : await assignExam(applicantId, pick);
       setLink(new URL(examUrl(currentCompanyId(), token), window.location.origin).toString());
       setPick("");
       load();
@@ -289,7 +294,15 @@ export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isH
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-[var(--text-primary)]">{x.title}</span>
                 <Badge tone={EXAM_STATUS[x.status].tone}>{EXAM_STATUS[x.status].label}</Badge>
-                {(x.status === "submitted" || x.status === "expired") && (
+                {x.kind === "psych" && x.result && (
+                  <>
+                    <span className="text-[var(--text-secondary)]">
+                      Overall <b className="text-[var(--text-primary)]">{x.result.overall}</b> / 100
+                    </span>
+                    <Badge tone={TONE[x.result.verdict[0]]}>{x.result.verdict[1]}</Badge>
+                  </>
+                )}
+                {x.kind === "exam" && (x.status === "submitted" || x.status === "expired") && (
                   <>
                     <span className="text-[var(--text-secondary)]">
                       <b className="text-[var(--text-primary)]">{t.score}</b> / {x.maxScore} ({t.percent}%)
@@ -302,7 +315,7 @@ export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isH
               <div className="mt-2 flex flex-wrap gap-2">
                 {(x.status === "submitted" || x.status === "expired") && (
                   <button onClick={() => setOpen(open === x.id ? null : x.id)} className={secondary}>
-                    <Eye size={15} /> {open === x.id ? "Hide answers" : isHr && !t.graded ? "View answers and score essays" : "View answers"}
+                    <Eye size={15} /> {open === x.id ? "Hide" : x.kind === "psych" ? "View the report" : isHr && !t.graded ? "View answers and score essays" : "View answers"}
                   </button>
                 )}
                 {isHr && (
@@ -311,7 +324,7 @@ export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isH
                   </button>
                 )}
               </div>
-              {open === x.id && <Answers x={x} isHr={isHr} onSaved={load} />}
+              {open === x.id && (x.kind === "psych" ? <PsychReport x={x} /> : <Answers x={x} isHr={isHr} onSaved={load} />)}
             </div>
           );
         })}
@@ -319,7 +332,8 @@ export function ApplicantExams({ applicantId, isHr }: { applicantId: string; isH
       {isHr && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select className={`${input} w-auto`} value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Exam to give">
-            <option value="">{exams.length ? "Give an exam…" : "No active exams — build one in the Exams tab"}</option>
+            <option value="">Give an exam…</option>
+            <option value={PSYCH}>Psychological screening (built-in, HR only)</option>
             {exams.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.title}
@@ -417,6 +431,73 @@ function Answers({ x, isHr, onSaved }: { x: ApplicantExam; isHr: boolean; onSave
           <Save size={15} /> Save essay scores
         </button>
       )}
+    </div>
+  );
+}
+
+// The Psychological screening's report (HR only).
+function PsychReport({ x }: { x: ApplicantExam }) {
+  const r = x.result as PsychResult | null;
+  const [items, setItems] = useState(false);
+  if (!r) return <p className="mt-3 text-sm text-[var(--text-muted)]">No result — the time ran out before the answers were sent.</p>;
+  const color: Record<Tone, string> = { good: "var(--status-good)", warn: "var(--status-warning)", bad: "var(--status-critical)" };
+  return (
+    <div className="mt-3 space-y-4 border-t border-[var(--border-hairline)] pt-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-3xl font-bold text-[var(--text-primary)] tabular-nums">{r.overall}</span>
+        <span className="text-xs text-[var(--text-muted)]">/ 100 overall</span>
+        <Badge tone={TONE[r.verdict[0]]}>{r.verdict[1]}</Badge>
+        <span className="text-xs text-[var(--text-secondary)]">{r.verdict[2]}</span>
+      </div>
+      <div>
+        <div className="mb-2 text-xs font-semibold text-[var(--text-primary)] uppercase">Trait scores</div>
+        <div className="space-y-3">
+          {(Object.keys(TRAITS) as Trait[]).map((k) => {
+            const v = r.traits[k];
+            const b = band(v);
+            return (
+              <div key={k}>
+                <div className="flex items-center gap-2">
+                  <b className="text-[var(--text-primary)]">{TRAITS[k].name}</b>
+                  <span className="ml-auto text-xs tabular-nums" style={{ color: color[BAND[b][1]] }}>
+                    {v}% · {BAND[b][0]}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--gridline)]">
+                  <div className="h-full rounded-full" style={{ width: `${Math.max(v, 2)}%`, background: color[BAND[b][1]] }} />
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{TRAITS[k].desc[b]}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <div className="mb-2 text-xs font-semibold text-[var(--text-primary)] uppercase">Validity checks</div>
+        <ul className="space-y-1.5">
+          {r.checks.map(([tone, text], i) => (
+            <li key={i} className="flex gap-2">
+              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color[tone] }} />
+              <span className="text-[var(--text-secondary)]">{text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button onClick={() => setItems((v) => !v)} className="text-xs text-[var(--series-1)] hover:underline">
+        {items ? "Hide the answers" : "Show the 30 answers"}
+      </button>
+      {items && (
+        <ol className="space-y-1 text-xs">
+          {PSYCH_ITEMS.map((it, i) => (
+            <li key={it.id} className="flex gap-2">
+              <span className="w-5 text-[var(--text-muted)]">{i + 1}.</span>
+              <span className="flex-1 text-[var(--text-secondary)]">{it.prompt}</span>
+              <b className="text-[var(--text-primary)]">{x.answers[it.id] ? `${x.answers[it.id]} · ${LIKERT[Number(x.answers[it.id]) - 1]}` : "—"}</b>
+            </li>
+          ))}
+        </ol>
+      )}
+      <p className="border-t border-[var(--border-hairline)] pt-2 text-[11px] text-[var(--text-muted)]">{PSYCH_NOTE}</p>
     </div>
   );
 }

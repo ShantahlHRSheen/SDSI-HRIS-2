@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase/client";
 import type { CompanyId } from "./companies";
+import { PSYCH_INSTRUCTIONS, PSYCH_ITEMS, PSYCH_TITLE, type PsychResult } from "./psych";
 
 // Initial exams for applicants (supabase/migrate_phase85_applicant_exams.sql).
 // HR builds exams; applicants take them from a secret link, served and scored
@@ -8,7 +9,7 @@ import type { CompanyId } from "./companies";
 
 export interface ExamQuestion {
   id: string;
-  kind: "choice" | "essay";
+  kind: "choice" | "essay" | "likert"; // likert: the Psychological screening (1–5)
   prompt: string;
   choices: string[]; // choice only
   answer: number | null; // choice only: the right choice's index
@@ -27,6 +28,8 @@ export interface Exam {
 export interface ApplicantExam {
   id: string;
   applicantId: string;
+  kind: "exam" | "psych";
+  result: PsychResult | null; // psych
   status: "pending" | "in_progress" | "submitted" | "expired";
   title: string;
   passingPercent: number;
@@ -45,13 +48,14 @@ export interface ApplicantExam {
 // What the applicant's browser gets: no answer key.
 export interface PublicExamQuestion {
   id: string;
-  kind: "choice" | "essay";
+  kind: "choice" | "essay" | "likert";
   prompt: string;
   choices: string[];
   points: number;
 }
 export interface PublicExam {
   company: CompanyId;
+  kind: "exam" | "psych";
   applicantName: string;
   position: string;
   status: ApplicantExam["status"];
@@ -87,7 +91,7 @@ export function cleanQuestions(raw: unknown): ExamQuestion[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((q: Record<string, unknown>, i): ExamQuestion => {
-      const kind = q?.kind === "essay" ? "essay" : "choice";
+      const kind = q?.kind === "essay" ? "essay" : q?.kind === "likert" ? "likert" : "choice";
       const choices = kind === "choice" && Array.isArray(q.choices) ? q.choices.map((c) => String(c ?? "")).slice(0, 10) : [];
       const a = Number(q?.answer);
       return {
@@ -96,7 +100,7 @@ export function cleanQuestions(raw: unknown): ExamQuestion[] {
         prompt: String(q?.prompt ?? ""),
         choices,
         answer: kind === "choice" && Number.isInteger(a) && a >= 0 && a < choices.length ? a : null,
-        points: Math.max(0, Math.min(100, Number(q?.points) || 1)),
+        points: kind === "likert" ? 0 : Math.max(0, Math.min(100, Number(q?.points) || 1)),
       };
     })
     .slice(0, 200);
@@ -107,7 +111,7 @@ export function cleanQuestions(raw: unknown): ExamQuestion[] {
 type Row = Record<string, unknown>;
 const db = () => getSupabaseClient() as unknown as SupabaseClient;
 const fail = (e: { message: string } | null) => {
-  if (e) throw new Error(/(exams|applicant_exams|hiring_assign_exam)/i.test(e.message) && /exist|find|not found|schema cache/i.test(e.message) ? "Exams aren't set up yet — ask HR to run the latest database update." : e.message);
+  if (e) throw new Error(/(exams|applicant_exams|hiring_assign_exam|hiring_assign_psych|kind|result)/i.test(e.message) && /exist|find|not found|schema cache/i.test(e.message) ? "Exams aren't set up yet — ask HR to run the latest database update." : e.message);
 };
 const toExam = (r: Row): Exam => ({
   id: String(r.id),
@@ -122,6 +126,8 @@ const toExam = (r: Row): Exam => ({
 const toApplicantExam = (r: Row): ApplicantExam => ({
   id: String(r.id),
   applicantId: String(r.applicant_id),
+  kind: r.kind === "psych" ? "psych" : "exam",
+  result: (r.result as PsychResult | null) ?? null,
   status: r.status as ApplicantExam["status"],
   title: String(r.title ?? ""),
   passingPercent: Number(r.passing_percent ?? 75),
@@ -181,12 +187,24 @@ export async function removeApplicantExam(id: string): Promise<void> {
   fail(error);
 }
 
+async function newLink(): Promise<{ token: string; hash: string }> {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return { token, hash: hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))) };
+}
+// The Psychological screening, for an applicant; returns the link's secret.
+export async function assignPsych(applicantId: string): Promise<string> {
+  const { token, hash } = await newLink();
+  const questions = PSYCH_ITEMS.map(({ id, prompt }) => ({ id, kind: "likert", prompt, choices: [], answer: null, points: 0 }));
+  const { error } = await db().rpc("hiring_assign_psych", { p_applicant: applicantId, p_token_hash: hash, p_title: PSYCH_TITLE, p_instructions: PSYCH_INSTRUCTIONS, p_questions: questions });
+  fail(error);
+  return token;
+}
+
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 // A new secret link for an applicant; only its hash is saved.
 export async function assignExam(applicantId: string, examId: string): Promise<string> {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const hash = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  const { token, hash } = await newLink();
   const { error } = await db().rpc("hiring_assign_exam", { p_applicant: applicantId, p_exam: examId, p_token_hash: hash });
   fail(error);
   return token;

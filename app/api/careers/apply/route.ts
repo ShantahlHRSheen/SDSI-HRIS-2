@@ -1,7 +1,7 @@
 import { isCompanyId } from "@/lib/companies";
 import { RESUME_MAX_BYTES } from "@/lib/careers";
 import { getAdminClient } from "@/lib/server/supabase-admin";
-import { giveExam } from "@/lib/server/exams";
+import { giveExam, givePsych } from "@/lib/server/exams";
 
 // POST (multipart form) — public: someone outside the company applies for an
 // open job post. Checked here, then added to Hiring & Onboarding as an
@@ -10,7 +10,8 @@ import { giveExam } from "@/lib/server/exams";
 //
 // Fields: co, jobId, name, email, phone, address, coverLetter, consent ("yes"),
 // resume (file), website (left empty by people; filled by bots).
-// Answers { ok, examToken } — examToken when the job has an initial exam.
+// Answers { ok, examToken, psychToken } — links to the job's initial exam and
+// the Psychological screening, when the post has them.
 
 const MAX_PER_HOUR = 100; // per company, all posts
 const recent = new Map<string, number[]>(); // best effort, per server instance
@@ -111,6 +112,8 @@ export async function POST(request: Request) {
   hits.push(now);
   recent.set(ip, hits);
   // The job's initial exam, if it has one (phase 85): a secret link to take it.
+  // And the Psychological screening, if the post asks for it (phase 86).
   const examToken = await giveExam(admin, created.id, (job.exam_id as string | null) ?? null).catch(() => null);
-  return Response.json({ ok: true, examToken });
+  const psychToken = job.psych_screening ? await givePsych(admin, created.id).catch(() => null) : null;
+  return Response.json({ ok: true, examToken, psychToken });
 }

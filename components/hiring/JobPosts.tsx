@@ -170,7 +170,16 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
     if (!v.title?.trim()) return reportSaveError("Type the job title.");
     setBusy(true);
     try {
-      const patch: JobPatch = { ...v, title: v.title.trim(), slots: Math.max(1, Math.min(500, Number(v.slots) || 1)), ...(next ? { status: next } : {}) };
+      const full: JobPatch = { ...v, title: v.title.trim(), slots: Math.max(1, Math.min(500, Number(v.slots) || 1)), ...(next ? { status: next } : {}) };
+      // Only what changed (and no empty exam settings), so a company that
+      // hasn't run the exam updates (phases 85–86) can still save posts.
+      const patch = Object.fromEntries(
+        Object.entries(full).filter(([k, val]) => {
+          if (k === "id" || k === "postedAt" || k === "updatedAt") return false;
+          if (job) return JSON.stringify(val) !== JSON.stringify((job as unknown as Record<string, unknown>)[k]);
+          return !((k === "examId" && !val) || (k === "psychScreening" && !val));
+        }),
+      ) as JobPatch;
       if (job) await updateJobPost(job.id, patch);
       else await createJobPost(patch);
       onSaved();
@@ -250,6 +259,10 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] sm:col-span-2">
+          <input type="checkbox" checked={!!v.psychScreening} onChange={(e) => set({ psychScreening: e.target.checked })} />
+          Also give the Psychological screening (30 statements, about 10 minutes; results for HR only)
         </label>
         {area("summary", "About the job", "A short description of the role.")}
         {area("responsibilities", "What you'll do", "One duty per line.")}
