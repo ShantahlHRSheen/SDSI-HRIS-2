@@ -60,7 +60,7 @@ export async function loadLogo(path: string | undefined): Promise<Uint8Array | n
   }
 }
 
-export function Requisitions() {
+export function Requisitions({ initialOpen = null }: { initialOpen?: string | null } = {}) {
   const { currentUser, currentEmployee, branches, departments } = useHris();
   const roles = currentUser?.roles ?? [];
   const isHr = roles.includes("hr_admin");
@@ -69,7 +69,7 @@ export function Requisitions() {
   const [list, setList] = useState<Requisition[] | null>(null);
   const [approverId, setApproverId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(initialOpen);
   const [tab, setTab] = useState<"mine" | "all">("mine");
   const role: Role = { isHr, me, approverId };
 

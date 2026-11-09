@@ -77,14 +77,14 @@ export function needsMe(a: Applicant, r: Role): boolean {
   return false;
 }
 
-export function Hiring() {
+export function Hiring({ initialOpen = null }: { initialOpen?: string | null } = {}) {
   const { currentUser, currentEmployee, branches, departments } = useHris();
   const isHr = !!currentUser?.roles.includes("hr_admin");
   const me = currentEmployee?.id ?? "";
   const [list, setList] = useState<Applicant[] | null>(null);
   const [approverId, setApprover] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(initialOpen);
   const [tab, setTab] = useState<"mine" | "progress" | "hired" | "closed" | "all">("mine");
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -798,6 +798,23 @@ function ApplicantDetail({ a, role, onBack, onChanged }: { a: Applicant; role: R
                   <button onClick={() => window.confirm("Return the assessment to the Head for changes?") && run("Couldn't return it", () => returnEval(a.id))} disabled={busy} className={secondary}>
                     <Undo2 size={15} /> Return to the Head
                   </button>
+                </div>
+              </div>
+            )}
+            {st === "hired" && (
+              <div className="space-y-2 rounded-lg border border-[var(--border-hairline)] p-3">
+                <div className="text-xs font-semibold text-[var(--text-primary)] uppercase">Contract signing — HR</div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label>
+                    <span className={lbl}>Contract signed on</span>
+                    <input type="date" className={input} disabled={!isHr} value={v.contractSignedAt ?? ""} onChange={(e) => setHr((c) => ({ ...c, contractSignedAt: e.target.value || null }))} />
+                  </label>
+                  {isHr && "contractSignedAt" in hr && (
+                    <button onClick={() => saveHr()} disabled={busy} className={secondary}>
+                      <Save size={15} /> Save
+                    </button>
+                  )}
+                  {!a.contractSignedAt && <Badge tone="warning">Waiting for contract signing</Badge>}
                 </div>
               </div>
             )}
