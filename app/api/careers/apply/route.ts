@@ -1,6 +1,7 @@
 import { isCompanyId } from "@/lib/companies";
 import { RESUME_MAX_BYTES } from "@/lib/careers";
 import { getAdminClient } from "@/lib/server/supabase-admin";
+import { giveExam } from "@/lib/server/exams";
 
 // POST (multipart form) — public: someone outside the company applies for an
 // open job post. Checked here, then added to Hiring & Onboarding as an
@@ -9,6 +10,7 @@ import { getAdminClient } from "@/lib/server/supabase-admin";
 //
 // Fields: co, jobId, name, email, phone, address, coverLetter, consent ("yes"),
 // resume (file), website (left empty by people; filled by bots).
+// Answers { ok, examToken } — examToken when the job has an initial exam.
 
 const MAX_PER_HOUR = 100; // per company, all posts
 const recent = new Map<string, number[]>(); // best effort, per server instance
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
   } catch {
     return bad("Applications for this company aren't open yet.", 503);
   }
-  const { data: job } = await admin.from("job_posts").select("id, title, status, closes_on, branch_id, department_id, requisition_id").eq("id", jobId).maybeSingle();
+  const { data: job } = await admin.from("job_posts").select("*").eq("id", jobId).maybeSingle();
   if (!job || job.status !== "open" || (job.closes_on && String(job.closes_on) < today())) return bad("This job is no longer open.", 404);
 
   const dayAgo = new Date(now - 24 * 3600_000).toISOString();
@@ -108,5 +110,7 @@ export async function POST(request: Request) {
   }
   hits.push(now);
   recent.set(ip, hits);
-  return Response.json({ ok: true });
+  // The job's initial exam, if it has one (phase 85): a secret link to take it.
+  const examToken = await giveExam(admin, created.id, (job.exam_id as string | null) ?? null).catch(() => null);
+  return Response.json({ ok: true, examToken });
 }

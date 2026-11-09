@@ -40,6 +40,7 @@ import {
   type HrPatch,
   type TrainingItem,
 } from "@/lib/hiring";
+import { ApplicantExams } from "@/components/hiring/Exams";
 import { fetchPrfApproverId, fetchRequisitions, prfApproverTitle, setPrfApproverId, type Requisition } from "@/lib/requisition";
 
 /* eslint-disable @next/next/no-img-element -- signed signature images */
@@ -550,6 +551,7 @@ function ApplicantDetail({ a, role, onBack, onChanged }: { a: Applicant; role: R
               </div>
             )}
           </div>
+          <ApplicantExams applicantId={a.id} isHr={isHr} />
           <div>
             <div className="mb-2 flex items-center gap-3 text-xs font-semibold text-[var(--text-primary)] uppercase">
               B. Resume

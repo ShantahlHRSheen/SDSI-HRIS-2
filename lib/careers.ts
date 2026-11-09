@@ -40,6 +40,7 @@ export interface JobPost {
   benefits: string;
   closesOn: string | null;
   requisitionId: string | null;
+  examId: string | null; // initial exam (phase 85)
   postedAt: string | null;
   updatedAt: string;
 }
@@ -135,6 +136,7 @@ export const toJob = (r: Row): JobPost => ({
   benefits: String(r.benefits ?? ""),
   closesOn: (r.closes_on as string | null) ?? null,
   requisitionId: (r.requisition_id as string | null) ?? null,
+  examId: (r.exam_id as string | null) ?? null,
   postedAt: (r.posted_at as string | null) ?? null,
   updatedAt: String(r.updated_at ?? ""),
 });
@@ -152,6 +154,7 @@ const JOB_COLS = {
   benefits: "benefits",
   closesOn: "closes_on",
   requisitionId: "requisition_id",
+  examId: "exam_id",
 } as const;
 export type JobPatch = Partial<Pick<JobPost, keyof typeof JOB_COLS>>;
 const jobRow = (p: JobPatch): Row =>

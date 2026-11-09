@@ -9,6 +9,7 @@ import { Hiring } from "@/components/hiring/Hiring";
 import { Requisitions } from "@/components/hiring/Requisitions";
 import { Overview } from "@/components/hiring/Overview";
 import { JobPosts } from "@/components/hiring/JobPosts";
+import { Exams } from "@/components/hiring/Exams";
 import { approverTitle } from "@/lib/hiring";
 
 // Hiring and Onboarding: personnel requisitions (Head → HR → final approver),
@@ -17,7 +18,7 @@ import { approverTitle } from "@/lib/hiring";
 export default function HiringPage() {
   const { isRealAccount, currentUser } = useHris();
   const isHr = !!currentUser?.roles.includes("hr_admin");
-  const [tab, setTab] = useState<"overview" | "applicants" | "requisitions" | "jobs">("overview");
+  const [tab, setTab] = useState<"overview" | "applicants" | "requisitions" | "jobs" | "exams">("overview");
   // Opened from the overview; the key remounts the tab on that record.
   const [openId, setOpenId] = useState<{ id: string; n: number } | null>(null);
   const go = (t: "applicants" | "requisitions", id: string) => {
@@ -35,7 +36,7 @@ export default function HiringPage() {
                 ["overview", "Overview"],
                 ["applicants", "Applicants"],
                 ["requisitions", "Personnel requisitions"],
-                ...(isHr ? ([["jobs", "Job posts"]] as const) : []),
+                ...(isHr ? ([["jobs", "Job posts"], ["exams", "Exams"]] as const) : []),
               ] as const
             ).map(([k, label]) => (
               <button key={k} role="tab" aria-selected={tab === k} onClick={() => {
@@ -49,6 +50,7 @@ export default function HiringPage() {
           {tab === "overview" && <Overview onOpenApplicant={(id) => go("applicants", id)} onOpenRequisition={(id) => go("requisitions", id)} />}
           {tab === "applicants" && <Hiring key={openId?.n ?? 0} initialOpen={openId?.id ?? null} />}
           {tab === "jobs" && <JobPosts />}
+          {tab === "exams" && <Exams />}
           {tab === "requisitions" && <Requisitions key={openId?.n ?? 0} initialOpen={openId?.id ?? null} />}
         </div>
       ) : (
