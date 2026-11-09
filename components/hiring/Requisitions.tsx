@@ -32,6 +32,7 @@ import {
   type PrfPatch,
   type Requisition,
 } from "@/lib/requisition";
+import { usePeople } from "@/components/hiring/Hiring";
 
 /* eslint-disable @next/next/no-img-element -- signature images */
 
@@ -183,7 +184,8 @@ function Part({ letter, title, sub, children }: { letter: string; title: string;
 }
 
 function RequisitionForm({ r, role, onBack, onChanged }: { r: Requisition; role: Role; onBack: () => void; onChanged: () => void }) {
-  const { branches, departments, employees } = useHris();
+  const { branches, departments } = useHris();
+  const employees = usePeople();
   const { isHr, me, approverId } = role;
   const isMaker = r.createdBy === me;
   const st = r.status;

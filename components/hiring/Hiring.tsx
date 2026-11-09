@@ -57,8 +57,15 @@ const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-PH"
 
 type Role = { isHr: boolean; me: string; approverId: string | null };
 
+// Staff plus admin-only accounts (lib/companies.ts adminAccountNumbers), who
+// can be a Head or the approver without being on the company's roster.
+export function usePeople() {
+  const { employees, adminAccounts } = useHris();
+  return useMemo(() => (adminAccounts.length ? [...employees, ...adminAccounts] : employees), [employees, adminAccounts]);
+}
+
 function useNames() {
-  const { employees } = useHris();
+  const employees = usePeople();
   return useCallback(
     (id: string | null | undefined, fallback = "—") => {
       const e = id ? employees.find((x) => x.id === id) : undefined;
@@ -294,7 +301,7 @@ function AddApplicantModal({ onClose, onSaved }: { onClose: () => void; onSaved:
 }
 
 function SettingsModal({ approverId, onClose, onSaved }: { approverId: string | null; onClose: () => void; onSaved: (id: string | null) => void }) {
-  const { employees } = useHris();
+  const employees = usePeople();
   const [v, setV] = useState(approverId ?? "");
   const [prf, setPrf] = useState<string | null>(null);
   const [prf0, setPrf0] = useState<string | null>(null);
@@ -454,7 +461,7 @@ function Files({ a, kind, canAdd, canDelete }: { a: Applicant; kind: "resume" | 
 }
 
 function ApplicantDetail({ a, role, onBack, onChanged }: { a: Applicant; role: Role; onBack: () => void; onChanged: () => void }) {
-  const { employees } = useHris();
+  const employees = usePeople();
   const nameOf = useNames();
   const { isHr, me, approverId } = role;
   const isHead = a.headId === me;
