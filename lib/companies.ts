@@ -124,6 +124,8 @@ export interface CompanyConfig {
   // "Our Products" on the company's website: the first picture is shown
   // wide (the line-up), the rest as a gallery.
   siteProducts?: { src: string; alt: string; name?: string }[];
+  // "Our Websites": the company's other sites, linked from its website.
+  siteLinks?: { name: string; url: string; about?: string }[];
   // Messages and Meetings (/chat, /meetings — phase 73) are on for this company.
   chat?: boolean;
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
@@ -208,6 +210,11 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       { src: "/brand/shantahl-slides/2-business.jpg", alt: "Start your Shantahl Business effortlessly with our automated dropshipping system. Even from the comfort of your home, you can engage in the dropshipping business. We provide high quality products for you to offer, eliminating the need for inventory management. We handle the shipping of your clients' orders." },
       { src: "/brand/shantahl-slides/3-global.jpg", alt: "Our dropshipping services cater to a global audience, not just limited to the Philippines. We've expanded our operations to Dubai, Taiwan, Hong Kong, and are soon to launch in more countries." },
       { src: "/brand/shantahl-slides/4-awards.jpg", alt: "The company, along with its Founder & CEO, has been honored with numerous awards." },
+    ],
+    siteLinks: [
+      { name: "Centapure", url: "https://centapure.com" },
+      { name: "Shantahl Direct Sales Dropshipping", url: "https://shantahl.net" },
+      { name: "Shantahl Cosmetics", url: "https://shantahlcosmetics.com" },
     ],
     siteProducts: [
       {

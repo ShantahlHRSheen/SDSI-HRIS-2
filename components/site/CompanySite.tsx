@@ -85,6 +85,13 @@ export function CompanySiteFooter({ co, address, phone, email }: { co: CompanyId
           <li><Link href={siteUrl(co, "careers")} className="hover:text-white hover:underline">Careers</Link></li>
           <li><Link href={`/login?co=${co}`} className="hover:text-white hover:underline">Employee Login</Link></li>
           <li><Link href="/" className="hover:text-white hover:underline">{GROUP_NAME}</Link></li>
+          {c.siteLinks?.map((l) => (
+            <li key={l.url}>
+              <a href={l.url} target="_blank" rel="noopener noreferrer" className="hover:text-white hover:underline">
+                {l.name} ↗
+              </a>
+            </li>
+          ))}
         </ul>
         <div className="space-y-1 text-sm text-white/75">
           {address && <p>{address}</p>}
