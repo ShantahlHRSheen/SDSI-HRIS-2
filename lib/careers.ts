@@ -22,6 +22,12 @@ export interface CompanyProfile {
   website: string;
   facebook: string;
   careersNote: string;
+  // The company's own homepage (phase 87).
+  founderName: string;
+  founderTitle: string;
+  founderMessage: string;
+  founderPhotoPath: string | null;
+  heroPhotoPath: string | null;
   updatedAt: string | null;
 }
 
@@ -83,7 +89,11 @@ export const jobTypeLabel = (t: JobEmploymentType | null) => JOB_TYPES.find(([k]
 export const RESUME_MAX_BYTES = 4 * 1024 * 1024;
 export const RESUME_ACCEPT = ".pdf,.doc,.docx,.jpg,.jpeg,.png";
 
-export const careersUrl = (co: CompanyId, jobId?: string) => `/careers/${co}${jobId ? `?job=${encodeURIComponent(jobId)}` : ""}`;
+// Each company's own website: /shantahl, /lsmbiz, /daro.
+export const SITE_SLUG: Record<CompanyId, string> = { sdsi: "shantahl", lsmbiz: "lsmbiz", daro: "daro" };
+export const companyFromSlug = (slug: string): CompanyId | null => (Object.keys(SITE_SLUG) as CompanyId[]).find((k) => SITE_SLUG[k] === slug) ?? null;
+export const siteUrl = (co: CompanyId, page = "") => `/${SITE_SLUG[co]}${page ? `/${page}` : ""}`;
+export const careersUrl = (co: CompanyId, jobId?: string) => `${siteUrl(co, "careers")}${jobId ? `?job=${encodeURIComponent(jobId)}` : ""}`;
 
 // ---- HR side (signed in) -----------------------------------------------------------
 
@@ -106,6 +116,11 @@ export const toProfile = (r: Row): CompanyProfile => ({
   website: String(r.website ?? ""),
   facebook: String(r.facebook ?? ""),
   careersNote: String(r.careers_note ?? ""),
+  founderName: String(r.founder_name ?? ""),
+  founderTitle: String(r.founder_title ?? ""),
+  founderMessage: String(r.founder_message ?? ""),
+  founderPhotoPath: (r.founder_photo_path as string | null) ?? null,
+  heroPhotoPath: (r.hero_photo_path as string | null) ?? null,
   updatedAt: (r.updated_at as string | null) ?? null,
 });
 const PROFILE_COLS: Record<Exclude<keyof CompanyProfile, "updatedAt">, string> = {
@@ -120,6 +135,11 @@ const PROFILE_COLS: Record<Exclude<keyof CompanyProfile, "updatedAt">, string> =
   website: "website",
   facebook: "facebook",
   careersNote: "careers_note",
+  founderName: "founder_name",
+  founderTitle: "founder_title",
+  founderMessage: "founder_message",
+  founderPhotoPath: "founder_photo_path",
+  heroPhotoPath: "hero_photo_path",
 };
 
 export const toJob = (r: Row): JobPost => ({

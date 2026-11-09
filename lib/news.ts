@@ -64,10 +64,14 @@ export async function deleteNewsPost(p: NewsPost): Promise<void> {
 
 export const COVER_ACCEPT = "image/jpeg,image/png,image/webp";
 export async function uploadCover(file: File): Promise<string> {
+  return uploadImage(file, "news");
+}
+// A public photo (news covers, the company homepage, the founder).
+export async function uploadImage(file: File, folder: "news" | "profile"): Promise<string> {
   if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error("Use a JPG, PNG or WebP photo.");
   if (file.size > 5 * 1024 * 1024) throw new Error("Photos up to 5 MB.");
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const path = `news/${crypto.randomUUID()}.${ext}`;
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
   const { error } = await media().upload(path, file, { contentType: file.type });
   fail(error);
   return path;

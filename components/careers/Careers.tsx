@@ -6,7 +6,7 @@ import { ArrowLeft, Briefcase, Building2, CalendarDays, CheckCircle2, Globe, Thu
 import { Modal } from "@/components/Modal";
 import { COMPANIES, COMPANY_ORDER, GROUP_NAME, isCompanyReady, type CompanyId } from "@/lib/companies";
 import { examUrl } from "@/lib/exams";
-import { RESUME_ACCEPT, RESUME_MAX_BYTES, careersUrl, jobTypeLabel, type PublicCareers, type PublicJob } from "@/lib/careers";
+import { RESUME_ACCEPT, RESUME_MAX_BYTES, careersUrl, siteUrl, jobTypeLabel, type PublicCareers, type PublicJob } from "@/lib/careers";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
 
@@ -78,8 +78,8 @@ function CompanyCard({ co, compact }: { co: CompanyId; compact: boolean }) {
             </li>
           ))}
         </ul>
-        <Link href={careersUrl(co)} className="mt-auto inline-flex items-center gap-1 text-sm font-medium hover:underline" style={{ color: t.mid }}>
-          Company profile{jobs.length ? " & all jobs" : ""} →
+        <Link href={siteUrl(co)} className="mt-auto inline-flex items-center gap-1 text-sm font-medium hover:underline" style={{ color: t.mid }}>
+          Visit {c.shortName === "SDSI" ? "Shantahl" : c.shortName}{jobs.length ? " & see all jobs" : ""} →
         </Link>
       </div>
     </div>
@@ -88,7 +88,8 @@ function CompanyCard({ co, compact }: { co: CompanyId; compact: boolean }) {
 
 // ---- One company: /careers/<company> ------------------------------------------------
 
-export function CompanyCareers({ co, initialJob }: { co: CompanyId; initialJob: string | null }) {
+// jobsOnly: just the open positions (the company website's Careers page).
+export function CompanyCareers({ co, initialJob, jobsOnly = false }: { co: CompanyId; initialJob: string | null; jobsOnly?: boolean }) {
   const { data, error } = useCareers(co);
   const c = COMPANIES[co];
   const t = theme(co);
@@ -109,6 +110,7 @@ export function CompanyCareers({ co, initialJob }: { co: CompanyId; initialJob: 
 
   return (
     <div className="flex flex-1 flex-col">
+      {!jobsOnly && (
       <section className="relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${t.deep}, ${t.mid})` }}>
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="flex flex-col items-center gap-3 py-8 text-center sm:flex-row sm:text-left">
@@ -123,11 +125,12 @@ export function CompanyCareers({ co, initialJob }: { co: CompanyId; initialJob: 
           </div>
         </div>
       </section>
+      )}
 
       <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-8">
         {error && <p className="text-sm text-[var(--status-critical)]">The careers page couldn&rsquo;t load. Please refresh.</p>}
 
-        {(p?.about || p?.mission || p?.vision || p?.coreValues) && (
+        {!jobsOnly && (p?.about || p?.mission || p?.vision || p?.coreValues) && (
           <section aria-labelledby="about" className="grid gap-4 lg:grid-cols-3">
             {p?.about && (
               <div className="lg:col-span-3">
@@ -177,6 +180,7 @@ export function CompanyCareers({ co, initialJob }: { co: CompanyId; initialJob: 
           </div>
         </section>
 
+        {!jobsOnly && (
         <section aria-labelledby="contact" className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
           <h2 id="contact" className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
             Contact us
@@ -207,6 +211,7 @@ export function CompanyCareers({ co, initialJob }: { co: CompanyId; initialJob: 
             )}
           </ul>
         </section>
+        )}
       </main>
 
       {job && <JobModal co={co} job={job} onClose={() => choose(null)} />}

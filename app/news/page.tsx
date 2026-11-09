@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "@/components/site/SiteShell";
 import { NewsCard, PageBanner } from "@/components/site/NewsCard";
+import { Pager } from "@/components/site/Pager";
 import { COMPANIES, GROUP_NAME, isCompanyId, type CompanyId } from "@/lib/companies";
 import { listNews, readyCompanies } from "@/lib/server/site";
 
@@ -27,8 +28,6 @@ export default async function NewsroomPage({ searchParams }: Props) {
     return `/news${s ? `?${s}` : ""}`;
   };
   const tabs: [CompanyId | "all", string][] = [["all", GROUP_NAME.replace(" of Companies", "")], ...readyCompanies().map((id) => [id, COMPANIES[id].name] as [CompanyId, string])];
-  // Page numbers, with gaps: 1 … 4 5 6 … 12
-  const nums = Array.from({ length: pages }, (_, i) => i + 1).filter((n) => n === 1 || n === pages || Math.abs(n - page) <= 1);
 
   return (
     <SiteShell>
@@ -59,32 +58,7 @@ export default async function NewsroomPage({ searchParams }: Props) {
           </div>
         )}
 
-        {pages > 1 && (
-          <nav className="mt-10 flex flex-wrap items-center justify-center gap-1.5" aria-label="Pages">
-            {page > 1 && (
-              <Link href={href(co, page - 1)} className="rounded-md border border-[var(--border-hairline)] bg-white px-3 py-1.5 text-sm hover:border-[#0b6b45]">
-                ‹ Previous
-              </Link>
-            )}
-            {nums.map((n, i) => (
-              <span key={n} className="flex items-center gap-1.5">
-                {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-[var(--text-muted)]">…</span>}
-                <Link
-                  href={href(co, n)}
-                  aria-current={n === page ? "page" : undefined}
-                  className={`min-w-9 rounded-md border px-3 py-1.5 text-center text-sm ${n === page ? "border-[#0b6b45] bg-[#0b6b45] font-semibold text-white" : "border-[var(--border-hairline)] bg-white hover:border-[#0b6b45]"}`}
-                >
-                  {n}
-                </Link>
-              </span>
-            ))}
-            {page < pages && (
-              <Link href={href(co, page + 1)} className="rounded-md border border-[var(--border-hairline)] bg-white px-3 py-1.5 text-sm hover:border-[#0b6b45]">
-                Next ›
-              </Link>
-            )}
-          </nav>
-        )}
+        <Pager page={page} pages={pages} href={(p) => href(co, p)} />
       </main>
     </SiteShell>
   );

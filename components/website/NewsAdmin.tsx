@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
 import { reportSaveError } from "@/lib/save-errors";
 import { currentCompanyId } from "@/lib/companies";
+import { siteUrl } from "@/lib/careers";
 import { COVER_ACCEPT, coverUrl, createNewsPost, deleteNewsPost, fetchNewsPosts, removeCover, updateNewsPost, uploadCover, type NewsPatch, type NewsPost } from "@/lib/news";
 
 /* eslint-disable @next/next/no-img-element -- cover photos from the company-media bucket */
@@ -42,7 +43,7 @@ export function NewsAdmin() {
         <button onClick={() => setEditing("new")} className={primary}>
           <Plus size={16} /> New article
         </button>
-        <a href={`/news?co=${currentCompanyId()}`} target="_blank" rel="noopener noreferrer" className={secondary}>
+        <a href={siteUrl(currentCompanyId(), "news")} target="_blank" rel="noopener noreferrer" className={secondary}>
           <ExternalLink size={16} /> View the Newsroom
         </a>
       </div>

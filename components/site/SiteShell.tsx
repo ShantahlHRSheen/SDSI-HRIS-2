@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { siteUrl } from "@/lib/careers";
 import { COMPANIES, COMPANY_ORDER, GROUP_NAME, isCompanyReady } from "@/lib/companies";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
@@ -37,7 +38,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             const c = COMPANIES[id];
             return (
               <div key={id} className="text-sm">
-                <Link href={`/careers/${id}`} className="flex items-center gap-2 font-semibold text-white hover:underline">
+                <Link href={siteUrl(id)} className="flex items-center gap-2 font-semibold text-white hover:underline">
                   <img src={c.logo} alt="" className="h-7 w-7 rounded-full bg-white object-contain" /> {c.name}
                 </Link>
                 {c.info.address && <p className="mt-2 text-white/70">{c.info.address}</p>}

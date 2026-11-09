@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { NewsAdmin } from "@/components/website/NewsAdmin";
 import { JobPosts, ProfileModal } from "@/components/hiring/JobPosts";
-import { currentCompany } from "@/lib/companies";
+import { currentCompany, currentCompanyId } from "@/lib/companies";
+import { siteUrl } from "@/lib/careers";
 
 // HR: the public company website (/) — news, job posts, company profile.
 export default function WebsitePage() {
@@ -39,8 +40,8 @@ export default function WebsitePage() {
               <button onClick={() => setProfile(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
                 <Building2 size={16} /> Company profile
               </button>
-              <a href="/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
-                <ExternalLink size={16} /> Open the website
+              <a href={siteUrl(currentCompanyId())} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--gridline)]/40">
+                <ExternalLink size={16} /> Open {currentCompany().shortName === "SDSI" ? "Shantahl" : currentCompany().shortName}&rsquo;s website
               </a>
             </div>
           </div>

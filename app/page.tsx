@@ -4,7 +4,7 @@ import { ArrowRight, Briefcase, MapPin } from "lucide-react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { NewsCard } from "@/components/site/NewsCard";
 import { COMPANIES, GROUP_NAME } from "@/lib/companies";
-import { careersUrl, jobTypeLabel } from "@/lib/careers";
+import { careersUrl, jobTypeLabel, siteUrl } from "@/lib/careers";
 import { getProfile, listJobs, listNews, readyCompanies } from "@/lib/server/site";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
@@ -49,7 +49,7 @@ export default async function HomePage({ searchParams }: Props) {
           </div>
           <div className="flex items-center justify-center gap-4 lg:justify-end">
             {cos.map((co, i) => (
-              <Link key={co} href={`/careers/${co}`} title={COMPANIES[co].name} className={`rounded-full bg-white p-1.5 shadow-xl transition-transform hover:scale-105 ${i === 1 ? "-mt-10" : "mt-6"}`}>
+              <Link key={co} href={siteUrl(co)} title={COMPANIES[co].name} className={`rounded-full bg-white p-1.5 shadow-xl transition-transform hover:scale-105 ${i === 1 ? "-mt-10" : "mt-6"}`}>
                 <img src={COMPANIES[co].logo} alt={COMPANIES[co].name} className="h-24 w-24 rounded-full object-contain sm:h-32 sm:w-32" />
               </Link>
             ))}
@@ -66,7 +66,7 @@ export default async function HomePage({ searchParams }: Props) {
             const p = profiles[i];
             const t = c.formTheme ?? { deep: "#013825", mid: "#0b6b45", accent: "#7cc9a0" };
             return (
-              <Link key={co} href={`/careers/${co}`} className="group flex flex-col overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white shadow-sm transition-shadow hover:shadow-md">
+              <Link key={co} href={siteUrl(co)} className="group flex flex-col overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white shadow-sm transition-shadow hover:shadow-md">
                 <div className="flex h-36 items-center justify-center" style={{ background: `linear-gradient(135deg, ${t.deep}, ${t.mid})` }}>
                   <img src={c.logo} alt="" className="h-24 w-24 rounded-full bg-white object-contain p-1 shadow-lg transition-transform group-hover:scale-105" />
                 </div>
