@@ -7,9 +7,9 @@ import type { CompanyId } from "./companies";
 // companies don't (proxy.ts). Add a domain to the Vercel project first
 // (Settings → Domains), then list it here.
 export const SITE_DOMAINS: Record<CompanyId, string[]> = {
-  sdsi: [],
-  lsmbiz: [],
-  daro: [],
+  sdsi: ["shantahldirectsales.vercel.app"],
+  lsmbiz: ["lsmbizcredit.vercel.app"],
+  daro: ["darolendingcorp.vercel.app"],
 };
 
 // The path of each company's website on the HRIS address: /shantahl, …
