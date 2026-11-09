@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { LogIn } from "lucide-react";
+import { Briefcase, Globe, LogIn, Newspaper } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { ROLE_LABELS } from "@/lib/types";
 import { Badge } from "@/components/Badge";
 import { isSupabaseConfigured } from "@/lib/supabase/auth";
+import { siteUrl } from "@/lib/careers";
 import { COMPANIES, COMPANY_ORDER, GROUP_NAME, chooseCompany, companyMissingSetup, currentCompany, currentCompanyId, isCompanyId, isCompanyReady } from "@/lib/companies";
 
 // Where to go after signing in: the page a link was for (?next=/meetings/…),
@@ -191,9 +192,38 @@ function LoginPage() {
           <p className="max-w-sm text-center text-xs text-[var(--text-muted)]">
             No login yet, or forgot your password? Ask HR to issue you a temporary one.
           </p>
-          <Link href="/" className="mt-6 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:underline">
-            ← {GROUP_NAME} website
-          </Link>
+          {/* The public websites: the group's and each company's. */}
+          <nav aria-label="Our websites" className="mt-8 w-full max-w-xl rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="mb-3 flex items-center justify-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+              <Globe size={13} /> Visit our websites
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Link href="/" className="flex flex-col items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-2 py-2.5 text-center text-xs font-medium text-[var(--text-primary)] hover:border-[var(--series-1)]/60">
+                <span className="flex -space-x-2">
+                  {COMPANY_ORDER.map((id) => (
+                    // eslint-disable-next-line @next/next/no-img-element -- small static brand logos
+                    <img key={id} src={COMPANIES[id].logo} alt="" className="h-7 w-7 rounded-full border border-[var(--surface-1)] bg-white object-contain" />
+                  ))}
+                </span>
+                {GROUP_NAME.replace(" of Companies", "")}
+              </Link>
+              {COMPANY_ORDER.filter((id) => isCompanyReady(id)).map((id) => (
+                <Link key={id} href={siteUrl(id)} className="flex flex-col items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-2 py-2.5 text-center text-xs font-medium text-[var(--text-primary)] hover:border-[var(--series-1)]/60">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- small static brand logo */}
+                  <img src={COMPANIES[id].logo} alt="" className="h-7 w-7 rounded-full bg-white object-contain" />
+                  {COMPANIES[id].shortName === "SDSI" ? "Shantahl" : COMPANIES[id].shortName}
+                </Link>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
+              <Link href="/news" className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline">
+                <Newspaper size={13} /> Newsroom
+              </Link>
+              <Link href="/careers" className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline">
+                <Briefcase size={13} /> Careers
+              </Link>
+            </div>
+          </nav>
         </>
       ) : (
         <>
