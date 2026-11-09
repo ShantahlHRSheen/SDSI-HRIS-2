@@ -32,6 +32,7 @@ export interface Applicant {
   position: string;
   branchId: string | null;
   departmentId: string | null;
+  requisitionId: string | null;
   shortlisted: boolean;
   hrInterviewAt: string | null;
   hrInterviewNotes: string;
@@ -108,6 +109,7 @@ const toApplicant = (r: Row): Applicant => ({
   position: String(r.position ?? ""),
   branchId: (r.branch_id as string | null) ?? null,
   departmentId: (r.department_id as string | null) ?? null,
+  requisitionId: (r.requisition_id as string | null) ?? null,
   shortlisted: !!r.shortlisted,
   hrInterviewAt: (r.hr_interview_at as string | null) ?? null,
   hrInterviewNotes: String(r.hr_interview_notes ?? ""),
@@ -154,6 +156,7 @@ export type HrPatch = Partial<
     | "position"
     | "branchId"
     | "departmentId"
+    | "requisitionId"
     | "shortlisted"
     | "hrInterviewAt"
     | "hrInterviewNotes"
@@ -174,6 +177,7 @@ const COLS: Record<keyof HrPatch, string> = {
   position: "position",
   branchId: "branch_id",
   departmentId: "department_id",
+  requisitionId: "requisition_id",
   shortlisted: "shortlisted",
   hrInterviewAt: "hr_interview_at",
   hrInterviewNotes: "hr_interview_notes",
@@ -192,9 +196,10 @@ export async function fetchApplicants(): Promise<Applicant[]> {
   return ((data as Row[]) ?? []).map(toApplicant);
 }
 
+// Applicants assigned to me, or personnel requisitions I made / approve.
 export async function hasHiringRecords(): Promise<boolean> {
-  const { data, error } = await db().from("applicants").select("id").limit(1);
-  return !error && (data ?? []).length > 0;
+  const [a, r] = await Promise.all([db().from("applicants").select("id").limit(1), db().from("personnel_requisitions").select("id").limit(1)]);
+  return (!a.error && (a.data ?? []).length > 0) || (!r.error && (r.data ?? []).length > 0);
 }
 
 export async function createApplicant(p: HrPatch): Promise<string> {

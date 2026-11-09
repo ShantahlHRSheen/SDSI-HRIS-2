@@ -114,6 +114,10 @@ export interface CompanyConfig {
   // Hiring and Onboarding (phase 81): the final approver's title — the person
   // is chosen by HR in the module's settings.
   hiringApproverTitle?: string;
+  // Personnel Requisition Form (phase 82): the final approver's title, and
+  // the form's colors (title bars, accent line) with the company logo.
+  requisitionApproverTitle?: string;
+  formTheme?: { deep: string; mid: string; accent: string };
   // Messages and Meetings (/chat, /meetings — phase 73) are on for this company.
   chat?: boolean;
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
@@ -190,6 +194,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     confidentialViewerIds: ["emp-001", "emp-004"],
     chat: true,
     hiringApproverTitle: "Vice Chairperson",
+    requisitionApproverTitle: "Vice Chairperson",
+    formTheme: { deep: "#0b3d2a", mid: "#1f7a5c", accent: "#7cc9a0" },
     regularization: {
       employerName: "SHANTAHL DIRECT SALES, INC.",
       signatoryId: "emp-001", // Lowel B. Magdadaro
@@ -261,6 +267,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
   lsmbiz: {
     id: "lsmbiz",
     hiringApproverTitle: "VP of Operations",
+    requisitionApproverTitle: "VP for Operations",
+    formTheme: { deep: "#0d4a1c", mid: "#1f8a35", accent: "#c9a227" },
     name: "LSMBiz Credit Corporation",
     shortName: "LSMBiz",
     logo: "/brand/lsmbiz.png",
@@ -316,6 +324,8 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
   daro: {
     id: "daro",
     hiringApproverTitle: "VP of Operations",
+    requisitionApproverTitle: "Vice Chairperson",
+    formTheme: { deep: "#0c2389", mid: "#1d4ed8", accent: "#f2b705" },
     name: "Daro Lending Corporation",
     shortName: "Daro",
     logo: "/brand/daro.png",
