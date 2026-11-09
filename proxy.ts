@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SITE_SLUG, companyForHost } from "@/lib/site-domains";
+import { SITE_DOMAINS, SITE_SLUG, companyForHost } from "@/lib/site-domains";
+import type { CompanyId } from "@/lib/companies";
 
 // A company's own website address (lib/site-domains.ts) shows only that
 // company's public pages: its homepage, Newsroom, Careers (with applying)
@@ -9,7 +10,7 @@ import { SITE_SLUG, companyForHost } from "@/lib/site-domains";
 
 export function proxy(request: NextRequest) {
   const co = companyForHost(request.headers.get("host"));
-  if (!co) return NextResponse.next();
+  if (!co) return onHrisAddress(request);
 
   const { pathname } = request.nextUrl;
   const slug = `/${SITE_SLUG[co]}`;
@@ -45,6 +46,24 @@ export function proxy(request: NextRequest) {
   home.pathname = "/";
   home.search = "";
   return NextResponse.redirect(home);
+}
+
+// On the HRIS address: a company's pages (/shantahl/…, old /careers/sdsi
+// links, applicants' exam links) move to its own address when it has one,
+// so the public never lands on the HRIS's.
+function onHrisAddress(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  for (const co of Object.keys(SITE_SLUG) as CompanyId[]) {
+    const domain = SITE_DOMAINS[co][0];
+    if (!domain) continue;
+    const slug = `/${SITE_SLUG[co]}`;
+    let rest: string | null = null;
+    if (pathname === slug || pathname.startsWith(`${slug}/`)) rest = pathname.slice(slug.length) || "/";
+    else if (pathname.startsWith(`/careers/${co}/exam/`)) rest = pathname;
+    else if (pathname === `/careers/${co}`) rest = "/careers";
+    if (rest !== null) return NextResponse.redirect(`https://${domain}${rest}${search}`, 308);
+  }
+  return NextResponse.next();
 }
 
 export const config = {
