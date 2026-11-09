@@ -3,22 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LogIn, Menu, X } from "lucide-react";
-import { useHris } from "@/lib/store";
-import { COMPANIES, GROUP_NAME, currentCompanyId, type CompanyId } from "@/lib/companies";
+import { Menu, X } from "lucide-react";
+import { COMPANIES, type CompanyId } from "@/lib/companies";
 import { siteUrl } from "@/lib/careers";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
 
 // One company's own website (/shantahl, /lsmbiz, /daro): its logo, colors and
-// menu only. Employee Login opens that company's sign-in directly.
+// menu only — no sign-in, LSM Group or other-company links (the public
+// can't reach those from here; see proxy.ts).
 export function CompanySiteHeader({ co }: { co: CompanyId }) {
   const c = COMPANIES[co];
   const t = c.formTheme ?? { deep: "#013825", mid: "#0b6b45", accent: "#7cc9a0" };
   const path = usePathname();
-  const { ready, currentUser } = useHris();
   const [menu, setMenu] = useState(false);
-  const signedHere = ready && currentUser && currentCompanyId() === co;
   const items: [string, string][] = [
     [siteUrl(co), "Home"],
     [`${siteUrl(co)}#about`, "About"],
@@ -46,15 +44,7 @@ export function CompanySiteHeader({ co }: { co: CompanyId }) {
         <nav className="ml-auto hidden items-center md:flex" aria-label="Main">
           {items.map(link)}
         </nav>
-        <Link
-          href={signedHere ? "/dashboard" : `/login?co=${co}`}
-          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm md:ml-2"
-          style={{ background: t.mid }}
-        >
-          <LogIn size={15} /> <span className="hidden sm:inline">{signedHere ? "Open HRIS" : "Employee Login"}</span>
-          <span className="sm:hidden">{signedHere ? "HRIS" : "Login"}</span>
-        </Link>
-        <button onClick={() => setMenu((v) => !v)} className="rounded-md p-2 text-[#2c3a33] md:hidden" aria-label="Menu" aria-expanded={menu}>
+        <button onClick={() => setMenu((v) => !v)} className="ml-auto rounded-md p-2 text-[#2c3a33] md:hidden" aria-label="Menu" aria-expanded={menu}>
           {menu ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
@@ -77,14 +67,11 @@ export function CompanySiteFooter({ co, address, phone, email }: { co: CompanyId
           <img src={c.logo} alt="" className="h-12 w-12 rounded-full bg-white object-contain p-0.5" />
           <div>
             <div className="font-bold text-white">{c.name}</div>
-            <div className="text-xs text-white/60">A member of the {GROUP_NAME}</div>
           </div>
         </div>
         <ul className="space-y-1.5 text-sm">
           <li><Link href={siteUrl(co, "news")} className="hover:text-white hover:underline">Newsroom</Link></li>
           <li><Link href={siteUrl(co, "careers")} className="hover:text-white hover:underline">Careers</Link></li>
-          <li><Link href={`/login?co=${co}`} className="hover:text-white hover:underline">Employee Login</Link></li>
-          <li><Link href="/" className="hover:text-white hover:underline">{GROUP_NAME}</Link></li>
           {c.siteLinks?.map((l) => (
             <li key={l.url}>
               <a href={l.url} target="_blank" rel="noopener noreferrer" className="hover:text-white hover:underline">

@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { Check, Copy, ExternalLink, Link2 } from "lucide-react";
 import { COMPANIES, COMPANY_ORDER, GROUP_NAME, isCompanyReady } from "@/lib/companies";
 import { siteUrl } from "@/lib/careers";
+import { publicLink } from "@/lib/site-domains";
 
 /* eslint-disable @next/next/no-img-element -- small static brand logos */
 
@@ -18,9 +19,10 @@ export function SiteLinks() {
   );
   const [copied, setCopied] = useState<string | null>(null);
   // One link per website: the group's and each company's.
-  const rows: { logo: string[]; name: string; path: string }[] = [
-    { logo: COMPANY_ORDER.map((id) => COMPANIES[id].logo), name: GROUP_NAME, path: "/" },
-    ...COMPANY_ORDER.filter((id) => isCompanyReady(id)).map((id) => ({ logo: [COMPANIES[id].logo], name: COMPANIES[id].name, path: siteUrl(id) })),
+  // Companies with their own address (lib/site-domains.ts) show that.
+  const rows: { logo: string[]; name: string; url: (origin: string) => string }[] = [
+    { logo: COMPANY_ORDER.map((id) => COMPANIES[id].logo), name: GROUP_NAME, url: (o) => o },
+    ...COMPANY_ORDER.filter((id) => isCompanyReady(id)).map((id) => ({ logo: [COMPANIES[id].logo], name: COMPANIES[id].name, url: (o: string) => publicLink(id, siteUrl(id), o) })),
   ];
   async function copy(url: string) {
     try {
@@ -32,7 +34,6 @@ export function SiteLinks() {
     setTimeout(() => setCopied((c) => (c === url ? null : c)), 1800);
   }
   if (!origin) return null;
-  const full = (path: string) => `${origin}${path === "/" ? "" : path}`;
   return (
     <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4" aria-labelledby="site-links">
       <h2 id="site-links" className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[var(--text-primary)]">
@@ -40,7 +41,7 @@ export function SiteLinks() {
       </h2>
       <div className="space-y-2">
         {rows.map((r) => {
-          const url = full(r.path);
+          const url = r.url(origin);
           return (
             <div key={r.name} className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-hairline)] p-2.5">
               <span className="flex w-64 shrink-0 items-center gap-2">
