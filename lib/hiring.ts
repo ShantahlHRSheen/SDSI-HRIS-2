@@ -63,6 +63,7 @@ export interface Applicant {
   approvalComment: string;
   approvedBy: string | null;
   approvedAt: string | null;
+  contractSignedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +80,45 @@ export const STATUS_LABEL: Record<ApplicantStatus, { label: string; tone: "info"
   not_hired: { label: "Disapproved", tone: "critical" },
   withdrawn: { label: "Withdrawn", tone: "muted" },
 };
+
+// The overview's steps, after the personnel requisition (step 1).
+export type Stage = "applicants" | "initial" | "head_interview" | "background" | "head_rec" | "final" | "onboarding" | "training" | "assessment" | "contract";
+export const CLOSED: ApplicantStatus[] = ["rejected", "not_hired", "withdrawn"];
+
+// Which step an applicant is on; null once hired with a signed contract, or closed.
+export function applicantStage(a: Applicant): Stage | null {
+  switch (a.status) {
+    case "screening":
+      return a.hrInterviewAt || a.hrInterviewResult ? "initial" : "applicants";
+    case "head":
+      if (!a.headInterviewResult) return "head_interview";
+      if (a.headInterviewResult === "passed" && !a.backgroundResult) return "background";
+      return "head_rec";
+    case "final":
+      return "final";
+    case "onboarding":
+      if (!a.orientationAt || !a.handbookReceivedAt || !a.teamMeetingAt) return "onboarding";
+      if (!a.training.length || a.training.some((t) => t.status !== "completed")) return "training";
+      return "assessment";
+    case "hr_sign":
+    case "approval":
+      return "assessment";
+    case "hired":
+      return a.contractSignedAt ? null : "contract";
+    default:
+      return null;
+  }
+}
+
+// Who the next move is with: HR, the Head or the final approver.
+export function applicantWaitingOn(a: Applicant): "hr" | "head" | "approver" | null {
+  const s = applicantStage(a);
+  if (!s) return null;
+  if (s === "applicants" || s === "initial" || s === "onboarding" || s === "contract") return "hr";
+  if (s === "final") return "approver";
+  if (s === "assessment") return a.status === "hr_sign" ? "hr" : a.status === "approval" ? "approver" : "head";
+  return "head";
+}
 
 export const approverTitle = () => currentCompany().hiringApproverTitle ?? "Final approver";
 
@@ -140,6 +180,7 @@ const toApplicant = (r: Row): Applicant => ({
   approvalComment: String(r.approval_comment ?? ""),
   approvedBy: (r.approved_by as string | null) ?? null,
   approvedAt: (r.approved_at as string | null) ?? null,
+  contractSignedAt: (r.contract_signed_at as string | null) ?? null,
   createdAt: String(r.created_at ?? ""),
   updatedAt: String(r.updated_at ?? ""),
 });
@@ -166,6 +207,7 @@ export type HrPatch = Partial<
     | "orientationAt"
     | "handbookReceivedAt"
     | "teamMeetingAt"
+    | "contractSignedAt"
   >
 >;
 const COLS: Record<keyof HrPatch, string> = {
@@ -187,6 +229,7 @@ const COLS: Record<keyof HrPatch, string> = {
   orientationAt: "orientation_at",
   handbookReceivedAt: "handbook_received_at",
   teamMeetingAt: "team_meeting_at",
+  contractSignedAt: "contract_signed_at",
 };
 const toRow = (p: HrPatch): Row => Object.fromEntries(Object.entries(p).map(([k, v]) => [COLS[k as keyof HrPatch], v === "" ? null : v]));
 
