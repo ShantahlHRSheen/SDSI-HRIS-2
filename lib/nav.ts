@@ -54,6 +54,8 @@ export const NAV_SECTIONS: NavSection[] = [
       // Heads start personnel requisitions here; also shown to anyone a hiring record
       // is assigned to (components/Sidebar.tsx).
       { label: "Hiring & Onboarding", href: "/hiring", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
+      // The public website (/): news, job posts, company profile.
+      { label: "Company Website", href: "/website", roles: ["hr_admin"], built: true },
     ],
   },
   {

@@ -1,223 +1,149 @@
-"use client";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ArrowRight, Briefcase, MapPin } from "lucide-react";
+import { SiteShell } from "@/components/site/SiteShell";
+import { NewsCard } from "@/components/site/NewsCard";
+import { COMPANIES, GROUP_NAME } from "@/lib/companies";
+import { careersUrl, jobTypeLabel } from "@/lib/careers";
+import { getProfile, listJobs, listNews, readyCompanies } from "@/lib/server/site";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { LogIn } from "lucide-react";
-import { useHris } from "@/lib/store";
-import { ROLE_LABELS } from "@/lib/types";
-import { Badge } from "@/components/Badge";
-import { isSupabaseConfigured } from "@/lib/supabase/auth";
-import { COMPANIES, COMPANY_ORDER, GROUP_NAME, chooseCompany, companyMissingSetup, currentCompany, currentCompanyId, isCompanyId, isCompanyReady } from "@/lib/companies";
+/* eslint-disable @next/next/no-img-element -- static brand logos */
 
-// Where to go after signing in: the page a link was for (?next=/meetings/…),
-// only within the HRIS; otherwise the dashboard.
-function safeNext(next: string | null): string {
-  const n = next ?? "";
-  return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : "/dashboard";
-}
+// The public company website: the group, its companies, news and careers.
+// Employees sign in from "Employee Login" (upper right) at /login.
+type Props = { searchParams: Promise<{ next?: string }> };
 
-export default function LoginPageWrapper() {
-  return (
-    <Suspense fallback={null}>
-      <LoginPage />
-    </Suspense>
-  );
-}
+export default async function HomePage({ searchParams }: Props) {
+  // Older sign-in links (/?next=/meetings/…) go to the sign-in page.
+  const next = (await searchParams).next;
+  if (typeof next === "string" && next) redirect(`/login?next=${encodeURIComponent(next)}`);
 
-function LoginPage() {
-  const { ready, currentUser, login, loginWithSupabase, demoUsers } = useHris();
-  const router = useRouter();
-  const next = safeNext(useSearchParams().get("next"));
-  const nextPage = () => next;
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const supabaseConfigured = isSupabaseConfigured();
-  // Read only after mount (it lives in this browser's storage).
-  const company = ready ? currentCompany() : COMPANIES.sdsi;
-
-  useEffect(() => {
-    if (ready && currentUser) router.replace(next);
-  }, [ready, currentUser, router, next]);
-
-  // A link for another company's HRIS (…?co=sdsi): switch to that company first.
-  useEffect(() => {
-    if (!ready) return;
-    const co = new URLSearchParams(next.split("?")[1] ?? "").get("co");
-    if (co && isCompanyId(co) && isCompanyReady(co) && co !== currentCompanyId()) {
-      chooseCompany(co);
-      window.location.reload();
-    }
-  }, [ready, next]);
-
-  function signInAs(userId: string) {
-    login(userId);
-    router.push(nextPage());
-  }
-
-  async function handleEmailLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthError(null);
-    setSubmitting(true);
-    // Phones often capitalise the first letter, and copying from a chat app
-    // can add spaces around the text — neither should make a login fail.
-    const cleanEmail = email.replace(/\s+/g, "").toLowerCase();
-    let { error } = await loginWithSupabase(cleanEmail, password);
-    if (error && password.trim() !== password) ({ error } = await loginWithSupabase(cleanEmail, password.trim()));
-    setSubmitting(false);
-    if (error) {
-      setAuthError(/invalid login credentials/i.test(error) ? "Email or password is incorrect. Check the password carefully — it is case-sensitive (capital and small letters must match)." : error);
-      return;
-    }
-    router.push(nextPage());
-  }
+  const cos = readyCompanies();
+  const [profiles, jobs, news] = await Promise.all([
+    Promise.all(cos.map((co) => getProfile(co))),
+    Promise.all(cos.map(async (co) => (await listJobs(co)).map((j) => ({ ...j, co })))),
+    listNews("all", 1, 3),
+  ]);
+  const allJobs = jobs.flat().sort((a, b) => (b.postedAt ?? "").localeCompare(a.postedAt ?? ""));
 
   return (
-    <div className="flex min-h-full flex-1 flex-col items-center bg-[var(--page-plane)] px-4 py-10 sm:py-16">
-      <div className="mb-6 flex flex-col items-center text-center">
-        <h1 className="flex flex-col items-center gap-1">
-          <span className="text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{GROUP_NAME}</span>
-          <span className="text-sm font-medium tracking-wide text-[var(--series-1)] uppercase">HRIS</span>
-        </h1>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">Human Resource Information System</p>
-      </div>
+    <SiteShell>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-[#013825] text-white">
+        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(ellipse 60% 80% at 85% 20%, #2fbf7f 0%, transparent 60%), radial-gradient(ellipse 50% 60% at 10% 100%, #0b6b45 0%, transparent 70%)" }} />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:py-24 lg:grid-cols-[1.3fr_1fr]">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.2em] text-[#9fe3c1] uppercase">Welcome to</p>
+            <h1 className="mt-2 text-4xl leading-tight font-bold tracking-tight sm:text-5xl">{GROUP_NAME}</h1>
+            <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
+              {cos.map((co) => COMPANIES[co].name).join(", ").replace(/, ([^,]*)$/, " and $1")}, together as one group.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/careers" className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#013825] hover:bg-[#e6f5ee]">
+                <Briefcase size={16} /> Join our team
+              </Link>
+              <Link href="/news" className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10">
+                Latest news <ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-4 lg:justify-end">
+            {cos.map((co, i) => (
+              <Link key={co} href={`/careers/${co}`} title={COMPANIES[co].name} className={`rounded-full bg-white p-1.5 shadow-xl transition-transform hover:scale-105 ${i === 1 ? "-mt-10" : "mt-6"}`}>
+                <img src={COMPANIES[co].logo} alt={COMPANIES[co].name} className="h-24 w-24 rounded-full object-contain sm:h-32 sm:w-32" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      {/* Which company to sign in to — each has its own database and logins. */}
-      {ready && (
-        <div className="mb-6 w-full max-w-xl">
-          <div className="mb-2 text-center text-xs font-medium text-[var(--text-muted)]">Choose your company</div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {COMPANY_ORDER.map((id) => {
-              const c = COMPANIES[id];
-              const available = isCompanyReady(id);
-              const selected = id === company.id;
+      {/* Our companies */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-14">
+        <SectionHead title="Our Companies" />
+        <div className="grid gap-6 md:grid-cols-3">
+          {cos.map((co, i) => {
+            const c = COMPANIES[co];
+            const p = profiles[i];
+            const t = c.formTheme ?? { deep: "#013825", mid: "#0b6b45", accent: "#7cc9a0" };
+            return (
+              <Link key={co} href={`/careers/${co}`} className="group flex flex-col overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex h-36 items-center justify-center" style={{ background: `linear-gradient(135deg, ${t.deep}, ${t.mid})` }}>
+                  <img src={c.logo} alt="" className="h-24 w-24 rounded-full bg-white object-contain p-1 shadow-lg transition-transform group-hover:scale-105" />
+                </div>
+                <div className="flex flex-1 flex-col gap-2 p-5">
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">{c.name}</h3>
+                  {p?.tagline && <p className="text-sm font-medium" style={{ color: t.mid }}>{p.tagline}</p>}
+                  {p?.about && <p className="line-clamp-3 text-sm leading-relaxed text-[var(--text-secondary)]">{p.about}</p>}
+                  <span className="mt-auto pt-2 text-sm font-semibold" style={{ color: t.mid }}>
+                    Company profile →
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Latest news */}
+      {news.items.length > 0 && (
+        <section className="bg-white py-14">
+          <div className="mx-auto max-w-6xl px-4">
+            <SectionHead title="Latest News" href="/news" more="View all news" />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {news.items.map((n) => (
+                <NewsCard key={`${n.co}-${n.id}`} n={n} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Careers */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-14">
+        <SectionHead title="Careers" href="/careers" more="See all open positions" />
+        {allJobs.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--border-hairline)] bg-white p-8 text-center text-sm text-[var(--text-muted)]">No open positions right now. Please check back soon.</div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {allJobs.slice(0, 6).map((j) => {
+              const c = COMPANIES[j.co];
               return (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={!available || selected}
-                  onClick={() => {
-                    chooseCompany(id);
-                    // A fresh start, so nothing from the other company stays loaded.
-                    window.location.reload();
-                  }}
-                  aria-pressed={selected}
-                  className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors ${
-                    selected
-                      ? "border-[var(--series-1)] bg-[var(--surface-1)] shadow-md"
-                      : available
-                        ? "border-[var(--border-hairline)] bg-[var(--surface-1)] hover:border-[var(--series-1)]/60"
-                        : "cursor-not-allowed border-dashed border-[var(--border-hairline)] opacity-50"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- small static brand logo */}
-                  <img src={c.logo} alt="" width={96} height={96} className="h-14 w-14 rounded-full object-contain sm:h-20 sm:w-20" />
-                  <span className="text-xs leading-tight font-medium text-[var(--text-primary)] sm:text-sm">{c.name}</span>
-                  {!available && (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      Coming soon
-                      {/* Setup hint for whoever is connecting the company's database. */}
-                      {id !== "sdsi" && <span className="block opacity-80">Not set: {companyMissingSetup(id).join(", ")}</span>}
-                    </span>
-                  )}
-                  {selected && <span className="text-[10px] font-medium text-[var(--series-1)]">Selected</span>}
-                </button>
+                <Link key={`${j.co}-${j.id}`} href={careersUrl(j.co, j.id)} className="flex items-center gap-4 rounded-lg border border-[var(--border-hairline)] bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+                  <img src={c.logo} alt="" className="h-11 w-11 shrink-0 rounded-full object-contain" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-[var(--text-primary)]">{j.title}</div>
+                    <div className="flex flex-wrap gap-x-3 text-xs text-[var(--text-muted)]">
+                      <span>{c.name}</span>
+                      {j.place && (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin size={12} /> {j.place}
+                        </span>
+                      )}
+                      {j.employmentType && <span>{jobTypeLabel(j.employmentType)}</span>}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[#0b6b45] px-3 py-1 text-xs font-semibold text-white">Apply</span>
+                </Link>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </section>
+    </SiteShell>
+  );
+}
 
-      {ready && nextPage().startsWith("/meetings/") && (
-        <p className="mb-4 max-w-sm rounded-lg border border-[var(--series-1)]/40 bg-[var(--series-1)]/10 px-3 py-2 text-center text-sm text-[var(--text-primary)]">
-          Sign in to join the meeting — you&rsquo;ll go straight to it.
-        </p>
-      )}
-
-      {ready && supabaseConfigured && (
-        <form onSubmit={handleEmailLogin} className="mb-10 w-full max-w-sm rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
-          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
-            <LogIn size={16} /> {company.shortName} Employee Login
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="mb-1 block text-xs text-[var(--text-muted)]">Work email</label>
-              <input
-                type="email"
-                required
-                autoComplete="username"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={company.emailHint}
-                className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--page-plane)] px-3 py-2 text-sm text-[var(--text-primary)]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-[var(--text-muted)]">Password</label>
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--page-plane)] px-3 py-2 text-sm text-[var(--text-primary)]"
-              />
-            </div>
-            {authError && <p className="text-xs text-[var(--status-critical)]">{authError}</p>}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-lg bg-[var(--series-1)] px-3 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-60"
-            >
-              {submitting ? "Signing in…" : "Sign in"}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {supabaseConfigured ? (
-        <p className="max-w-sm text-center text-xs text-[var(--text-muted)]">
-          No login yet, or forgot your password? Ask HR to issue you a temporary one.
-        </p>
-      ) : (
-        <>
-          <div className="mb-3 max-w-lg text-center text-xs text-[var(--text-muted)]">
-            This is a demo build with sample data only — no real database, credentials, or personal information. Pick a demo user below to preview the system from that role&rsquo;s point of view.
-          </div>
-
-          <div className="grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
-            {demoUsers.map((u) => (
-              <button
-                key={u.id}
-                onClick={() => signInAs(u.id)}
-                className="flex items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 text-left transition-shadow hover:shadow-md"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--on-accent)]">
-                  {u.initials}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-[var(--text-primary)]">{u.name}</div>
-                  <div className="truncate text-xs text-[var(--text-secondary)]">{u.title}</div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {u.roles.map((r) => (
-                      <Badge key={r} tone="info">{ROLE_LABELS[r]}</Badge>
-                    ))}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <p className="mt-8 text-xs text-[var(--text-muted)]">Build spec Section 2 role matrix — additive roles are shown as multiple badges.</p>
-        </>
+function SectionHead({ title, href, more }: { title: string; href?: string; more?: string }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end gap-3">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-3xl">{title}</h2>
+        <div className="mt-2 h-1 w-12 rounded-full bg-[#0b6b45]" />
+      </div>
+      {href && (
+        <Link href={href} className="ml-auto text-sm font-semibold text-[#0b6b45] hover:underline">
+          {more} →
+        </Link>
       )}
     </div>
   );
