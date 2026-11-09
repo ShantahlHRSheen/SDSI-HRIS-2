@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanQuestions } from "@/lib/exams";
+import { PSYCH_INSTRUCTIONS, PSYCH_ITEMS, PSYCH_TITLE } from "@/lib/psych";
 
 // Server side of applicant exams (app/api/careers/exam).
 
@@ -27,6 +28,22 @@ export async function giveExam(admin: SupabaseClient, applicantId: string, examI
     passing_percent: e.passing_percent,
     questions,
     max_score: questions.reduce((t, q) => t + q.points, 0),
+  });
+  return error ? null : token;
+}
+
+// The Psychological screening for an applicant who just applied online.
+export async function givePsych(admin: SupabaseClient, applicantId: string): Promise<string | null> {
+  const token = randomBytes(32).toString("base64url");
+  const { error } = await admin.from("applicant_exams").insert({
+    applicant_id: applicantId,
+    kind: "psych",
+    token_hash: hashToken(token),
+    title: PSYCH_TITLE,
+    instructions: PSYCH_INSTRUCTIONS,
+    passing_percent: 0,
+    questions: PSYCH_ITEMS.map(({ id, prompt }) => ({ id, kind: "likert", prompt, choices: [], answer: null, points: 0 })),
+    max_score: 100,
   });
   return error ? null : token;
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlarmClock, CheckCircle2, ClipboardCheck, Send, TimerOff } from "lucide-react";
 import { COMPANIES, type CompanyId } from "@/lib/companies";
 import type { PublicExam } from "@/lib/exams";
+import { LIKERT } from "@/lib/psych";
 
 /* eslint-disable @next/next/no-img-element -- static brand logo */
 
@@ -102,7 +103,7 @@ export function ExamTaker({ co, token }: { co: CompanyId; token: string }) {
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-6 text-white">
           <img src={c.logo} alt="" className="h-12 w-12 shrink-0 rounded-full bg-white object-contain p-0.5" />
           <div className="min-w-0">
-            <div className="text-xs text-white/75">{c.name} · Initial exam</div>
+            <div className="text-xs text-white/75">{c.name} · {exam?.kind === "psych" ? "Pre-employment screening" : "Initial exam"}</div>
             <h1 className="truncate text-xl font-semibold">{exam?.title || "Initial exam"}</h1>
             {exam && <div className="text-xs text-white/75">{[exam.applicantName, exam.position].filter(Boolean).join(" · ")}</div>}
           </div>
@@ -134,7 +135,7 @@ export function ExamTaker({ co, token }: { co: CompanyId; token: string }) {
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Before you start</h2>
             {exam.instructions && <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">{exam.instructions}</p>}
             <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--text-secondary)]">
-              <li>{exam.questionCount} questions.</li>
+              <li>{exam.kind === "psych" ? `${exam.questionCount} statements, about 10 minutes.` : `${exam.questionCount} questions.`}</li>
               <li>{exam.timeLimitMinutes ? `You have ${exam.timeLimitMinutes} minutes once you start. Your answers are sent by themselves when the time is up.` : "There's no time limit."}</li>
               <li>You can take it once. Use a steady internet connection.</li>
               <li>This link works until {new Date(exam.linkExpiresAt).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric" })}.</li>
@@ -149,24 +150,47 @@ export function ExamTaker({ co, token }: { co: CompanyId; token: string }) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (exam.kind === "psych" && answered < exam.questionCount) {
+                const first = exam.questions?.find((q) => answers[q.id] === undefined);
+                setError(`Please answer all ${exam.questionCount} statements first (${exam.questionCount - answered} left).`);
+                if (first) document.getElementById(`item-${first.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+              }
               if (window.confirm(answered < exam.questionCount ? `You answered ${answered} of ${exam.questionCount}. Send your answers now?` : "Send your answers now? You can't change them after.")) submit();
             }}
             className="space-y-4"
           >
             {exam.instructions && <p className="text-sm whitespace-pre-wrap text-[var(--text-secondary)]">{exam.instructions}</p>}
+            {exam.kind === "psych" && (
+              <p className="rounded-lg bg-[#eef2f0] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                {LIKERT.map((l, k) => `${k + 1} = ${l}`).join(" · ")}
+              </p>
+            )}
             {exam.questions?.map((q, i) => (
-              <fieldset key={q.id} className="rounded-xl border border-[var(--border-hairline)] bg-white p-5">
+              <fieldset key={q.id} id={`item-${q.id}`} className="rounded-xl border border-[var(--border-hairline)] bg-white p-5">
                 <legend className="sr-only">Question {i + 1}</legend>
                 <div className="mb-3 flex gap-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ background: t.mid }}>
                     {i + 1}
                   </span>
                   <p className="flex-1 text-sm font-medium whitespace-pre-wrap text-[var(--text-primary)]">{q.prompt}</p>
-                  <span className="shrink-0 text-xs text-[var(--text-muted)]">
-                    {q.points} pt{q.points === 1 ? "" : "s"}
-                  </span>
+                  {q.kind !== "likert" && (
+                    <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                      {q.points} pt{q.points === 1 ? "" : "s"}
+                    </span>
+                  )}
                 </div>
-                {q.kind === "choice" ? (
+                {q.kind === "likert" ? (
+                  <div className="grid grid-cols-5 gap-1.5 sm:pl-8">
+                    {LIKERT.map((l, k) => (
+                      <label key={k} className={`flex min-h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1.5 text-center text-[11px] leading-tight ${answers[q.id] === k + 1 ? "border-[#0b6b45] bg-[#0b6b45] text-white" : "border-[var(--border-hairline)] text-[var(--text-secondary)] hover:border-[#0b6b45]"}`}>
+                        <input type="radio" name={q.id} checked={answers[q.id] === k + 1} onChange={() => answer(q.id, k + 1)} className="sr-only" />
+                        <b className="text-sm">{k + 1}</b>
+                        <span className="hidden sm:block">{l}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : q.kind === "choice" ? (
                   <div className="space-y-2 pl-8">
                     {q.choices.map((ch, k) => (
                       <label key={k} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm ${answers[q.id] === k ? "border-[#0b6b45] bg-[#eef7f2]" : "border-[var(--border-hairline)] hover:bg-[#f6f8f7]"}`}>

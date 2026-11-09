@@ -35,7 +35,11 @@ const toPost = (r: Row): NewsPost => ({
 });
 const toRow = (p: NewsPatch): Row => {
   const m: Record<keyof NewsPatch, string> = { status: "status", title: "title", summary: "summary", body: "body", coverPath: "cover_path", publishedOn: "published_on" };
-  return Object.fromEntries(Object.entries(p).map(([k, v]) => [m[k as keyof NewsPatch], v === "" && k === "publishedOn" ? null : v]));
+  return Object.fromEntries(
+    Object.entries(p)
+      .filter(([k]) => k in m)
+      .map(([k, v]) => [m[k as keyof NewsPatch], v === "" && k === "publishedOn" ? null : v]),
+  );
 };
 
 export async function fetchNewsPosts(): Promise<NewsPost[]> {
