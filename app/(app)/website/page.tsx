@@ -6,6 +6,7 @@ import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { NewsAdmin } from "@/components/website/NewsAdmin";
+import { SiteLinks } from "@/components/website/SiteLinks";
 import { JobPosts, ProfileModal } from "@/components/hiring/JobPosts";
 import { currentCompany, currentCompanyId } from "@/lib/companies";
 import { siteUrl } from "@/lib/careers";
@@ -23,6 +24,7 @@ export default function WebsitePage() {
         <EmptyState icon={Globe} title="HR only" description="Sign in with an HR account." />
       ) : (
         <div className="space-y-4">
+          <SiteLinks />
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1 border-b border-[var(--border-hairline)] text-sm" role="tablist">
               {(
