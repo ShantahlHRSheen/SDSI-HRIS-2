@@ -5,6 +5,7 @@ import { ArrowRight, Briefcase, Mail, MapPin, Phone, Quote } from "lucide-react"
 import { CompanyShell } from "@/components/site/CompanyShell";
 import { NewsCard } from "@/components/site/NewsCard";
 import { HeroSlider } from "@/components/site/HeroSlider";
+import { ShantahlAbout } from "@/components/site/about/ShantahlAbout";
 import { COMPANIES, isCompanyReady } from "@/lib/companies";
 import { careersUrl, companyFromSlug, jobTypeLabel, siteUrl } from "@/lib/careers";
 import { getProfile, listJobs, listNews, mediaUrl } from "@/lib/server/site";
@@ -68,10 +69,17 @@ export default async function CompanyHome({ params }: Props) {
 
       {/* About */}
       <section id="about" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14">
-        <Head title={`About ${c.name}`} color={t.mid} />
-        {p?.about ? <p className="max-w-3xl text-base leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">{p.about}</p> : <p className="text-sm text-[var(--text-muted)]">Our company profile is coming soon.</p>}
+        {co === "sdsi" ? (
+          // Shantahl's designed About Us; HR's mission / vision / values follow.
+          <ShantahlAbout t={t} />
+        ) : (
+          <>
+            <Head title={`About ${c.name}`} color={t.mid} />
+            {p?.about ? <p className="max-w-3xl text-base leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">{p.about}</p> : <p className="text-sm text-[var(--text-muted)]">Our company profile is coming soon.</p>}
+          </>
+        )}
         {pillars.length > 0 && (
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <div className={`grid gap-4 md:grid-cols-3 ${co === "sdsi" ? "mt-16" : "mt-8"}`}>
             {pillars.map(([k, v]) => (
               <div key={k} className="rounded-lg border border-[var(--border-hairline)] bg-white p-5 shadow-sm" style={{ borderTop: `4px solid ${t.mid}` }}>
                 <h3 className="mb-2 font-semibold text-[var(--text-primary)]">{k}</h3>
