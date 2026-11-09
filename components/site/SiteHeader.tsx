@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, LogIn, Menu, X } from "lucide-react";
 import { useHris } from "@/lib/store";
+import { siteUrl } from "@/lib/careers";
 import { COMPANIES, COMPANY_ORDER, GROUP_NAME, isCompanyReady } from "@/lib/companies";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
@@ -55,7 +56,7 @@ export function SiteHeader() {
             {cos && (
               <div className="absolute left-0 mt-1 w-72 rounded-lg border border-[#dfe5e2] bg-white p-1.5 shadow-lg">
                 {companies.map((id) => (
-                  <Link key={id} href={`/careers/${id}`} onClick={() => setCos(false)} className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm text-[#16211c] hover:bg-[#f0f4f2]">
+                  <Link key={id} href={siteUrl(id)} onClick={() => setCos(false)} className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm text-[#16211c] hover:bg-[#f0f4f2]">
                     <img src={COMPANIES[id].logo} alt="" className="h-8 w-8 rounded-full object-contain" />
                     {COMPANIES[id].name}
                   </Link>
@@ -87,7 +88,7 @@ export function SiteHeader() {
               <span className="block px-3 py-2">Our Companies</span>
             </div>
             {companies.map((id) => (
-              <Link key={id} href={`/careers/${id}`} onClick={() => setMenu(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-[#16211c]">
+              <Link key={id} href={siteUrl(id)} onClick={() => setMenu(false)} className="flex items-center gap-2 px-3 py-2 text-sm text-[#16211c]">
                 <img src={COMPANIES[id].logo} alt="" className="h-6 w-6 rounded-full object-contain" /> {COMPANIES[id].name}
               </Link>
             ))}

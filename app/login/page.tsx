@@ -43,15 +43,17 @@ function LoginPage() {
     if (ready && currentUser) router.replace(next);
   }, [ready, currentUser, router, next]);
 
-  // A link for another company's HRIS (…?co=sdsi): switch to that company first.
+  // A link for another company's HRIS (…?co=sdsi), or a company website's
+  // Employee Login (/login?co=sdsi): switch to that company first.
+  const coParam = useSearchParams().get("co");
   useEffect(() => {
     if (!ready) return;
-    const co = new URLSearchParams(next.split("?")[1] ?? "").get("co");
+    const co = coParam ?? new URLSearchParams(next.split("?")[1] ?? "").get("co");
     if (co && isCompanyId(co) && isCompanyReady(co) && co !== currentCompanyId()) {
       chooseCompany(co);
       window.location.reload();
     }
-  }, [ready, next]);
+  }, [ready, next, coParam]);
 
   function signInAs(userId: string) {
     login(userId);

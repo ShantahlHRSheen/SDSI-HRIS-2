@@ -70,6 +70,8 @@ export async function listJobs(co: CompanyId): Promise<PublicJob[]> {
     }));
 }
 
+// A photo in the public company-media bucket.
+export const mediaUrl = (co: CompanyId, path: unknown) => coverUrl(co, path);
 const coverUrl = (co: CompanyId, path: unknown) => {
   if (typeof path !== "string" || !path) return null;
   const a = admin(co);

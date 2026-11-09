@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Copy, ExternalLink, Lock, Plus, Save, Send, Trash2 } from "lucide-react";
+import { Building2, Copy, ExternalLink, ImagePlus, Lock, Plus, Save, Send, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Badge } from "@/components/Badge";
 import { Modal } from "@/components/Modal";
@@ -24,6 +24,9 @@ import {
 } from "@/lib/careers";
 import { EDUCATION, fetchRequisitions, type Requisition } from "@/lib/requisition";
 import { fetchExams, type Exam } from "@/lib/exams";
+import { COVER_ACCEPT, coverUrl, removeCover, uploadImage } from "@/lib/news";
+
+/* eslint-disable @next/next/no-img-element -- photos from the company-media bucket */
 
 // HR: job posts for the public careers page, and the company profile shown
 // there (lib/careers.ts). Online applications land in Applicants.
@@ -309,12 +312,20 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [v, setV] = useState<CompanyProfile | null>(null);
+  const [orig, setOrig] = useState<CompanyProfile | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploaded, setUploaded] = useState<string[]>([]);
   useEffect(() => {
-    fetchProfile().then(setV, (e) => {
-      reportSaveError("Couldn't load the company profile", e);
-      onClose();
-    });
+    fetchProfile().then(
+      (p) => {
+        setV(p);
+        setOrig(p);
+      },
+      (e) => {
+        reportSaveError("Couldn't load the company profile", e);
+        onClose();
+      },
+    );
   }, [onClose]);
   const set = (p: Partial<CompanyProfile>) => setV((c) => (c ? { ...c, ...p } : c));
   const one = (k: keyof CompanyProfile, label: string, ph = "") => (
@@ -323,24 +334,79 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       <input className={input} value={(v?.[k] as string) ?? ""} placeholder={ph} onChange={(e) => set({ [k]: e.target.value })} />
     </label>
   );
-  const many = (k: keyof CompanyProfile, label: string, ph = "") => (
+  const many = (k: keyof CompanyProfile, label: string, ph = "", rows = 4) => (
     <label className="sm:col-span-2">
       <span className={lbl}>{label}</span>
-      <textarea rows={4} className={input} value={(v?.[k] as string) ?? ""} placeholder={ph} onChange={(e) => set({ [k]: e.target.value })} />
+      <textarea rows={rows} className={input} value={(v?.[k] as string) ?? ""} placeholder={ph} onChange={(e) => set({ [k]: e.target.value })} />
     </label>
   );
+  const photo = (k: "heroPhotoPath" | "founderPhotoPath", label: string, tall = false) => {
+    const url = coverUrl(v?.[k] ?? null);
+    return (
+      <div className="sm:col-span-1">
+        <span className={lbl}>{label}</span>
+        {url ? (
+          <div className="relative w-fit">
+            <img src={url} alt="" className={`${tall ? "aspect-[4/5] w-40" : "aspect-[16/9] w-72"} rounded-lg object-cover`} />
+            <button onClick={() => set({ [k]: null })} className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-1 text-white" aria-label="Remove the photo">
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <label className={`${secondary} w-fit cursor-pointer`}>
+            <ImagePlus size={16} /> {busy ? "Uploading…" : "Add a photo"}
+            <input
+              type="file"
+              accept={COVER_ACCEPT}
+              className="hidden"
+              disabled={busy}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                setBusy(true);
+                try {
+                  const path = await uploadImage(f, "profile");
+                  setUploaded((u) => [...u, path]);
+                  set({ [k]: path });
+                } catch (err) {
+                  reportSaveError("Couldn't upload the photo", err);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          </label>
+        )}
+      </div>
+    );
+  };
+  async function close() {
+    await Promise.all(uploaded.map(removeCover));
+    onClose();
+  }
   return (
-    <Modal open onClose={onClose} title="Company profile — public careers page" wide>
+    <Modal open onClose={close} title="Company profile — public website" wide>
       {!v ? (
         <p className="text-sm text-[var(--text-muted)]">Loading…</p>
       ) : (
         <>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Shown on the company&rsquo;s own website (homepage, About, Founder, Careers, Contact). Photos can be seen by anyone with the link.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">{one("tagline", "Tagline", "A short line under the company name")}</div>
+            {photo("heroPhotoPath", "Homepage banner photo (wide)")}
+            <div className="hidden sm:block" />
             {many("about", "About us", "Who the company is, what it does, its history.")}
             {many("mission", "Mission")}
             {many("vision", "Vision")}
             {many("coreValues", "Core values", "One per line.")}
+            <div className="pt-2 text-xs font-semibold text-[var(--text-primary)] uppercase sm:col-span-2">Our Founder</div>
+            {one("founderName", "Founder's name")}
+            {one("founderTitle", "Title", "e.g. Founder and Chairperson")}
+            {many("founderMessage", "Founder's message or story", "", 5)}
+            {photo("founderPhotoPath", "Founder's photo (portrait)", true)}
+            <div className="hidden sm:block" />
+            <div className="pt-2 text-xs font-semibold text-[var(--text-primary)] uppercase sm:col-span-2">Contact and careers</div>
             {one("address", "Address", "Shown under Contact us")}
             {one("phone", "Phone")}
             {one("email", "Email for applicants")}
@@ -349,15 +415,22 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             {many("careersNote", "Note above the job list (optional)", "e.g. Walk-in applicants are welcome Monday to Friday, 9 AM to 4 PM.")}
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={onClose} className={secondary}>
+            <button onClick={close} className={secondary}>
               Cancel
             </button>
             <button
               disabled={busy}
               onClick={async () => {
+                if (!orig) return;
                 setBusy(true);
                 try {
-                  await saveProfile(v);
+                  // Only what changed, so a company that hasn't run the
+                  // website update for founders (phase 87) can still save.
+                  const changed = Object.fromEntries(Object.entries(v).filter(([k, val]) => val !== orig[k as keyof CompanyProfile])) as Partial<CompanyProfile>;
+                  if (Object.keys(changed).length) await saveProfile(changed);
+                  // Photos replaced or removed, and ones uploaded but not kept.
+                  const keep = new Set([v.heroPhotoPath, v.founderPhotoPath].filter(Boolean));
+                  await Promise.all([...uploaded, orig.heroPhotoPath, orig.founderPhotoPath].filter((x): x is string => !!x && !keep.has(x)).map(removeCover));
                   onClose();
                 } catch (e) {
                   reportSaveError("Couldn't save the company profile", e);
