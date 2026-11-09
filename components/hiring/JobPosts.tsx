@@ -23,6 +23,7 @@ import {
   type JobPost,
 } from "@/lib/careers";
 import { EDUCATION, fetchRequisitions, type Requisition } from "@/lib/requisition";
+import { fetchExams, type Exam } from "@/lib/exams";
 
 // HR: job posts for the public careers page, and the company profile shown
 // there (lib/careers.ts). Online applications land in Applicants.
@@ -158,6 +159,12 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
   const set = (p: JobPatch) => setV((c) => ({ ...c, ...p }));
   const status = job?.status ?? "draft";
   const co = currentCompanyId();
+  const [exams, setExams] = useState<Exam[]>([]);
+  useEffect(() => {
+    fetchExams().then((l) => setExams(l.filter((e) => e.status === "active" || e.id === v.examId)), () => {});
+    // once, on open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function save(next?: JobPost["status"]) {
     if (!v.title?.trim()) return reportSaveError("Type the job title.");
@@ -231,6 +238,18 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
         <label>
           <span className={lbl}>Accept applications until (optional)</span>
           <input type="date" className={input} value={v.closesOn ?? ""} onChange={(e) => set({ closesOn: e.target.value || null })} />
+        </label>
+        <label className="sm:col-span-2">
+          <span className={lbl}>Initial exam for online applicants (optional)</span>
+          <select className={input} value={v.examId ?? ""} onChange={(e) => set({ examId: e.target.value || null })}>
+            <option value="">{exams.length ? "— No exam —" : "— No active exams (build one in Hiring → Exams) —"}</option>
+            {exams.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.title}
+                {e.status !== "active" ? " (not active)" : ""}
+              </option>
+            ))}
+          </select>
         </label>
         {area("summary", "About the job", "A short description of the role.")}
         {area("responsibilities", "What you'll do", "One duty per line.")}
