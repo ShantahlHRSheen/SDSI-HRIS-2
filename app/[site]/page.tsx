@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Briefcase, Mail, MapPin, Phone, Quote } from "lucide-react";
 import { CompanyShell } from "@/components/site/CompanyShell";
 import { NewsCard } from "@/components/site/NewsCard";
+import { HeroSlider } from "@/components/site/HeroSlider";
 import { COMPANIES, isCompanyReady } from "@/lib/companies";
 import { careersUrl, companyFromSlug, jobTypeLabel, siteUrl } from "@/lib/careers";
 import { getProfile, listJobs, listNews, mediaUrl } from "@/lib/server/site";
@@ -37,7 +38,11 @@ export default async function CompanyHome({ params }: Props) {
 
   return (
     <CompanyShell co={co}>
-      {/* Hero */}
+      {/* Hero: the company's slides, or its banner */}
+      {c.siteSlides?.length ? (
+        <HeroSlider slides={c.siteSlides} color={t.accent} />
+      ) : (
+        <>
       <section className="relative overflow-hidden text-white" style={{ background: `linear-gradient(120deg, ${t.deep}, ${t.mid})` }}>
         {hero && <img src={hero} alt="" className="absolute inset-0 h-full w-full object-cover" />}
         {hero && <div className="absolute inset-0" style={{ background: `linear-gradient(100deg, ${t.deep}f2 0%, ${t.deep}b3 45%, ${t.deep}33 100%)` }} />}
@@ -57,6 +62,9 @@ export default async function CompanyHome({ params }: Props) {
           </div>
         </div>
       </section>
+
+        </>
+      )}
 
       {/* About */}
       <section id="about" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14">
