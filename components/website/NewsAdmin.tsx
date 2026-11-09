@@ -7,7 +7,7 @@ import { Modal } from "@/components/Modal";
 import { reportSaveError } from "@/lib/save-errors";
 import { currentCompanyId } from "@/lib/companies";
 import { siteUrl } from "@/lib/careers";
-import { COVER_ACCEPT, coverUrl, createNewsPost, deleteNewsPost, fetchNewsPosts, removeCover, updateNewsPost, uploadCover, type NewsPatch, type NewsPost } from "@/lib/news";
+import { COVER_ACCEPT, MAX_NEWS_PHOTOS, coverUrl, createNewsPost, deleteNewsPost, fetchNewsPosts, removeCover, updateNewsPost, uploadCover, type NewsPatch, type NewsPost } from "@/lib/news";
 
 /* eslint-disable @next/next/no-img-element -- cover photos from the company-media bucket */
 
@@ -103,6 +103,32 @@ function NewsModal({ post, onClose, onSaved }: { post: NewsPost | null; onClose:
     }
   }
 
+  // The gallery: up to 10 photos, several at a time.
+  const photos = v.photoPaths ?? [];
+  async function addPhotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = [...(e.target.files ?? [])].slice(0, MAX_NEWS_PHOTOS - photos.length);
+    e.target.value = "";
+    if (!files.length) return;
+    setBusy(true);
+    const added: string[] = [];
+    for (const f of files) {
+      try {
+        added.push(await uploadCover(f));
+      } catch (err) {
+        reportSaveError(`Couldn't upload ${f.name}`, err);
+      }
+    }
+    setUploaded((u) => [...u, ...added]);
+    setV((c) => ({ ...c, photoPaths: [...(c.photoPaths ?? []), ...added].slice(0, MAX_NEWS_PHOTOS) }));
+    setBusy(false);
+  }
+  const movePhoto = (i: number, d: -1 | 1) =>
+    setV((c) => {
+      const l = [...(c.photoPaths ?? [])];
+      [l[i], l[i + d]] = [l[i + d], l[i]];
+      return { ...c, photoPaths: l };
+    });
+
   async function close() {
     await Promise.all(uploaded.map(removeCover));
     onClose();
@@ -113,12 +139,20 @@ function NewsModal({ post, onClose, onSaved }: { post: NewsPost | null; onClose:
     if (next === "published" && !v.body?.trim()) return reportSaveError("Write the article before publishing.");
     setBusy(true);
     try {
-      const patch: NewsPatch = { ...v, title: v.title.trim(), ...(next ? { status: next } : {}) };
+      const full: NewsPatch = { ...v, title: v.title.trim(), ...(next ? { status: next } : {}) };
+      // Only what changed (no empty gallery on a new article), so a company
+      // that hasn't run the photo update (phase 89) can still save.
+      const patch = Object.fromEntries(
+        Object.entries(full).filter(([k, val]) => {
+          if (post) return JSON.stringify(val) !== JSON.stringify((post as unknown as Record<string, unknown>)[k]);
+          return !(k === "photoPaths" && !(val as string[]).length);
+        }),
+      ) as NewsPatch;
       if (post) await updateNewsPost(post.id, patch);
       else await createNewsPost(patch);
       // Photos replaced or removed in this edit.
-      const keep = patch.coverPath ?? null;
-      await Promise.all([...uploaded, ...(post?.coverPath ? [post.coverPath] : [])].filter((p) => p !== keep).map(removeCover));
+      const keep = new Set([full.coverPath, ...(full.photoPaths ?? [])].filter(Boolean));
+      await Promise.all([...uploaded, ...(post?.coverPath ? [post.coverPath] : []), ...(post?.photoPaths ?? [])].filter((p) => !keep.has(p)).map(removeCover));
       onSaved();
     } catch (e) {
       reportSaveError("Couldn't save the article", e);
@@ -151,6 +185,37 @@ function NewsModal({ post, onClose, onSaved }: { post: NewsPost | null; onClose:
             <label className={`${secondary} w-fit cursor-pointer`}>
               <ImagePlus size={16} /> {busy ? "Uploading…" : "Add a photo"}
               <input type="file" accept={COVER_ACCEPT} className="hidden" onChange={pick} disabled={busy} />
+            </label>
+          )}
+        </div>
+        <div>
+          <span className={lbl}>
+            Photos for the article ({photos.length} of {MAX_NEWS_PHOTOS}) — shown as a gallery; anyone with the link can see them
+          </span>
+          {photos.length > 0 && (
+            <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {photos.map((ph, i) => (
+                <div key={ph} className="group relative">
+                  <img src={coverUrl(ph) ?? ""} alt="" className="aspect-square w-full rounded-lg object-cover" />
+                  <div className="absolute inset-x-1 bottom-1 flex justify-between opacity-90">
+                    <button disabled={i === 0} onClick={() => movePhoto(i, -1)} className="rounded bg-black/60 px-1.5 text-xs text-white disabled:opacity-30" aria-label="Move left">
+                      ‹
+                    </button>
+                    <button disabled={i === photos.length - 1} onClick={() => movePhoto(i, 1)} className="rounded bg-black/60 px-1.5 text-xs text-white disabled:opacity-30" aria-label="Move right">
+                      ›
+                    </button>
+                  </div>
+                  <button onClick={() => set({ photoPaths: photos.filter((x) => x !== ph) })} className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white" aria-label="Remove the photo">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {photos.length < MAX_NEWS_PHOTOS && (
+            <label className={`${secondary} w-fit cursor-pointer`}>
+              <ImagePlus size={16} /> {busy ? "Uploading…" : photos.length ? "Add more photos" : "Add photos"}
+              <input type="file" multiple accept={COVER_ACCEPT} className="hidden" onChange={addPhotos} disabled={busy} />
             </label>
           )}
         </div>

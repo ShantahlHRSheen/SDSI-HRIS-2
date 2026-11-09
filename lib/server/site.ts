@@ -17,6 +17,7 @@ export interface NewsCard {
 }
 export interface NewsArticle extends NewsCard {
   body: string;
+  photos: string[]; // the article's gallery
 }
 
 const today = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10); // Manila
@@ -112,6 +113,8 @@ export async function listNews(which: CompanyId | "all", page: number, per: numb
 export async function getNews(co: CompanyId, id: string): Promise<NewsArticle | null> {
   const a = admin(co);
   if (!a || !/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const { data } = await a.from("news_posts").select("id, title, summary, body, published_on, cover_path").eq("id", id).eq("status", "published").maybeSingle();
-  return data ? { ...toCard(co, data), body: String(data.body ?? "") } : null;
+  const { data } = await a.from("news_posts").select("*").eq("id", id).eq("status", "published").maybeSingle();
+  if (!data) return null;
+  const photos = (Array.isArray(data.photo_paths) ? data.photo_paths : []).map((p: unknown) => coverUrl(co, p)).filter((u: string | null): u is string => !!u).slice(0, 10);
+  return { ...toCard(co, data), body: String(data.body ?? ""), photos };
 }
