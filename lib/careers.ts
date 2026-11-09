@@ -46,6 +46,7 @@ export interface JobPost {
   benefits: string;
   closesOn: string | null;
   requisitionId: string | null;
+  bannerPhotoPath: string | null; // hiring banner (phase 88)
   examId: string | null; // initial exam (phase 85)
   psychScreening: boolean; // the Psychological screening too (phase 86)
   postedAt: string | null;
@@ -65,6 +66,7 @@ export interface PublicJob {
   benefits: string;
   closesOn: string | null;
   postedAt: string | null;
+  banner: string | null; // hiring banner photo URL
 }
 export interface PublicCareers {
   company: CompanyId;
@@ -157,6 +159,7 @@ export const toJob = (r: Row): JobPost => ({
   benefits: String(r.benefits ?? ""),
   closesOn: (r.closes_on as string | null) ?? null,
   requisitionId: (r.requisition_id as string | null) ?? null,
+  bannerPhotoPath: (r.banner_photo_path as string | null) ?? null,
   examId: (r.exam_id as string | null) ?? null,
   psychScreening: !!r.psych_screening,
   postedAt: (r.posted_at as string | null) ?? null,
@@ -176,6 +179,7 @@ const JOB_COLS = {
   benefits: "benefits",
   closesOn: "closes_on",
   requisitionId: "requisition_id",
+  bannerPhotoPath: "banner_photo_path",
   examId: "exam_id",
   psychScreening: "psych_screening",
 } as const;

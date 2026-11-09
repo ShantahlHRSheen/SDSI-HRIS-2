@@ -43,7 +43,7 @@ export async function listJobs(co: CompanyId): Promise<PublicJob[]> {
   const [posts, branches, departments] = await Promise.all([
     a
       .from("job_posts")
-      .select("id, title, branch_id, department_id, location, employment_type, slots, summary, responsibilities, qualifications, benefits, closes_on, posted_at")
+      .select("*")
       .eq("status", "open")
       .order("posted_at", { ascending: false }),
     a.from("branches").select("id, name"),
@@ -67,6 +67,7 @@ export async function listJobs(co: CompanyId): Promise<PublicJob[]> {
       benefits: String(r.benefits ?? ""),
       closesOn: (r.closes_on as string | null) ?? null,
       postedAt: (r.posted_at as string | null) ?? null,
+      banner: coverUrl(co, r.banner_photo_path),
     }));
 }
 

@@ -163,6 +163,12 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
   const status = job?.status ?? "draft";
   const co = currentCompanyId();
   const [exams, setExams] = useState<Exam[]>([]);
+  // Banner photos uploaded while this is open (removed if not kept).
+  const [uploaded, setUploaded] = useState<string[]>([]);
+  async function close() {
+    await Promise.all(uploaded.map(removeCover));
+    onClose();
+  }
   useEffect(() => {
     fetchExams().then((l) => setExams(l.filter((e) => e.status === "active" || e.id === v.examId)), () => {});
     // once, on open
@@ -180,11 +186,14 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
         Object.entries(full).filter(([k, val]) => {
           if (k === "id" || k === "postedAt" || k === "updatedAt") return false;
           if (job) return JSON.stringify(val) !== JSON.stringify((job as unknown as Record<string, unknown>)[k]);
-          return !((k === "examId" && !val) || (k === "psychScreening" && !val));
+          return !((k === "examId" || k === "psychScreening" || k === "bannerPhotoPath") && !val);
         }),
       ) as JobPatch;
       if (job) await updateJobPost(job.id, patch);
       else await createJobPost(patch);
+      // A banner replaced or removed, and ones uploaded but not kept.
+      const keep = full.bannerPhotoPath ?? null;
+      await Promise.all([...uploaded, job?.bannerPhotoPath].filter((x): x is string => !!x && x !== keep).map(removeCover));
       onSaved();
     } catch (e) {
       reportSaveError("Couldn't save the job post", e);
@@ -200,12 +209,48 @@ function JobPostModal({ job, seed, onClose, onSaved }: { job: JobPost | null; se
   );
 
   return (
-    <Modal open onClose={onClose} title={job ? "Job post" : "New job post"} wide>
+    <Modal open onClose={close} title={job ? "Job post" : "New job post"} wide>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="sm:col-span-2">
           <span className={lbl}>Job title *</span>
           <input className={input} value={v.title ?? ""} onChange={(e) => set({ title: e.target.value })} placeholder="e.g. Sales Associate" />
         </label>
+        <div className="sm:col-span-2">
+          <span className={lbl}>Hiring banner photo (optional — JPG, PNG or WebP up to 5 MB; also the picture when the link is shared on Facebook)</span>
+          {v.bannerPhotoPath ? (
+            <div className="relative w-fit">
+              <img src={coverUrl(v.bannerPhotoPath) ?? ""} alt="" className="max-h-64 rounded-lg border border-[var(--border-hairline)] object-contain" />
+              <button onClick={() => set({ bannerPhotoPath: null })} className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-1 text-white" aria-label="Remove the banner">
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <label className={`${secondary} w-fit cursor-pointer`}>
+              <ImagePlus size={16} /> {busy ? "Uploading…" : "Upload a banner"}
+              <input
+                type="file"
+                accept={COVER_ACCEPT}
+                className="hidden"
+                disabled={busy}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  setBusy(true);
+                  try {
+                    const path = await uploadImage(f, "jobs");
+                    setUploaded((u) => [...u, path]);
+                    set({ bannerPhotoPath: path });
+                  } catch (err) {
+                    reportSaveError("Couldn't upload the banner", err);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            </label>
+          )}
+        </div>
         <label>
           <span className={lbl}>Branch</span>
           <select className={input} value={v.branchId ?? ""} onChange={(e) => set({ branchId: e.target.value || null })}>

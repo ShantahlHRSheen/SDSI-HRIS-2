@@ -166,7 +166,12 @@ export function CompanyCareers({ co, initialJob, jobsOnly = false }: { co: Compa
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {data?.jobs.map((j) => (
-              <button key={j.id} onClick={() => choose(j.id)} className="flex flex-col gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 text-left transition-shadow hover:shadow-md">
+              <button key={j.id} onClick={() => choose(j.id)} className="flex flex-col gap-2 overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4 text-left transition-shadow hover:shadow-md">
+                {j.banner && (
+                  <div className="-mx-4 -mt-4 mb-1 aspect-[16/9] bg-[#eef2f0]">
+                    <img src={j.banner} alt="" className="h-full w-full object-contain" />
+                  </div>
+                )}
                 <div className="flex items-start gap-2">
                   <span className="min-w-0 flex-1 text-base font-semibold text-[var(--text-primary)]">{j.title}</span>
                   <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: t.accent, color: t.deep }}>
@@ -279,6 +284,7 @@ function JobModal({ co, job, onClose }: { co: CompanyId; job: PublicJob; onClose
     <Modal open onClose={onClose} title={job.title} wide>
       {!applying ? (
         <div className="space-y-4">
+          {job.banner && <img src={job.banner} alt={`${job.title} — hiring`} className="max-h-[70vh] w-full rounded-lg bg-[#eef2f0] object-contain" />}
           <JobFacts j={job} />
           {[
             ["About the job", job.summary],
