@@ -39,7 +39,7 @@ export default async function HomePage({ searchParams }: Props) {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="#companies" className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#013825] hover:bg-[#e6f5ee]">
-                Our companies <ArrowRight size={16} />
+                Company profile websites <ArrowRight size={16} />
               </Link>
               <Link href="#login" className="inline-flex items-center gap-2 rounded-full border border-white/40 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10">
                 <LogIn size={16} /> Employee login
@@ -64,7 +64,7 @@ export default async function HomePage({ searchParams }: Props) {
       </section>
       {/* Our companies: each one's own website */}
       <section id="companies" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14">
-        <SectionHead title="Our Companies" />
+        <SectionHead title="Company Profile Websites" />
         <div className="grid gap-6 md:grid-cols-3">
           {cos.map((co, i) => {
             const c = COMPANIES[co];
