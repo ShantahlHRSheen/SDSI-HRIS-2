@@ -40,6 +40,7 @@ import {
   type HrPatch,
   type TrainingItem,
 } from "@/lib/hiring";
+import { fetchPrfApproverId, fetchRequisitions, prfApproverTitle, setPrfApproverId, type Requisition } from "@/lib/requisition";
 
 /* eslint-disable @next/next/no-img-element -- signed signature images */
 
@@ -188,8 +189,36 @@ export function Hiring() {
 
 function InfoFields({ v, set, disabled }: { v: HrPatch; set: (p: HrPatch) => void; disabled?: boolean }) {
   const { branches, departments } = useHris();
+  // Approved personnel requisitions this applicant can be hired against.
+  const [prfs, setPrfs] = useState<Requisition[]>([]);
+  useEffect(() => {
+    fetchRequisitions().then((l) => setPrfs(l.filter((r) => r.status === "approved" || r.id === v.requisitionId)), () => {});
+    // only on open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
+      {(prfs.length > 0 || v.requisitionId) && (
+        <label className="sm:col-span-2">
+          <span className={lbl}>Personnel requisition (approved)</span>
+          <select
+            className={input}
+            disabled={disabled}
+            value={v.requisitionId ?? ""}
+            onChange={(e) => {
+              const r = prfs.find((x) => x.id === e.target.value);
+              set(r ? { requisitionId: r.id, position: v.position?.trim() ? v.position : r.position, branchId: v.branchId ?? r.branchId, departmentId: v.departmentId ?? r.departmentId } : { requisitionId: null });
+            }}
+          >
+            <option value="">— None —</option>
+            {prfs.map((r) => (
+              <option key={r.id} value={r.id}>
+                {[r.prfNo, r.position, branches.find((b) => b.id === r.branchId)?.name, departments.find((d) => d.id === r.departmentId)?.name].filter(Boolean).join(" · ")}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="sm:col-span-2">
         <span className={lbl}>Full name *</span>
         <input className={input} disabled={disabled} value={v.name ?? ""} onChange={(e) => set({ name: e.target.value })} />
@@ -267,21 +296,42 @@ function AddApplicantModal({ onClose, onSaved }: { onClose: () => void; onSaved:
 function SettingsModal({ approverId, onClose, onSaved }: { approverId: string | null; onClose: () => void; onSaved: (id: string | null) => void }) {
   const { employees } = useHris();
   const [v, setV] = useState(approverId ?? "");
+  const [prf, setPrf] = useState<string | null>(null);
+  const [prf0, setPrf0] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fetchPrfApproverId().then(
+      (id) => {
+        setPrf(id ?? "");
+        setPrf0(id ?? "");
+      },
+      () => {},
+    );
+  }, []);
   const active = employees.filter((e) => e.status === "active" || e.status === "on_leave").sort((a, b) => fullName(a).localeCompare(fullName(b)));
+  const options = active.map((e) => (
+    <option key={e.id} value={e.id}>
+      {fullName(e)}
+    </option>
+  ));
   return (
     <Modal open onClose={onClose} title="Hiring settings">
-      <label className="block">
-        <span className={lbl}>{approverTitle()} — gives the final hiring decision and approves the recommendation for employment</span>
-        <select className={input} value={v} onChange={(e) => setV(e.target.value)}>
-          <option value="">— Choose —</option>
-          {active.map((e) => (
-            <option key={e.id} value={e.id}>
-              {fullName(e)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="space-y-4">
+        <label className="block">
+          <span className={lbl}>{approverTitle()} — gives the final hiring decision and approves the recommendation for employment</span>
+          <select className={input} value={v} onChange={(e) => setV(e.target.value)}>
+            <option value="">— Choose —</option>
+            {options}
+          </select>
+        </label>
+        <label className="block">
+          <span className={lbl}>{prfApproverTitle()} — approves personnel requisitions</span>
+          <select className={input} value={prf ?? ""} disabled={prf === null} onChange={(e) => setPrf(e.target.value)}>
+            <option value="">— Choose —</option>
+            {options}
+          </select>
+        </label>
+      </div>
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className={secondary}>
           Cancel
@@ -292,6 +342,7 @@ function SettingsModal({ approverId, onClose, onSaved }: { approverId: string | 
             setBusy(true);
             try {
               await setApproverId(v || null);
+              if (prf !== null && prf !== prf0) await setPrfApproverId(prf || null);
               onSaved(v || null);
             } catch (e) {
               reportSaveError("Couldn't save the settings", e);
