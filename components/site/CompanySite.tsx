@@ -22,6 +22,7 @@ export function CompanySiteHeader({ co }: { co: CompanyId }) {
   const items: [string, string][] = [
     [siteUrl(co), "Home"],
     [`${siteUrl(co)}#about`, "About"],
+    ...(c.siteProducts?.length ? ([[`${siteUrl(co)}#products`, "Products"]] as [string, string][]) : []),
     [siteUrl(co, "news"), "Newsroom"],
     [siteUrl(co, "careers"), "Careers"],
   ];

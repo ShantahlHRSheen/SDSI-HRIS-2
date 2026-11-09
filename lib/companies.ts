@@ -121,6 +121,9 @@ export interface CompanyConfig {
   // Slides at the top of the company's own website (the text is in the
   // pictures; alt repeats it for screen readers and search).
   siteSlides?: { src: string; alt: string }[];
+  // "Our Products" on the company's website: the first picture is shown
+  // wide (the line-up), the rest as a gallery.
+  siteProducts?: { src: string; alt: string; name?: string }[];
   // Messages and Meetings (/chat, /meetings — phase 73) are on for this company.
   chat?: boolean;
   // A payroll import whose Net Pay is rounded (up to 5 centavos off) isn't
@@ -205,6 +208,12 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       { src: "/brand/shantahl-slides/2-business.jpg", alt: "Start your Shantahl Business effortlessly with our automated dropshipping system. Even from the comfort of your home, you can engage in the dropshipping business. We provide high quality products for you to offer, eliminating the need for inventory management. We handle the shipping of your clients' orders." },
       { src: "/brand/shantahl-slides/3-global.jpg", alt: "Our dropshipping services cater to a global audience, not just limited to the Philippines. We've expanded our operations to Dubai, Taiwan, Hong Kong, and are soon to launch in more countries." },
       { src: "/brand/shantahl-slides/4-awards.jpg", alt: "The company, along with its Founder & CEO, has been honored with numerous awards." },
+    ],
+    siteProducts: [
+      {
+        src: "/brand/shantahl-products/showcase.webp",
+        alt: "Shantahl products: Rejuvenating Set 2, Glow Bloom Premium Kojic Acid Soap, VitaMelon Milk Drink, Snail Instant Whitening Lotion, Niacinamide Glutathione Moisturizing Body Lotion, NutriFit 360, Premium Rejuvenating Set, Vitamin C Rejuvenating Toner, Underarm Spray, Glutathione, Renewal Serum with 10% Niacinamide and HPR, Collagen, Repair & Protect Sunscreen SPF 50+, and EDRO Premium Rejuvenating Set. Awards: 24th Q Asia's Quality Excellence Awards 2024 — Best Quality Premium Skincare Rejuvenating Products; ASEAN Excellence Achievers Awards 2023 — Outstanding Merchant for Health and Beauty; Global Trends Business Leaders Awards Year 3 — Industry Expert in Cosmetic Distributorship; Maharlikang Filipino Awards 2022 — Company of the Year Awardee; 25th Q Asia's Quality Excellence Awards 2025 — Best Quality Immune Boosting Gluta Collagen Drink.",
+      },
     ],
     regularization: {
       employerName: "SHANTAHL DIRECT SALES, INC.",

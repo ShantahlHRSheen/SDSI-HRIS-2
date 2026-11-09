@@ -5,6 +5,7 @@ import { ArrowRight, Briefcase, Mail, MapPin, Phone, Quote } from "lucide-react"
 import { CompanyShell } from "@/components/site/CompanyShell";
 import { NewsCard } from "@/components/site/NewsCard";
 import { HeroSlider } from "@/components/site/HeroSlider";
+import { Products } from "@/components/site/Products";
 import { ShantahlAbout } from "@/components/site/about/ShantahlAbout";
 import { COMPANIES, isCompanyReady } from "@/lib/companies";
 import { careersUrl, companyFromSlug, jobTypeLabel, siteUrl } from "@/lib/careers";
@@ -90,6 +91,9 @@ export default async function CompanyHome({ params }: Props) {
           </div>
         )}
       </section>
+
+      {/* Our Products */}
+      {!!c.siteProducts?.length && <Products items={c.siteProducts} t={t} eyebrow={co === "sdsi" ? "Shantahl Cosmetics" : undefined} />}
 
       {/* Founder */}
       {(p?.founderName || p?.founderMessage) && (
