@@ -358,15 +358,18 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     // Admin-only accounts, not on Daro's roster: Sheena Evangelista (LSM
     // Group HR, see supabase/daro-first-admin.sql) and Maricris Barlinan
     // (approves payroll; supabase/daro-payroll-signatories.sql).
-    adminAccountNumbers: ["ADMIN-01", "ADMIN-02", "ADMIN-03", "ADMIN-04"],
+    // Joenifer Gomez (ADMIN-05), VP for Operations: upper management here,
+    // not on Daro's payroll (supabase/daro-vp-operations.sql).
+    adminAccountNumbers: ["ADMIN-01", "ADMIN-02", "ADMIN-03", "ADMIN-04", "ADMIN-05"],
     // Daro's HR handles its own HR Messages; Sheena (ADMIN-01) doesn't see them.
     hrMessagesHiddenFrom: ["ADMIN-01"],
     // Lowel and Sheilah Magdadaro and Maricris Barlinan use their Shantahl sign-in.
     // Jonifer Doble (ADMIN-03) and Raymond Gantalao (ADMIN-04), the LSM Area
-    // Managers for HO-Tarlac and Bulacan, use their LSMBiz sign-in.
+    // Managers for HO-Tarlac and Bulacan, and Joenifer Gomez (ADMIN-05, VP for
+    // Operations) use their LSMBiz sign-in.
     linkedSignIn: [
       { from: "sdsi", employeeNumbers: ["EMP-0001", "EMP-0002", "ADMIN-02"] },
-      { from: "lsmbiz", employeeNumbers: ["ADMIN-03", "ADMIN-04"] },
+      { from: "lsmbiz", employeeNumbers: ["ADMIN-03", "ADMIN-04", "ADMIN-05"] },
     ],
     // HR uploads photos of Daro's own org chart, like LSMBiz.
     // One sheet per branch (BULACAN, CABANATUAN, HO-TARLAC) in the LSMBiz

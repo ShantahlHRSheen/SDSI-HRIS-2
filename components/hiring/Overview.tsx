@@ -6,6 +6,7 @@ import { useHris } from "@/lib/store";
 import { Badge } from "@/components/Badge";
 import { fullName } from "@/lib/helpers";
 import { CLOSED, applicantStage, applicantWaitingOn, approverTitle, fetchApplicants, fetchApproverId, type Applicant, type Stage } from "@/lib/hiring";
+import { usePeople } from "@/components/hiring/Hiring";
 import { PRF_STATUS, fetchPrfApproverId, fetchRequisitions, prfApproverTitle, type Requisition } from "@/lib/requisition";
 
 // Hiring & Onboarding at a glance: every step from the personnel requisition
@@ -33,7 +34,8 @@ const ago = (iso: string) => {
 };
 
 export function Overview({ onOpenApplicant, onOpenRequisition }: { onOpenApplicant: (id: string) => void; onOpenRequisition: (id: string) => void }) {
-  const { employees, branches, departments } = useHris();
+  const { branches, departments } = useHris();
+  const employees = usePeople();
   const [apps, setApps] = useState<Applicant[] | null>(null);
   const [prfs, setPrfs] = useState<Requisition[]>([]);
   const [approver, setApprover] = useState<string | null>(null);
