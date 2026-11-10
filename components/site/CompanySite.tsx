@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Briefcase, Menu, X } from "lucide-react";
 import { COMPANIES, type CompanyId } from "@/lib/companies";
 import { siteUrl } from "@/lib/careers";
 
 /* eslint-disable @next/next/no-img-element -- static brand logos */
 
-// One company's own website (/shantahl, /lsmbiz, /daro): its logo, colors and
-// menu only — no sign-in, LSM Group or other-company links (the public
+// One company's own website (/shantahl, /lsmbiz, /daro): its logo, colors,
+// menu and an Apply now! button only — no sign-in, LSM Group or other-company links (the public
 // can't reach those from here; see proxy.ts).
 export function CompanySiteHeader({ co }: { co: CompanyId }) {
   const c = COMPANIES[co];
@@ -44,7 +44,20 @@ export function CompanySiteHeader({ co }: { co: CompanyId }) {
         <nav className="ml-auto hidden items-center md:flex" aria-label="Main">
           {items.map(link)}
         </nav>
-        <button onClick={() => setMenu((v) => !v)} className="ml-auto rounded-md p-2 text-[#2c3a33] md:hidden" aria-label="Menu" aria-expanded={menu}>
+        {/* Apply now! — always in view, to the company's Careers. */}
+        <Link
+          href={siteUrl(co, "careers")}
+          onClick={() => setMenu(false)}
+          className="relative ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold tracking-wide uppercase shadow-md ring-2 ring-white transition-transform hover:scale-105 md:ml-2"
+          style={{ background: t.accent, color: t.deep, boxShadow: `0 4px 14px ${t.accent}99` }}
+        >
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping" style={{ background: t.mid }} />
+            <span className="relative inline-flex h-3 w-3 rounded-full ring-2 ring-white" style={{ background: t.mid }} />
+          </span>
+          <Briefcase size={15} /> Apply now!
+        </Link>
+        <button onClick={() => setMenu((v) => !v)} className="rounded-md p-2 text-[#2c3a33] md:hidden" aria-label="Menu" aria-expanded={menu}>
           {menu ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
