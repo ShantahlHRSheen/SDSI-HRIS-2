@@ -336,6 +336,9 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
     adminAccountNumbers: ["ADMIN-01"],
     // LSMBiz's HR handles its own HR Messages; Sheena doesn't see them.
     hrMessagesHiddenFrom: ["ADMIN-01"],
+    // Lowel B. Magdadaro (Chairman) uses his Shantahl sign-in here too
+    // (chairman@shantahl.com.ph, his Shantahl password).
+    linkedSignIn: [{ from: "sdsi", employeeNumbers: ["EMP-0001"] }],
     // LSM OP / LSM ADM / CEO sheets — see lib/payroll-import-lsmbiz.ts.
     payrollImportFormat: "lsmbiz",
     allowanceBreakdown: true,
