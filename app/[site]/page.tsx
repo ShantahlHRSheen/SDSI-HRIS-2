@@ -94,7 +94,7 @@ export default async function CompanyHome({ params }: Props) {
       </section>
 
       {/* Our Products */}
-      {!!c.siteProducts?.length && <Products items={c.siteProducts} t={t} eyebrow={co === "sdsi" ? "Shantahl Cosmetics" : undefined} />}
+      {!!c.siteProducts?.length && <Products items={c.siteProducts} t={t} eyebrow={co === "sdsi" ? "Cosmetics · Wellness · Centapure" : undefined} />}
 
       {/* Founder */}
       {(p?.founderName || p?.founderMessage) && (

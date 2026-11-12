@@ -121,9 +121,9 @@ export interface CompanyConfig {
   // Slides at the top of the company's own website (the text is in the
   // pictures; alt repeats it for screen readers and search).
   siteSlides?: { src: string; alt: string }[];
-  // "Our Products" on the company's website: the first picture is shown
-  // wide (the line-up), the rest as a gallery.
-  siteProducts?: { src: string; alt: string; name?: string }[];
+  // "Our Products" on the company's website: the first picture and any marked
+  // wide are shown full width (banners, line-ups), the rest as a gallery.
+  siteProducts?: { src: string; alt: string; name?: string; wide?: boolean }[];
   // "Our Websites": the company's other sites, linked from its website.
   siteLinks?: { name: string; url: string; about?: string }[];
   // Messages and Meetings (/chat, /meetings — phase 73) are on for this company.
@@ -220,6 +220,16 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
       {
         src: "/brand/shantahl-products/showcase.webp",
         alt: "Shantahl products: Rejuvenating Set 2, Glow Bloom Premium Kojic Acid Soap, VitaMelon Milk Drink, Snail Instant Whitening Lotion, Niacinamide Glutathione Moisturizing Body Lotion, NutriFit 360, Premium Rejuvenating Set, Vitamin C Rejuvenating Toner, Underarm Spray, Glutathione, Renewal Serum with 10% Niacinamide and HPR, Collagen, Repair & Protect Sunscreen SPF 50+, and EDRO Premium Rejuvenating Set. Awards: 24th Q Asia's Quality Excellence Awards 2024 — Best Quality Premium Skincare Rejuvenating Products; ASEAN Excellence Achievers Awards 2023 — Outstanding Merchant for Health and Beauty; Global Trends Business Leaders Awards Year 3 — Industry Expert in Cosmetic Distributorship; Maharlikang Filipino Awards 2022 — Company of the Year Awardee; 25th Q Asia's Quality Excellence Awards 2025 — Best Quality Immune Boosting Gluta Collagen Drink.",
+      },
+      {
+        src: "/brand/shantahl-products/wellness-banner.webp",
+        alt: "Shantahl Wellness — Wellness for everyday life. Nourish. Restore. Thrive. Quality ingredients, thoughtfully formulated, supporting your wellness journey. Products: VertexPro Antrorata, Tocoma food supplement, Dr Vita Barley with Wheatgrass & Mangosteen, EZFit Garcinia Plus Coffee, Barley Pro, Barley Pure, Opcumin Pro, Q10, Kirei and Chondroitin.",
+        wide: true,
+      },
+      {
+        src: "/brand/shantahl-products/centapure-q10-pro.webp",
+        alt: "Centapure Q10 Pro — all-in-one essentials for heart health: CoQ10, turmeric, vitamin C, vitamin D and E, natto and apple stem cell extract. Food supplement, 30 tablets.",
+        name: "Centapure Q10 Pro",
       },
     ],
     regularization: {
