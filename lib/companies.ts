@@ -227,9 +227,9 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
         wide: true,
       },
       {
-        src: "/brand/shantahl-products/centapure-q10-pro.webp",
-        alt: "Centapure Q10 Pro — all-in-one essentials for heart health: CoQ10, turmeric, vitamin C, vitamin D and E, natto and apple stem cell extract. Food supplement, 30 tablets.",
-        name: "Centapure Q10 Pro",
+        src: "/brand/shantahl-products/centapure-banner.webp",
+        alt: "Centapure — your partner in lasting wellness.",
+        wide: true,
       },
     ],
     regularization: {
