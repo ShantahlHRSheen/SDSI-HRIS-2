@@ -14,6 +14,12 @@ export interface ExamQuestion {
   choices: string[]; // choice only
   answer: number | null; // choice only: the right choice's index
   points: number;
+  // A picture shown with the question (e.g. an abstract-reasoning figure):
+  // an image in the app (public/exams/...) or an https link.
+  image?: string;
+  // The part the question starts (e.g. "Part II. Abstract"), shown as a
+  // heading above it.
+  section?: string;
 }
 export interface Exam {
   id: string;
@@ -52,6 +58,8 @@ export interface PublicExamQuestion {
   prompt: string;
   choices: string[];
   points: number;
+  image?: string;
+  section?: string;
 }
 export interface PublicExam {
   company: CompanyId;
@@ -86,6 +94,12 @@ export function examTotals(x: Pick<ApplicantExam, "questions" | "autoScore" | "e
   return { score, percent, graded, essayCount: essays.length, passed: graded && percent >= x.passingPercent };
 }
 
+// A question's picture: an image in the app (public/exams/...) or an https link.
+function examImage(v: unknown): { image?: string } {
+  const s = typeof v === "string" ? v.trim() : "";
+  return /^\/exams\/[\w./-]+\.(png|jpe?g|gif|webp|svg)$/i.test(s) && !s.includes("..") ? { image: s } : /^https:\/\/\S+$/i.test(s) ? { image: s.slice(0, 500) } : {};
+}
+
 // Normalizes questions from the database or the editor.
 export function cleanQuestions(raw: unknown): ExamQuestion[] {
   if (!Array.isArray(raw)) return [];
@@ -101,6 +115,8 @@ export function cleanQuestions(raw: unknown): ExamQuestion[] {
         choices,
         answer: kind === "choice" && Number.isInteger(a) && a >= 0 && a < choices.length ? a : null,
         points: kind === "likert" ? 0 : Math.max(0, Math.min(100, Number(q?.points) || 1)),
+        ...examImage(q?.image),
+        ...(typeof q?.section === "string" && q.section.trim() ? { section: q.section.trim().slice(0, 120) } : {}),
       };
     })
     .slice(0, 200);
