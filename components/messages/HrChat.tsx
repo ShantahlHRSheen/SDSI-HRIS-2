@@ -499,7 +499,7 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
             <Send size={16} /> <span className="hidden sm:inline">{sending ? "Sending…" : "Send"}</span>
           </button>
         </div>
-        <div className="mt-1 px-1 text-[11px] text-[var(--text-muted)]">Photos and files up to 10 MB.</div>
+        <div className="mt-1 px-1 text-[11px] text-[var(--text-muted)]">Photos and files up to 10 MB. You can also paste a copied photo (Ctrl+V).</div>
       </form>
     </div>
   );
