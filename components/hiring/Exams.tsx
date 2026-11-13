@@ -183,7 +183,13 @@ function ExamEditor({ exam, onClose, onSaved }: { exam: Exam | null; onClose: ()
                 <Trash2 size={14} />
               </button>
             </div>
+            <input className={input} value={q.section ?? ""} onChange={(e) => setQ(i, { section: e.target.value })} placeholder="Part heading above this question (optional), e.g. Part II. Abstract" />
             <textarea rows={2} className={input} value={q.prompt} onChange={(e) => setQ(i, { prompt: e.target.value })} placeholder="Type the question." />
+            <input className={input} value={q.image ?? ""} onChange={(e) => setQ(i, { image: e.target.value })} placeholder="Picture (optional): link to an image, e.g. /exams/daro/abstract-1.png" />
+            {q.image && (
+              // eslint-disable-next-line @next/next/no-img-element -- exam figure
+              <img src={q.image} alt="" className="max-h-48 max-w-full rounded-md border border-[var(--border-hairline)] bg-white" />
+            )}
             {q.kind === "choice" && (
               <div className="space-y-1.5">
                 {q.choices.map((c, k) => (
@@ -371,11 +377,16 @@ function Answers({ x, isHr, onSaved }: { x: ApplicantExam; isHr: boolean; onSave
         const a = x.answers[q.id];
         return (
           <div key={q.id} className="text-sm">
+            {q.section && <div className="mb-1 text-xs font-bold tracking-wide text-[var(--text-primary)] uppercase">{q.section}</div>}
             <div className="flex gap-2">
               <span className="font-medium text-[var(--text-primary)]">{i + 1}.</span>
               <p className="flex-1 whitespace-pre-wrap text-[var(--text-primary)]">{q.prompt}</p>
               <span className="text-xs text-[var(--text-muted)]">{q.points} pts</span>
             </div>
+            {q.image && (
+              // eslint-disable-next-line @next/next/no-img-element -- exam figure
+              <img src={q.image} alt="" className="mt-1 ml-5 max-h-48 max-w-full rounded-md border border-[var(--border-hairline)] bg-white" />
+            )}
             {q.kind === "choice" ? (
               <ul className="mt-1 space-y-0.5 pl-5">
                 {q.choices.map((c, k) => (
