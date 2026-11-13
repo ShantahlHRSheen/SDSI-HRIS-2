@@ -88,7 +88,7 @@ export function PhotoPicker({ files, onChange }: { files: File[]; onChange: (fil
 
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Photos (optional, up to {MAX_PHOTOS})</label>
+      <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Photos (optional, up to {MAX_PHOTOS}) — or paste a copied photo (Ctrl+V)</label>
       <input ref={inputRef} type="file" accept={PHOTO_TYPES.join(",")} multiple className="hidden" onChange={add} />
       <div className="flex flex-wrap gap-2">
         {previews.map((src, i) => (
