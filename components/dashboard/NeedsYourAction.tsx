@@ -10,6 +10,7 @@ import { fetchMplRequests, type MplRequest } from "@/lib/mpl";
 import { fetchCoeRequests, type CoeRequest } from "@/lib/coe";
 import { fetchRegularizations, type Regularization } from "@/lib/regularization";
 import { fetchProbationExtensions, peMyPart, type ProbationExtension } from "@/lib/probation-extension";
+import { fetchMaternityBenefits, mbMyStep, type MaternityBenefit } from "@/lib/maternity";
 import { disciplineActions, fetchAssessments, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 // The dashboard's "Needs your action": everything waiting for the signed-in
@@ -40,6 +41,7 @@ export function NeedsYourAction() {
   const [assessments, setAssessments] = useState<DisciplineAssessment[]>([]);
   const [regs, setRegs] = useState<Regularization[]>([]);
   const [pes, setPes] = useState<ProbationExtension[]>([]);
+  const [mbs, setMbs] = useState<MaternityBenefit[]>([]);
 
   const load = useCallback(() => {
     if (!isRealAccount || !me) return;
@@ -50,6 +52,7 @@ export function NeedsYourAction() {
     fetchAssessments().then(setAssessments, () => setAssessments([]));
     fetchRegularizations().then(setRegs, () => setRegs([]));
     fetchProbationExtensions().then(setPes, () => setPes([]));
+    fetchMaternityBenefits().then(setMbs, () => setMbs([]));
   }, [isRealAccount, me, isHr]);
   useEffect(() => {
     load();
@@ -143,6 +146,20 @@ export function NeedsYourAction() {
       names: peMine.map((r) => r.employeeName),
       href: "/probation-extension",
       button: own || sign ? "Sign" : "Open",
+    });
+  }
+
+  const mbMine = mbs.filter((r) => mbMyStep(r, me) || (isHr && r.status === "hr"));
+  if (mbMine.length) {
+    const sign = mbMine.filter((r) => mbMyStep(r, me)).length;
+    const drafts = mbMine.filter((r) => r.status === "hr").length;
+    cards.push({
+      key: "mb",
+      title: "Maternity Benefit",
+      summary: [sign && `${plural(sign, "voucher")} to sign`, drafts && `${plural(drafts, "draft")} to send`].filter(Boolean).join(" · "),
+      names: mbMine.map((r) => r.employeeName),
+      href: "/maternity-benefit",
+      button: sign ? "Sign" : "Open",
     });
   }
 
