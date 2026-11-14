@@ -513,7 +513,7 @@ export function SignPeModal({ item, as, onClose, onChanged }: { item: ProbationE
         {employee ? (
           <div className="overflow-hidden rounded-xl border-2 border-[var(--status-critical)]">
             <div className="flex items-center gap-2 bg-[var(--status-critical)] px-4 py-2.5 font-bold tracking-wide text-white uppercase">
-              <AlertTriangle size={18} className="animate-pulse" /> Action required: Extension of your probationary employment
+              <AlertTriangle size={18} className="shrink-0 animate-pulse" /> Action required: Extension of your probationary employment
             </div>
             <div className="grid gap-3 p-4 sm:grid-cols-3" style={{ background: "color-mix(in srgb, var(--status-critical) 8%, var(--surface-1))" }}>
               <Fact icon={<CalendarClock size={16} />} label="Probation extended until" value={longDate(d.extendTo)} />
