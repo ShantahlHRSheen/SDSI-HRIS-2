@@ -8,6 +8,7 @@ import { getSupabaseClient } from "./client";
 export interface HrMessage {
   id: string;
   employeeId: string;
+  senderEmployeeId: string | null;
   senderName: string;
   fromHr: boolean;
   body: string;
@@ -20,6 +21,8 @@ export interface HrMessage {
   fileRemoved: boolean;
   createdAt: string;
   readAt: string | null;
+  // Deleted by its sender (supabase/migrate_phase92_hr_message_delete.sql).
+  deletedAt: string | null;
 }
 
 export const HR_MESSAGE_MAX = 2000;
@@ -32,6 +35,7 @@ export const HR_CHAT_FILE_TYPES = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".c
 type Row = {
   id: string;
   employee_id: string;
+  sender_employee_id?: string | null;
   sender_name: string;
   from_hr: boolean;
   body: string;
@@ -42,11 +46,13 @@ type Row = {
   file_removed_at?: string | null;
   created_at: string;
   read_at: string | null;
+  deleted_at?: string | null;
 };
 
 const toMessage = (r: Row): HrMessage => ({
   id: r.id,
   employeeId: r.employee_id,
+  senderEmployeeId: r.sender_employee_id ?? null,
   senderName: r.sender_name,
   fromHr: r.from_hr,
   body: r.body,
@@ -57,6 +63,7 @@ const toMessage = (r: Row): HrMessage => ({
   fileRemoved: !!r.file_removed_at,
   createdAt: r.created_at,
   readAt: r.read_at,
+  deletedAt: r.deleted_at ?? null,
 });
 
 export async function fetchHrThread(employeeId: string): Promise<HrMessage[]> {
@@ -134,6 +141,20 @@ export async function hrChatFileViewUrl(path: string): Promise<string> {
   const { data, error } = await getSupabaseClient().storage.from(HR_CHAT_FILE_BUCKET).createSignedUrl(path, 300);
   if (error) throw error;
   return data.signedUrl;
+}
+
+// Deletes my own sent message for both sides; its photo / file are removed too.
+export async function deleteHrMessage(id: string): Promise<void> {
+  const client = getSupabaseClient() as unknown as {
+    rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  };
+  const { data, error } = await client.rpc("hr_delete_message", { p_id: id });
+  if (error) throw new Error(/hr_delete_message/.test(error.message) && /find|exist|schema cache/i.test(error.message) ? "Deleting messages isn't set up yet — ask HR to run the latest database update." : error.message);
+  const paths = (data ?? {}) as { image?: string | null; file?: string | null };
+  const storage = getSupabaseClient().storage;
+  // Best effort: the message is already gone either way.
+  if (paths.image) await storage.from(HR_CHAT_BUCKET).remove([paths.image]).catch(() => {});
+  if (paths.file) await storage.from(HR_CHAT_FILE_BUCKET).remove([paths.file]).catch(() => {});
 }
 
 export async function markHrThreadRead(employeeId: string): Promise<void> {

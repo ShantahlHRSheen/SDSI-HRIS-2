@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, FileText, ImagePlus, MessageCircle, Paperclip, Search, Send, Smile, SmilePlus, X } from "lucide-react";
+import { ArrowLeft, FileText, ImagePlus, MessageCircle, Paperclip, Search, Send, Smile, SmilePlus, Trash2, X } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { currentCompany } from "@/lib/companies";
 import { reportSaveError } from "@/lib/save-errors";
@@ -20,6 +20,7 @@ import {
   hrChatFileViewUrl,
   hrChatFileProblem,
   hrChatPhotoUrls,
+  deleteHrMessage,
   markHrThreadRead,
   sendHrMessage,
   setHrReaction,
@@ -242,6 +243,17 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
     }
   }
 
+  async function remove(m: HrMessage) {
+    if (!window.confirm("Delete this message for both of you?")) return;
+    try {
+      await deleteHrMessage(m.id);
+      setMessages((cur) => cur?.map((x) => (x.id === m.id ? { ...x, body: "", imagePath: null, filePath: null, fileName: null, deletedAt: new Date().toISOString() } : x)) ?? cur);
+      setReactions((cur) => cur.filter((r) => r.messageId !== m.id));
+    } catch (err) {
+      reportSaveError("Couldn't delete the message", err);
+    }
+  }
+
   async function send() {
     const body = draft.trim();
     const sentPhoto = photo;
@@ -283,6 +295,18 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
           const grouped = HR_REACTIONS.map((r) => ({ ...r, who: msgReactions.filter((x) => x.reaction === r.value) })).filter((g) => g.who.length);
           const myReaction = msgReactions.find((r) => r.reactorEmployeeId === myId)?.reaction;
           const bigEmoji = !!m.body && isEmojiOnly(m.body);
+          const myOwn = !!myId && m.senderEmployeeId === myId;
+          if (m.deletedAt)
+            return (
+              <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                <div className="max-w-[85%] sm:max-w-[70%]">
+                  <div className={`w-fit rounded-2xl border border-dashed border-[var(--border-hairline)] px-3 py-2 text-sm text-[var(--text-muted)] italic ${mine ? "ml-auto" : ""}`}>
+                    {myOwn ? "You deleted this message" : "This message was deleted"}
+                  </div>
+                  <div className={`mt-0.5 px-1 text-[11px] text-[var(--text-muted)] ${mine ? "text-right" : ""}`}>{timeLabel(m.createdAt)}</div>
+                </div>
+              </div>
+            );
           return (
             <div key={m.id} className={`group flex items-center gap-1 ${mine ? "flex-row-reverse" : "flex-row"}`}>
               <div className={`max-w-[85%] sm:max-w-[70%]`}>
@@ -369,6 +393,17 @@ export function ChatThread({ employeeId, viewerIsHr, otherName, onSent }: { empl
                   {mine && (m.readAt ? " · Seen" : " · Sent")}
                 </div>
               </div>
+              {myOwn && (
+                <button
+                  type="button"
+                  onClick={() => remove(m)}
+                  className="shrink-0 self-center rounded-full p-1 text-[var(--text-muted)] opacity-60 hover:bg-[var(--gridline)]/50 hover:text-[var(--status-critical)] focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                  aria-label="Delete message"
+                  title="Delete"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
               <div className="relative shrink-0 self-center">
                 <button
                   type="button"
@@ -597,7 +632,7 @@ export function HrInbox() {
                 </div>
                 <div className="truncate text-xs text-[var(--text-secondary)]">
                   {c.last.fromHr ? "You: " : ""}
-                  {c.last.body || (c.last.imagePath || c.last.imageRemoved ? "📷 Photo" : c.last.filePath || c.last.fileRemoved ? `📎 ${c.last.fileName ?? "File"}` : "")}
+                  {c.last.deletedAt ? "Message deleted" : c.last.body || (c.last.imagePath || c.last.imageRemoved ? "📷 Photo" : c.last.filePath || c.last.fileRemoved ? `📎 ${c.last.fileName ?? "File"}` : "")}
                 </div>
               </div>
               {c.unread > 0 && <span className="mt-0.5 rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white">{c.unread}</span>}
