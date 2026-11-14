@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, BellRing, Signature } from "lucide-react";
+import { AlertTriangle, Signature } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { longDate, peMyPart, type PeSigner, type ProbationExtension } from "@/lib/probation-extension";
 import { SignPeModal, useProbationExtensions } from "@/components/probation/ProbationExtension";
 
 // Hard to miss: when an Extension of Probationary Employment is waiting for
 // the signed-in person to sign, a red banner stays at the top of every page
-// and a notice pops up once per visit until it's signed. The Department Head
-// and the Chairman get a lighter banner for the ones waiting on them.
+// and a notice pops up once per visit until it's signed.
 export function PendingNoticeAlert() {
   const { currentEmployee } = useHris();
   const pathname = usePathname();
@@ -27,7 +26,6 @@ export function PendingNoticeAlert() {
   if (!items || !me || pathname?.startsWith("/probation-extension")) return null;
 
   const mine = items.find((r) => peMyPart(r, me) === "employee");
-  const forMe = items.filter((r) => { const p = peMyPart(r, me); return p === "noted" || p === "approved"; });
   const dismiss = () => {
     setDismissed(true);
     try {
@@ -50,19 +48,6 @@ export function PendingNoticeAlert() {
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-bold text-[var(--status-critical)]">
             <Signature size={13} /> Read &amp; sign
           </span>
-        </button>
-      )}
-      {!mine && forMe.length > 0 && (
-        <button
-          onClick={() => setSigning({ item: forMe[0], as: peMyPart(forMe[0], me) === "noted" ? "noted" : "approved" })}
-          className="flex w-full items-center gap-2 border-b border-[var(--series-1)]/40 px-4 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--gridline)]/30"
-          style={{ background: "color-mix(in srgb, var(--series-1) 12%, var(--surface-1))" }}
-        >
-          <BellRing size={16} className="shrink-0 text-[var(--series-1)]" />
-          <span className="flex-1">
-            {forMe.length === 1 ? `Extension of probation of ${forMe[0].employeeName} is waiting for your signature.` : `${forMe.length} extensions of probation are waiting for your signature.`}
-          </span>
-          <span className="shrink-0 text-xs font-semibold text-[var(--series-1)]">Review &amp; sign →</span>
         </button>
       )}
 

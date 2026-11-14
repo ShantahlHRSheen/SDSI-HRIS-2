@@ -23,8 +23,6 @@ export default function ProbationExtensionPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const list = items ?? [];
-  const toNote = list.filter((r) => peMyPart(r, me) === "noted");
-  const toApprove = list.filter((r) => peMyPart(r, me) === "approved");
   const toSign = list.filter((r) => peMyPart(r, me) === "employee");
   const drafts = isHr ? list.filter((r) => r.status === "hr") : [];
 
@@ -94,7 +92,7 @@ export default function ProbationExtensionPage() {
     <div>
       <PageHeader
         title="Probation Extension"
-        subtitle="Extension of Probationary Employment: HR prepares, signs and sends it, and the employee gets it right away to sign the conforme. The Department Head (Noted by) and the Chairman (Approved by) sign their parts too."
+        subtitle="Extension of Probationary Employment: HR prepares, signs and sends it, and the employee gets it right away to sign the conforme. Noted by and Approved by are printed on the letter only."
         actions={
           isHr && (
             <button onClick={() => (setActionError(null), setEditing("new"))} className={primary}>
@@ -106,8 +104,6 @@ export default function ProbationExtensionPage() {
       {(error || actionError) && <div className="mb-4 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">{error || actionError}</div>}
 
       {queue("Your notice — please read and sign", toSign, "Read & sign", (r) => setSigning({ item: r, as: "employee" }), true)}
-      {queue("For you to note (Noted by)", toNote, "Review & sign", (r) => setSigning({ item: r, as: "noted" }))}
-      {queue("For you to approve (Approved by)", toApprove, "Review & sign", (r) => setSigning({ item: r, as: "approved" }))}
       {queue("Drafts to send", drafts, "Open", (r) => setEditing(r))}
 
       {items && !list.length && (

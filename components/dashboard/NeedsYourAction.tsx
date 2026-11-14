@@ -137,15 +137,14 @@ export function NeedsYourAction() {
   const peMine = pes.filter((r) => peMyPart(r, me) || (isHr && r.status === "hr"));
   if (peMine.length) {
     const own = peMine.some((r) => peMyPart(r, me) === "employee");
-    const sign = peMine.filter((r) => { const p = peMyPart(r, me); return p === "noted" || p === "approved"; }).length;
     const drafts = peMine.filter((r) => r.status === "hr").length;
     cards.push({
       key: "pe",
       title: "Probation Extension",
-      summary: [own && "Your notice to read and sign", sign && `${plural(sign, "extension")} to sign`, drafts && `${plural(drafts, "draft")} to send`].filter(Boolean).join(" · "),
+      summary: [own && "Your notice to read and sign", drafts && `${plural(drafts, "draft")} to send`].filter(Boolean).join(" · "),
       names: peMine.map((r) => r.employeeName),
       href: "/probation-extension",
-      button: own || sign ? "Sign" : "Open",
+      button: own ? "Sign" : "Open",
     });
   }
 
