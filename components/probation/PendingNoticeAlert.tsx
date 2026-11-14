@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { AlertTriangle, BellRing, Signature } from "lucide-react";
 import { useHris } from "@/lib/store";
-import { longDate, type PeSigner, type ProbationExtension } from "@/lib/probation-extension";
+import { longDate, peMyPart, type PeSigner, type ProbationExtension } from "@/lib/probation-extension";
 import { SignPeModal, useProbationExtensions } from "@/components/probation/ProbationExtension";
 
 // Hard to miss: when an Extension of Probationary Employment is waiting for
@@ -26,8 +26,8 @@ export function PendingNoticeAlert() {
   });
   if (!items || !me || pathname?.startsWith("/probation-extension")) return null;
 
-  const mine = items.find((r) => r.status === "employee" && r.employeeId === me);
-  const forMe = items.filter((r) => (r.status === "noted" && r.notedId === me) || (r.status === "approved" && r.approverId === me));
+  const mine = items.find((r) => peMyPart(r, me) === "employee");
+  const forMe = items.filter((r) => { const p = peMyPart(r, me); return p === "noted" || p === "approved"; });
   const dismiss = () => {
     setDismissed(true);
     try {
@@ -54,7 +54,7 @@ export function PendingNoticeAlert() {
       )}
       {!mine && forMe.length > 0 && (
         <button
-          onClick={() => setSigning({ item: forMe[0], as: forMe[0].status === "noted" ? "noted" : "approved" })}
+          onClick={() => setSigning({ item: forMe[0], as: peMyPart(forMe[0], me) === "noted" ? "noted" : "approved" })}
           className="flex w-full items-center gap-2 border-b border-[var(--series-1)]/40 px-4 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--gridline)]/30"
           style={{ background: "color-mix(in srgb, var(--series-1) 12%, var(--surface-1))" }}
         >
