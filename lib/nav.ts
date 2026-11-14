@@ -9,6 +9,9 @@ export interface NavItem {
 
 export interface NavSection {
   title: string;
+  // Pinned sections are always shown (Dashboard, Bulletin Board); the others
+  // are groups that open when clicked (components/Sidebar.tsx).
+  pinned?: boolean;
   items: NavItem[];
 }
 
@@ -20,21 +23,35 @@ const ALL_ROLES: Role[] = [
 export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Overview",
+    pinned: true,
     items: [
       { label: "Dashboard", href: "/dashboard", roles: ALL_ROLES, built: true },
       { label: "Bulletin Board", href: "/bulletin", roles: ALL_ROLES, built: true },
+    ],
+  },
+  {
+    title: "Communication",
+    items: [
       // Only for companies with Messages on (lib/companies.ts chat; components/Sidebar.tsx).
       { label: "Messages", href: "/chat", roles: ALL_ROLES, built: true },
       { label: "Meetings", href: "/meetings", roles: ALL_ROLES, built: true },
       { label: "Chat with HR", href: "/messages", roles: ALL_ROLES, built: true },
+    ],
+  },
+  {
+    title: "My Records",
+    items: [
       { label: "My ID Card", href: "/id-card", roles: ALL_ROLES, built: true },
-      { label: "Employee Directory", href: "/employees", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin", "payroll_officer"], built: true },
-      { label: "Org Chart", href: "/modules/org-chart", roles: ALL_ROLES, built: true },
+      { label: "My Payslips", href: "/my-payslips", roles: ALL_ROLES, built: true },
+      { label: "My Notices", href: "/my-notices", roles: ALL_ROLES, built: true },
+      { label: "BIR Form 2316", href: "/bir/2316", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management", "employee"], built: true },
+      { label: "Certificate of Employment", href: "/coe", roles: ALL_ROLES, built: true },
+      { label: "Pag-IBIG Loan Form", href: "/pagibig-loan", roles: ALL_ROLES, built: true },
       { label: "Employee Handbook", href: "/handbook", roles: ALL_ROLES, built: true },
     ],
   },
   {
-    title: "Workforce",
+    title: "Time & Attendance",
     items: [
       { label: "Attendance", href: "/modules/attendance", roles: ALL_ROLES, built: true },
       { label: "Work From Home", href: "/wfh", roles: ALL_ROLES, built: true },
@@ -42,18 +59,25 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Overtime", href: "/modules/overtime", roles: ALL_ROLES, built: true },
       { label: "Attendance Corrections", href: "/modules/corrections", roles: ALL_ROLES, built: true },
       { label: "Travel Allowance", href: "/modules/travel", roles: ALL_ROLES, built: true },
+    ],
+  },
+  {
+    title: "Employee Relations",
+    items: [
+      { label: "Employee Directory", href: "/employees", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin", "payroll_officer"], built: true },
+      { label: "Org Chart", href: "/modules/org-chart", roles: ALL_ROLES, built: true },
       // Also shown to anyone named as a head on an evaluation (components/Sidebar.tsx).
       { label: "Performance Evaluations", href: "/sales-admin-evaluation", roles: ["hr_admin", "upper_management", "dept_head"], built: true },
-      // Also shown to the company's confidential viewers (components/Sidebar.tsx).
-      { label: "Confidential Cases", href: "/confidential-cases", roles: ["hr_admin"], built: true },
-      { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
-      { label: "My Notices", href: "/my-notices", roles: ALL_ROLES, built: true },
-      { label: "Certificate of Employment", href: "/coe", roles: ALL_ROLES, built: true },
-      { label: "Pag-IBIG Loan Form", href: "/pagibig-loan", roles: ALL_ROLES, built: true },
       { label: "Regularization", href: "/regularization", roles: ALL_ROLES, built: true },
       { label: "Probation Extension", href: "/probation-extension", roles: ALL_ROLES, built: true },
-      // Seen by HR, the voucher's signers and the employee (the list is filtered by the database).
-      { label: "Maternity Benefit", href: "/maternity-benefit", roles: ALL_ROLES, built: true },
+      { label: "Discipline", href: "/discipline", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
+      // Also shown to the company's confidential viewers (components/Sidebar.tsx).
+      { label: "Confidential Cases", href: "/confidential-cases", roles: ["hr_admin"], built: true },
+    ],
+  },
+  {
+    title: "Hiring & Website",
+    items: [
       // Heads start personnel requisitions here; also shown to anyone a hiring record
       // is assigned to (components/Sidebar.tsx).
       { label: "Hiring & Onboarding", href: "/hiring", roles: ["hr_admin", "dept_head", "upper_management"], built: true },
@@ -62,33 +86,33 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "Reports & Analytics",
+    title: "Payroll & Benefits",
+    items: [
+      { label: "Payroll Processing", href: "/modules/payroll", roles: ["hr_admin", "payroll_officer"], built: true },
+      { label: "Payroll (Read-only)", href: "/modules/payroll", roles: ["sr_accounting_assistant", "treasurer", "cfo", "upper_management"], built: true },
+      { label: "All Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "cfo", "upper_management"], built: true },
+      { label: "Vouchers", href: "/modules/vouchers", roles: ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management", "sys_admin"], built: true },
+      // Seen by HR, the voucher's signers and the employee (the list is filtered by the database).
+      { label: "Maternity Benefit", href: "/maternity-benefit", roles: ALL_ROLES, built: true },
+      { label: "13th Month Pay", href: "/modules/thirteenth-month", roles: ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management"], built: true },
+      { label: "Government Reports", href: "/modules/gov-reports", roles: ["hr_admin", "payroll_officer"], built: true },
+    ],
+  },
+  {
+    title: "BIR / Tax",
+    items: [
+      { label: "BIR Form 1601-C", href: "/bir/1601c", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management"], built: true },
+      { label: "Employee Tax Ledger", href: "/bir/tax-ledger", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management"], built: true },
+    ],
+  },
+  {
+    title: "Reports",
     items: [
       { label: "Attendance Report", href: "/reports/attendance", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin"], built: true },
       { label: "Overtime Report", href: "/reports/overtime", roles: ["hr_admin", "dept_head", "upper_management", "sys_admin"], built: true },
       { label: "Payroll Expense Report", href: "/reports/payroll-expense", roles: ["hr_admin", "payroll_officer", "upper_management", "sr_accounting_assistant", "treasurer", "cfo", "sys_admin"], built: true },
       { label: "Tardiness Report", href: "/reports/tardiness", roles: ALL_ROLES, built: true },
       { label: "Absenteeism Report", href: "/reports/absenteeism", roles: ALL_ROLES, built: true },
-    ],
-  },
-  {
-    title: "Payroll & Compliance",
-    items: [
-      { label: "Payroll Processing", href: "/modules/payroll", roles: ["hr_admin", "payroll_officer"], built: true },
-      { label: "Payroll (Read-only)", href: "/modules/payroll", roles: ["sr_accounting_assistant", "treasurer", "cfo", "upper_management"], built: true },
-      { label: "My Payslips", href: "/my-payslips", roles: ALL_ROLES, built: true },
-      { label: "All Payslips", href: "/modules/payslips", roles: ["hr_admin", "payroll_officer", "cfo", "upper_management"], built: true },
-      { label: "Vouchers", href: "/modules/vouchers", roles: ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management", "sys_admin"], built: true },
-      { label: "Government Reports", href: "/modules/gov-reports", roles: ["hr_admin", "payroll_officer"], built: true },
-      { label: "13th Month Pay", href: "/modules/thirteenth-month", roles: ["hr_admin", "payroll_officer", "sr_accounting_assistant", "treasurer", "cfo", "upper_management"], built: true },
-    ],
-  },
-  {
-    title: "BIR",
-    items: [
-      { label: "BIR Form 1601-C", href: "/bir/1601c", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management"], built: true },
-      { label: "BIR Form 2316", href: "/bir/2316", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management", "employee"], built: true },
-      { label: "Employee Tax Ledger", href: "/bir/tax-ledger", roles: ["hr_admin", "cfo", "payroll_officer", "upper_management"], built: true },
     ],
   },
   {

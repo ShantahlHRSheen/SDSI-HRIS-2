@@ -5,7 +5,7 @@ import { currentCompany } from "@/lib/companies";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, Clock, MessagesSquare, Receipt, Settings, User, UserPlus, Users, Wallet, X, type LucideIcon } from "lucide-react";
 import { isEvaluationHead } from "@/lib/sales-admin-eval";
 import { canSeeConfidential } from "@/lib/confidential-cases";
 import { NAV_SECTIONS } from "@/lib/nav";
@@ -17,6 +17,30 @@ import { useWorkforceBadges } from "./workforce/WorkforceBadges";
 import { useChat } from "./chat/ChatProvider";
 import { chatEnabled } from "@/lib/chat";
 import { hasHiringRecords } from "@/lib/hiring";
+
+// Icons for the menu's groups (lib/nav.ts).
+const GROUP_ICONS: Record<string, LucideIcon> = {
+  Communication: MessagesSquare,
+  "My Records": User,
+  "Time & Attendance": Clock,
+  "Employee Relations": Users,
+  "Hiring & Website": UserPlus,
+  "Payroll & Benefits": Wallet,
+  "BIR / Tax": Receipt,
+  Reports: BarChart3,
+  System: Settings,
+};
+
+// Which groups the person opened or closed, remembered in this browser.
+const OPEN_KEY = "hris.navGroups";
+function readOpen(): Record<string, boolean> {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(OPEN_KEY) ?? "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
 
 export function Sidebar({ onClose }: { onClose: () => void }) {
   const { currentUser, currentEmployee } = useHris();
@@ -43,6 +67,28 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
     if (meId && !isHr && isSupabaseConfigured()) hasHiringRecords().then(setHiring, () => setHiring(false));
   }, [meId, isHr]);
 
+  const isActive = (href: string) => pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+  // Red counts: unread HR messages and chat, and Workforce requests.
+  const countFor = (href: string) => (href === "/messages" ? unread : href === "/chat" ? chatUnread : (workforce[href] ?? 0));
+  // Groups the person opened stay open (remembered in this browser). The group
+  // of the current page is always open, unless they close it while there.
+  const [open, setOpen] = useState<Record<string, boolean>>(() => (typeof window === "undefined" ? {} : readOpen()));
+  const [closedHere, setClosedHere] = useState<string | null>(null);
+  const toggle = (title: string, value: boolean, hasActive: boolean) => {
+    if (hasActive) setClosedHere(value ? null : `${title}|${pathname}`);
+    setOpen((cur) => {
+      const next = { ...cur };
+      if (value) next[title] = true;
+      else delete next[title];
+      try {
+        window.localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+      } catch {
+        // Storage blocked: it's just not remembered.
+      }
+      return next;
+    });
+  };
+
   const content = (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-4">
@@ -67,46 +113,75 @@ export function Sidebar({ onClose }: { onClose: () => void }) {
               !((item.href === "/chat" || item.href === "/meetings") && !chatEnabled()),
           );
           if (items.length === 0) return null;
-          return (
-            <div key={section.title} className="mb-4">
-              <div className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-[var(--text-muted)] uppercase">
-                {section.title}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                {items.map((item) => {
-                  const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-                  return (
-                    <Link
-                      key={item.href + item.label}
-                      href={item.href}
-                      onClick={onClose}
-                      className={`flex items-center justify-between rounded-lg border-l-2 px-3 py-2 text-sm transition-colors ${
-                        active
-                          ? "border-[var(--series-1)] bg-[var(--series-1)]/10 font-medium text-[var(--series-1)]"
-                          : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50"
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        {(() => {
-                          const Icon = NAV_ICONS[item.href];
-                          return Icon ? <Icon size={16} className="shrink-0 opacity-80" aria-hidden /> : null;
-                        })()}
-                        <span className="truncate">{item.href === "/messages" && isHr ? "HR Messages" : item.label}</span>
+          const links = (
+            <div className="flex flex-col gap-0.5">
+              {items.map((item) => {
+                const active = isActive(item.href);
+                const n = countFor(item.href);
+                return (
+                  <Link
+                    key={item.href + item.label}
+                    href={item.href}
+                    onClick={onClose}
+                    className={`flex items-center justify-between rounded-lg border-l-2 px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? "border-[var(--series-1)] bg-[var(--series-1)]/10 font-medium text-[var(--series-1)]"
+                        : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--gridline)]/50"
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      {(() => {
+                        const Icon = NAV_ICONS[item.href];
+                        return Icon ? <Icon size={16} className="shrink-0 opacity-80" aria-hidden /> : null;
+                      })()}
+                      <span className="truncate">{item.href === "/messages" && isHr ? "HR Messages" : item.label}</span>
+                    </span>
+                    {!item.built && <Badge tone="muted">Preview</Badge>}
+                    {n > 0 && (
+                      <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${n} new`}>
+                        {n}
                       </span>
-                      {!item.built && <Badge tone="muted">Preview</Badge>}
-                      {item.href === "/messages" && unread > 0 && (
-                        <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${unread} unread`}>{unread}</span>
-                      )}
-                      {item.href === "/chat" && chatUnread > 0 && (
-                        <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${chatUnread} unread`}>{chatUnread}</span>
-                      )}
-                      {(workforce[item.href] ?? 0) > 0 && (
-                        <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${workforce[item.href]} new`}>{workforce[item.href]}</span>
-                      )}
-                    </Link>
-                  );
-                })}
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          );
+          if (section.pinned)
+            return (
+              <div key={section.title} className="mb-2 border-b border-[var(--border-hairline)] pb-2">
+                {links}
               </div>
+            );
+          const hasActive = items.some((i) => isActive(i.href));
+          const isOpen = hasActive ? closedHere !== `${section.title}|${pathname}` : !!open[section.title];
+          const total = items.reduce((t, i) => t + countFor(i.href), 0);
+          const GroupIcon = GROUP_ICONS[section.title];
+          const Chevron = isOpen ? ChevronDown : ChevronRight;
+          return (
+            <div key={section.title}>
+              <button
+                type="button"
+                onClick={() => toggle(section.title, !isOpen, hasActive)}
+                aria-expanded={isOpen}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors hover:bg-[var(--gridline)]/50 ${
+                  isOpen ? "bg-[var(--gridline)]/30 text-[var(--text-primary)]" : hasActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  {GroupIcon && <GroupIcon size={17} className={`shrink-0 ${hasActive ? "text-[var(--series-1)]" : "opacity-80"}`} aria-hidden />}
+                  <span className="truncate">{section.title}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {!isOpen && total > 0 && (
+                    <span className="rounded-full bg-[var(--status-critical)] px-1.5 text-[11px] font-semibold text-white" aria-label={`${total} new`}>
+                      {total}
+                    </span>
+                  )}
+                  <Chevron size={15} className="opacity-70" aria-hidden />
+                </span>
+              </button>
+              {isOpen && <div className="mt-0.5 mb-1 ml-5 border-l border-[var(--border-hairline)] pl-1">{links}</div>}
             </div>
           );
         })}
