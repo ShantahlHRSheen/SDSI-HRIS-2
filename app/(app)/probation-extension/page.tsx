@@ -6,7 +6,7 @@ import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
-import { longDate, deleteProbationExtension, type PeSigner, type ProbationExtension } from "@/lib/probation-extension";
+import { longDate, deleteProbationExtension, peMyPart, type PeSigner, type ProbationExtension } from "@/lib/probation-extension";
 import { PeStatus, PreparePeModal, SignPeModal, ViewPeButton, primary, secondary, useProbationExtensions } from "@/components/probation/ProbationExtension";
 
 // Extension of Probationary Employment: HR prepares and signs; the Department
@@ -23,9 +23,9 @@ export default function ProbationExtensionPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const list = items ?? [];
-  const toNote = list.filter((r) => r.status === "noted" && r.notedId === me);
-  const toApprove = list.filter((r) => r.status === "approved" && r.approverId === me);
-  const toSign = list.filter((r) => r.status === "employee" && r.employeeId === me);
+  const toNote = list.filter((r) => peMyPart(r, me) === "noted");
+  const toApprove = list.filter((r) => peMyPart(r, me) === "approved");
+  const toSign = list.filter((r) => peMyPart(r, me) === "employee");
   const drafts = isHr ? list.filter((r) => r.status === "hr") : [];
 
   // Opened from the sign-in alert (?open=<id>): straight to signing.
@@ -34,7 +34,7 @@ export default function ProbationExtensionPage() {
   useEffect(() => {
     if (opened || !openId || !items) return;
     const r = items.find((x) => x.id === openId);
-    const as = r && (r.status === "employee" && r.employeeId === me ? "employee" : r.status === "noted" && r.notedId === me ? "noted" : r.status === "approved" && r.approverId === me ? "approved" : null);
+    const as = r ? peMyPart(r, me) : null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time open from the link
     if (r && as) setSigning({ item: r, as });
     setOpened(true);
@@ -94,7 +94,7 @@ export default function ProbationExtensionPage() {
     <div>
       <PageHeader
         title="Probation Extension"
-        subtitle="Extension of Probationary Employment: HR prepares and signs it, the Department Head notes it, the Chairman approves it, and the employee signs the conforme."
+        subtitle="Extension of Probationary Employment: HR prepares, signs and sends it, and the employee gets it right away to sign the conforme. The Department Head (Noted by) and the Chairman (Approved by) sign their parts too."
         actions={
           isHr && (
             <button onClick={() => (setActionError(null), setEditing("new"))} className={primary}>

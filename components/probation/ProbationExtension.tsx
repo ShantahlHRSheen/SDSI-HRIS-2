@@ -436,7 +436,7 @@ export function PreparePeModal({ item, onClose, onChanged }: { item: ProbationEx
 
             <MySignature onChange={setHasSignature} />
             <div className="text-xs text-[var(--text-muted)]">
-              Sending signs the letter as HR. It then goes to {nameOf(notedId) || "the Department Head"} (Noted by), then {nameOf(approverId) || "the Chairman"} (Approved by). After that, {data.employeeName || "the employee"} sees it right away when signing in and signs the conforme.
+              Sending signs the letter as HR and sends it to {data.employeeName || "the employee"} right away: they see it as soon as they sign in and sign the conforme. {nameOf(notedId) || "The Department Head"} (Noted by) and {nameOf(approverId) || "the Chairman"} (Approved by) get it at the same time to sign their parts.
             </div>
           </>
         )}
@@ -524,8 +524,9 @@ export function SignPeModal({ item, as, onClose, onChanged }: { item: ProbationE
         ) : (
           <p className="text-[var(--text-secondary)]">
             {as === "noted"
-              ? `HR (${item.hrName ?? "—"}) prepared this extension of probation for ${item.employeeName}. Sign as Noted by, or return it to HR with what needs changing. It then goes to ${item.approverName ?? "the Chairman"} for approval.`
-              : `HR prepared it and ${item.notedName ?? "the Department Head"} noted it. Sign as Approved by, and ${item.employeeName} gets it right away to sign the conforme — or return it to HR.`}
+              ? `HR (${item.hrName ?? "—"}) sent this extension of probation to ${item.employeeName}. Sign as Noted by.`
+              : `HR (${item.hrName ?? "—"}) sent this extension of probation to ${item.employeeName}. Sign as Approved by.`}
+            {item.status === "employee" ? " If something needs changing, you can return it to HR while the employee hasn't signed yet." : ` ${item.employeeName} already signed the conforme.`}
           </p>
         )}
 
@@ -561,7 +562,7 @@ export function SignPeModal({ item, as, onClose, onChanged }: { item: ProbationE
           </div>
         ) : (
           <div className="flex flex-wrap justify-end gap-2">
-            {!employee && (
+            {!employee && item.status === "employee" && (
               <button onClick={() => setReturning(true)} disabled={!!busy} className={secondary}>
                 <Undo2 size={15} /> Return to HR
               </button>

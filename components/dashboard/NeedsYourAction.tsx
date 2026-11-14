@@ -9,7 +9,7 @@ import { fetchSalesAdminEvaluations, saeMyTurn, type SalesAdminEvaluation } from
 import { fetchMplRequests, type MplRequest } from "@/lib/mpl";
 import { fetchCoeRequests, type CoeRequest } from "@/lib/coe";
 import { fetchRegularizations, type Regularization } from "@/lib/regularization";
-import { fetchProbationExtensions, type ProbationExtension } from "@/lib/probation-extension";
+import { fetchProbationExtensions, peMyPart, type ProbationExtension } from "@/lib/probation-extension";
 import { disciplineActions, fetchAssessments, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 // The dashboard's "Needs your action": everything waiting for the signed-in
@@ -131,10 +131,10 @@ export function NeedsYourAction() {
     });
   }
 
-  const peMine = pes.filter((r) => (r.status === "noted" && r.notedId === me) || (r.status === "approved" && r.approverId === me) || (r.status === "employee" && r.employeeId === me) || (isHr && r.status === "hr"));
+  const peMine = pes.filter((r) => peMyPart(r, me) || (isHr && r.status === "hr"));
   if (peMine.length) {
-    const own = peMine.some((r) => r.status === "employee");
-    const sign = peMine.filter((r) => r.status === "noted" || r.status === "approved").length;
+    const own = peMine.some((r) => peMyPart(r, me) === "employee");
+    const sign = peMine.filter((r) => { const p = peMyPart(r, me); return p === "noted" || p === "approved"; }).length;
     const drafts = peMine.filter((r) => r.status === "hr").length;
     cards.push({
       key: "pe",

@@ -4,8 +4,8 @@
 --
 -- Run after migrate_phase90_probation_extension.sql. Nothing is signed or sent:
 -- HR opens it under "Drafts to send", checks it, and clicks "Sign & send".
--- It then goes to Michelle Ignacio (Noted by), Lowel B. Magdadaro (Approved by),
--- and then to Jennifer, who signs the CONFORME.
+-- Jennifer then gets it right away and signs the CONFORME; Michelle Ignacio (Noted by)
+-- and Lowel B. Magdadaro (Approved by) sign their parts too (phase 91).
 -- Safe to re-run: it adds the draft only once.
 -- =============================================================================
 
