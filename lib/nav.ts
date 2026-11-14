@@ -52,6 +52,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Pag-IBIG Loan Form", href: "/pagibig-loan", roles: ALL_ROLES, built: true },
       { label: "Regularization", href: "/regularization", roles: ALL_ROLES, built: true },
       { label: "Probation Extension", href: "/probation-extension", roles: ALL_ROLES, built: true },
+      // Seen by HR, the voucher's signers and the employee (the list is filtered by the database).
+      { label: "Maternity Benefit", href: "/maternity-benefit", roles: ALL_ROLES, built: true },
       // Heads start personnel requisitions here; also shown to anyone a hiring record
       // is assigned to (components/Sidebar.tsx).
       { label: "Hiring & Onboarding", href: "/hiring", roles: ["hr_admin", "dept_head", "upper_management"], built: true },

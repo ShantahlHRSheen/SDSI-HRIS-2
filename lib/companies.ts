@@ -108,6 +108,9 @@ export interface CompanyConfig {
     headerLines: string[];
     allowances: { label: string; amount: number }[];
   };
+  // SSS Maternity Benefit voucher (lib/maternity.ts): who HR starts from for
+  // Checked by, the two Approved by and Released by (employee id, title).
+  maternitySigners?: Record<"check" | "approve1" | "approve2" | "release", { id: string; title: string }>;
   // Confidential Cases (lib/confidential-cases.ts) are seen by HR and these
   // employees (ids) — kept in step with confidential_case_viewers (phase 71).
   confidentialViewerIds?: string[];
@@ -232,6 +235,12 @@ export const COMPANIES: Record<CompanyId, CompanyConfig> = {
         wide: true,
       },
     ],
+    maternitySigners: {
+      check: { id: "emp-007", title: "Sr. Accounting Assistant" }, // Wendie Halog
+      approve1: { id: "emp-004", title: "Vice Chairperson" }, // Sheilah A. Magdadaro
+      approve2: { id: "emp-002", title: "CEO" }, // Junrey M. Japitan
+      release: { id: "emp-011", title: "Corporate Treasurer" }, // Joan Mariette Santarina
+    },
     regularization: {
       employerName: "SHANTAHL DIRECT SALES, INC.",
       signatoryId: "emp-001", // Lowel B. Magdadaro
