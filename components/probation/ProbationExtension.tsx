@@ -421,12 +421,12 @@ export function PreparePeModal({ item, onClose, onChanged }: { item: ProbationEx
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className={lbl}>Noted by (Department Head)</label>
+                <label className={lbl}>Noted by (printed only)</label>
                 {pick(notedId, (id) => (setNotedId(id), set("notedName", nameOf(id))), [employeeId])}
               </div>
               <Field label="Their title" value={data.notedTitle} onChange={(v) => set("notedTitle", v)} />
               <div>
-                <label className={lbl}>Approved by</label>
+                <label className={lbl}>Approved by (printed only)</label>
                 {pick(approverId, (id) => (setApproverId(id), set("approverName", nameOf(id))), [employeeId])}
               </div>
               <Field label="Their title" value={data.approverTitle} onChange={(v) => set("approverTitle", v)} />
@@ -436,7 +436,7 @@ export function PreparePeModal({ item, onClose, onChanged }: { item: ProbationEx
 
             <MySignature onChange={setHasSignature} />
             <div className="text-xs text-[var(--text-muted)]">
-              Sending signs the letter as HR and sends it to {data.employeeName || "the employee"} right away: they see it as soon as they sign in and sign the conforme. {nameOf(notedId) || "The Department Head"} (Noted by) and {nameOf(approverId) || "the Chairman"} (Approved by) get it at the same time to sign their parts.
+              Sending signs the letter as HR and sends it to {data.employeeName || "the employee"} right away: they see it as soon as they sign in and sign the conforme. Noted by and Approved by are printed on the letter only — they don&rsquo;t sign.
             </div>
           </>
         )}

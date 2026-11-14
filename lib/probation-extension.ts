@@ -2,9 +2,10 @@ import { getSupabaseClient } from "./supabase/client";
 import { placeMySignature } from "./supabase/leave-forms";
 
 // Extension of Probationary Employment (supabase/migrate_phase90_probation_extension.sql,
-// phase 91): HR prepares, signs and sends the notice, and the employee gets it
-// right away to read and sign the CONFORME. The Department Head ("Noted by")
-// and the Chairman ("Approved by") sign their parts any time after it's sent. The letter's wording is built from the details below
+// phases 91 and 94): HR prepares, signs and sends the notice, and the employee
+// gets it right away to read and sign the CONFORME. The Department Head
+// ("Noted by") and the Chairman ("Approved by") are printed on the letter
+// only; they don't sign. The letter's wording is built from the details below
 // (peBlocks), the same for the on-screen letter and the printed PDF.
 
 export type PeStatus = "hr" | "noted" | "approved" | "employee" | "done";
@@ -72,20 +73,16 @@ export const peTotal = (d: PeData) => Math.round(d.scores.reduce((t, s) => t + (
 export const pePassed = (d: PeData) => peTotal(d) >= d.passingScore;
 
 export function peStatusLabel(r: ProbationExtension): { label: string; tone: "warning" | "good" | "info" | "critical" } {
-  const missing = [!r.notedAt && (r.notedName || "the Department Head"), !r.approvedAt && (r.approverName || "the Chairman")].filter(Boolean).join(" and ");
-  if (r.status === "done") return missing ? { label: `Signed by the employee · waiting for ${missing}`, tone: "info" } : { label: "Signed by everyone", tone: "good" };
+  if (r.status === "done") return { label: "Signed by the employee", tone: "good" };
   if (r.status === "hr") return r.returnedNote ? { label: "Returned to HR", tone: "critical" } : { label: "Draft — HR to send", tone: "warning" };
-  return { label: `Sent · waiting for the employee${missing ? ` and ${missing}` : ""}`, tone: "info" };
+  return { label: "Sent · waiting for the employee to sign", tone: "info" };
 }
 
-// What the signed-in person still has to sign on it, if anything. Once HR
-// sends it, the employee and both signers can sign, in any order (phase 91).
+// What the signed-in person still has to sign on it, if anything. Only HR
+// and the employee sign (phase 94): "Noted by" and "Approved by" are printed
+// names only.
 export function peMyPart(r: ProbationExtension, me: string | undefined): Exclude<PeSigner, "hr"> | null {
-  if (!me || (r.status !== "employee" && r.status !== "done")) return null;
-  if (r.status === "employee" && r.employeeId === me) return "employee";
-  if (r.notedId === me && !r.notedAt) return "noted";
-  if (r.approverId === me && !r.approvedAt) return "approved";
-  return null;
+  return !!me && r.status === "employee" && r.employeeId === me ? "employee" : null;
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
