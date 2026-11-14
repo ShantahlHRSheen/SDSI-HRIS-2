@@ -9,6 +9,7 @@ import { fetchSalesAdminEvaluations, saeMyTurn, type SalesAdminEvaluation } from
 import { fetchMplRequests, type MplRequest } from "@/lib/mpl";
 import { fetchCoeRequests, type CoeRequest } from "@/lib/coe";
 import { fetchRegularizations, type Regularization } from "@/lib/regularization";
+import { fetchProbationExtensions, type ProbationExtension } from "@/lib/probation-extension";
 import { disciplineActions, fetchAssessments, type DisciplineAssessment } from "@/lib/discipline-assessment";
 
 // The dashboard's "Needs your action": everything waiting for the signed-in
@@ -38,6 +39,7 @@ export function NeedsYourAction() {
   const [coe, setCoe] = useState<CoeRequest[]>([]);
   const [assessments, setAssessments] = useState<DisciplineAssessment[]>([]);
   const [regs, setRegs] = useState<Regularization[]>([]);
+  const [pes, setPes] = useState<ProbationExtension[]>([]);
 
   const load = useCallback(() => {
     if (!isRealAccount || !me) return;
@@ -47,6 +49,7 @@ export function NeedsYourAction() {
     if (isHr) fetchCoeRequests().then(setCoe, () => setCoe([]));
     fetchAssessments().then(setAssessments, () => setAssessments([]));
     fetchRegularizations().then(setRegs, () => setRegs([]));
+    fetchProbationExtensions().then(setPes, () => setPes([]));
   }, [isRealAccount, me, isHr]);
   useEffect(() => {
     load();
@@ -125,6 +128,21 @@ export function NeedsYourAction() {
       names: regMine.map((r) => r.employeeName),
       href: "/regularization",
       button: sign || receive ? "Sign" : "Open",
+    });
+  }
+
+  const peMine = pes.filter((r) => (r.status === "noted" && r.notedId === me) || (r.status === "approved" && r.approverId === me) || (r.status === "employee" && r.employeeId === me) || (isHr && r.status === "hr"));
+  if (peMine.length) {
+    const own = peMine.some((r) => r.status === "employee");
+    const sign = peMine.filter((r) => r.status === "noted" || r.status === "approved").length;
+    const drafts = peMine.filter((r) => r.status === "hr").length;
+    cards.push({
+      key: "pe",
+      title: "Probation Extension",
+      summary: [own && "Your notice to read and sign", sign && `${plural(sign, "extension")} to sign`, drafts && `${plural(drafts, "draft")} to send`].filter(Boolean).join(" · "),
+      names: peMine.map((r) => r.employeeName),
+      href: "/probation-extension",
+      button: own || sign ? "Sign" : "Open",
     });
   }
 

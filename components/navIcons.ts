@@ -1,6 +1,7 @@
 import {
   AlarmClockOff,
   BadgeCheck,
+  CalendarClock,
   BarChart3,
   Bell,
   BookOpen,
@@ -65,6 +66,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/coe": FileBadge,
   "/pagibig-loan": HandCoins,
   "/regularization": BadgeCheck,
+  "/probation-extension": CalendarClock,
   "/hiring": UserPlus,
   "/website": Globe,
   "/reports/attendance": BarChart3,
