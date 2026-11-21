@@ -6,7 +6,7 @@ import { COMPANIES, type CompanyId } from "@/lib/companies";
 import type { PublicExam } from "@/lib/exams";
 import { LIKERT } from "@/lib/psych";
 
-/* eslint-disable @next/next/no-img-element -- static brand logo */
+/* eslint-disable @next/next/no-img-element -- static brand logo and exam figures */
 
 // An applicant's initial exam (app/api/careers/exam). Answers are kept in this
 // browser while answering, so a refresh doesn't lose them.
@@ -167,7 +167,9 @@ export function ExamTaker({ co, token }: { co: CompanyId; token: string }) {
               </p>
             )}
             {exam.questions?.map((q, i) => (
-              <fieldset key={q.id} id={`item-${q.id}`} className="rounded-xl border border-[var(--border-hairline)] bg-white p-5">
+              <div key={q.id} className="space-y-3">
+              {q.section && <h2 className="pt-2 text-sm font-bold tracking-wide text-[var(--text-primary)] uppercase">{q.section}</h2>}
+              <fieldset id={`item-${q.id}`} className="rounded-xl border border-[var(--border-hairline)] bg-white p-5">
                 <legend className="sr-only">Question {i + 1}</legend>
                 <div className="mb-3 flex gap-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ background: t.mid }}>
@@ -180,6 +182,7 @@ export function ExamTaker({ co, token }: { co: CompanyId; token: string }) {
                     </span>
                   )}
                 </div>
+                {q.image && <img src={q.image} alt={`Figure for question ${i + 1}`} className="mb-3 max-h-72 max-w-full rounded-md border border-[var(--border-hairline)] bg-white sm:ml-8" />}
                 {q.kind === "likert" ? (
                   <div className="grid grid-cols-5 gap-1.5 sm:pl-8">
                     {LIKERT.map((l, k) => (
@@ -203,6 +206,7 @@ export function ExamTaker({ co, token }: { co: CompanyId; token: string }) {
                   <textarea rows={5} maxLength={5000} value={String(answers[q.id] ?? "")} onChange={(e) => answer(q.id, e.target.value)} className="ml-8 w-[calc(100%-2rem)] rounded-lg border border-[var(--border-hairline)] bg-white px-3 py-2 text-sm" placeholder="Type your answer." />
                 )}
               </fieldset>
+              </div>
             ))}
             <div className="flex justify-end">
               <button type="submit" disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ background: t.mid }}>

@@ -52,7 +52,7 @@ async function view(admin: ReturnType<typeof getAdminClient>, co: CompanyId, x: 
     questionCount: qs.length,
     deadlineAt: (x.deadline_at as string | null) ?? null,
     linkExpiresAt: String(x.link_expires_at),
-    questions: x.status === "in_progress" ? qs.map(({ id, kind, prompt, choices, points }) => ({ id, kind, prompt, choices, points })) : undefined,
+    questions: x.status === "in_progress" ? qs.map(({ id, kind, prompt, choices, points, image, section }) => ({ id, kind, prompt, choices, points, image, section })) : undefined,
   };
 }
 
