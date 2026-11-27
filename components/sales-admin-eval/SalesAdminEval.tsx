@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Award, Eye, History, Loader2, Pencil, Plus, Save, Signature, Trash2 } from "lucide-react";
+import { Award, CheckCircle2, Eye, History, Loader2, Pencil, Plus, Save, Signature, Trash2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { FileViewer, type ViewerFile } from "@/components/FileViewer";
@@ -17,6 +17,7 @@ import {
   saeScores,
   saeSignatures,
   saveHeadPart,
+  acknowledgeSae,
   editHeadPart,
   saeEditChanges,
   type SaeEdit,
@@ -532,6 +533,7 @@ export function Recommendations({ e }: { e: SalesAdminEvaluation }) {
       : []),
     ...(e.vcId || e.vcSignedAt ? [[`${cfg.vcTitle}${e.vcName ? ` (${e.vcName})` : ""}`, null, e.vcRecommendation, e.vcSignedAt] as [string, null, string | null, string | null]] : []),
     ...(e.chairmanId || e.chairmanSignedAt ? [[`${cfg.chairmanTitle}${e.chairmanName ? ` (${e.chairmanName})` : ""}`, null, e.chairmanRecommendation, e.chairmanSignedAt] as [string, null, string | null, string | null]] : []),
+    ...(e.releasedAt ? [[`Employee's acknowledgement (${e.employeeName})`, null, null, e.acknowledgedAt] as [string, null, null, string | null]] : []),
   ];
   return (
     <div className="space-y-1.5 text-xs">
@@ -577,6 +579,7 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
         hr: { name: e.hrName ?? "", title: "HR Manager" },
         vc: { name: e.vcName ?? "", title: cfg.vcTitle },
         chairman: { name: e.chairmanName ?? "", title: cfg.chairmanTitle },
+        employee: e.status === "done" ? { name: e.employeeName, title: e.hr?.employee?.position || "Employee" } : undefined,
       });
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
       setViewer({
@@ -639,5 +642,58 @@ export function EditHistory({ e, edits }: { e: SalesAdminEvaluation; edits: SaeE
         </ol>
       )}
     </div>
+  );
+}
+
+// ---- The employee's acknowledgement (phase 98) ------------------------------------------
+
+export function AcknowledgeModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation; onClose: () => void; onChanged: () => void }) {
+  const { currentEmployee } = useHris();
+  const [hasSignature, setHasSignature] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function submit() {
+    if (!currentEmployee) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await acknowledgeSae(e.id, currentEmployee.id);
+      onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't acknowledge.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal open wide onClose={() => !busy && onClose()} title={`Your ${e.purpose}${e.period ? ` ${e.period}` : ""}`}>
+      <div className="space-y-4 text-sm">
+        <p className="text-[var(--text-secondary)]">HR has released your performance evaluation. Please read it — open the full form with View / print — then sign your acknowledgement below.</p>
+        <ScoreSummary e={e} />
+        <Recommendations e={e} />
+        <div className="flex justify-end">
+          <ViewSaeButton e={e} />
+        </div>
+        {e.acknowledgedAt ? (
+          <div className="flex items-center gap-1.5 rounded-lg bg-[var(--status-good)]/10 px-3 py-2 text-[var(--status-good)]">
+            <CheckCircle2 size={15} /> You acknowledged this evaluation.
+          </div>
+        ) : (
+          <>
+            <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/15 px-3 py-2 text-xs text-[var(--text-secondary)]">
+              I acknowledge that I have received, read and understood this performance evaluation, and that it was discussed with me.
+            </div>
+            <MySignature onChange={setHasSignature} />
+            {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
+            <div className="flex justify-end">
+              <button onClick={submit} disabled={busy || !hasSignature} className={primary}>
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <Signature size={15} />} Sign &amp; acknowledge
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }

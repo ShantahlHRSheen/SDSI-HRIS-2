@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Loader2, Pencil, Plus, RotateCcw, Settings2, Table2, Trash2 } from "lucide-react";
+import { CheckCircle2, ClipboardList, Loader2, Pencil, Plus, RotateCcw, Send, Settings2, Table2, Trash2, Undo2 } from "lucide-react";
 import { ManageEvaluatorsModal } from "@/components/sales-admin-eval/ManageEvaluators";
 import { EvaluationSummary } from "@/components/sales-admin-eval/EvaluationSummary";
 import { HrSheetModal } from "@/components/sales-admin-eval/HrSheet";
@@ -15,8 +15,9 @@ import { Badge } from "@/components/Badge";
 import { departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import { effectiveJobPerformanceEvaluatorId } from "@/lib/performance-eval";
 import type { Employee } from "@/lib/types";
-import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, fetchSaeEdits, reopenSaePart, saeEditableSlot, saeMyTurn, type SaeEdit, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
+import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, fetchSaeEdits, releaseSae, reopenSaePart, saeEditableSlot, saeMyTurn, type SaeEdit, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import {
+  AcknowledgeModal,
   EditHistory,
   HeadPartModal,
   HrPartModal,
@@ -47,7 +48,8 @@ export default function SalesAdminEvaluationPage() {
   const [sheet, setSheet] = useState(false);
   const [headSheet, setHeadSheet] = useState(false);
   const [bulk, setBulk] = useState(false);
-  const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" | "edit" } | null>(null);
+  const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" | "edit" | "ack" } | null>(null);
+  const [releasingAll, setReleasingAll] = useState(false);
   // Heads' edits to their signed parts (phase 97), reloaded with the evaluations.
   const [edits, setEdits] = useState<SaeEdit[]>([]);
   useEffect(() => {
@@ -65,6 +67,12 @@ export default function SalesAdminEvaluationPage() {
     (e) => (!purposeFilter || e.purpose === purposeFilter) && (!search.trim() || e.employeeName.toLowerCase().includes(search.trim().toLowerCase())),
   );
   const mine = (items ?? []).filter((e) => myTurn(e));
+  // The person's own released evaluations still to acknowledge (phase 98).
+  const toAck = (items ?? []).filter((e) => e.employeeId === me && e.status === "done" && e.releasedAt && !e.acknowledgedAt);
+  // Completed evaluations HR hasn't released to the employee yet.
+  const unreleased = isHr ? (items ?? []).filter((e) => e.status === "done" && !e.releasedAt) : [];
+  // The scores summary and awards: not one's own evaluation (unless HR).
+  const others = (items ?? []).filter((e) => isHr || e.employeeId !== me);
   // Evaluations waiting for the signed-in person's Job Performance rating.
   const toRate = mine.filter((e) => myTurn(e) === "head").length;
 
@@ -100,6 +108,11 @@ export default function SalesAdminEvaluationPage() {
         actions={
           isHr && (
             <div className="flex flex-wrap gap-2">
+              {unreleased.length > 0 && (
+                <button onClick={() => setReleasingAll(true)} className={secondary} title="Let the employees see their completed evaluations and acknowledge them">
+                  <Send size={16} /> Release completed ({unreleased.length})
+                </button>
+              )}
               <button onClick={() => setSheet(true)} className={secondary}>
                 <Table2 size={16} /> HR Rating Sheet
               </button>
@@ -114,6 +127,22 @@ export default function SalesAdminEvaluationPage() {
         }
       />
       {(error || actionError) && <div className="mb-4 rounded-lg border border-[var(--status-critical)]/40 px-3 py-2 text-sm text-[var(--status-critical)]">{error || actionError}</div>}
+
+      {toAck.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--series-1)]/50 bg-[var(--series-1)]/5 p-4">
+          <div className="mb-2 text-sm font-medium text-[var(--text-primary)]">Your evaluation is ready — please read and acknowledge it</div>
+          <div className="space-y-2">
+            {toAck.map((e) => (
+              <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--gridline)]/20 px-3 py-2 text-sm">
+                <span className="font-medium text-[var(--text-primary)]">{[e.purpose, e.period].filter(Boolean).join(" ")}</span>
+                <button onClick={() => setOpen({ id: e.id, as: "ack" })} className={primary}>
+                  View &amp; acknowledge
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {mine.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
@@ -149,7 +178,7 @@ export default function SalesAdminEvaluationPage() {
           <Loader2 size={14} className="animate-spin" /> Loading…
         </div>
       )}
-      {!!items?.length && <EvaluationSummary items={items} />}
+      {others.length > 0 && <EvaluationSummary items={others} />}
       {!!items?.length && (
         <div className="mb-3 flex flex-wrap gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" className={`${input} max-w-xs`} />
@@ -162,7 +191,7 @@ export default function SalesAdminEvaluationPage() {
         </div>
       )}
       {items && !list.length && (
-        <EmptyState icon={ClipboardList} title="No evaluations yet" description={isHr ? "Start one with New evaluation." : "Evaluations you take part in, and those of the employees under you, show here."} />
+        <EmptyState icon={ClipboardList} title="No evaluations yet" description={isHr ? "Start one with New evaluation." : "Evaluations you take part in, those of the employees under you, and your own once HR releases it show here."} />
       )}
 
       <div className="space-y-3">
@@ -180,6 +209,26 @@ export default function SalesAdminEvaluationPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={st.tone}>{st.label}</Badge>
                   <ViewSaeButton e={e} />
+                  {e.employeeId === me && e.releasedAt && (
+                    <button onClick={() => setOpen({ id: e.id, as: "ack" })} className={e.acknowledgedAt ? secondary : primary}>
+                      {e.acknowledgedAt ? <CheckCircle2 size={13} /> : null} {e.acknowledgedAt ? "Acknowledged" : "Acknowledge"}
+                    </button>
+                  )}
+                  {isHr && e.status === "done" && !e.releasedAt && (
+                    <button onClick={() => act(() => releaseSae(e.id, true))} disabled={busy} className={primary} title="Let the employee see this evaluation and acknowledge it">
+                      <Send size={13} /> Release to employee
+                    </button>
+                  )}
+                  {(isHr || e.employeeId !== me) && e.releasedAt && (
+                    <Badge tone={e.acknowledgedAt ? "good" : "info"}>
+                      {e.acknowledgedAt ? `Acknowledged ${formatDate(e.acknowledgedAt)}` : `Released ${formatDate(e.releasedAt)} · not yet acknowledged`}
+                    </Badge>
+                  )}
+                  {isHr && e.releasedAt && !e.acknowledgedAt && (
+                    <button onClick={() => act(() => releaseSae(e.id, false))} disabled={busy} className={secondary} title="Hide it from the employee again">
+                      <Undo2 size={13} /> Take back
+                    </button>
+                  )}
                   {saeEditableSlot(e, me) && (
                     <button onClick={() => setOpen({ id: e.id, as: "edit" })} className={secondary} title="Change your signed Job Performance part — saved to the edit history">
                       <Pencil size={13} /> Edit my part
@@ -210,7 +259,7 @@ export default function SalesAdminEvaluationPage() {
               <ScoreSummary e={e} />
               <div className="mt-3">
                 <Recommendations e={e} />
-                <EditHistory e={e} edits={edits.filter((x) => x.evaluationId === e.id)} />
+                {(isHr || e.employeeId !== me) && <EditHistory e={e} edits={edits.filter((x) => x.evaluationId === e.id)} />}
               </div>
             </div>
           );
@@ -224,6 +273,38 @@ export default function SalesAdminEvaluationPage() {
       {creating && <NewEvaluationModal employees={employees} onClose={() => setCreating(false)} onCreated={async (id) => (await reload(), setCreating(false), setOpen({ id, as: "hr" }))} />}
       {opened && open?.as === "hr" && <HrPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {opened && open?.as === "head" && <HeadPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
+      {opened && open?.as === "ack" && <AcknowledgeModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
+      {isHr && releasingAll && (
+        <Modal open onClose={() => !busy && setReleasingAll(false)} title={`Release ${unreleased.length} completed evaluation${unreleased.length === 1 ? "" : "s"}?`}>
+          <p className="mb-2 text-sm text-[var(--text-secondary)]">
+            Each employee will see their own evaluation (scores, ratings, comments and recommendations — not the edit history) and be asked to sign an acknowledgement. You can take one back until the employee acknowledges it.
+          </p>
+          <ul className="mb-4 max-h-60 list-disc overflow-auto pl-5 text-xs text-[var(--text-secondary)]">
+            {unreleased.map((e) => (
+              <li key={e.id}>
+                {e.employeeName} — {[e.purpose, e.period].filter(Boolean).join(" ")}
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setReleasingAll(false)} disabled={busy} className={secondary}>
+              Cancel
+            </button>
+            <button
+              onClick={() =>
+                act(async () => {
+                  for (const e of unreleased) await releaseSae(e.id, true);
+                  setReleasingAll(false);
+                })
+              }
+              disabled={busy}
+              className={primary}
+            >
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Release {unreleased.length}
+            </button>
+          </div>
+        </Modal>
+      )}
       {opened && open?.as === "edit" && <HeadPartModal edit e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {opened && open?.as === "recommend" && <RecommendModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {deleting && (

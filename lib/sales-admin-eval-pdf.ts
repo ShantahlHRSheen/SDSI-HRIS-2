@@ -84,6 +84,8 @@ export interface SaePdfInput {
   hr: SaeSignatory;
   vc: SaeSignatory;
   chairman: SaeSignatory;
+  // The evaluated employee's acknowledgement (phase 98).
+  employee?: SaeSignatory;
 }
 
 export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
@@ -475,6 +477,19 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   if (e.vcId || e.vcSignedAt) recommendation("VICE CHAIRPERSON'S RECOMMENDATION", "vc", input.vc, e.vcRecommendation, e.vcSignedAt);
   // No Chairman on a Year-end Evaluation (phase 95).
   if (e.chairmanId || e.chairmanSignedAt) recommendation("CHAIRMAN'S RECOMMENDATION", "chairman", input.chairman, e.chairmanRecommendation, e.chairmanSignedAt);
+
+  // ---- The employee's acknowledgement (phase 98) -------------------------------------
+  if (input.employee) {
+    ensure(110);
+    title("EMPLOYEE'S ACKNOWLEDGEMENT");
+    const ack = "I acknowledge that I have received, read and understood this performance evaluation, and that it was discussed with me.";
+    const lines = wrap(font, ack, 8, full - 12);
+    rect(M, y, full, lines.length * 10 + 10);
+    lines.forEach((ln, i) => text(ln, M + 6, y - 12 - i * 10, 8));
+    y -= lines.length * 10 + 10;
+    signBlock(W - M - 110, y - 2, "employee", input.employee, e.acknowledgedAt, "Acknowledged");
+    y -= 78;
+  }
 
   return doc.save();
 }
