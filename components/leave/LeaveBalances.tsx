@@ -13,8 +13,8 @@ import type { Employee, LeaveType } from "@/lib/types";
 // and Upper Management.
 //
 // Vacation and Sick Leave: only the current half-year's credits can be used.
-// In Jul–Dec, the unused Jan–Jun days can no longer be used; they are shown
-// as going to the year-end 13th month pay.
+// In Jul–Dec, the unused Jan–Jun days can no longer be used; unused Vacation
+// Leave goes to the year-end 13th month pay (Sick Leave doesn't).
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100);
 
@@ -39,7 +39,7 @@ export function LeaveBalances({ today }: { today: string }) {
           const b = balanceFor(leaveRequests, e.id, lt, today);
           const from = paidLeaveEligibleFrom(e.id, lt.id);
           // In Jul–Dec: what's left of Jan–Jun (no longer usable).
-          const firstHalf = isSemiannual(lt.id) && Number(today.slice(5, 7)) > 6 ? balanceFor(leaveRequests, e.id, lt, `${today.slice(0, 4)}-03-01`) : null;
+          const firstHalf = lt.id === "lt-vl" && Number(today.slice(5, 7)) > 6 ? balanceFor(leaveRequests, e.id, lt, `${today.slice(0, 4)}-03-01`) : null;
           return { ...b, notYet: !!from && today < from ? from : null, firstHalf };
         }),
       })),
@@ -56,7 +56,7 @@ export function LeaveBalances({ today }: { today: string }) {
 
   function exportCsv() {
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const h1 = (lt: LeaveType) => isSemiannual(lt.id) && Number(today.slice(5, 7)) > 6;
+    const h1 = (lt: LeaveType) => lt.id === "lt-vl" && Number(today.slice(5, 7)) > 6;
     const head = [
       "Employee No.",
       "Name",
@@ -112,7 +112,7 @@ export function LeaveBalances({ today }: { today: string }) {
         <>
           <p className="mt-1 mb-3 text-xs text-[var(--text-muted)]">
             Remaining days for {periodNote}, counting approved and pending leave. <b className="text-[var(--text-secondary)]">Vacation and Sick Leave:</b>{" "}only the current half-year&rsquo;s balance can be used
-            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used and go to the 13th month pay</>}. With pay after 1 year of service.
+            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used; unused Jan–Jun Vacation Leave goes to the 13th month pay</>}. With pay after 1 year of service.
           </p>
           <div className="max-h-[520px] overflow-auto rounded-lg border border-[var(--border-hairline)]">
             <table className="w-full min-w-[900px] text-sm">
