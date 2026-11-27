@@ -35,7 +35,8 @@ export function HrSheetModal({ items, onClose, onChanged, onStartAll }: { items:
   const { currentEmployee } = useHris();
   const open = useMemo(() => items.filter((e) => e.status === "open" && !e.hrSignedAt), [items]);
   const purposes = SAE_PURPOSES.filter((p) => open.some((e) => e.purpose === p));
-  const [purpose, setPurpose] = useState(purposes.includes("Year-end Evaluation") ? "Year-end Evaluation" : (purposes[0] ?? ""));
+  // Everything waiting, like Needs your action; narrow it with the filters.
+  const [purpose, setPurpose] = useState("");
   const periods = [...new Set(open.filter((e) => !purpose || e.purpose === purpose).map((e) => e.period))].sort().reverse();
   const [period, setPeriod] = useState("");
   const rows = open.filter((e) => (!purpose || e.purpose === purpose) && (!period || e.period === period)).sort((a, b) => a.employeeName.localeCompare(b.employeeName));
