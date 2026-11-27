@@ -38,9 +38,14 @@ export function LeaveBalances({ today }: { today: string }) {
           if (!applies(e, lt)) return null;
           const b = balanceFor(leaveRequests, e.id, lt, today);
           const from = paidLeaveEligibleFrom(e.id, lt.id);
-          // In Jul–Dec: what's left of Jan–Jun (no longer usable).
-          const firstHalf = lt.id === "lt-vl" && Number(today.slice(5, 7)) > 6 ? balanceFor(leaveRequests, e.id, lt, `${today.slice(0, 4)}-03-01`) : null;
-          return { ...b, notYet: !!from && today < from ? from : null, firstHalf };
+          const y = today.slice(0, 4);
+          // VL / SL: the whole year (Jan–Jun + Jul–Dec) as the total balance.
+          const h1 = isSemiannual(lt.id) ? balanceFor(leaveRequests, e.id, lt, `${y}-03-01`) : null;
+          const h2 = isSemiannual(lt.id) ? balanceFor(leaveRequests, e.id, lt, `${y}-09-01`) : null;
+          const total = h1 && h2 ? { remaining: h1.remaining + h2.remaining, credits: h1.credits + h2.credits, used: h1.used + h2.used } : null;
+          // In Jul–Dec: what's left of Jan–Jun VL (no longer usable; to the 13th month).
+          const firstHalf = lt.id === "lt-vl" && Number(today.slice(5, 7)) > 6 ? h1 : null;
+          return { ...b, notYet: !!from && today < from ? from : null, firstHalf, total };
         }),
       })),
     // The credit context (date hired, HR's adjustments) is set by the store from these.
@@ -62,18 +67,24 @@ export function LeaveBalances({ today }: { today: string }) {
       "Name",
       "Department",
       "Position",
-      ...types.flatMap((lt) => [
-        `${lt.name} — ${isSemiannual(lt.id) ? "usable now" : "remaining"}`,
-        `${lt.name} — credits`,
-        ...(h1(lt) ? [`${lt.name} — Jan–Jun unused (13th month)`] : []),
-      ]),
+      ...types.flatMap((lt) =>
+        isSemiannual(lt.id)
+          ? [`${lt.name} — total balance`, `${lt.name} — total credits`, `${lt.name} — usable now`, `${lt.name} — usable credits`, ...(h1(lt) ? [`${lt.name} — Jan–Jun unused (13th month)`] : [])]
+          : [`${lt.name} — remaining`, `${lt.name} — credits`],
+      ),
     ];
     const lines = shown.map(({ e, cells }) => [
       e.employeeNumber,
       fullName(e),
       departmentName(e.departmentId),
       positionTitle(e.positionId),
-      ...cells.flatMap((c, i) => [...(c ? [fmt(c.remaining), fmt(c.credits)] : ["", ""]), ...(h1(types[i]) ? [c?.firstHalf ? fmt(c.firstHalf.remaining) : ""] : [])]),
+      ...cells.flatMap((c, i) =>
+        isSemiannual(types[i].id)
+          ? [...(c?.total ? [fmt(c.total.remaining), fmt(c.total.credits)] : ["", ""]), ...(c ? [fmt(c.remaining), fmt(c.credits)] : ["", ""]), ...(h1(types[i]) ? [c?.firstHalf ? fmt(c.firstHalf.remaining) : ""] : [])]
+          : c
+            ? [fmt(c.remaining), fmt(c.credits)]
+            : ["", ""],
+      ),
     ]);
     const csv = [head, ...lines].map((r) => r.map((v) => esc(String(v ?? ""))).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
@@ -117,55 +128,87 @@ export function LeaveBalances({ today }: { today: string }) {
           <div className="max-h-[520px] overflow-auto rounded-lg border border-[var(--border-hairline)]">
             <table className="w-full min-w-[900px] text-sm">
               <thead className="sticky top-0 z-10 bg-[var(--surface-1)]">
-                <tr className="border-b border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)]">
-                  <th className="sticky left-0 bg-[var(--surface-1)] px-3 py-2 font-medium">Employee</th>
+                <tr className="text-left text-xs text-[var(--text-muted)]">
+                  <th rowSpan={2} className="sticky left-0 border-b border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 font-medium">
+                    Employee
+                  </th>
                   {types.map((lt) => (
-                    <th key={lt.id} className="px-3 py-2 text-center font-medium whitespace-nowrap">
+                    <th
+                      key={lt.id}
+                      rowSpan={isSemiannual(lt.id) ? 1 : 2}
+                      colSpan={isSemiannual(lt.id) ? 2 : 1}
+                      className={`px-3 pt-2 text-center font-medium whitespace-nowrap ${isSemiannual(lt.id) ? "border-x border-[var(--border-hairline)] pb-1 text-[var(--text-secondary)]" : "border-b border-[var(--border-hairline)] pb-2"}`}
+                    >
                       {lt.name.replace(/ Leave$/, "")}
-                      {isSemiannual(lt.id) && <div className="text-[10px] font-normal text-[var(--series-1)]">usable now</div>}
                     </th>
                   ))}
+                </tr>
+                <tr className="border-b border-[var(--border-hairline)] text-[10px] text-[var(--text-muted)]">
+                  {types
+                    .filter((lt) => isSemiannual(lt.id))
+                    .flatMap((lt) => [
+                      <th key={`${lt.id}-t`} className="border-l border-[var(--border-hairline)] px-2 pb-1.5 text-center font-normal whitespace-nowrap">
+                        Total balance {today.slice(0, 4)}
+                      </th>,
+                      <th key={`${lt.id}-u`} className="border-r border-[var(--border-hairline)] px-2 pb-1.5 text-center font-semibold whitespace-nowrap text-[var(--series-1)]">
+                        Usable now ({creditPeriodOf(lt.id, today).label.slice(0, 7)})
+                      </th>,
+                    ])}
                 </tr>
               </thead>
               <tbody>
                 {shown.map(({ e, cells }) => (
                   <tr key={e.id} className="border-b border-[var(--gridline)] last:border-0">
-                    <td className="sticky left-0 bg-[var(--surface-1)] px-3 py-1.5">
+                    <td className="sticky left-0 min-w-[220px] bg-[var(--surface-1)] px-3 py-1.5">
                       <div className="font-medium text-[var(--text-primary)]">{fullName(e)}</div>
                       <div className="text-[11px] text-[var(--text-muted)]">
                         {departmentName(e.departmentId)} · {positionTitle(e.positionId)}
                       </div>
                     </td>
-                    {cells.map((c, i) => (
-                      <td key={types[i].id} className="px-3 py-1.5 text-center tabular-nums">
-                        {!c ? (
-                          <span className="text-[var(--text-muted)]">—</span>
-                        ) : c.notYet ? (
-                          <div title={`No paid ${types[i].name} yet: with pay after 1 year of service, from ${formatDate(c.notYet)}.`}>
+                    {cells.flatMap((c, i) => {
+                      const lt = types[i];
+                      const semi = isSemiannual(lt.id);
+                      const cls = "px-3 py-1.5 text-center whitespace-nowrap tabular-nums";
+                      if (!c) return semi ? [<td key={`${lt.id}-t`} className={`${cls} border-l border-[var(--gridline)] text-[var(--text-muted)]`}>—</td>, <td key={`${lt.id}-u`} className={`${cls} border-r border-[var(--gridline)] text-[var(--text-muted)]`}>—</td>] : [<td key={lt.id} className={`${cls} text-[var(--text-muted)]`}>—</td>];
+                      if (c.notYet) {
+                        const zero = (
+                          <div title={`No paid ${lt.name} yet: with pay after 1 year of service, from ${formatDate(c.notYet)}.`}>
                             <b className="text-[var(--text-muted)]">0</b>
                             <span className="text-xs text-[var(--text-muted)]"> / 0</span>
                             <div className="text-[10px] whitespace-nowrap text-[var(--text-muted)]">under 1 yr of service</div>
                           </div>
-                        ) : (
-                          <div>
-                            <span title={`${fmt(c.used)} used of ${fmt(c.credits)} (${c.period.label})`}>
-                              <b className={c.remaining <= 0 ? "text-[var(--status-critical)]" : "text-[var(--text-primary)]"}>{fmt(c.remaining)}</b>
-                              <span className="text-xs text-[var(--text-muted)]"> / {fmt(c.credits)}</span>
-                            </span>
-                            {c.firstHalf && c.firstHalf.credits > 0 && (
-                              <div className="text-[10px] whitespace-nowrap text-[var(--text-muted)]" title={`Jan–Jun: ${fmt(c.firstHalf.used)} used of ${fmt(c.firstHalf.credits)}. Unused days can't be used now; they go to the 13th month pay.`}>
-                                Jan–Jun {fmt(c.firstHalf.remaining)} → 13th mo.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    ))}
+                        );
+                        return semi
+                          ? [<td key={`${lt.id}-t`} className={`${cls} border-l border-[var(--gridline)]`}>{zero}</td>, <td key={`${lt.id}-u`} className={`${cls} border-r border-[var(--gridline)]`}>{zero}</td>]
+                          : [<td key={lt.id} className={cls}>{zero}</td>];
+                      }
+                      const num = (remaining: number, credits: number, title: string, strong: boolean) => (
+                        <span title={title}>
+                          <b className={remaining <= 0 ? "text-[var(--status-critical)]" : strong ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}>{fmt(remaining)}</b>
+                          <span className="text-xs text-[var(--text-muted)]"> / {fmt(credits)}</span>
+                        </span>
+                      );
+                      const usable = num(c.remaining, c.credits, `${fmt(c.used)} used of ${fmt(c.credits)} (${c.period.label})`, true);
+                      if (!semi || !c.total) return [<td key={lt.id} className={cls}>{usable}</td>];
+                      return [
+                        <td key={`${lt.id}-t`} className={`${cls} border-l border-[var(--gridline)]`}>
+                          {num(c.total.remaining, c.total.credits, `${fmt(c.total.used)} used of ${fmt(c.total.credits)} in ${today.slice(0, 4)} (Jan–Jun + Jul–Dec)`, false)}
+                          {c.firstHalf && c.firstHalf.credits > 0 && (
+                            <div className="text-[10px] whitespace-nowrap text-[var(--text-muted)]" title={`Jan–Jun: ${fmt(c.firstHalf.used)} used of ${fmt(c.firstHalf.credits)}. Unused days can't be used now; they go to the 13th month pay.`}>
+                              Jan–Jun {fmt(c.firstHalf.remaining)} → 13th mo.
+                            </div>
+                          )}
+                        </td>,
+                        <td key={`${lt.id}-u`} className={`${cls} border-r border-[var(--gridline)] bg-[var(--series-1)]/5`}>
+                          {usable}
+                        </td>,
+                      ];
+                    })}
                   </tr>
                 ))}
                 {!shown.length && (
                   <tr>
-                    <td colSpan={types.length + 1} className="px-3 py-6 text-center text-sm text-[var(--text-muted)]">
+                    <td colSpan={types.length + types.filter((lt) => isSemiannual(lt.id)).length + 1} className="px-3 py-6 text-center text-sm text-[var(--text-muted)]">
                       No matching employees.
                     </td>
                   </tr>
