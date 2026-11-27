@@ -473,7 +473,13 @@ export async function myEvaluationsToAcknowledge(me: string): Promise<{ id: stri
 
 // The employee's attendance from the HRIS for the evaluation's year (phase 99).
 export async function fetchSaeAttendance(id: string): Promise<SaeAttendance | null> {
-  const { data, error } = await (getSupabaseClient() as unknown as { rpc: (fn: string, a: Row) => PromiseLike<{ data: unknown; error: { message: string } | null }> }).rpc("sae_attendance", { p_id: id });
+  let res: { data: unknown; error: { message: string } | null };
+  try {
+    res = await (getSupabaseClient() as unknown as { rpc: (fn: string, a: Row) => PromiseLike<{ data: unknown; error: { message: string } | null }> }).rpc("sae_attendance", { p_id: id });
+  } catch {
+    return null;
+  }
+  const { data, error } = res;
   if (error || !data) return null;
   const d = data as Row;
   const n = (x: unknown) => Number(x) || 0;

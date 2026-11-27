@@ -371,7 +371,7 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
   }
 
   return (
-    <Modal open wide onClose={() => !busy && onClose()} title={`${edit ? "Edit " : ""}Job Performance — ${e.employeeName} (${e.purpose})`}>
+    <Modal open wide onClose={() => !busy && onClose()} title={`${edit ? "Edit " : ""}${rb ? "Managerial Evaluation" : "Job Performance"} — ${e.employeeName} (${e.purpose})`}>
       <div className="space-y-5 text-sm">
         {rb ? (
           <p className="text-[var(--text-secondary)]">You are the only evaluator: rate {e.employeeName}&rsquo;s Behavior and Job Performance, then give your overall rating, comment and recommendation.</p>
