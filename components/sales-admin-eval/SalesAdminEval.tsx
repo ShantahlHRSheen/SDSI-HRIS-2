@@ -19,7 +19,6 @@ import {
   saveHeadPart,
   saeHeads,
   saveHrPart,
-  SAE_AWARD_SUGGESTIONS,
   saePassMark,
   SAE_BEHAVIOR,
   awardLine,
@@ -473,12 +472,7 @@ function AwardFields({ award, justification, onAward, onJustification }: { award
       <div className="space-y-2">
         <div>
           <label className={label}>Suggested Special Award</label>
-          <input value={award} onChange={(ev) => onAward(ev.target.value)} list="sae-award-suggestions" maxLength={150} placeholder="e.g. Employee of the Year — or leave blank" className={input} />
-          <datalist id="sae-award-suggestions">
-            {SAE_AWARD_SUGGESTIONS.map((a) => (
-              <option key={a} value={a} />
-            ))}
-          </datalist>
+          <input value={award} onChange={(ev) => onAward(ev.target.value)} maxLength={150} placeholder="Type any award you'd like to suggest — or leave blank" className={input} />
         </div>
         {award.trim() && (
           <div>
