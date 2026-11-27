@@ -170,6 +170,16 @@ export interface SaeScores {
 // `heads`: each Department Head's part (two for Cebu). Job Performance
 // averages the heads' ratings item by item: (Mary Jane's total + Marlyn's
 // total) ÷ 2 ÷ 6 items ÷ 3 × the weight.
+// Passing scores: 80 for other employees, and for Sales Admins on a Year-end
+// Evaluation; otherwise the company's Sales Admin mark (90).
+export const SAE_PASS_GENERAL = 80;
+export const SAE_PASS_YEAR_END = 80;
+export function saePassMark(e: { form: SaeForm; purpose: string }, salesAdminPassMark: number): number {
+  if (e.form === "general") return SAE_PASS_GENERAL;
+  if (e.purpose === "Year-end Evaluation") return SAE_PASS_YEAR_END;
+  return salesAdminPassMark;
+}
+
 export function saeScores(form: SaeForm, hr: SaeHrPart | null, heads: (SaeHeadPart | null)[], passMark: number): SaeScores {
   const w = saeWeights(form);
   const b = rated(hr?.behavior);

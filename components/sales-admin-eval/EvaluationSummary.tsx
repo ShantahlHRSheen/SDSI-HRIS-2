@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Award, ChevronDown, ChevronRight, Download, Table2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { departmentName } from "@/lib/helpers";
-import { awardLine, saeHeads, saeScores, saeStatusLabel, saeWeights, SAE_FORMS, SAE_PURPOSES, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
+import { awardLine, saePassMark, saeHeads, saeScores, saeStatusLabel, saeWeights, SAE_FORMS, SAE_PURPOSES, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import { saeConfig } from "./SalesAdminEval";
 import { TopPerformers } from "./TopPerformers";
 
@@ -28,7 +28,8 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
     () =>
       items.map((e) => {
         const emp = employees.find((x) => x.id === e.employeeId);
-        const s = saeScores(e.form, e.hr, saeHeads(e), cfg.passMark);
+        const pass = saePassMark(e, cfg.passMark);
+        const s = saeScores(e.form, e.hr, saeHeads(e), pass);
         const heads = saeHeads(e);
         const award = [e.hr, ...heads].map((p, i) => (p?.award?.trim() ? `${i === 0 ? "HR" : "Head"}: ${p.award.trim()}` : "")).filter(Boolean);
         return {
@@ -37,6 +38,7 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
           department: emp ? departmentName(emp.departmentId) : "",
           position: e.hr?.employee?.position ?? "",
           s,
+          pass,
           w: saeWeights(e.form),
           done: e.status === "done",
           headOverall: heads.map((h) => h?.overall).filter(Boolean).join(" / "),
@@ -198,7 +200,7 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
                     <td className="px-3 py-2 text-right text-base font-bold tabular-nums text-[var(--text-primary)]">{fmt(r.s.total)}</td>
                     <td className="px-3 py-2">
                       {r.done ? (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.s.passed ? "bg-[var(--status-good)]/15 text-[var(--status-good)]" : "bg-[var(--status-critical)]/15 text-[var(--status-critical)]"}`}>{r.s.passed ? "PASSED" : "FAILED"}</span>
+                        <span title={`Passing score ${r.pass}`} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.s.passed ? "bg-[var(--status-good)]/15 text-[var(--status-good)]" : "bg-[var(--status-critical)]/15 text-[var(--status-critical)]"}`}>{r.s.passed ? "PASSED" : "FAILED"}</span>
                       ) : (
                         <span className="text-xs text-[var(--text-muted)]" title={saeStatusLabel(r.e).label}>
                           In progress
@@ -231,7 +233,7 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
             </table>
           </div>
           <p className="mt-2 text-[11px] text-[var(--text-muted)]">
-            Passing score {cfg.passMark}. &ldquo;In progress&rdquo; scores count only the parts signed or saved so far. Hover a special award to see the justification.
+            Passing score: {cfg.passMark} for Sales Admins (80 on a Year-end Evaluation), 80 for other employees. &ldquo;In progress&rdquo; scores count only the parts signed or saved so far. Hover a special award to see the justification.
           </p>
         </>
       )}
