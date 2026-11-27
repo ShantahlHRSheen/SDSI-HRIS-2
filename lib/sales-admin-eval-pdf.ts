@@ -357,7 +357,15 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
     cols.map((c) => ({ t: `${c.label} comment and recommendation`, w: colW, f: bold, align: "center" as const })),
     true,
   );
-  const cr = (p: { comment: string; recommendation: string } | null | undefined) => [p?.comment, p?.recommendation && `Recommendation: ${p.recommendation}`].filter(Boolean).join("\n\n");
+  const cr = (p: { comment: string; recommendation: string; award?: string; awardJustification?: string } | null | undefined) =>
+    [
+      p?.comment,
+      p?.recommendation && `Recommendation: ${p.recommendation}`,
+      p?.award?.trim() && `Suggested Special Award: ${p.award.trim()}`,
+      p?.award?.trim() && p.awardJustification?.trim() && `Justification: ${p.awardJustification.trim()}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   row(
     cols.map((c) => ({ t: cr(c.part), w: colW })),
     false,

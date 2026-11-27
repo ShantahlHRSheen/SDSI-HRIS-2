@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Loader2, Plus, Save, Signature, Trash2 } from "lucide-react";
+import { Award, Eye, Loader2, Plus, Save, Signature, Trash2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { FileViewer, type ViewerFile } from "@/components/FileViewer";
@@ -19,7 +19,9 @@ import {
   saveHeadPart,
   saeHeads,
   saveHrPart,
+  SAE_AWARD_SUGGESTIONS,
   SAE_BEHAVIOR,
+  awardLine,
   SAE_BEHAVIOR_KRA,
   SAE_OVERALL,
   SAE_SCALE,
@@ -167,7 +169,7 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
   const set = <K extends keyof SaeHrPart>(k: K, v: SaeHrPart[K]) => setPart((p) => ({ ...p, [k]: v }));
   const w = saeWeights(e.form);
   const withSales = w.sales > 0;
-  const ready = part.behavior.every((x) => x !== null) && (!withSales || part.sales.some((m) => monthSalesScore(m) !== null)) && !!part.overall && !!part.recommendation.trim();
+  const ready = part.behavior.every((x) => x !== null) && (!withSales || part.sales.some((m) => monthSalesScore(m) !== null)) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
 
   async function save(sign: boolean) {
     if (!currentEmployee) return;
@@ -295,6 +297,7 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
           <label className={label}>HR&rsquo;s comment</label>
           <textarea value={part.comment} onChange={(ev) => set("comment", ev.target.value)} rows={3} maxLength={3000} className={input} />
         </div>
+        <AwardFields award={part.award ?? ""} justification={part.awardJustification ?? ""} onAward={(v) => set("award", v)} onJustification={(v) => set("awardJustification", v)} />
 
         <ScoreSummary e={e} hr={part} />
         <MySignature onChange={setHasSignature} />
@@ -307,7 +310,7 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
             {busy === "sign" ? <Loader2 size={15} className="animate-spin" /> : <Signature size={15} />} Sign &amp; submit
           </button>
         </div>
-        {!ready && <div className="text-right text-xs text-[var(--text-muted)]">To sign: rate every item, enter the sales, and give the overall rating and recommendation.</div>}
+        {!ready && <div className="text-right text-xs text-[var(--text-muted)]">To sign: rate every item, enter the sales, and give the overall rating and recommendation (and a justification for a suggested award).</div>}
       </div>
     </Modal>
   );
@@ -330,7 +333,7 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof SaeHeadPart>(k: K, v: SaeHeadPart[K]) => setPart((p) => ({ ...p, [k]: v }));
-  const ready = part.job.every((x) => x !== null) && !!part.overall && !!part.recommendation.trim();
+  const ready = part.job.every((x) => x !== null) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
 
   async function save(sign: boolean) {
     if (!currentEmployee) return;
@@ -389,6 +392,7 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
           <label className={label}>Your comment</label>
           <textarea value={part.comment} onChange={(ev) => set("comment", ev.target.value)} rows={3} maxLength={3000} className={input} />
         </div>
+        <AwardFields award={part.award ?? ""} justification={part.awardJustification ?? ""} onAward={(v) => set("award", v)} onJustification={(v) => set("awardJustification", v)} />
         <MySignature onChange={setHasSignature} />
         {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
         <div className="flex flex-wrap justify-end gap-2">
@@ -399,7 +403,7 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
             {busy === "sign" ? <Loader2 size={15} className="animate-spin" /> : <Signature size={15} />} Sign &amp; submit
           </button>
         </div>
-        {!ready && <div className="text-right text-xs text-[var(--text-muted)]">To sign: rate every item and give the overall rating and recommendation.</div>}
+        {!ready && <div className="text-right text-xs text-[var(--text-muted)]">To sign: rate every item and give the overall rating and recommendation (and a justification for a suggested award).</div>}
       </div>
     </Modal>
   );
@@ -455,18 +459,48 @@ export function RecommendModal({ e, onClose, onChanged }: { e: SalesAdminEvaluat
   );
 }
 
+// Optional: a special award to suggest for the employee, with the reason.
+function AwardFields({ award, justification, onAward, onJustification }: { award: string; justification: string; onAward: (v: string) => void; onJustification: (v: string) => void }) {
+  const label = "mb-1 block text-xs font-medium text-[var(--text-secondary)]";
+  const input = "w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm";
+  return (
+    <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/15 p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
+        <Award size={14} className="text-[var(--series-1)]" /> Special award (optional)
+      </div>
+      <div className="space-y-2">
+        <div>
+          <label className={label}>Suggested Special Award</label>
+          <input value={award} onChange={(ev) => onAward(ev.target.value)} list="sae-award-suggestions" maxLength={150} placeholder="e.g. Employee of the Year — or leave blank" className={input} />
+          <datalist id="sae-award-suggestions">
+            {SAE_AWARD_SUGGESTIONS.map((a) => (
+              <option key={a} value={a} />
+            ))}
+          </datalist>
+        </div>
+        {award.trim() && (
+          <div>
+            <label className={label}>Justification</label>
+            <textarea value={justification} onChange={(ev) => onJustification(ev.target.value)} rows={3} maxLength={2000} placeholder="Why does this employee deserve the award?" className={input} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Each signer's rating / recommendation so far.
 export function Recommendations({ e }: { e: SalesAdminEvaluation }) {
   const cfg = saeConfig();
   const rows: [string, string | null | undefined, string | null | undefined, string | null][] = [
-    [`HR${e.hrName ? ` (${e.hrName})` : ""}`, e.hr?.overall, [e.hr?.recommendation, e.hr?.comment].filter(Boolean).join(" — "), e.hrSignedAt],
-    [`${cfg.headTitle}${e.headName ? ` (${e.headName})` : ""}`, e.head?.overall, [e.head?.recommendation, e.head?.comment].filter(Boolean).join(" — "), e.headSignedAt],
+    [`HR${e.hrName ? ` (${e.hrName})` : ""}`, e.hr?.overall, [e.hr?.recommendation, e.hr?.comment, awardLine(e.hr)].filter(Boolean).join(" — "), e.hrSignedAt],
+    [`${cfg.headTitle}${e.headName ? ` (${e.headName})` : ""}`, e.head?.overall, [e.head?.recommendation, e.head?.comment, awardLine(e.head)].filter(Boolean).join(" — "), e.headSignedAt],
     ...(e.head2Id
       ? [
           [
             `${cfg.headTitle}${e.head2Name ? ` (${e.head2Name})` : ""}`,
             e.head2?.overall,
-            [e.head2?.recommendation, e.head2?.comment].filter(Boolean).join(" — "),
+            [e.head2?.recommendation, e.head2?.comment, awardLine(e.head2)].filter(Boolean).join(" — "),
             e.head2SignedAt,
           ] as [string, string | null | undefined, string | null | undefined, string | null],
         ]

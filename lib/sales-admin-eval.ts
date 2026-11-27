@@ -93,6 +93,9 @@ export interface SaeHrPart {
   overall: string;
   comment: string;
   recommendation: string;
+  // Optional: a special award HR / the head suggests, and why.
+  award?: string;
+  awardJustification?: string;
 }
 
 export interface SaeHeadPart {
@@ -100,6 +103,9 @@ export interface SaeHeadPart {
   overall: string;
   comment: string;
   recommendation: string;
+  // Optional: a special award HR / the head suggests, and why.
+  award?: string;
+  awardJustification?: string;
 }
 
 export type SaeStatus = "open" | "vc" | "chairman" | "done";
@@ -358,3 +364,19 @@ export async function saeSignatures(e: SalesAdminEvaluation): Promise<Partial<Re
   );
   return out;
 }
+
+// Special awards HR and the heads can suggest (they can also type their own).
+export const SAE_AWARD_SUGGESTIONS = [
+  "Employee of the Year",
+  "Employee of the Month",
+  "Best Performer",
+  "Top Sales Award",
+  "Perfect Attendance Award",
+  "Most Improved Employee",
+  "Leadership Award",
+  "Loyalty Award",
+  "Customer Service Award",
+  "Team Player Award",
+];
+export const awardLine = (p: { award?: string; awardJustification?: string } | null | undefined) =>
+  p?.award?.trim() ? `Suggested Special Award: ${p.award.trim()}${p.awardJustification?.trim() ? ` — Justification: ${p.awardJustification.trim()}` : ""}` : "";
