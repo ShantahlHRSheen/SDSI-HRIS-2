@@ -33,7 +33,7 @@ const cellInput = "w-full rounded border border-[var(--border-hairline)] bg-[var
 
 export function HrSheetModal({ items, onClose, onChanged, onStartAll }: { items: SalesAdminEvaluation[]; onClose: () => void; onChanged: () => void; onStartAll?: () => void }) {
   const { currentEmployee } = useHris();
-  const open = useMemo(() => items.filter((e) => e.status === "open" && !e.hrSignedAt), [items]);
+  const open = useMemo(() => items.filter((e) => e.status === "open" && !e.hrSignedAt && e.form !== "managerial"), [items]);
   const purposes = SAE_PURPOSES.filter((p) => open.some((e) => e.purpose === p));
   // Everything waiting, like Needs your action; narrow it with the filters.
   const [purpose, setPurpose] = useState("");

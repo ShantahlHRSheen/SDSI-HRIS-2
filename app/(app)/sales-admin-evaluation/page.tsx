@@ -74,7 +74,7 @@ export default function SalesAdminEvaluationPage() {
   // The scores summary and awards: not one's own evaluation (unless HR).
   const others = (items ?? []).filter((e) => isHr || e.employeeId !== me);
   // Evaluations waiting for the signed-in person's Job Performance rating.
-  const toRate = mine.filter((e) => myTurn(e) === "head").length;
+  const toRate = mine.filter((e) => myTurn(e) === "head" && e.form !== "managerial").length;
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -164,7 +164,7 @@ export default function SalesAdminEvaluationPage() {
                     <span className="text-[var(--text-secondary)]"> — {[e.purpose, e.period].filter(Boolean).join(" ")}</span>
                   </div>
                   <button onClick={() => setOpen({ id: e.id, as })} className={primary}>
-                    {actionLabel[as]}
+                    {as === "head" && e.form === "managerial" ? "Rate evaluation" : actionLabel[as]}
                   </button>
                 </div>
               );
@@ -338,7 +338,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
   const [search, setSearch] = useState("");
   const q = search.trim().toLowerCase();
   const shown = active
-    .filter((e) => (form === "sales_admin" ? isSalesAdmin(e) : !isSalesAdmin(e)))
+    .filter((e) => form === "managerial" || (form === "sales_admin" ? isSalesAdmin(e) : !isSalesAdmin(e)))
     .filter((e) => !q || [e.firstName, e.middleName, e.lastName, e.nickname, e.employeeNumber, positionTitle(e.positionId)].some((x) => x?.toLowerCase().includes(q)));
   const [employeeId, setEmployeeId] = useState("");
   const [purpose, setPurpose] = useState("Evaluation for Regularization");
@@ -352,15 +352,17 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
   const [error, setError] = useState<string | null>(null);
   // Year-end Evaluations don't go to the Vice Chairperson or the Chairman (phase 95).
   const yearEnd = purpose === "Year-end Evaluation";
+  // Managerial form (phase 99): one evaluator rates everything.
+  const mgr = form === "managerial";
 
   // The head defaults to the Sales Admins' head, or the employee's Job
   // Performance evaluator / supervisor.
   function choose(id: string) {
     setEmployeeId(id);
     const emp = active.find((e) => e.id === id);
-    setHeadId(form === "sales_admin" ? cfg.headId : (emp && effectiveJobPerformanceEvaluatorId(emp)) || "");
+    setHeadId(form === "sales_admin" ? cfg.headId : form === "managerial" ? (emp?.supervisorId && emp.supervisorId !== emp.id ? emp.supervisorId : "") : (emp && effectiveJobPerformanceEvaluatorId(emp)) || "");
     // Cebu: Mary Jane Pedrano also rates (not herself).
-    const second = emp ? cfg.secondHeads?.[emp.branchId] : undefined;
+    const second = emp && form !== "managerial" ? cfg.secondHeads?.[emp.branchId] : undefined;
     setHead2Id(second && second !== emp?.id ? second : "");
   }
   function chooseForm(f: SaeForm) {
@@ -389,9 +391,9 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
         purpose,
         period,
         headId,
-        head2Id: head2Id || null,
-        vcId: yearEnd ? null : vcId || null,
-        chairmanId: yearEnd ? null : chairmanId,
+        head2Id: mgr ? null : head2Id || null,
+        vcId: yearEnd || mgr ? null : vcId || null,
+        chairmanId: yearEnd || mgr ? null : chairmanId,
         employee: {
           name: `${emp.firstName}${mi} ${emp.lastName}`,
           position: positionTitle(emp.positionId),
@@ -419,7 +421,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
     </select>
   );
   const lbl = "mb-1 block text-xs font-medium text-[var(--text-secondary)]";
-  const w = form === "general" ? SAE_WEIGHTS_GENERAL : SAE_WEIGHTS;
+  const w = form === "sales_admin" ? SAE_WEIGHTS : SAE_WEIGHTS_GENERAL;
 
   return (
     <Modal open onClose={() => !busy && onClose()} title="New evaluation">
@@ -466,14 +468,20 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
           </div>
         </div>
         <div>
-          <label className={lbl}>Department Head (rates Job Performance)</label>
+          <label className={lbl}>{mgr ? "Evaluator (rates Behavior and Job Performance)" : "Department Head (rates Job Performance)"}</label>
           {pick(headId, setHeadId)}
         </div>
+        {!mgr && (
         <div>
           <label className={lbl}>Second Department Head (optional — also rates Job Performance; the two are averaged)</label>
           {pick(head2Id, setHead2Id)}
         </div>
-        {yearEnd ? (
+        )}
+        {mgr ? (
+          <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/20 px-3 py-2 text-xs text-[var(--text-secondary)]">
+            Managerial evaluation: the evaluator alone rates Behavior (with the employee&rsquo;s lates and absences from the HRIS shown) and Job Performance, and signs. HR doesn&rsquo;t rate it. It&rsquo;s completed once the evaluator signs.
+          </div>
+        ) : yearEnd ? (
           <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/20 px-3 py-2 text-xs text-[var(--text-secondary)]">
             Year-end Evaluation: completed once HR and the Department Head{head2Id ? "s" : ""} sign. The {cfg.vcTitle} and the {cfg.chairmanTitle} don&rsquo;t sign it, but they can see the results.
           </div>
@@ -494,7 +502,7 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
           <button onClick={onClose} disabled={busy} className={secondary}>
             Cancel
           </button>
-          <button onClick={create} disabled={busy || !employeeId || !headId || (!yearEnd && !chairmanId) || head2Id === headId} className={primary}>
+          <button onClick={create} disabled={busy || !employeeId || !headId || (!yearEnd && !mgr && !chairmanId) || (!mgr && head2Id === headId)} className={primary}>
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Start
           </button>
         </div>

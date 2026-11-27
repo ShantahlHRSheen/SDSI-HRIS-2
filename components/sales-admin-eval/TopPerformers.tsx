@@ -16,6 +16,13 @@ export const KPI_AWARDS: Record<string, string> = {
   "Quality of work done": "Quota Crusher Award",
   Accomplishment: "Goal Achiever Award",
   "Learning and growth strategies": "Growth Mindset Award",
+  // Managers (phase 99).
+  Leadership: "Leadership Excellence Award",
+  "Decision making": "Sound Judgment Award",
+  "Planning and organizing": "Master Planner Award",
+  "Developing people": "People Developer Award",
+  "Communication and coordination": "Bridge Builder Award",
+  "Accountability for results": "Results Champion Award",
 };
 export const CATEGORY_AWARDS = {
   sales: "Top Seller Award",

@@ -11,10 +11,12 @@ import { placeMySignature } from "./supabase/leave-forms";
 //   Other employees:  Behavior 40 + Job Performance 60.
 // The pass mark is the company's (lib/companies.ts).
 
-export type SaeForm = "sales_admin" | "general";
+export type SaeForm = "sales_admin" | "general" | "managerial";
 export const SAE_FORMS: Record<SaeForm, { label: string; title: string }> = {
   sales_admin: { label: "Sales Admin (with sales)", title: "SALES ADMIN EVALUATION" },
   general: { label: "Other employees", title: "EMPLOYEE PERFORMANCE EVALUATION" },
+  // Rated entirely by one evaluator (phase 99) — HR doesn't rate it.
+  managerial: { label: "Managers (one evaluator rates all)", title: "MANAGERIAL PERFORMANCE EVALUATION" },
 };
 export const SAE_PURPOSES = ["Monthly Evaluation", "Year-end Evaluation", "Evaluation for Regularization"];
 
@@ -51,7 +53,18 @@ export const SAE_JOB_GENERAL: { kra: string; objective: string }[] = [
   { kra: "Accomplishment", objective: "Accomplished 100% of the requirements monthly" },
   { kra: "Learning and growth strategies", objective: "Shows willingness to learn new skills, improve performance, and adapt to new processes or tools" },
 ];
-export const jobItems = (form: SaeForm) => (form === "general" ? SAE_JOB_GENERAL : SAE_JOB);
+// Managers (phase 99).
+export const SAE_JOB_MANAGERIAL: { kra: string; objective: string }[] = [
+  { kra: "Leadership", objective: "Leads, motivates and guides the team toward the company's goals" },
+  { kra: "Decision making", objective: "Makes sound, timely decisions and takes responsibility for them" },
+  { kra: "Planning and organizing", objective: "Sets clear plans, priorities and deadlines for the department" },
+  { kra: "Developing people", objective: "Coaches, trains and develops the people under him/her" },
+  { kra: "Communication and coordination", objective: "Communicates clearly and works well with management, other departments and staff" },
+  { kra: "Accountability for results", objective: "Achieves the department's targets and owns the results" },
+];
+export const jobItems = (form: SaeForm) => (form === "general" ? SAE_JOB_GENERAL : form === "managerial" ? SAE_JOB_MANAGERIAL : SAE_JOB);
+// The evaluator rates Behavior too (no HR part) on the managerial form.
+export const saeHeadRatesBehavior = (form: SaeForm) => form === "managerial";
 
 export const SAE_SCALE: { value: number; label: string; tagalog: string }[] = [
   { value: 0, label: "Doesn't demonstrate", tagalog: "HINDI NAGAWA" },
@@ -64,7 +77,7 @@ export const SAE_OVERALL = ["Outstanding", "Exceeds Expectation", "Meets Expecta
 
 export const SAE_WEIGHTS = { behavior: 10, job: 10, sales: 80 };
 export const SAE_WEIGHTS_GENERAL = { behavior: 40, job: 60, sales: 0 };
-export const saeWeights = (form: SaeForm) => (form === "general" ? SAE_WEIGHTS_GENERAL : SAE_WEIGHTS);
+export const saeWeights = (form: SaeForm) => (form === "sales_admin" ? SAE_WEIGHTS : SAE_WEIGHTS_GENERAL);
 // Required sales are 3× the ads spent.
 export const SAE_SALES_MULTIPLE = 3;
 
@@ -106,6 +119,27 @@ export interface SaeHeadPart {
   // Optional: a special award HR / the head suggests, and why.
   award?: string;
   awardJustification?: string;
+  // Managerial form (phase 99): the evaluator's Behavior ratings, and the
+  // HRIS attendance they rated from (saved when they save).
+  behavior?: Rating[];
+  attendance?: SaeAttendance | null;
+}
+
+// The employee's attendance for the evaluation's year, from the HRIS.
+export interface SaeAttendance {
+  year: number;
+  cutoffs: number;
+  detailCutoffs: number;
+  from: string | null;
+  to: string | null;
+  lateCount: number;
+  lateMinutes: number;
+  lates: { date: string; minutes: number }[];
+  absentCount: number;
+  absentDates: string[];
+  slDays: number;
+  vlDays: number;
+  daysWorked: number;
 }
 
 export type SaeStatus = "open" | "vc" | "chairman" | "done";
@@ -146,7 +180,7 @@ export interface SalesAdminEvaluation {
 }
 
 export const emptyHrPart = (): SaeHrPart => ({ behavior: SAE_BEHAVIOR.map(() => null), sales: [], overall: "", comment: "", recommendation: "" });
-export const emptyHeadPart = (form: SaeForm): SaeHeadPart => ({ job: jobItems(form).map(() => null), overall: "", comment: "", recommendation: "" });
+export const emptyHeadPart = (form: SaeForm): SaeHeadPart => ({ job: jobItems(form).map(() => null), overall: "", comment: "", recommendation: "", ...(saeHeadRatesBehavior(form) ? { behavior: SAE_BEHAVIOR.map(() => null) } : {}) });
 
 // ---- Scoring ------------------------------------------------------------------------
 
@@ -179,26 +213,26 @@ export interface SaeScores {
 export const SAE_PASS_GENERAL = 80;
 export const SAE_PASS_YEAR_END = 80;
 export function saePassMark(e: { form: SaeForm; purpose: string }, salesAdminPassMark: number): number {
-  if (e.form === "general") return SAE_PASS_GENERAL;
+  if (e.form !== "sales_admin") return SAE_PASS_GENERAL;
   if (e.purpose === "Year-end Evaluation") return SAE_PASS_YEAR_END;
   return salesAdminPassMark;
 }
 
 export function saeScores(form: SaeForm, hr: SaeHrPart | null, heads: (SaeHeadPart | null)[], passMark: number): SaeScores {
   const w = saeWeights(form);
-  const b = rated(hr?.behavior);
+  const b = rated(saeHeadRatesBehavior(form) ? heads[0]?.behavior : hr?.behavior);
   const items = jobItems(form);
   const j = items
     .map((_, i) => rated(heads.map((h) => h?.job?.[i] ?? null)))
     .filter((xs) => xs.length > 0)
     .map(avg);
   const allHeadsDone = heads.every((h) => rated(h?.job).length === items.length);
-  const months = form === "general" ? [] : (hr?.sales ?? []).map(monthSalesScore).filter((x): x is number => x !== null);
+  const months = w.sales === 0 ? [] : (hr?.sales ?? []).map(monthSalesScore).filter((x): x is number => x !== null);
   const behavior = r2((avg(b) / 3) * w.behavior);
   const job = r2((avg(j) / 3) * w.job);
   const sales = r2(avg(months));
   const total = r2(behavior + job + sales);
-  const complete = b.length === SAE_BEHAVIOR.length && allHeadsDone && (form === "general" || months.length > 0);
+  const complete = b.length === SAE_BEHAVIOR.length && allHeadsDone && (w.sales === 0 || months.length > 0);
   return { behavior, job, sales, total, passed: total >= passMark, complete };
 }
 
@@ -207,13 +241,13 @@ export function saeStatusLabel(e: SalesAdminEvaluation): { label: string; tone: 
   // Year-end Evaluations have no Vice Chairperson or Chairman (phase 95).
   if (e.status === "chairman") return { label: "Waiting for the Chairman", tone: "info" };
   if (e.status === "vc") return { label: "Waiting for the Vice Chairperson", tone: "info" };
-  const waiting = [!e.hrSignedAt && "HR", !e.headSignedAt && (e.headName || "the Department Head"), e.head2Id && !e.head2SignedAt && (e.head2Name || "the second Department Head")].filter(Boolean);
+  const waiting = [!e.hrSignedAt && !saeHeadRatesBehavior(e.form) && "HR", !e.headSignedAt && (e.headName || "the Department Head"), e.head2Id && !e.head2SignedAt && (e.head2Name || "the second Department Head")].filter(Boolean);
   return { label: `Waiting for ${waiting.join(" and ")}`, tone: "warning" };
 }
 
 // What the signed-in person has to do on an evaluation, if anything.
 export function saeMyTurn(e: SalesAdminEvaluation, me: string | undefined, isHr: boolean): "hr" | "head" | "recommend" | null {
-  if (e.status === "open" && isHr && !e.hrSignedAt) return "hr";
+  if (e.status === "open" && isHr && !e.hrSignedAt && !saeHeadRatesBehavior(e.form)) return "hr";
   if (me && e.status === "open" && e.headId === me && !e.headSignedAt) return "head";
   if (me && e.status === "open" && e.head2Id === me && !e.head2SignedAt) return "head";
   if (me && ((e.status === "vc" && e.vcId === me) || (e.status === "chairman" && e.chairmanId === me))) return "recommend";
@@ -256,7 +290,7 @@ const toEval = (r: Row): SalesAdminEvaluation => ({
   id: String(r.id),
   employeeId: String(r.employee_id),
   employeeName: String(r.employee_name ?? ""),
-  form: r.form === "general" ? "general" : "sales_admin",
+  form: r.form === "general" || r.form === "managerial" ? r.form : "sales_admin",
   purpose: String(r.purpose ?? "Evaluation for Regularization"),
   period: String(r.period ?? ""),
   status: (r.status as SaeStatus) ?? "open",
@@ -397,6 +431,10 @@ export async function fetchSaeEdits(): Promise<SaeEdit[]> {
 export function saeEditChanges(form: SaeForm, before: SaeHeadPart | null, after: SaeHeadPart): string[] {
   const out: string[] = [];
   const v = (x: Rating | undefined) => (typeof x === "number" ? String(x) : "—");
+  if (saeHeadRatesBehavior(form))
+    SAE_BEHAVIOR.forEach((item, i) => {
+      if ((before?.behavior?.[i] ?? null) !== (after.behavior?.[i] ?? null)) out.push(`Behavior ${i + 1} (${item.length > 40 ? `${item.slice(0, 40)}…` : item}): ${v(before?.behavior?.[i])} → ${v(after.behavior?.[i])}`);
+    });
   jobItems(form).forEach((j, i) => {
     if ((before?.job?.[i] ?? null) !== (after.job?.[i] ?? null)) out.push(`${j.kra}: ${v(before?.job?.[i])} → ${v(after.job?.[i])}`);
   });
@@ -431,6 +469,29 @@ export async function myEvaluationsToAcknowledge(me: string): Promise<{ id: stri
   return ((data as Row[] | null) ?? [])
     .filter((r) => r.status === "done" && r.released_at && !r.acknowledged_at)
     .map((r) => ({ id: String(r.id), purpose: String(r.purpose ?? ""), period: String(r.period ?? "") }));
+}
+
+// The employee's attendance from the HRIS for the evaluation's year (phase 99).
+export async function fetchSaeAttendance(id: string): Promise<SaeAttendance | null> {
+  const { data, error } = await (getSupabaseClient() as unknown as { rpc: (fn: string, a: Row) => PromiseLike<{ data: unknown; error: { message: string } | null }> }).rpc("sae_attendance", { p_id: id });
+  if (error || !data) return null;
+  const d = data as Row;
+  const n = (x: unknown) => Number(x) || 0;
+  return {
+    year: n(d.year),
+    cutoffs: n(d.cutoffs),
+    detailCutoffs: n(d.detailCutoffs),
+    from: (d.from as string | null) ?? null,
+    to: (d.to as string | null) ?? null,
+    lateCount: n(d.lateCount),
+    lateMinutes: n(d.lateMinutes),
+    lates: ((d.lates as Row[] | null) ?? []).map((x) => ({ date: String(x.date), minutes: n(x.minutes) })),
+    absentCount: n(d.absentCount),
+    absentDates: ((d.absentDates as string[] | null) ?? []).map(String),
+    slDays: n(d.slDays),
+    vlDays: n(d.vlDays),
+    daysWorked: n(d.daysWorked),
+  };
 }
 
 export async function recommendSae(e: SalesAdminEvaluation, me: string, text: string): Promise<void> {
