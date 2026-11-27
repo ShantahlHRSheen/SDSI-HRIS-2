@@ -18,6 +18,7 @@ import { balanceFor, checkLeaveRequest, isSemiannual, paidLeaveEligibleFrom, tod
 import { ATTACHMENT_ACCEPT, ATTACHMENT_RETENTION_DAYS, KIND_LABEL, LeaveDocuments, prepareUpload, requiredKinds, validateUpload, withFileType } from "@/components/leave/LeaveAttachments";
 import { LeaveApplicationModal, LeaveFormModal, FormProgress, canHeadForm, useLeaveForms } from "@/components/leave/LeaveApplication";
 import { formStage, leaveCategoriesFor, type LeaveForm } from "@/lib/leave-form";
+import { LeaveBalances } from "@/components/leave/LeaveBalances";
 import type { LeaveAttachmentKind, LeaveRequest, RequestStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<RequestStatus, BadgeTone> = {
@@ -331,6 +332,8 @@ export default function LeaveManagementPage() {
           />
         </div>
       )}
+
+      {isHrOrUpper && <LeaveBalances today={today} />}
 
       {isHrOrUpper && (
         <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
