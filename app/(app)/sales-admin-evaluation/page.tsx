@@ -6,6 +6,7 @@ import { ManageEvaluatorsModal } from "@/components/sales-admin-eval/ManageEvalu
 import { EvaluationSummary } from "@/components/sales-admin-eval/EvaluationSummary";
 import { HrSheetModal } from "@/components/sales-admin-eval/HrSheet";
 import { HeadSheetModal } from "@/components/sales-admin-eval/HeadSheet";
+import { BulkStartModal } from "@/components/sales-admin-eval/BulkStart";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -44,6 +45,7 @@ export default function SalesAdminEvaluationPage() {
   const [managing, setManaging] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [headSheet, setHeadSheet] = useState(false);
+  const [bulk, setBulk] = useState(false);
   const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" } | null>(null);
   const [deleting, setDeleting] = useState<SalesAdminEvaluation | null>(null);
   const [busy, setBusy] = useState(false);
@@ -204,7 +206,8 @@ export default function SalesAdminEvaluationPage() {
       </div>
 
       {headSheet && items && <HeadSheetModal items={items} onClose={() => setHeadSheet(false)} onChanged={reload} />}
-      {isHr && sheet && items && <HrSheetModal items={items} onClose={() => setSheet(false)} onChanged={reload} />}
+      {isHr && sheet && !bulk && items && <HrSheetModal items={items} onClose={() => setSheet(false)} onChanged={reload} onStartAll={() => setBulk(true)} />}
+      {isHr && bulk && items && <BulkStartModal items={items} onClose={() => setBulk(false)} onChanged={reload} />}
       {isHr && <ManageEvaluatorsModal open={managing} onClose={() => setManaging(false)} employees={employees} updateEmployee={updateEmployee} />}
       {creating && <NewEvaluationModal employees={employees} onClose={() => setCreating(false)} onCreated={async (id) => (await reload(), setCreating(false), setOpen({ id, as: "hr" }))} />}
       {opened && open?.as === "hr" && <HrPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}

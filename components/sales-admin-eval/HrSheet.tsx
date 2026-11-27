@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { CheckCircle2, Loader2, Save, Signature } from "lucide-react";
+import { CheckCircle2, Loader2, Play, Save, Signature } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { MySignature } from "@/components/leave/LeaveApplication";
@@ -31,7 +31,7 @@ const SHORT = [
 const fmt = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 const cellInput = "w-full rounded border border-[var(--border-hairline)] bg-[var(--surface-1)] px-1.5 py-1 text-xs";
 
-export function HrSheetModal({ items, onClose, onChanged }: { items: SalesAdminEvaluation[]; onClose: () => void; onChanged: () => void }) {
+export function HrSheetModal({ items, onClose, onChanged, onStartAll }: { items: SalesAdminEvaluation[]; onClose: () => void; onChanged: () => void; onStartAll?: () => void }) {
   const { currentEmployee } = useHris();
   const open = useMemo(() => items.filter((e) => e.status === "open" && !e.hrSignedAt), [items]);
   const purposes = SAE_PURPOSES.filter((p) => open.some((e) => e.purpose === p));
@@ -119,10 +119,15 @@ export function HrSheetModal({ items, onClose, onChanged }: { items: SalesAdminE
           <span className="text-xs text-[var(--text-muted)]">
             {rows.length} employee{rows.length === 1 ? "" : "s"} waiting for HR&rsquo;s part · {readyRows.length} complete · type 0–3 in each box (Tab to move)
           </span>
+          {onStartAll && (
+            <button onClick={onStartAll} className="ml-auto flex items-center gap-1.5 rounded-lg border border-[var(--series-1)]/60 px-2.5 py-1.5 text-xs font-medium text-[var(--series-1)] hover:bg-[var(--series-1)]/10">
+              <Play size={13} /> Start Year-end Evaluations for all employees
+            </button>
+          )}
         </div>
 
         {!rows.length ? (
-          <div className="rounded-lg border border-[var(--border-hairline)] px-3 py-6 text-center text-[var(--text-muted)]">No evaluations are waiting for HR&rsquo;s part. Start them with New evaluation.</div>
+          <div className="rounded-lg border border-[var(--border-hairline)] px-3 py-6 text-center text-[var(--text-muted)]">No evaluations are waiting for HR&rsquo;s part. Click &ldquo;Start Year-end Evaluations for all employees&rdquo; above to add everyone here.</div>
         ) : (
           <div className="max-h-[60vh] overflow-auto rounded-lg border border-[var(--border-hairline)]">
             <table className="text-xs">
