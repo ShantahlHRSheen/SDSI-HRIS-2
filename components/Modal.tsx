@@ -9,12 +9,15 @@ export function Modal({
   title,
   children,
   wide = false,
+  full = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   wide?: boolean;
+  // Nearly the whole screen width (e.g. a sheet with many columns).
+  full?: boolean;
 }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -29,7 +32,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10 sm:pt-16" onClick={onClose}>
       <div
-        className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5 shadow-xl`}
+        className={`w-full ${full ? "max-w-[96vw] sm:pt-10" : wide ? "max-w-2xl" : "max-w-md"} rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5 shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

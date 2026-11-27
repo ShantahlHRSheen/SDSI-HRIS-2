@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardList, Loader2, Plus, RotateCcw, Settings2, Trash2 } from "lucide-react";
+import { ClipboardList, Loader2, Plus, RotateCcw, Settings2, Table2, Trash2 } from "lucide-react";
 import { ManageEvaluatorsModal } from "@/components/sales-admin-eval/ManageEvaluators";
 import { EvaluationSummary } from "@/components/sales-admin-eval/EvaluationSummary";
+import { HrSheetModal } from "@/components/sales-admin-eval/HrSheet";
+import { HeadSheetModal } from "@/components/sales-admin-eval/HeadSheet";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -40,6 +42,8 @@ export default function SalesAdminEvaluationPage() {
   const cfg = saeConfig();
   const [creating, setCreating] = useState(false);
   const [managing, setManaging] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const [headSheet, setHeadSheet] = useState(false);
   const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" } | null>(null);
   const [deleting, setDeleting] = useState<SalesAdminEvaluation | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,6 +57,8 @@ export default function SalesAdminEvaluationPage() {
     (e) => (!purposeFilter || e.purpose === purposeFilter) && (!search.trim() || e.employeeName.toLowerCase().includes(search.trim().toLowerCase())),
   );
   const mine = (items ?? []).filter((e) => myTurn(e));
+  // Evaluations waiting for the signed-in person's Job Performance rating.
+  const toRate = mine.filter((e) => myTurn(e) === "head").length;
 
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -86,6 +92,9 @@ export default function SalesAdminEvaluationPage() {
         actions={
           isHr && (
             <div className="flex flex-wrap gap-2">
+              <button onClick={() => setSheet(true)} className={secondary}>
+                <Table2 size={16} /> HR Rating Sheet
+              </button>
               <button onClick={() => setManaging(true)} className={secondary}>
                 <Settings2 size={16} /> Manage evaluators
               </button>
@@ -100,7 +109,14 @@ export default function SalesAdminEvaluationPage() {
 
       {mine.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--series-1)]/40 bg-[var(--surface-1)] p-4">
-          <div className="mb-3 text-sm font-medium text-[var(--text-primary)]">Needs your action ({mine.length})</div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium text-[var(--text-primary)]">Needs your action ({mine.length})</div>
+            {toRate > 1 && (
+              <button onClick={() => setHeadSheet(true)} className={primary}>
+                <Table2 size={15} /> Rate all {toRate} on one sheet
+              </button>
+            )}
+          </div>
           <div className="space-y-2">
             {mine.map((e) => {
               const as = myTurn(e)!;
@@ -187,6 +203,8 @@ export default function SalesAdminEvaluationPage() {
         })}
       </div>
 
+      {headSheet && items && <HeadSheetModal items={items} onClose={() => setHeadSheet(false)} onChanged={reload} />}
+      {isHr && sheet && items && <HrSheetModal items={items} onClose={() => setSheet(false)} onChanged={reload} />}
       {isHr && <ManageEvaluatorsModal open={managing} onClose={() => setManaging(false)} employees={employees} updateEmployee={updateEmployee} />}
       {creating && <NewEvaluationModal employees={employees} onClose={() => setCreating(false)} onCreated={async (id) => (await reload(), setCreating(false), setOpen({ id, as: "hr" }))} />}
       {opened && open?.as === "hr" && <HrPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
