@@ -226,6 +226,7 @@ type Query = PromiseLike<{ data: unknown; error: { message: string } | null }> &
   select: (c?: string) => Query;
   delete: () => Query;
   eq: (c: string, v: string) => Query;
+  neq: (c: string, v: string) => Query;
   or: (f: string) => Query;
   limit: (n: number) => Query;
   order: (c: string, o?: { ascending: boolean }) => Query;
@@ -268,8 +269,11 @@ const toEval = (r: Row): SalesAdminEvaluation => ({
 });
 
 // Whether the employee is a head on any evaluation (for the menu).
+// Whether the person can see any evaluation other than their own: as a head
+// named on it, or as a supervisor / Department Head of the employee (the
+// database only returns those, phase 96).
 export async function isEvaluationHead(employeeId: string): Promise<boolean> {
-  const { data, error } = await client().from("sales_admin_evaluations").select("id").or(`head_id.eq.${employeeId},head2_id.eq.${employeeId}`).limit(1);
+  const { data, error } = await client().from("sales_admin_evaluations").select("id").neq("employee_id", employeeId).limit(1);
   return !error && ((data as Row[] | null) ?? []).length > 0;
 }
 

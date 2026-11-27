@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ClipboardList, Loader2, Plus, RotateCcw, Settings2, Trash2 } from "lucide-react";
 import { ManageEvaluatorsModal } from "@/components/sales-admin-eval/ManageEvaluators";
+import { EvaluationSummary } from "@/components/sales-admin-eval/EvaluationSummary";
 import { useHris } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -29,7 +30,8 @@ import {
 // Employee evaluation (Monthly, Year-end, for Regularization): HR starts it
 // and rates Behavior (and the sales, on the Sales Admin form); the
 // Department Head rates Job Performance; the Vice Chairperson and the
-// Chairman recommend. Seen by HR, Upper Management and the head named on it.
+// Chairman recommend. Seen by HR, Upper Management, the heads named on it, and
+// the employee's supervisors and Department Head (phase 96, read only).
 export default function SalesAdminEvaluationPage() {
   const { currentUser, currentEmployee, employees, isRealAccount, updateEmployee } = useHris();
   const { items, error, reload } = useSalesAdminEvaluations();
@@ -123,6 +125,7 @@ export default function SalesAdminEvaluationPage() {
           <Loader2 size={14} className="animate-spin" /> Loading…
         </div>
       )}
+      {!!items?.length && <EvaluationSummary items={items} />}
       {!!items?.length && (
         <div className="mb-3 flex flex-wrap gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" className={`${input} max-w-xs`} />
@@ -135,7 +138,7 @@ export default function SalesAdminEvaluationPage() {
         </div>
       )}
       {items && !list.length && (
-        <EmptyState icon={ClipboardList} title="No evaluations yet" description={isHr ? "Start one with New evaluation." : "Evaluations you take part in show here."} />
+        <EmptyState icon={ClipboardList} title="No evaluations yet" description={isHr ? "Start one with New evaluation." : "Evaluations you take part in, and those of the employees under you, show here."} />
       )}
 
       <div className="space-y-3">
