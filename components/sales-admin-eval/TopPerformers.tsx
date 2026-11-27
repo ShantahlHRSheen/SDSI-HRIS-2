@@ -35,26 +35,25 @@ interface Pick {
   key: string;
   award: string;
   what: string;
-  winner: TopRow;
+  winners: TopRow[];
   score: string;
-  tied: TopRow[];
   big?: boolean;
 }
 
 const fmt = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 
-// The highest by `value`, and the others tied with it. A tie goes to someone
-// who hasn't won an award yet (`awarded`), then to the higher overall score,
-// so the awards are spread out.
-function best(rows: TopRow[], value: (r: TopRow) => number | null, awarded: Set<string>): { winner: TopRow; v: number; tied: TopRow[] } | null {
+// Everyone with the highest `value`: when two or more tie, they all get the
+// award (co-winners), listed by overall score.
+function best(rows: TopRow[], value: (r: TopRow) => number | null): { winners: TopRow[]; v: number } | null {
   const scored = rows.map((r) => ({ r, v: value(r) })).filter((x): x is { r: TopRow; v: number } => x.v !== null);
   if (!scored.length) return null;
   const top = Math.max(...scored.map((x) => x.v));
-  const at = scored
+  const winners = scored
     .filter((x) => Math.abs(x.v - top) < 1e-9)
-    .sort((a, b) => Number(awarded.has(a.r.e.employeeId)) - Number(awarded.has(b.r.e.employeeId)) || b.r.s.total - a.r.s.total);
-  awarded.add(at[0].r.e.employeeId);
-  return { winner: at[0].r, v: top, tied: at.slice(1).map((x) => x.r) };
+    .map((x) => x.r)
+    .sort((a, b) => b.s.total - a.s.total || a.e.employeeName.localeCompare(b.e.employeeName))
+    .filter((r, i, all) => all.findIndex((x) => x.e.employeeId === r.e.employeeId) === i);
+  return { winners, v: top };
 }
 
 // A head-rated Job Performance item, averaged across the heads (0–3).
@@ -71,47 +70,48 @@ export function TopPerformers({ rows, purpose }: { rows: TopRow[]; purpose: stri
   const done = rows.filter((r) => r.e.status === "done");
   if (!done.length) return null;
   const picks: Pick[] = [];
-  const awarded = new Set<string>();
   // The overall award's name follows the evaluations shown (all Year-end: Employee of the Year).
   const purposes = new Set(done.map((r) => r.e.purpose));
   const overallName = CATEGORY_AWARDS.overall[purpose || (purposes.size === 1 ? [...purposes][0] : "")] ?? CATEGORY_AWARDS.overall.default;
   const add = (key: string, award: string, what: string, b: ReturnType<typeof best>, score: (v: number, r: TopRow) => string, big = false) => {
-    if (b) picks.push({ key, award, what, winner: b.winner, score: score(b.v, b.winner), tied: b.tied, big });
+    if (b) picks.push({ key, award, what, winners: b.winners, score: score(b.v, b.winners[0]), big });
   };
   // Category winners (as % of each form's weight, so both forms compare).
-  add("overall", overallName, "Highest overall score", best(done, (r) => r.s.total, awarded), (v) => `${fmt(v)} / 100`, true);
-  add("behavior", CATEGORY_AWARDS.behavior, "Highest in Behavior", best(done, (r) => (r.w.behavior ? (r.s.behavior / r.w.behavior) * 100 : null), awarded), (_, r) => `${fmt(r.s.behavior)} / ${r.w.behavior}`, true);
-  add("job", CATEGORY_AWARDS.job, "Highest in Job Performance", best(done, (r) => (r.w.job ? (r.s.job / r.w.job) * 100 : null), awarded), (_, r) => `${fmt(r.s.job)} / ${r.w.job}`, true);
-  if (done.some((r) => r.w.sales > 0)) add("sales", CATEGORY_AWARDS.sales, "Highest in Sales", best(done, (r) => (r.w.sales ? r.s.sales : null), awarded), (v) => `${fmt(v)} / 80`);
+  add("overall", overallName, "Highest overall score", best(done, (r) => r.s.total), (v) => `${fmt(v)} / 100`, true);
+  add("behavior", CATEGORY_AWARDS.behavior, "Highest in Behavior", best(done, (r) => (r.w.behavior ? (r.s.behavior / r.w.behavior) * 100 : null)), (_, r) => `${fmt(r.s.behavior)} / ${r.w.behavior}`, true);
+  add("job", CATEGORY_AWARDS.job, "Highest in Job Performance", best(done, (r) => (r.w.job ? (r.s.job / r.w.job) * 100 : null)), (_, r) => `${fmt(r.s.job)} / ${r.w.job}`, true);
+  if (done.some((r) => r.w.sales > 0)) add("sales", CATEGORY_AWARDS.sales, "Highest in Sales", best(done, (r) => (r.w.sales ? r.s.sales : null)), (v) => `${fmt(v)} / 80`);
   // Each KPI the shown evaluations use.
   for (const kra of Object.keys(KPI_AWARDS)) {
-    const b = best(done, (r) => kpiRating(r, kra), awarded);
+    const b = best(done, (r) => kpiRating(r, kra));
     add(`kpi-${kra}`, KPI_AWARDS[kra], kra, b, (v) => `${(Math.round(v * 100) / 100).toString()} / 3`);
   }
 
   const card = (p: Pick) => {
-    const others = p.tied.length;
+    const co = p.winners.length > 1;
     return (
       <div key={p.key} className={`rounded-xl border p-3 ${p.big ? "border-[var(--series-1)]/50 bg-[var(--series-1)]/5" : "border-[var(--border-hairline)] bg-[var(--surface-1)]"}`}>
         <div className="flex items-start gap-2">
           {p.key === "overall" ? <Crown size={18} className="mt-0.5 shrink-0 text-amber-400" /> : p.big ? <Trophy size={17} className="mt-0.5 shrink-0 text-amber-400" /> : <Award size={16} className="mt-0.5 shrink-0 text-[var(--series-1)]" />}
           <div className="min-w-0">
             <div className="text-sm font-semibold text-[var(--text-primary)]">{p.award}</div>
-            <div className="text-[11px] text-[var(--text-muted)]">{p.what}</div>
+            <div className="text-[11px] text-[var(--text-muted)]">
+              {p.what}
+              {co && <span className="ml-1 rounded-full bg-amber-400/15 px-1.5 py-px font-medium text-amber-500">Tie · {p.winners.length} co-winners</span>}
+            </div>
           </div>
         </div>
         <div className="mt-2 flex items-end justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-medium text-[var(--text-primary)]">{p.winner.e.employeeName}</div>
-            <div className="truncate text-[11px] text-[var(--text-muted)]">{p.winner.department}</div>
+          <div className="min-w-0 space-y-1">
+            {p.winners.map((w) => (
+              <div key={w.e.id} className="min-w-0">
+                <div className="truncate font-medium text-[var(--text-primary)]">{w.e.employeeName}</div>
+                <div className="truncate text-[11px] text-[var(--text-muted)]">{w.department}</div>
+              </div>
+            ))}
           </div>
           <div className="shrink-0 text-sm font-bold text-[var(--text-primary)] tabular-nums">{p.score}</div>
         </div>
-        {others > 0 && (
-          <div className="mt-1 text-[11px] text-[var(--text-muted)]" title={p.tied.map((t) => t.e.employeeName).join(", ")}>
-            Tied with {others} other{others === 1 ? "" : "s"} (hover to see) — given to one not yet awarded, then by overall score
-          </div>
-        )}
       </div>
     );
   };
