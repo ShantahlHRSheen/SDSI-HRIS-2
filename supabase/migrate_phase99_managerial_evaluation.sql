@@ -6,15 +6,30 @@
 --   both rated by the evaluator (the "Department Head" on the evaluation) —
 --   HR doesn't rate it; HR only starts and releases it. No second head, no
 --   Vice Chairperson or Chairman: done when the evaluator signs.
+-- * Behavior on the managerial form is two ratings: attendance and
+--   punctuality (with the HRIS figures shown) and the evaluator's actual
+--   observation, which they write down.
 -- * sae_attendance: the employee's attendance for the evaluation's year from
---   the HRIS (lates with minutes and dates, absences with dates, leaves) — for
---   HR, Upper Management and the evaluator, shown beside "Comes to work on
---   time" and "Does not show absenteeism".
+--   the HRIS (lates with minutes and dates, absences with dates, leaves) and
+--   their disciplinary records for the year — for HR, Upper Management and
+--   the evaluator, shown on the form.
 --
 -- Needs migrate_phase98_evaluation_release.sql. Safe to run more than once.
 
 alter table sales_admin_evaluations drop constraint if exists sales_admin_evaluations_form_check;
 alter table sales_admin_evaluations add constraint sales_admin_evaluations_form_check check (form in ('sales_admin', 'general', 'managerial'));
+
+-- Managerial Behavior: both ratings (attendance, actual observation) given,
+-- and the observation written.
+create or replace function app_sae_mgr_behavior_ok(p jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(app_sae_ratings_ok(p -> 'behavior'), false)
+     and case when jsonb_typeof(p -> 'behavior') = 'array' then jsonb_array_length(p -> 'behavior') else 0 end = 2
+     and nullif(btrim(coalesce(p ->> 'observation', '')), '') is not null;
+$$;
 
 create or replace function sae_create(p_id text, p_employee text, p_period text, p_head text, p_vc text, p_chairman text, p_form text, p_purpose text, p_head2 text default null)
 returns void
@@ -170,8 +185,8 @@ begin
     raise exception 'The evaluation''s details are missing.';
   end if;
   if p_sign then
-    if r.form = 'managerial' and not coalesce(app_sae_ratings_ok(p_data -> 'behavior'), false) then
-      raise exception 'Rate every Behavior item (0 to 3).';
+    if r.form = 'managerial' and not app_sae_mgr_behavior_ok(p_data) then
+      raise exception 'Rate attendance and your actual observation, and write your observation.';
     end if;
     if not coalesce(app_sae_ratings_ok(p_data -> 'job'), false) then
       raise exception 'Rate every Job Performance item (0 to 3).';
@@ -237,8 +252,8 @@ begin
   if p_data is null or jsonb_typeof(p_data) <> 'object' or octet_length(p_data::text) > 30000 then
     raise exception 'The evaluation''s details are missing.';
   end if;
-  if r.form = 'managerial' and not coalesce(app_sae_ratings_ok(p_data -> 'behavior'), false) then
-    raise exception 'Rate every Behavior item (0 to 3).';
+  if r.form = 'managerial' and not app_sae_mgr_behavior_ok(p_data) then
+    raise exception 'Rate attendance and your actual observation, and write your observation.';
   end if;
   if not coalesce(app_sae_ratings_ok(p_data -> 'job'), false) then
     raise exception 'Rate every Job Performance item (0 to 3).';
@@ -322,7 +337,10 @@ begin
     'absentDates', (select coalesce(jsonb_agg(dt order by dt), '[]'::jsonb) from absent),
     'slDays', (select coalesce(sum(sl_days), 0) from p),
     'vlDays', (select coalesce(sum(vl_days), 0) from p),
-    'daysWorked', (select coalesce(sum(days_worked), 0) from p)
+    'daysWorked', (select coalesce(sum(days_worked), 0) from p),
+    'records', (select coalesce(jsonb_agg(jsonb_build_object('date', dr.date, 'type', dr.type, 'description', left(dr.description, 300), 'status', dr.status) order by dr.date), '[]'::jsonb)
+                  from disciplinary_records dr
+                 where dr.employee_id = r.employee_id and extract(year from dr.date) = v_year and dr.withdrawn_at is null)
   ) into v;
   return v;
 end;

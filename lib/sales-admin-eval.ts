@@ -37,6 +37,11 @@ export const SAE_BEHAVIOR = [
   "Follows all established processes for requests such as Leaves, OT, Locator, etc.",
 ];
 
+// Managerial form (phase 99): Behavior is two ratings — attendance (with the
+// HRIS figures) and the evaluator's actual observation (written).
+export const SAE_BEHAVIOR_MANAGERIAL = ["Attendance and punctuality (lates and absences from the HRIS)", "Actual observation"];
+export const behaviorItems = (form: SaeForm) => (form === "managerial" ? SAE_BEHAVIOR_MANAGERIAL : SAE_BEHAVIOR);
+
 export const SAE_JOB: { kra: string; objective: string }[] = [
   { kra: "Communication with superiors", objective: "Communicate effectively and respectfully with superiors" },
   { kra: "Time management", objective: "Finishes assigned tasks on-time" },
@@ -122,6 +127,8 @@ export interface SaeHeadPart {
   // Managerial form (phase 99): the evaluator's Behavior ratings, and the
   // HRIS attendance they rated from (saved when they save).
   behavior?: Rating[];
+  // The evaluator's written actual observation (managerial form).
+  observation?: string;
   attendance?: SaeAttendance | null;
 }
 
@@ -140,6 +147,8 @@ export interface SaeAttendance {
   slDays: number;
   vlDays: number;
   daysWorked: number;
+  // The employee's disciplinary records for the year (memos, NTEs, …).
+  records: { date: string; type: string; description: string; status: string }[];
 }
 
 export type SaeStatus = "open" | "vc" | "chairman" | "done";
@@ -180,7 +189,7 @@ export interface SalesAdminEvaluation {
 }
 
 export const emptyHrPart = (): SaeHrPart => ({ behavior: SAE_BEHAVIOR.map(() => null), sales: [], overall: "", comment: "", recommendation: "" });
-export const emptyHeadPart = (form: SaeForm): SaeHeadPart => ({ job: jobItems(form).map(() => null), overall: "", comment: "", recommendation: "", ...(saeHeadRatesBehavior(form) ? { behavior: SAE_BEHAVIOR.map(() => null) } : {}) });
+export const emptyHeadPart = (form: SaeForm): SaeHeadPart => ({ job: jobItems(form).map(() => null), overall: "", comment: "", recommendation: "", ...(saeHeadRatesBehavior(form) ? { behavior: SAE_BEHAVIOR_MANAGERIAL.map(() => null), observation: "" } : {}) });
 
 // ---- Scoring ------------------------------------------------------------------------
 
@@ -232,7 +241,7 @@ export function saeScores(form: SaeForm, hr: SaeHrPart | null, heads: (SaeHeadPa
   const job = r2((avg(j) / 3) * w.job);
   const sales = r2(avg(months));
   const total = r2(behavior + job + sales);
-  const complete = b.length === SAE_BEHAVIOR.length && allHeadsDone && (w.sales === 0 || months.length > 0);
+  const complete = b.length === behaviorItems(form).length && allHeadsDone && (w.sales === 0 || months.length > 0);
   return { behavior, job, sales, total, passed: total >= passMark, complete };
 }
 
@@ -432,8 +441,9 @@ export function saeEditChanges(form: SaeForm, before: SaeHeadPart | null, after:
   const out: string[] = [];
   const v = (x: Rating | undefined) => (typeof x === "number" ? String(x) : "—");
   if (saeHeadRatesBehavior(form))
-    SAE_BEHAVIOR.forEach((item, i) => {
-      if ((before?.behavior?.[i] ?? null) !== (after.behavior?.[i] ?? null)) out.push(`Behavior ${i + 1} (${item.length > 40 ? `${item.slice(0, 40)}…` : item}): ${v(before?.behavior?.[i])} → ${v(after.behavior?.[i])}`);
+    SAE_BEHAVIOR_MANAGERIAL.forEach((item, i) => {
+      if ((before?.behavior?.[i] ?? null) !== (after.behavior?.[i] ?? null)) out.push(`${i === 0 ? "Attendance" : "Actual observation"} rating: ${v(before?.behavior?.[i])} → ${v(after.behavior?.[i])}`);
+      void item;
     });
   jobItems(form).forEach((j, i) => {
     if ((before?.job?.[i] ?? null) !== (after.job?.[i] ?? null)) out.push(`${j.kra}: ${v(before?.job?.[i])} → ${v(after.job?.[i])}`);
@@ -442,6 +452,7 @@ export function saeEditChanges(form: SaeForm, before: SaeHeadPart | null, after:
   const q = (x: string) => (x ? `“${x.length > 80 ? `${x.slice(0, 80)}…` : x}”` : "—");
   if (t(before?.overall) !== t(after.overall)) out.push(`Overall rating: ${t(before?.overall) || "—"} → ${t(after.overall) || "—"}`);
   if (t(before?.recommendation) !== t(after.recommendation)) out.push(`Recommendation: ${q(t(before?.recommendation))} → ${q(t(after.recommendation))}`);
+  if (t(before?.observation) !== t(after.observation)) out.push(`Actual observation: ${q(t(before?.observation))} → ${q(t(after.observation))}`);
   if (t(before?.comment) !== t(after.comment)) out.push(`Comment: ${q(t(before?.comment))} → ${q(t(after.comment))}`);
   if (t(before?.award) !== t(after.award)) out.push(`Suggested award: ${q(t(before?.award))} → ${q(t(after.award))}`);
   else if (t(before?.awardJustification) !== t(after.awardJustification)) out.push(`Award justification: ${q(t(before?.awardJustification))} → ${q(t(after.awardJustification))}`);
@@ -497,6 +508,7 @@ export async function fetchSaeAttendance(id: string): Promise<SaeAttendance | nu
     slDays: n(d.slDays),
     vlDays: n(d.vlDays),
     daysWorked: n(d.daysWorked),
+    records: ((d.records as Row[] | null) ?? []).map((x) => ({ date: String(x.date ?? ""), type: String(x.type ?? ""), description: String(x.description ?? ""), status: String(x.status ?? "") })),
   };
 }
 

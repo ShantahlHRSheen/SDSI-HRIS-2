@@ -231,22 +231,41 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   row(
     [
       { t: "KRA", w: kraW, f: bold, align: "center" },
-      { t: "Behavior", w: full - kraW - rateW, f: bold, align: "center" },
+      { t: mgr ? "Basis" : "Behavior", w: full - kraW - rateW, f: bold, align: "center" },
       { t: mgr ? "Rating" : "HR's rating", w: rateW, f: bold, align: "center" },
     ],
     true,
   );
-  SAE_BEHAVIOR.forEach((item, i) =>
+  // The attendance the evaluator rated from (from the HRIS), managerial form.
+  const att = mgr ? e.head?.attendance : null;
+  const attText = !att
+    ? ""
+    : att.detailCutoffs
+      ? `From the HRIS (${att.from && att.to ? `${longDate(att.from)} - ${longDate(att.to)}` : att.year}): ${att.lateCount} late(s), ${Math.round(att.lateMinutes)} minutes in all; ${att.absentCount} absence(s); leaves used: SL ${att.slDays}, VL ${att.vlDays} day(s).`
+      : `No day-by-day attendance in the HRIS for ${att.year}.`;
+  if (mgr) {
     row([
-      { t: i === 0 ? SAE_BEHAVIOR_KRA : "", w: kraW, f: bold },
-      { t: `${i + 1}. ${item}`, w: full - kraW - rateW },
-      { t: rating(behaviorRatings?.[i]), w: rateW, align: "center", f: bold },
-    ]),
-  );
+      { t: "Attendance and punctuality", w: kraW, f: bold },
+      { t: attText || "-", w: full - kraW - rateW },
+      { t: rating(behaviorRatings?.[0]), w: rateW, align: "center", f: bold },
+    ]);
+    row([
+      { t: "Actual observation", w: kraW, f: bold },
+      { t: e.head?.observation?.trim() || "", w: full - kraW - rateW },
+      { t: rating(behaviorRatings?.[1]), w: rateW, align: "center", f: bold },
+    ]);
+  } else
+    SAE_BEHAVIOR.forEach((item, i) =>
+      row([
+        { t: i === 0 ? SAE_BEHAVIOR_KRA : "", w: kraW, f: bold },
+        { t: `${i + 1}. ${item}`, w: full - kraW - rateW },
+        { t: rating(behaviorRatings?.[i]), w: rateW, align: "center", f: bold },
+      ]),
+    );
   row(
     [
       {
-        t: `Behavior score (average ÷ 3 × ${w.behavior})`,
+        t: mgr ? `Behavior score ((attendance + observation) ÷ 6 × ${w.behavior})` : `Behavior score (average ÷ 3 × ${w.behavior})`,
         w: full - rateW,
         f: bold,
         align: "right",
@@ -255,21 +274,6 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
     ],
     true,
   );
-
-  // The attendance the evaluator rated from (from the HRIS).
-  const att = mgr ? e.head?.attendance : null;
-  if (att) {
-    const span = att.from && att.to ? `${longDate(att.from)} - ${longDate(att.to)}` : String(att.year);
-    row([
-      { t: "Attendance from the HRIS", w: kraW, f: bold },
-      {
-        t: att.detailCutoffs
-          ? `${span}: ${att.lateCount} late(s), ${Math.round(att.lateMinutes)} minutes in all; ${att.absentCount} absence(s); leaves used: SL ${att.slDays}, VL ${att.vlDays} day(s).`
-          : `No day-by-day attendance in the HRIS for ${att.year}.`,
-        w: full - kraW,
-      },
-    ]);
-  }
 
   // ---- Job Performance -------------------------------------------------------------
   title(`JOB PERFORMANCE (${w.job}%) - rated by ${mgr ? "the evaluator" : `the Department Head${two ? "s (averaged)" : ""}`}`);

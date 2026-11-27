@@ -340,7 +340,7 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
     ...emptyHeadPart(e.form),
     ...mine,
     job: items.map((_, i) => mine?.job?.[i] ?? null),
-    ...(rb ? { behavior: SAE_BEHAVIOR.map((_, i) => mine?.behavior?.[i] ?? null) } : {}),
+    ...(rb ? { behavior: [0, 1].map((i) => mine?.behavior?.[i] ?? null), observation: mine?.observation ?? "" } : {}),
   }));
   const [att, setAtt] = useState<SaeAttendance | null | undefined>(rb ? undefined : null);
   useEffect(() => {
@@ -351,7 +351,7 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof SaeHeadPart>(k: K, v: SaeHeadPart[K]) => setPart((p) => ({ ...p, [k]: v }));
-  const ready = part.job.every((x) => x !== null) && (!rb || !!part.behavior?.every((x) => x !== null)) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
+  const ready = part.job.every((x) => x !== null) && (!rb || ((part.behavior ?? []).length === 2 && !!part.behavior?.every((x) => x !== null) && !!part.observation?.trim())) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
 
   async function save(sign: boolean) {
     if (!currentEmployee) return;
@@ -390,21 +390,36 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
         <ScaleLegend />
         {rb && (
           <div>
-            <div className="mb-2 font-medium text-[var(--text-primary)]">
-              Behavior ({saeWeights(e.form).behavior}%) — {SAE_BEHAVIOR_KRA}
-            </div>
-            <div className="space-y-1.5">
-              {SAE_BEHAVIOR.map((item, i) => (
-                <div key={i} className="rounded-lg px-2 py-1 hover:bg-[var(--gridline)]/20">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[var(--text-secondary)]">
-                      {i + 1}. {item}
-                    </span>
-                    <RatingPicker value={part.behavior?.[i] ?? null} onChange={(v) => set("behavior", (part.behavior ?? []).map((x, k) => (k === i ? v : x)))} />
-                  </div>
-                  {i < 2 && <AttendanceBox a={att} kind={i === 0 ? "late" : "absent"} />}
+            <div className="mb-2 font-medium text-[var(--text-primary)]">Behavior ({saeWeights(e.form).behavior}%)</div>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-[var(--border-hairline)] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--text-primary)]">1. Attendance and punctuality</span>
+                  <RatingPicker value={part.behavior?.[0] ?? null} onChange={(x) => set("behavior", [x, part.behavior?.[1] ?? null])} />
                 </div>
-              ))}
+                <AttendanceBox a={att} kind="late" />
+                <AttendanceBox a={att} kind="absent" />
+              </div>
+              <div className="rounded-lg border border-[var(--border-hairline)] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--text-primary)]">2. Actual observation</span>
+                  <RatingPicker value={part.behavior?.[1] ?? null} onChange={(x) => set("behavior", [part.behavior?.[0] ?? null, x])} />
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Conduct at work: following company policy and instructions, professionalism, confidentiality, dealings with others.</p>
+                <RecordsBox a={att} />
+                <textarea
+                  value={part.observation ?? ""}
+                  onChange={(ev) => set("observation", ev.target.value)}
+                  rows={3}
+                  maxLength={3000}
+                  placeholder="Your actual observation (required)"
+                  className={`${input} mt-1 ${part.observation?.trim() ? "" : "border-[var(--status-critical)]"}`}
+                />
+              </div>
+              <div className="text-right text-xs text-[var(--text-muted)]">
+                Behavior score = (attendance + observation) ÷ 6 × {saeWeights(e.form).behavior}
+                {part.behavior?.every((x) => typeof x === "number") ? ` = ${(((part.behavior[0] ?? 0) + (part.behavior[1] ?? 0)) / 6 * saeWeights(e.form).behavior).toFixed(2)}` : ""}
+              </div>
             </div>
             <div className="mt-3 mb-1 font-medium text-[var(--text-primary)]">Job Performance ({saeWeights(e.form).job}%)</div>
           </div>
@@ -739,13 +754,34 @@ export function AcknowledgeModal({ e, onClose, onChanged }: { e: SalesAdminEvalu
 
 // ---- Attendance from the HRIS (phase 99) ------------------------------------------------
 
+// The employee's disciplinary records for the year, as a basis for Behavior.
+function RecordsBox({ a }: { a: SaeAttendance | null | undefined }) {
+  if (a === undefined) return null;
+  const recs = a?.records ?? [];
+  return (
+    <div className="mt-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/15 px-3 py-2 text-xs text-[var(--text-secondary)]">
+      <div className="font-medium text-[var(--text-primary)]">Disciplinary records in the HRIS{a ? ` for ${a.year}` : ""}: {recs.length ? recs.length : "none"}</div>
+      {recs.length > 0 && (
+        <ul className="mt-1 list-disc space-y-0.5 pl-5">
+          {recs.map((r, i) => (
+            <li key={i}>
+              {shortDate(r.date)} — {r.type.replace(/_/g, " ").toUpperCase()}: {r.description}
+              {r.status ? ` (${r.status})` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 const shortDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 // The employee's lates or absences for the evaluation's year, as recorded in
 // the HRIS — shown to the evaluator beside the attendance items.
 export function AttendanceBox({ a, kind }: { a: SaeAttendance | null | undefined; kind: "late" | "absent" }) {
   const [open, setOpen] = useState(false);
-  const box = "mt-1 ml-4 rounded-lg border border-[var(--series-1)]/30 bg-[var(--series-1)]/5 px-3 py-2 text-xs text-[var(--text-secondary)]";
+  const box = "mt-1 rounded-lg border border-[var(--series-1)]/30 bg-[var(--series-1)]/5 px-3 py-2 text-xs text-[var(--text-secondary)]";
   if (a === undefined)
     return (
       <div className={box}>
