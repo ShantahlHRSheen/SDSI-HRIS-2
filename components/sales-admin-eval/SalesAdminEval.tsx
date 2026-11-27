@@ -340,7 +340,8 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
     ...emptyHeadPart(e.form),
     ...mine,
     job: items.map((_, i) => mine?.job?.[i] ?? null),
-    ...(rb ? { behavior: SAE_BEHAVIOR.map((_, i) => mine?.behavior?.[i] ?? null) } : {}),
+    // By exception: an item not rated yet starts at 3.
+    ...(rb ? { behavior: SAE_BEHAVIOR.map((_, i) => mine?.behavior?.[i] ?? 3), behaviorNotes: SAE_BEHAVIOR.map((_, i) => mine?.behaviorNotes?.[i] ?? "") } : {}),
   }));
   const [att, setAtt] = useState<SaeAttendance | null | undefined>(rb ? undefined : null);
   useEffect(() => {
@@ -351,7 +352,7 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof SaeHeadPart>(k: K, v: SaeHeadPart[K]) => setPart((p) => ({ ...p, [k]: v }));
-  const ready = part.job.every((x) => x !== null) && (!rb || !!part.behavior?.every((x) => x !== null)) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
+  const ready = part.job.every((x) => x !== null) && (!rb || (!!part.behavior?.every((x) => x !== null) && (part.behavior ?? []).every((x, i) => x === 3 || !!part.behaviorNotes?.[i]?.trim()))) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
 
   async function save(sign: boolean) {
     if (!currentEmployee) return;
@@ -393,18 +394,36 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
             <div className="mb-2 font-medium text-[var(--text-primary)]">
               Behavior ({saeWeights(e.form).behavior}%) — {SAE_BEHAVIOR_KRA}
             </div>
+            <div className="mb-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-[var(--text-secondary)]">
+              <b className="text-[var(--text-primary)]">Rated by exception:</b> every item starts at <b>3</b>. Lower an item only when there&rsquo;s a record — a memo, NTE, incident report, or the attendance from the HRIS below — and write that basis.
+            </div>
+            <RecordsBox a={att} />
             <div className="space-y-1.5">
-              {SAE_BEHAVIOR.map((item, i) => (
-                <div key={i} className="rounded-lg px-2 py-1 hover:bg-[var(--gridline)]/20">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[var(--text-secondary)]">
-                      {i + 1}. {item}
-                    </span>
-                    <RatingPicker value={part.behavior?.[i] ?? null} onChange={(v) => set("behavior", (part.behavior ?? []).map((x, k) => (k === i ? v : x)))} />
+              {SAE_BEHAVIOR.map((item, i) => {
+                const v = part.behavior?.[i] ?? null;
+                return (
+                  <div key={i} className="rounded-lg px-2 py-1 hover:bg-[var(--gridline)]/20">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[var(--text-secondary)]">
+                        {i + 1}. {item}
+                      </span>
+                      <RatingPicker value={v} onChange={(x) => set("behavior", (part.behavior ?? []).map((y, k) => (k === i ? x : y)))} />
+                    </div>
+                    {i < 2 && <AttendanceBox a={att} kind={i === 0 ? "late" : "absent"} />}
+                    {v !== null && v < 3 && (
+                      <div className="mt-1 pl-4">
+                      <input
+                        value={part.behaviorNotes?.[i] ?? ""}
+                        onChange={(ev) => set("behaviorNotes", SAE_BEHAVIOR.map((_, k) => (k === i ? ev.target.value : (part.behaviorNotes?.[k] ?? ""))))}
+                        maxLength={300}
+                        placeholder="Basis (required): e.g. NTE dated March 5, 2026 / 32 lates per the HRIS"
+                        className={`${input} text-xs ${part.behaviorNotes?.[i]?.trim() ? "" : "border-[var(--status-critical)]"}`}
+                      />
+                      </div>
+                    )}
                   </div>
-                  {i < 2 && <AttendanceBox a={att} kind={i === 0 ? "late" : "absent"} />}
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-3 mb-1 font-medium text-[var(--text-primary)]">Job Performance ({saeWeights(e.form).job}%)</div>
           </div>
@@ -738,6 +757,27 @@ export function AcknowledgeModal({ e, onClose, onChanged }: { e: SalesAdminEvalu
 }
 
 // ---- Attendance from the HRIS (phase 99) ------------------------------------------------
+
+// The employee's disciplinary records for the year, as a basis for Behavior.
+function RecordsBox({ a }: { a: SaeAttendance | null | undefined }) {
+  if (a === undefined) return null;
+  const recs = a?.records ?? [];
+  return (
+    <div className="mb-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/15 px-3 py-2 text-xs text-[var(--text-secondary)]">
+      <div className="font-medium text-[var(--text-primary)]">Disciplinary records in the HRIS{a ? ` for ${a.year}` : ""}: {recs.length ? recs.length : "none"}</div>
+      {recs.length > 0 && (
+        <ul className="mt-1 list-disc space-y-0.5 pl-5">
+          {recs.map((r, i) => (
+            <li key={i}>
+              {shortDate(r.date)} — {r.type.replace(/_/g, " ").toUpperCase()}: {r.description}
+              {r.status ? ` (${r.status})` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const shortDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 

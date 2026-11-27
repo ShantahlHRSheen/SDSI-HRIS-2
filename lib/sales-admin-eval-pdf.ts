@@ -256,6 +256,14 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
     true,
   );
 
+  // By exception: the basis for each Behavior item rated below 3.
+  if (mgr) {
+    const basis = SAE_BEHAVIOR.map((_, i) => ({ i, r: behaviorRatings?.[i], n: e.head?.behaviorNotes?.[i]?.trim() })).filter((x) => typeof x.r === "number" && x.r < 3);
+    row([
+      { t: "Basis for ratings below 3", w: kraW, f: bold },
+      { t: basis.length ? basis.map((x) => `Item ${x.i + 1}: ${x.n || "-"}`).join("\n") : "None - every item rated 3 (rated by exception: no record against the employee).", w: full - kraW },
+    ]);
+  }
   // The attendance the evaluator rated from (from the HRIS).
   const att = mgr ? e.head?.attendance : null;
   if (att) {
