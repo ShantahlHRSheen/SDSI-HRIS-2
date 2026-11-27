@@ -341,6 +341,67 @@ export async function saveHeadPart(id: string, slot: "head" | "head2", part: Sae
   if (error) throw new Error(friendly(error.message));
 }
 
+// A head's own signed part they may still edit (phase 97): until management
+// has given a recommendation.
+export function saeEditableSlot(e: SalesAdminEvaluation, me: string | undefined): "head" | "head2" | null {
+  if (!me) return null;
+  const open = e.status === "open" || e.status === "vc" || (e.status === "chairman" && !e.vcId) || (e.status === "done" && !e.vcId && !e.chairmanId);
+  if (!open) return null;
+  if (e.headId === me && e.headSignedAt) return "head";
+  if (e.head2Id === me && e.head2SignedAt) return "head2";
+  return null;
+}
+
+export async function editHeadPart(id: string, part: SaeHeadPart, reason: string): Promise<void> {
+  const { error } = await client().rpc("sae_edit_head", { p_id: id, p_data: part as unknown as Row, p_reason: reason.trim() || null });
+  if (error) throw new Error(friendly(error.message));
+}
+
+export interface SaeEdit {
+  id: string;
+  evaluationId: string;
+  part: "head" | "head2";
+  editorName: string;
+  editedAt: string;
+  before: SaeHeadPart | null;
+  after: SaeHeadPart;
+  reason: string | null;
+}
+
+// Every edit the signed-in person can see (only for evaluations they can see);
+// none when the update (phase 97) hasn't been run yet.
+export async function fetchSaeEdits(): Promise<SaeEdit[]> {
+  const { data, error } = await client().from("sales_admin_evaluation_edits").select("*").order("edited_at", { ascending: true });
+  if (error) return [];
+  return ((data as Row[] | null) ?? []).map((r) => ({
+    id: String(r.id),
+    evaluationId: String(r.evaluation_id),
+    part: r.part === "head2" ? "head2" : "head",
+    editorName: String(r.editor_name ?? ""),
+    editedAt: String(r.edited_at ?? ""),
+    before: (r.before_data as SaeHeadPart | null) ?? null,
+    after: r.after_data as SaeHeadPart,
+    reason: (r.reason as string | null) ?? null,
+  }));
+}
+
+// What an edit changed, line by line ("Productivity: 2 → 3").
+export function saeEditChanges(form: SaeForm, before: SaeHeadPart | null, after: SaeHeadPart): string[] {
+  const out: string[] = [];
+  const v = (x: Rating | undefined) => (typeof x === "number" ? String(x) : "—");
+  jobItems(form).forEach((j, i) => {
+    if ((before?.job?.[i] ?? null) !== (after.job?.[i] ?? null)) out.push(`${j.kra}: ${v(before?.job?.[i])} → ${v(after.job?.[i])}`);
+  });
+  const t = (x: string | undefined | null) => (x ?? "").trim();
+  const q = (x: string) => (x ? `“${x.length > 80 ? `${x.slice(0, 80)}…` : x}”` : "—");
+  if (t(before?.overall) !== t(after.overall)) out.push(`Overall rating: ${t(before?.overall) || "—"} → ${t(after.overall) || "—"}`);
+  if (t(before?.recommendation) !== t(after.recommendation)) out.push(`Recommendation: ${q(t(before?.recommendation))} → ${q(t(after.recommendation))}`);
+  if (t(before?.comment) !== t(after.comment)) out.push(`Comment: ${q(t(before?.comment))} → ${q(t(after.comment))}`);
+  if (t(before?.award) !== t(after.award)) out.push(`Suggested award: ${q(t(before?.award))} → ${q(t(after.award))}`);
+  else if (t(before?.awardJustification) !== t(after.awardJustification)) out.push(`Award justification: ${q(t(before?.awardJustification))} → ${q(t(after.awardJustification))}`);
+  return out;
+}
+
 export async function recommendSae(e: SalesAdminEvaluation, me: string, text: string): Promise<void> {
   await placeMySignature(me, sigPath(e.id, e.status === "chairman" ? "chairman" : "vc"));
   const { error } = await client().rpc("sae_recommend", { p_id: e.id, p_recommendation: text });
