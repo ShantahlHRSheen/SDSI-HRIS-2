@@ -22,7 +22,7 @@ export function HeadSheetModal({ items, onClose, onChanged }: { items: SalesAdmi
   const me = currentEmployee?.id;
   // The evaluations where the signed-in person is a head who hasn't signed yet.
   const slotOf = (e: SalesAdminEvaluation): "head" | "head2" | null => (e.headId === me && !e.headSignedAt ? "head" : e.head2Id === me && !e.head2SignedAt ? "head2" : null);
-  const open = useMemo(() => items.filter((e) => e.status === "open" && slotOf(e)), [items, me]); // eslint-disable-line react-hooks/exhaustive-deps
+  const open = useMemo(() => items.filter((e) => e.status === "open" && e.form !== "managerial" && slotOf(e)), [items, me]); // eslint-disable-line react-hooks/exhaustive-deps
   const purposes = SAE_PURPOSES.filter((p) => open.some((e) => e.purpose === p));
   // Everything waiting, like Needs your action; narrow it with the filters.
   const [purpose, setPurpose] = useState("");

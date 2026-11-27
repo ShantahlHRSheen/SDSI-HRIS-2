@@ -18,6 +18,9 @@ import {
   saeSignatures,
   saveHeadPart,
   acknowledgeSae,
+  fetchSaeAttendance,
+  saeHeadRatesBehavior,
+  type SaeAttendance,
   editHeadPart,
   saeEditChanges,
   type SaeEdit,
@@ -330,25 +333,34 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
   // The caller's own part: the first or the second head's.
   const slot = e.headId === currentEmployee?.id ? "head" : "head2";
   const mine = slot === "head" ? e.head : e.head2;
+  // Managerial form (phase 99): the evaluator rates Behavior too, with the
+  // employee's attendance from the HRIS beside the two attendance items.
+  const rb = saeHeadRatesBehavior(e.form);
   const [part, setPart] = useState<SaeHeadPart>(() => ({
     ...emptyHeadPart(e.form),
     ...mine,
     job: items.map((_, i) => mine?.job?.[i] ?? null),
+    ...(rb ? { behavior: SAE_BEHAVIOR.map((_, i) => mine?.behavior?.[i] ?? null) } : {}),
   }));
+  const [att, setAtt] = useState<SaeAttendance | null | undefined>(rb ? undefined : null);
+  useEffect(() => {
+    if (rb) fetchSaeAttendance(e.id).then((a) => setAtt(a ?? mine?.attendance ?? null));
+  }, [rb, e.id, mine?.attendance]);
   const [hasSignature, setHasSignature] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof SaeHeadPart>(k: K, v: SaeHeadPart[K]) => setPart((p) => ({ ...p, [k]: v }));
-  const ready = part.job.every((x) => x !== null) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
+  const ready = part.job.every((x) => x !== null) && (!rb || !!part.behavior?.every((x) => x !== null)) && !!part.overall && !!part.recommendation.trim() && (!part.award?.trim() || !!part.awardJustification?.trim());
 
   async function save(sign: boolean) {
     if (!currentEmployee) return;
     setBusy(sign ? "sign" : "save");
     setError(null);
     try {
-      if (edit) await editHeadPart(e.id, part, reason);
-      else await saveHeadPart(e.id, slot, part, sign ? currentEmployee.id : null);
+      const data = rb ? { ...part, attendance: att ?? part.attendance ?? null } : part;
+      if (edit) await editHeadPart(e.id, data, reason);
+      else await saveHeadPart(e.id, slot, data, sign ? currentEmployee.id : null);
       onChanged();
       onClose();
     } catch (err) {
@@ -361,17 +373,42 @@ export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEv
   return (
     <Modal open wide onClose={() => !busy && onClose()} title={`${edit ? "Edit " : ""}Job Performance — ${e.employeeName} (${e.purpose})`}>
       <div className="space-y-5 text-sm">
+        {rb ? (
+          <p className="text-[var(--text-secondary)]">You are the only evaluator: rate {e.employeeName}&rsquo;s Behavior and Job Performance, then give your overall rating, comment and recommendation.</p>
+        ) : (
         <p className="text-[var(--text-secondary)]">
           As the Department Head, rate {e.employeeName}&rsquo;s job performance, then give your overall rating, comment and recommendation. HR rates the Behavior
           {e.form === "sales_admin" ? " and enters the sales" : ""}.
           {e.head2Id && ` ${slot === "head" ? e.head2Name || "The other head" : e.headName || "The other head"} also rates Job Performance; your ratings are averaged.`}
         </p>
+        )}
         {edit && (
           <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-[var(--text-secondary)]">
             You already signed this. Your changes are saved to the evaluation&rsquo;s <b>edit history</b> (what changed, by whom and when), which HR and everyone who can see the evaluation can read. Your signature stays.
           </div>
         )}
         <ScaleLegend />
+        {rb && (
+          <div>
+            <div className="mb-2 font-medium text-[var(--text-primary)]">
+              Behavior ({saeWeights(e.form).behavior}%) — {SAE_BEHAVIOR_KRA}
+            </div>
+            <div className="space-y-1.5">
+              {SAE_BEHAVIOR.map((item, i) => (
+                <div key={i} className="rounded-lg px-2 py-1 hover:bg-[var(--gridline)]/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[var(--text-secondary)]">
+                      {i + 1}. {item}
+                    </span>
+                    <RatingPicker value={part.behavior?.[i] ?? null} onChange={(v) => set("behavior", (part.behavior ?? []).map((x, k) => (k === i ? v : x)))} />
+                  </div>
+                  {i < 2 && <AttendanceBox a={att} kind={i === 0 ? "late" : "absent"} />}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 mb-1 font-medium text-[var(--text-primary)]">Job Performance ({saeWeights(e.form).job}%)</div>
+          </div>
+        )}
         <div className="space-y-1.5">
           {items.map((j, i) => (
             <div key={i} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1 hover:bg-[var(--gridline)]/20">
@@ -519,8 +556,10 @@ function AwardFields({ award, justification, onAward, onJustification }: { award
 export function Recommendations({ e }: { e: SalesAdminEvaluation }) {
   const cfg = saeConfig();
   const rows: [string, string | null | undefined, string | null | undefined, string | null][] = [
-    [`HR${e.hrName ? ` (${e.hrName})` : ""}`, e.hr?.overall, [e.hr?.recommendation, e.hr?.comment, awardLine(e.hr)].filter(Boolean).join(" — "), e.hrSignedAt],
-    [`${cfg.headTitle}${e.headName ? ` (${e.headName})` : ""}`, e.head?.overall, [e.head?.recommendation, e.head?.comment, awardLine(e.head)].filter(Boolean).join(" — "), e.headSignedAt],
+    ...(saeHeadRatesBehavior(e.form)
+      ? []
+      : [[`HR${e.hrName ? ` (${e.hrName})` : ""}`, e.hr?.overall, [e.hr?.recommendation, e.hr?.comment, awardLine(e.hr)].filter(Boolean).join(" — "), e.hrSignedAt] as [string, string | null | undefined, string | null | undefined, string | null]]),
+    [`${saeHeadRatesBehavior(e.form) ? "Evaluator" : cfg.headTitle}${e.headName ? ` (${e.headName})` : ""}`, e.head?.overall, [e.head?.recommendation, e.head?.comment, awardLine(e.head)].filter(Boolean).join(" — "), e.headSignedAt],
     ...(e.head2Id
       ? [
           [
@@ -574,7 +613,7 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
         passMark: saePassMark(e, cfg.passMark),
         letterhead: await loadHrLetterhead(),
         signatures: await saeSignatures(e),
-        head: { name: e.headName ?? "", title: cfg.headTitle },
+        head: { name: e.headName ?? "", title: e.form === "managerial" ? (e.headId && e.headId === cfg.vcId ? cfg.vcTitle : "Evaluator") : cfg.headTitle },
         head2: e.head2Id ? { name: e.head2Name ?? "", title: cfg.headTitle } : null,
         hr: { name: e.hrName ?? "", title: "HR Manager" },
         vc: { name: e.vcName ?? "", title: cfg.vcTitle },
@@ -584,7 +623,7 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
       setViewer({
         url,
-        name: `${e.form === "general" ? "Performance Evaluation" : "Sales Admin Evaluation"} - ${e.purpose} - ${e.employeeName}.pdf`,
+        name: `${e.form === "sales_admin" ? "Sales Admin Evaluation" : e.form === "managerial" ? "Managerial Performance Evaluation" : "Performance Evaluation"} - ${e.purpose} - ${e.employeeName}.pdf`,
         kind: "pdf",
       });
     } catch (err) {
@@ -695,5 +734,42 @@ export function AcknowledgeModal({ e, onClose, onChanged }: { e: SalesAdminEvalu
         )}
       </div>
     </Modal>
+  );
+}
+
+// ---- Attendance from the HRIS (phase 99) ------------------------------------------------
+
+const shortDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+// The employee's lates or absences for the evaluation's year, as recorded in
+// the HRIS — shown to the evaluator beside the attendance items.
+export function AttendanceBox({ a, kind }: { a: SaeAttendance | null | undefined; kind: "late" | "absent" }) {
+  const [open, setOpen] = useState(false);
+  const box = "mt-1 ml-4 rounded-lg border border-[var(--series-1)]/30 bg-[var(--series-1)]/5 px-3 py-2 text-xs text-[var(--text-secondary)]";
+  if (a === undefined)
+    return (
+      <div className={box}>
+        <Loader2 size={12} className="mr-1 inline animate-spin" /> Loading attendance from the HRIS…
+      </div>
+    );
+  if (!a || !a.detailCutoffs)
+    return <div className={box}>No day-by-day attendance in the HRIS{a ? ` for ${a.year}` : ""} — rate from what you know.</div>;
+  const span = a.from && a.to ? `${shortDate(a.from)} – ${shortDate(a.to)}, ${a.year}` : String(a.year);
+  const list = kind === "late" ? a.lates.map((l) => `${shortDate(l.date)}${l.minutes ? ` (${l.minutes} min)` : ""}`) : a.absentDates.map(shortDate);
+  return (
+    <div className={box}>
+      <div className="font-medium text-[var(--text-primary)]">
+        From the HRIS ({span}):{" "}
+        {kind === "late"
+          ? `${a.lateCount} late${a.lateCount === 1 ? "" : "s"}${a.lateMinutes ? ` · ${Math.round(a.lateMinutes)} minutes in all` : ""}`
+          : `${a.absentCount} absence${a.absentCount === 1 ? "" : "s"} · leaves used: SL ${a.slDays}, VL ${a.vlDays} day${a.slDays + a.vlDays === 1 ? "" : "s"}`}
+      </div>
+      {list.length > 0 && (
+        <button type="button" onClick={() => setOpen((x) => !x)} className="mt-0.5 text-[var(--series-1)] hover:underline">
+          {open ? "Hide dates" : `Show the ${list.length} date${list.length === 1 ? "" : "s"}`}
+        </button>
+      )}
+      {open && <div className="mt-1 leading-relaxed">{list.join(" · ")}</div>}
+    </div>
   );
 }

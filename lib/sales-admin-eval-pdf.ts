@@ -12,6 +12,7 @@ import {
   SAE_SCALE,
   jobItems,
   saeWeights,
+  saeHeadRatesBehavior,
   type SaeSigner,
   type SalesAdminEvaluation,
 } from "./sales-admin-eval";
@@ -92,6 +93,9 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   const e = input.evaluation;
   const hr = e.hr;
   const heads = saeHeads(e);
+  // Managerial form (phase 99): the evaluator rates Behavior too; no HR part.
+  const mgr = saeHeadRatesBehavior(e.form);
+  const behaviorRatings = mgr ? e.head?.behavior : hr?.behavior;
   const info = hr?.employee;
   const doc = await PDFDocument.create();
   doc.setTitle(`${SAE_FORMS[e.form].title} - ${e.employeeName}`);
@@ -221,14 +225,14 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   ]);
 
   // ---- Behavior --------------------------------------------------------------------
-  title(`BEHAVIOR (${w.behavior}%) - rated by HR`);
+  title(`BEHAVIOR (${w.behavior}%) - rated by ${mgr ? "the evaluator" : "HR"}`);
   const kraW = 110;
   const rateW = 60;
   row(
     [
       { t: "KRA", w: kraW, f: bold, align: "center" },
       { t: "Behavior", w: full - kraW - rateW, f: bold, align: "center" },
-      { t: "HR's rating", w: rateW, f: bold, align: "center" },
+      { t: mgr ? "Rating" : "HR's rating", w: rateW, f: bold, align: "center" },
     ],
     true,
   );
@@ -236,7 +240,7 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
     row([
       { t: i === 0 ? SAE_BEHAVIOR_KRA : "", w: kraW, f: bold },
       { t: `${i + 1}. ${item}`, w: full - kraW - rateW },
-      { t: rating(hr?.behavior[i]), w: rateW, align: "center", f: bold },
+      { t: rating(behaviorRatings?.[i]), w: rateW, align: "center", f: bold },
     ]),
   );
   row(
@@ -252,9 +256,24 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
     true,
   );
 
+  // The attendance the evaluator rated from (from the HRIS).
+  const att = mgr ? e.head?.attendance : null;
+  if (att) {
+    const span = att.from && att.to ? `${longDate(att.from)} - ${longDate(att.to)}` : String(att.year);
+    row([
+      { t: "Attendance from the HRIS", w: kraW, f: bold },
+      {
+        t: att.detailCutoffs
+          ? `${span}: ${att.lateCount} late(s), ${Math.round(att.lateMinutes)} minutes in all; ${att.absentCount} absence(s); leaves used: SL ${att.slDays}, VL ${att.vlDays} day(s).`
+          : `No day-by-day attendance in the HRIS for ${att.year}.`,
+        w: full - kraW,
+      },
+    ]);
+  }
+
   // ---- Job Performance -------------------------------------------------------------
-  title(`JOB PERFORMANCE (${w.job}%) - rated by the Department Head${two ? "s (averaged)" : ""}`);
-  const rateCols = two ? [...headCols.map((c, i) => `${short(c.s.name, `Head ${i + 1}`)}'s rating`), "Average"] : ["Head's rating"];
+  title(`JOB PERFORMANCE (${w.job}%) - rated by ${mgr ? "the evaluator" : `the Department Head${two ? "s (averaged)" : ""}`}`);
+  const rateCols = two ? [...headCols.map((c, i) => `${short(c.s.name, `Head ${i + 1}`)}'s rating`), "Average"] : [mgr ? "Rating" : "Head's rating"];
   const jobRateW = two ? 52 : rateW;
   const objW = full - kraW - 40 - jobRateW * rateCols.length;
   row(
@@ -345,8 +364,8 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   const half = full / 2;
   title("OVERALL RATING AND COMMENTS");
   const cols = [
-    ...headCols.map((c, i) => ({ ...c, label: two ? `${short(c.s.name, `Head ${i + 1}`)}'s` : "Head's" })),
-    { part: hr, who: "hr" as SaeSigner, s: input.hr, at: e.hrSignedAt, label: "HR's" },
+    ...headCols.map((c, i) => ({ ...c, label: two ? `${short(c.s.name, `Head ${i + 1}`)}'s` : mgr ? "Evaluator's" : "Head's" })),
+    ...(mgr ? [] : [{ part: hr, who: "hr" as SaeSigner, s: input.hr, at: e.hrSignedAt, label: "HR's" }]),
   ];
   const colW = full / cols.length;
   const mark = (v: string | undefined) => SAE_OVERALL.map((o) => `${o === v ? "[X]" : "[  ]"} ${o}`).join(cols.length > 2 ? "\n" : "    ");
@@ -397,13 +416,13 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   };
   ensure(80);
   cols.forEach((c, i) =>
-    signBlock(M + colW * i + colW / 2, y - 4, c.who, c.s, c.at, c.who === "hr" ? "HR's signature" : "Department Head's signature", Math.min(95, colW / 2 - 8)),
+    signBlock(M + colW * i + colW / 2, y - 4, c.who, c.s, c.at, c.who === "hr" ? "HR's signature" : mgr ? "Evaluator's signature" : "Department Head's signature", Math.min(95, colW / 2 - 8)),
   );
   y -= 80;
 
   // ---- HR certification ------------------------------------------------------------
   ensure(260);
-  title("HR CERTIFICATION");
+  title(mgr ? "EVALUATION SUMMARY" : "HR CERTIFICATION");
   const statusLabel = (s: string | undefined) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
   row([
     { t: "Date hired:", w: 110, f: bold },
