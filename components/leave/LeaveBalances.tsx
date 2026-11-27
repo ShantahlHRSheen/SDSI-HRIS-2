@@ -4,13 +4,17 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Download, Users } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
-import { balanceFor, creditPeriodOf, paidLeaveEligibleFrom } from "@/lib/leave-policy";
+import { balanceFor, creditPeriodOf, isSemiannual, paidLeaveEligibleFrom } from "@/lib/leave-policy";
 import type { Employee, LeaveType } from "@/lib/types";
 
 // Every active employee's remaining leave for the current period (VL / SL by
 // half-year, the rest per year), counting approved and pending requests — the
 // same numbers each employee sees on their own Leave Management page. For HR
 // and Upper Management.
+//
+// Vacation and Sick Leave: only the current half-year's credits can be used.
+// In Jul–Dec, the unused Jan–Jun days can no longer be used; they are shown
+// as going to the year-end 13th month pay.
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100);
 
@@ -34,7 +38,9 @@ export function LeaveBalances({ today }: { today: string }) {
           if (!applies(e, lt)) return null;
           const b = balanceFor(leaveRequests, e.id, lt, today);
           const from = paidLeaveEligibleFrom(e.id, lt.id);
-          return { ...b, notYet: !!from && today < from ? from : null };
+          // In Jul–Dec: what's left of Jan–Jun (no longer usable).
+          const firstHalf = isSemiannual(lt.id) && Number(today.slice(5, 7)) > 6 ? balanceFor(leaveRequests, e.id, lt, `${today.slice(0, 4)}-03-01`) : null;
+          return { ...b, notYet: !!from && today < from ? from : null, firstHalf };
         }),
       })),
     // The credit context (date hired, HR's adjustments) is set by the store from these.
@@ -50,8 +56,25 @@ export function LeaveBalances({ today }: { today: string }) {
 
   function exportCsv() {
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const head = ["Employee No.", "Name", "Department", "Position", ...types.flatMap((lt) => [`${lt.name} — remaining`, `${lt.name} — credits`])];
-    const lines = shown.map(({ e, cells }) => [e.employeeNumber, fullName(e), departmentName(e.departmentId), positionTitle(e.positionId), ...cells.flatMap((c) => (c ? [fmt(c.remaining), fmt(c.credits)] : ["", ""]))]);
+    const h1 = (lt: LeaveType) => isSemiannual(lt.id) && Number(today.slice(5, 7)) > 6;
+    const head = [
+      "Employee No.",
+      "Name",
+      "Department",
+      "Position",
+      ...types.flatMap((lt) => [
+        `${lt.name} — ${isSemiannual(lt.id) ? "usable now" : "remaining"}`,
+        `${lt.name} — credits`,
+        ...(h1(lt) ? [`${lt.name} — Jan–Jun unused (13th month)`] : []),
+      ]),
+    ];
+    const lines = shown.map(({ e, cells }) => [
+      e.employeeNumber,
+      fullName(e),
+      departmentName(e.departmentId),
+      positionTitle(e.positionId),
+      ...cells.flatMap((c, i) => [...(c ? [fmt(c.remaining), fmt(c.credits)] : ["", ""]), ...(h1(types[i]) ? [c?.firstHalf ? fmt(c.firstHalf.remaining) : ""] : [])]),
+    ]);
     const csv = [head, ...lines].map((r) => r.map((v) => esc(String(v ?? ""))).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -88,7 +111,8 @@ export function LeaveBalances({ today }: { today: string }) {
       {open && (
         <>
           <p className="mt-1 mb-3 text-xs text-[var(--text-muted)]">
-            Remaining days for {periodNote}, counting approved and pending leave. Vacation and Sick Leave are with pay after 1 year of service.
+            Remaining days for {periodNote}, counting approved and pending leave. <b className="text-[var(--text-secondary)]">Vacation and Sick Leave:</b>{" "}only the current half-year&rsquo;s balance can be used
+            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used and go to the 13th month pay</>}. With pay after 1 year of service.
           </p>
           <div className="max-h-[520px] overflow-auto rounded-lg border border-[var(--border-hairline)]">
             <table className="w-full min-w-[900px] text-sm">
@@ -98,6 +122,7 @@ export function LeaveBalances({ today }: { today: string }) {
                   {types.map((lt) => (
                     <th key={lt.id} className="px-3 py-2 text-center font-medium whitespace-nowrap">
                       {lt.name.replace(/ Leave$/, "")}
+                      {isSemiannual(lt.id) && <div className="text-[10px] font-normal text-[var(--series-1)]">usable now</div>}
                     </th>
                   ))}
                 </tr>
@@ -120,10 +145,17 @@ export function LeaveBalances({ today }: { today: string }) {
                             from {formatDate(c.notYet)}
                           </span>
                         ) : (
-                          <span title={`${fmt(c.used)} used of ${fmt(c.credits)} (${c.period.label})`}>
-                            <b className={c.remaining <= 0 ? "text-[var(--status-critical)]" : "text-[var(--text-primary)]"}>{fmt(c.remaining)}</b>
-                            <span className="text-xs text-[var(--text-muted)]"> / {fmt(c.credits)}</span>
-                          </span>
+                          <div>
+                            <span title={`${fmt(c.used)} used of ${fmt(c.credits)} (${c.period.label})`}>
+                              <b className={c.remaining <= 0 ? "text-[var(--status-critical)]" : "text-[var(--text-primary)]"}>{fmt(c.remaining)}</b>
+                              <span className="text-xs text-[var(--text-muted)]"> / {fmt(c.credits)}</span>
+                            </span>
+                            {c.firstHalf && c.firstHalf.credits > 0 && (
+                              <div className="text-[10px] whitespace-nowrap text-[var(--text-muted)]" title={`Jan–Jun: ${fmt(c.firstHalf.used)} used of ${fmt(c.firstHalf.credits)}. Unused days can't be used now; they go to the 13th month pay.`}>
+                                Jan–Jun {fmt(c.firstHalf.remaining)} → 13th mo.
+                              </div>
+                            )}
+                          </div>
                         )}
                       </td>
                     ))}
