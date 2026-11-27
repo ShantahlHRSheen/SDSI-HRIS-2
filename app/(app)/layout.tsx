@@ -9,6 +9,7 @@ import { PasswordForm } from "@/components/account/PasswordForm";
 import { SaveErrorToasts } from "@/components/SaveErrorToasts";
 import { PastePhotos } from "@/components/PastePhotos";
 import { PendingNoticeAlert } from "@/components/probation/PendingNoticeAlert";
+import { EvaluationReadyAlert } from "@/components/sales-admin-eval/EvaluationReadyAlert";
 import { NewAnnouncementPopup } from "@/components/bulletin/NewAnnouncementPopup";
 import { AlertTriangle } from "lucide-react";
 import { ChatProvider } from "@/components/chat/ChatProvider";
@@ -77,6 +78,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <PendingNoticeAlert />
+          <EvaluationReadyAlert />
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
           <SaveErrorToasts />
           <PastePhotos />

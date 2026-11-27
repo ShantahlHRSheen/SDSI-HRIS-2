@@ -139,6 +139,10 @@ export interface SalesAdminEvaluation {
   chairmanRecommendation: string | null;
   chairmanName: string | null;
   chairmanSignedAt: string | null;
+  // Released to the employee by HR, and the employee's acknowledgement (phase 98).
+  releasedAt: string | null;
+  releasedBy: string | null;
+  acknowledgedAt: string | null;
 }
 
 export const emptyHrPart = (): SaeHrPart => ({ behavior: SAE_BEHAVIOR.map(() => null), sales: [], overall: "", comment: "", recommendation: "" });
@@ -276,6 +280,9 @@ const toEval = (r: Row): SalesAdminEvaluation => ({
   chairmanRecommendation: (r.chairman_recommendation as string | null) ?? null,
   chairmanName: (r.chairman_name as string | null) ?? null,
   chairmanSignedAt: (r.chairman_signed_at as string | null) ?? null,
+  releasedAt: (r.released_at as string | null) ?? null,
+  releasedBy: (r.released_by as string | null) ?? null,
+  acknowledgedAt: (r.acknowledged_at as string | null) ?? null,
 });
 
 // Whether the employee is a head on any evaluation (for the menu).
@@ -283,7 +290,8 @@ const toEval = (r: Row): SalesAdminEvaluation => ({
 // named on it, or as a supervisor / Department Head of the employee (the
 // database only returns those, phase 96).
 export async function isEvaluationHead(employeeId: string): Promise<boolean> {
-  const { data, error } = await client().from("sales_admin_evaluations").select("id").neq("employee_id", employeeId).limit(1);
+  void employeeId; // the database returns only what the person may see
+  const { data, error } = await client().from("sales_admin_evaluations").select("id").limit(1);
   return !error && ((data as Row[] | null) ?? []).length > 0;
 }
 
@@ -321,8 +329,8 @@ export async function createSalesAdminEvaluation(input: {
   return id;
 }
 
-export type SaeSigner = "hr" | "head" | "head2" | "vc" | "chairman";
-const SIGNERS: SaeSigner[] = ["hr", "head", "head2", "vc", "chairman"];
+export type SaeSigner = "hr" | "head" | "head2" | "vc" | "chairman" | "employee";
+const SIGNERS: SaeSigner[] = ["hr", "head", "head2", "vc", "chairman", "employee"];
 // Every head's part, for scoring.
 export const saeHeads = (e: SalesAdminEvaluation): (SaeHeadPart | null)[] => (e.head2Id ? [e.head, e.head2] : [e.head]);
 const sigPath = (id: string, as: SaeSigner) => `sae/${id}/${as}.png`;
@@ -346,7 +354,7 @@ export async function saveHeadPart(id: string, slot: "head" | "head2", part: Sae
 export function saeEditableSlot(e: SalesAdminEvaluation, me: string | undefined): "head" | "head2" | null {
   if (!me) return null;
   const open = e.status === "open" || e.status === "vc" || (e.status === "chairman" && !e.vcId) || (e.status === "done" && !e.vcId && !e.chairmanId);
-  if (!open) return null;
+  if (!open || e.acknowledgedAt) return null;
   if (e.headId === me && e.headSignedAt) return "head";
   if (e.head2Id === me && e.head2SignedAt) return "head2";
   return null;
@@ -402,6 +410,29 @@ export function saeEditChanges(form: SaeForm, before: SaeHeadPart | null, after:
   return out;
 }
 
+// HR releases a completed evaluation to the employee, or takes it back
+// (until the employee acknowledges) — phase 98.
+export async function releaseSae(id: string, release: boolean): Promise<void> {
+  const { error } = await client().rpc("sae_release", { p_id: id, p_release: release });
+  if (error) throw new Error(friendly(error.message));
+}
+
+// The employee signs that they've read their released evaluation.
+export async function acknowledgeSae(id: string, me: string): Promise<void> {
+  await placeMySignature(me, sigPath(id, "employee"));
+  const { error } = await client().rpc("sae_acknowledge", { p_id: id });
+  if (error) throw new Error(friendly(error.message));
+}
+
+// The person's own released evaluations still to acknowledge.
+export async function myEvaluationsToAcknowledge(me: string): Promise<{ id: string; purpose: string; period: string }[]> {
+  const { data, error } = await client().from("sales_admin_evaluations").select("id, purpose, period, released_at, acknowledged_at, status").eq("employee_id", me);
+  if (error) return [];
+  return ((data as Row[] | null) ?? [])
+    .filter((r) => r.status === "done" && r.released_at && !r.acknowledged_at)
+    .map((r) => ({ id: String(r.id), purpose: String(r.purpose ?? ""), period: String(r.period ?? "") }));
+}
+
 export async function recommendSae(e: SalesAdminEvaluation, me: string, text: string): Promise<void> {
   await placeMySignature(me, sigPath(e.id, e.status === "chairman" ? "chairman" : "vc"));
   const { error } = await client().rpc("sae_recommend", { p_id: e.id, p_recommendation: text });
@@ -427,6 +458,7 @@ export async function saeSignatures(e: SalesAdminEvaluation): Promise<Partial<Re
     ["head2", e.head2SignedAt],
     ["vc", e.vcSignedAt],
     ["chairman", e.chairmanSignedAt],
+    ["employee", e.acknowledgedAt],
   ];
   const out: Partial<Record<SaeSigner, Uint8Array>> = {};
   await Promise.all(
