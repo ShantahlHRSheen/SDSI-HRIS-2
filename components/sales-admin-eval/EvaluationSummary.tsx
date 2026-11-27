@@ -6,6 +6,7 @@ import { useHris } from "@/lib/store";
 import { departmentName } from "@/lib/helpers";
 import { awardLine, saeHeads, saeScores, saeStatusLabel, saeWeights, SAE_FORMS, SAE_PURPOSES, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import { saeConfig } from "./SalesAdminEval";
+import { TopPerformers } from "./TopPerformers";
 
 // The scores of every evaluation the signed-in person can see, as one table:
 // HR and Upper Management see all; Department Heads and supervisors see the
@@ -52,6 +53,8 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
     .filter((r) => (!purpose || r.e.purpose === purpose) && (!period || r.e.period === period) && (!dept || r.departmentId === dept) && (!q || r.e.employeeName.toLowerCase().includes(q)))
     .sort((a, b) => (sort === "score" ? b.s.total - a.s.total : 0) || a.e.employeeName.localeCompare(b.e.employeeName));
   const anySales = shown.some((r) => r.w.sales > 0);
+  // Top performers: by the filters (not the name search).
+  const forTop = rows.filter((r) => (!purpose || r.e.purpose === purpose) && (!period || r.e.period === period) && (!dept || r.departmentId === dept));
   const completed = shown.filter((r) => r.done);
   const passed = completed.filter((r) => r.s.passed).length;
   const average = completed.length ? completed.reduce((t, r) => t + r.s.total, 0) / completed.length : 0;
@@ -130,7 +133,9 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
       </div>
       {open && (
         <>
-          <div className="mt-3 mb-3 flex flex-wrap gap-2 text-xs">
+          <div className="mt-3" />
+          <TopPerformers rows={forTop} purpose={purpose} />
+          <div className="mb-3 flex flex-wrap gap-2 text-xs">
             {[
               ["Shown", String(shown.length)],
               ["Completed", String(completed.length)],
