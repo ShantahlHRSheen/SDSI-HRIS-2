@@ -20,6 +20,7 @@ import {
   saeHeads,
   saveHrPart,
   SAE_AWARD_SUGGESTIONS,
+  saePassMark,
   SAE_BEHAVIOR,
   awardLine,
   SAE_BEHAVIOR_KRA,
@@ -125,7 +126,8 @@ const peso = (n: number) => `₱${(Number(n) || 0).toLocaleString("en-PH", { min
 
 export function ScoreSummary({ e, hr }: { e: SalesAdminEvaluation; hr?: SaeHrPart | null }) {
   const cfg = saeConfig();
-  const s = saeScores(e.form, hr ?? e.hr, saeHeads(e), cfg.passMark);
+  const pass = saePassMark(e, cfg.passMark);
+  const s = saeScores(e.form, hr ?? e.hr, saeHeads(e), pass);
   const w = saeWeights(e.form);
   const cell = "rounded-lg bg-[var(--gridline)]/25 px-3 py-2";
   return (
@@ -145,7 +147,7 @@ export function ScoreSummary({ e, hr }: { e: SalesAdminEvaluation; hr?: SaeHrPar
         Actual score <div className="tabular text-sm font-semibold text-[var(--text-primary)]">{fmt(s.total)}</div>
       </div>
       <div className={cell}>
-        Remarks (pass {cfg.passMark})
+        Remarks (pass {pass})
         <div className={`text-sm font-semibold ${!s.complete ? "text-[var(--text-muted)]" : s.passed ? "text-[var(--status-good)]" : "text-[var(--status-critical)]"}`}>
           {!s.complete ? "Incomplete" : s.passed ? "PASSED" : "FAILED"}
         </div>
@@ -544,7 +546,7 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
       const bytes = await buildSaePdf({
         evaluation: e,
         companyName: company.name,
-        passMark: cfg.passMark,
+        passMark: saePassMark(e, cfg.passMark),
         letterhead: await loadHrLetterhead(),
         signatures: await saeSignatures(e),
         head: { name: e.headName ?? "", title: cfg.headTitle },
