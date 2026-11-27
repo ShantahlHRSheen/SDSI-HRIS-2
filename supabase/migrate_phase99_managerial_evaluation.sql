@@ -6,9 +6,9 @@
 --   both rated by the evaluator (the "Department Head" on the evaluation) —
 --   HR doesn't rate it; HR only starts and releases it. No second head, no
 --   Vice Chairperson or Chairman: done when the evaluator signs.
--- * Behavior "by exception": every item starts at 3; the evaluator may rate
---   an item lower only with its basis written down (a memo, NTE, incident
---   report or the HRIS attendance) — checked when they sign or edit.
+-- * Behavior on the managerial form is two ratings: attendance and
+--   punctuality (with the HRIS figures shown) and the evaluator's actual
+--   observation, which they write down.
 -- * sae_attendance: the employee's attendance for the evaluation's year from
 --   the HRIS (lates with minutes and dates, absences with dates, leaves) and
 --   their disciplinary records for the year — for HR, Upper Management and
@@ -19,17 +19,16 @@
 alter table sales_admin_evaluations drop constraint if exists sales_admin_evaluations_form_check;
 alter table sales_admin_evaluations add constraint sales_admin_evaluations_form_check check (form in ('sales_admin', 'general', 'managerial'));
 
--- Every Behavior item rated below 3 has its basis written in behaviorNotes.
-create or replace function app_sae_basis_ok(p jsonb)
+-- Managerial Behavior: both ratings (attendance, actual observation) given,
+-- and the observation written.
+create or replace function app_sae_mgr_behavior_ok(p jsonb)
 returns boolean
 language sql
 immutable
 as $$
-  select not exists (
-    select 1
-      from jsonb_array_elements(case when jsonb_typeof(p -> 'behavior') = 'array' then p -> 'behavior' else '[]'::jsonb end) with ordinality as b(v, i)
-     where jsonb_typeof(b.v) = 'number' and b.v::text <> '3'
-       and nullif(btrim(coalesce(p -> 'behaviorNotes' ->> (b.i::int - 1), '')), '') is null);
+  select coalesce(app_sae_ratings_ok(p -> 'behavior'), false)
+     and case when jsonb_typeof(p -> 'behavior') = 'array' then jsonb_array_length(p -> 'behavior') else 0 end = 2
+     and nullif(btrim(coalesce(p ->> 'observation', '')), '') is not null;
 $$;
 
 create or replace function sae_create(p_id text, p_employee text, p_period text, p_head text, p_vc text, p_chairman text, p_form text, p_purpose text, p_head2 text default null)
@@ -186,11 +185,8 @@ begin
     raise exception 'The evaluation''s details are missing.';
   end if;
   if p_sign then
-    if r.form = 'managerial' and not coalesce(app_sae_ratings_ok(p_data -> 'behavior'), false) then
-      raise exception 'Rate every Behavior item (0 to 3).';
-    end if;
-    if r.form = 'managerial' and not app_sae_basis_ok(p_data) then
-      raise exception 'Write the basis (record) for each Behavior item rated below 3.';
+    if r.form = 'managerial' and not app_sae_mgr_behavior_ok(p_data) then
+      raise exception 'Rate attendance and your actual observation, and write your observation.';
     end if;
     if not coalesce(app_sae_ratings_ok(p_data -> 'job'), false) then
       raise exception 'Rate every Job Performance item (0 to 3).';
@@ -256,11 +252,8 @@ begin
   if p_data is null or jsonb_typeof(p_data) <> 'object' or octet_length(p_data::text) > 30000 then
     raise exception 'The evaluation''s details are missing.';
   end if;
-  if r.form = 'managerial' and not coalesce(app_sae_ratings_ok(p_data -> 'behavior'), false) then
-    raise exception 'Rate every Behavior item (0 to 3).';
-  end if;
-  if r.form = 'managerial' and not app_sae_basis_ok(p_data) then
-    raise exception 'Write the basis (record) for each Behavior item rated below 3.';
+  if r.form = 'managerial' and not app_sae_mgr_behavior_ok(p_data) then
+    raise exception 'Rate attendance and your actual observation, and write your observation.';
   end if;
   if not coalesce(app_sae_ratings_ok(p_data -> 'job'), false) then
     raise exception 'Rate every Job Performance item (0 to 3).';
