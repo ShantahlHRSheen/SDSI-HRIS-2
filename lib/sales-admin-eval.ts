@@ -184,6 +184,7 @@ export function saeScores(form: SaeForm, hr: SaeHrPart | null, heads: (SaeHeadPa
 
 export function saeStatusLabel(e: SalesAdminEvaluation): { label: string; tone: "warning" | "good" | "info" } {
   if (e.status === "done") return { label: "Completed", tone: "good" };
+  // Year-end Evaluations have no Vice Chairperson or Chairman (phase 95).
   if (e.status === "chairman") return { label: "Waiting for the Chairman", tone: "info" };
   if (e.status === "vc") return { label: "Waiting for the Vice Chairperson", tone: "info" };
   const waiting = [!e.hrSignedAt && "HR", !e.headSignedAt && (e.headName || "the Department Head"), e.head2Id && !e.head2SignedAt && (e.head2Name || "the second Department Head")].filter(Boolean);
@@ -280,7 +281,7 @@ export async function createSalesAdminEvaluation(input: {
   headId: string;
   head2Id: string | null;
   vcId: string | null; // none: straight to the Chairman
-  chairmanId: string;
+  chairmanId: string | null; // none for a Year-end Evaluation (phase 95)
   employee: SaeEmployeeInfo;
 }): Promise<string> {
   const id = crypto.randomUUID();
@@ -290,7 +291,7 @@ export async function createSalesAdminEvaluation(input: {
     p_period: input.period,
     p_head: input.headId,
     p_vc: input.vcId || null,
-    p_chairman: input.chairmanId,
+    p_chairman: input.chairmanId || null,
     p_form: input.form,
     p_purpose: input.purpose,
     p_head2: input.head2Id || null,

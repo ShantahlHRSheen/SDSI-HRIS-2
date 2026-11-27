@@ -153,17 +153,17 @@ export default function SalesAdminEvaluationPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={st.tone}>{st.label}</Badge>
                   <ViewSaeButton e={e} />
-                  {isHr && (e.status === "open" || e.status === "vc") && e.hrSignedAt && (
+                  {isHr && (e.status === "open" || e.status === "vc" || (e.status === "done" && !e.vcId && !e.chairmanId)) && e.hrSignedAt && (
                     <button onClick={() => act(() => reopenSaePart(e.id, "hr"))} disabled={busy} className={secondary} title="Unlock HR's part to edit it">
                       <RotateCcw size={13} /> Edit HR&rsquo;s part
                     </button>
                   )}
-                  {isHr && (e.status === "open" || e.status === "vc") && e.head2SignedAt && (
+                  {isHr && (e.status === "open" || e.status === "vc" || (e.status === "done" && !e.vcId && !e.chairmanId)) && e.head2SignedAt && (
                     <button onClick={() => act(() => reopenSaePart(e.id, "head2"))} disabled={busy} className={secondary} title={`Send ${e.head2Name ?? "the second head"}'s part back to be redone`}>
                       <RotateCcw size={13} /> Return {e.head2Name?.split(" ")[0] ?? "2nd head"}&rsquo;s part
                     </button>
                   )}
-                  {isHr && (e.status === "open" || e.status === "vc") && e.headSignedAt && (
+                  {isHr && (e.status === "open" || e.status === "vc" || (e.status === "done" && !e.vcId && !e.chairmanId)) && e.headSignedAt && (
                     <button onClick={() => act(() => reopenSaePart(e.id, "head"))} disabled={busy} className={secondary} title="Send the head's part back to be redone">
                       <RotateCcw size={13} /> Return head&rsquo;s part
                     </button>
@@ -232,6 +232,8 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
   const [chairmanId, setChairmanId] = useState(cfg.chairmanId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Year-end Evaluations don't go to the Vice Chairperson or the Chairman (phase 95).
+  const yearEnd = purpose === "Year-end Evaluation";
 
   // The head defaults to the Sales Admins' head, or the employee's Job
   // Performance evaluator / supervisor.
@@ -270,8 +272,8 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
         period,
         headId,
         head2Id: head2Id || null,
-        vcId: vcId || null,
-        chairmanId,
+        vcId: yearEnd ? null : vcId || null,
+        chairmanId: yearEnd ? null : chairmanId,
         employee: {
           name: `${emp.firstName}${mi} ${emp.lastName}`,
           position: positionTitle(emp.positionId),
@@ -353,6 +355,11 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
           <label className={lbl}>Second Department Head (optional — also rates Job Performance; the two are averaged)</label>
           {pick(head2Id, setHead2Id)}
         </div>
+        {yearEnd ? (
+          <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--gridline)]/20 px-3 py-2 text-xs text-[var(--text-secondary)]">
+            Year-end Evaluation: completed once HR and the Department Head{head2Id ? "s" : ""} sign. The {cfg.vcTitle} and the {cfg.chairmanTitle} don&rsquo;t sign it, but they can see the results.
+          </div>
+        ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className={lbl}>{cfg.vcTitle} (optional)</label>
@@ -363,12 +370,13 @@ function NewEvaluationModal({ employees, onClose, onCreated }: { employees: Retu
             {pick(chairmanId, setChairmanId)}
           </div>
         </div>
+        )}
         {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} disabled={busy} className={secondary}>
             Cancel
           </button>
-          <button onClick={create} disabled={busy || !employeeId || !headId || !chairmanId || head2Id === headId} className={primary}>
+          <button onClick={create} disabled={busy || !employeeId || !headId || (!yearEnd && !chairmanId) || head2Id === headId} className={primary}>
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Start
           </button>
         </div>

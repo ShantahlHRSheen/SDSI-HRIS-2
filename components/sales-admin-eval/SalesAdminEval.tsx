@@ -472,7 +472,7 @@ export function Recommendations({ e }: { e: SalesAdminEvaluation }) {
         ]
       : []),
     ...(e.vcId || e.vcSignedAt ? [[`${cfg.vcTitle}${e.vcName ? ` (${e.vcName})` : ""}`, null, e.vcRecommendation, e.vcSignedAt] as [string, null, string | null, string | null]] : []),
-    [`${cfg.chairmanTitle}${e.chairmanName ? ` (${e.chairmanName})` : ""}`, null, e.chairmanRecommendation, e.chairmanSignedAt],
+    ...(e.chairmanId || e.chairmanSignedAt ? [[`${cfg.chairmanTitle}${e.chairmanName ? ` (${e.chairmanName})` : ""}`, null, e.chairmanRecommendation, e.chairmanSignedAt] as [string, null, string | null, string | null]] : []),
   ];
   return (
     <div className="space-y-1.5 text-xs">

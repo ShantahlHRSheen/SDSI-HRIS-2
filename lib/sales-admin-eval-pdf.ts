@@ -465,7 +465,8 @@ export async function buildSaePdf(input: SaePdfInput): Promise<Uint8Array> {
   };
   // No Vice Chairperson on the Sales Admin form.
   if (e.vcId || e.vcSignedAt) recommendation("VICE CHAIRPERSON'S RECOMMENDATION", "vc", input.vc, e.vcRecommendation, e.vcSignedAt);
-  recommendation("CHAIRMAN'S RECOMMENDATION", "chairman", input.chairman, e.chairmanRecommendation, e.chairmanSignedAt);
+  // No Chairman on a Year-end Evaluation (phase 95).
+  if (e.chairmanId || e.chairmanSignedAt) recommendation("CHAIRMAN'S RECOMMENDATION", "chairman", input.chairman, e.chairmanRecommendation, e.chairmanSignedAt);
 
   return doc.save();
 }
