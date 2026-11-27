@@ -213,7 +213,7 @@ export default function LeaveManagementPage() {
               b.eligibleFrom && today < b.eligibleFrom
                 ? `With pay from ${formatDate(b.eligibleFrom)} (1 year of service)`
                 : isSemiannual(b.leaveType.id)
-                  ? `of ${b.credits} · ${b.period.label.slice(0, 7)}`
+                  ? `of ${b.credits} · usable ${b.period.label.slice(0, 7)}`
                   : `of ${b.credits}`
             }
             compact
