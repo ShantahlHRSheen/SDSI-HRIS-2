@@ -112,7 +112,7 @@ export function LeaveBalances({ today }: { today: string }) {
         <>
           <p className="mt-1 mb-3 text-xs text-[var(--text-muted)]">
             Remaining days for {periodNote}, counting approved and pending leave. <b className="text-[var(--text-secondary)]">Vacation and Sick Leave:</b>{" "}only the current half-year&rsquo;s balance can be used
-            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used; unused Jan–Jun Vacation Leave goes to the 13th month pay</>}. With pay after 1 year of service.
+            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used; unused Jan–Jun Vacation Leave goes to the 13th month pay</>}. Paid Vacation and Sick Leave start after 1 year of service; until then the balance is 0.
           </p>
           <div className="max-h-[520px] overflow-auto rounded-lg border border-[var(--border-hairline)]">
             <table className="w-full min-w-[900px] text-sm">
@@ -141,9 +141,11 @@ export function LeaveBalances({ today }: { today: string }) {
                         {!c ? (
                           <span className="text-[var(--text-muted)]">—</span>
                         ) : c.notYet ? (
-                          <span className="text-xs text-[var(--text-muted)]" title={`With pay from ${formatDate(c.notYet)}`}>
-                            from {formatDate(c.notYet)}
-                          </span>
+                          <div title={`No paid ${types[i].name} yet: with pay after 1 year of service, from ${formatDate(c.notYet)}.`}>
+                            <b className="text-[var(--text-muted)]">0</b>
+                            <span className="text-xs text-[var(--text-muted)]"> / 0</span>
+                            <div className="text-[10px] whitespace-nowrap text-[var(--text-muted)]">under 1 yr of service</div>
+                          </div>
                         ) : (
                           <div>
                             <span title={`${fmt(c.used)} used of ${fmt(c.credits)} (${c.period.label})`}>
