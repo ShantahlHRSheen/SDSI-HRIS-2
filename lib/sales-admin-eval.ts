@@ -512,6 +512,44 @@ export async function fetchSaeAttendance(id: string): Promise<SaeAttendance | nu
   };
 }
 
+// Every active employee's attendance for the year from the HRIS, for the
+// attendance awards (phase 100; HR and Upper Management). Null when it
+// can't be read (not allowed, or the update isn't run).
+export interface SaeAttendanceAwardRow {
+  employeeId: string;
+  detailCutoffs: number;
+  daysWorked: number;
+  absences: number;
+  lates: number;
+  lateMinutes: number;
+  punchDays: number;
+  avgFirstIn: number | null; // minutes after midnight
+}
+export async function fetchAttendanceAwards(year: number): Promise<{ year: number; maxDetailCutoffs: number; employees: SaeAttendanceAwardRow[] } | null> {
+  try {
+    const { data, error } = await (getSupabaseClient() as unknown as { rpc: (fn: string, a: Row) => PromiseLike<{ data: unknown; error: { message: string } | null }> }).rpc("sae_attendance_awards", { p_year: year });
+    if (error || !data) return null;
+    const d = data as Row;
+    const n = (x: unknown) => Number(x) || 0;
+    return {
+      year: n(d.year),
+      maxDetailCutoffs: n(d.maxDetailCutoffs),
+      employees: ((d.employees as Row[] | null) ?? []).map((x) => ({
+        employeeId: String(x.employeeId),
+        detailCutoffs: n(x.detailCutoffs),
+        daysWorked: n(x.daysWorked),
+        absences: n(x.absences),
+        lates: n(x.lates),
+        lateMinutes: n(x.lateMinutes),
+        punchDays: n(x.punchDays),
+        avgFirstIn: x.avgFirstIn === null || x.avgFirstIn === undefined ? null : Number(x.avgFirstIn),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function recommendSae(e: SalesAdminEvaluation, me: string, text: string): Promise<void> {
   await placeMySignature(me, sigPath(e.id, e.status === "chairman" ? "chairman" : "vc"));
   const { error } = await client().rpc("sae_recommend", { p_id: e.id, p_recommendation: text });

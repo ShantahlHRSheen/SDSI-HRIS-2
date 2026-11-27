@@ -1,6 +1,6 @@
 "use client";
 
-import { Award, Crown, Trophy } from "lucide-react";
+import { Award, Crown, Medal, Trophy } from "lucide-react";
 import { jobItems, saeHeads, type SaeScores, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 
 // The top employee for each KPI (Job Performance item), for Sales, for
@@ -94,6 +94,17 @@ export function TopPerformers({ rows, purpose }: { rows: TopRow[]; purpose: stri
     add(`kpi-${kra}`, KPI_AWARDS[kra], kra, b, (v) => `${(Math.round(v * 100) / 100).toString()} / 3`);
   }
 
+  // Top 1, 2 and 3 by overall score (each employee once, by their best);
+  // tied employees share a place.
+  const bestOf = new Map<string, TopRow>();
+  for (const r of done) {
+    const cur = bestOf.get(r.e.employeeId);
+    if (!cur || r.s.total > cur.s.total) bestOf.set(r.e.employeeId, r);
+  }
+  const levels = [...new Set([...bestOf.values()].map((r) => Math.round(r.s.total * 100) / 100))].sort((a, b) => b - a).slice(0, 3);
+  const podium = levels.map((lv) => [...bestOf.values()].filter((r) => Math.round(r.s.total * 100) / 100 === lv).sort((a, b) => a.e.employeeName.localeCompare(b.e.employeeName)));
+  const medal = ["text-amber-400", "text-slate-300", "text-orange-400"];
+
   const card = (p: Pick) => {
     const co = p.winners.length > 1;
     return (
@@ -128,6 +139,26 @@ export function TopPerformers({ rows, purpose }: { rows: TopRow[]; purpose: stri
       <div className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
         <Trophy size={16} className="text-amber-400" /> Top performers &amp; suggested awards
         <span className="text-xs font-normal text-[var(--text-muted)]">— among the {done.length} completed evaluation{done.length === 1 ? "" : "s"} shown</span>
+      </div>
+      <div className="mb-2 grid gap-2 sm:grid-cols-3">
+        {podium.map((ws, i) => (
+          <div key={i} className={`rounded-xl border p-3 ${i === 0 ? "border-amber-400/60 bg-amber-400/10" : "border-[var(--border-hairline)] bg-[var(--surface-1)]"}`}>
+            <div className="flex items-center gap-2">
+              <Medal size={18} className={`shrink-0 ${medal[i]}`} />
+              <div className="text-sm font-semibold text-[var(--text-primary)]">Top {i + 1}</div>
+              {ws.length > 1 && <span className="rounded-full bg-amber-400/15 px-1.5 py-px text-[11px] font-medium text-amber-500">Tie · {ws.length}</span>}
+              <div className="ml-auto text-sm font-bold text-[var(--text-primary)] tabular-nums">{fmt(ws[0].s.total)}</div>
+            </div>
+            <div className="mt-2 space-y-1">
+              {ws.map((w) => (
+                <div key={w.e.employeeId} className="min-w-0">
+                  <div className="truncate font-medium text-[var(--text-primary)]">{w.e.employeeName}</div>
+                  <div className="truncate text-[11px] text-[var(--text-muted)]">{w.department}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
       <div className="mb-2 grid gap-2 sm:grid-cols-3">{picks.filter((p) => p.big).map(card)}</div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{picks.filter((p) => !p.big).map(card)}</div>

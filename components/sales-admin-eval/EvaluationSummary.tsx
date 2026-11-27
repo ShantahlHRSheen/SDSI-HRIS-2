@@ -7,6 +7,7 @@ import { departmentName } from "@/lib/helpers";
 import { awardLine, saePassMark, saeHeads, saeScores, saeStatusLabel, saeWeights, SAE_FORMS, SAE_PURPOSES, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import { saeConfig } from "./SalesAdminEval";
 import { TopPerformers } from "./TopPerformers";
+import { AttendanceAwards } from "./AttendanceAwards";
 
 // The scores of every evaluation the signed-in person can see, as one table:
 // HR and Upper Management see all; Department Heads and supervisors see the
@@ -15,8 +16,10 @@ import { TopPerformers } from "./TopPerformers";
 const fmt = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 
 export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) {
-  const { employees } = useHris();
+  const { employees, currentUser } = useHris();
   const cfg = saeConfig();
+  // Attendance awards (phase 100): HR and Upper Management.
+  const seesAttendance = !!currentUser?.roles.some((r) => r === "hr_admin" || r === "upper_management");
   const [open, setOpen] = useState(true);
   const [purpose, setPurpose] = useState("");
   const [period, setPeriod] = useState("");
@@ -137,6 +140,7 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
         <>
           <div className="mt-3" />
           <TopPerformers rows={forTop} purpose={purpose} />
+          {seesAttendance && <AttendanceAwards year={/^\d{4}$/.test(period.trim()) ? Number(period.trim()) : new Date().getFullYear()} />}
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
             {[
               ["Shown", String(shown.length)],
@@ -233,7 +237,7 @@ export function EvaluationSummary({ items }: { items: SalesAdminEvaluation[] }) 
             </table>
           </div>
           <p className="mt-2 text-[11px] text-[var(--text-muted)]">
-            Passing score: {cfg.passMark} for Sales Admins (80 on a Year-end Evaluation), 80 for other employees. &ldquo;In progress&rdquo; scores count only the parts signed or saved so far. Hover a special award to see the justification.
+            {`Passing score: ${cfg.passMark} for Sales Admins (80 on a Year-end Evaluation), 80 for other employees.`} &ldquo;In progress&rdquo; scores count only the parts signed or saved so far. Hover a special award to see the justification.
           </p>
         </>
       )}
