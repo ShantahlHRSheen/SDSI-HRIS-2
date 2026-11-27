@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Award, Eye, Loader2, Plus, Save, Signature, Trash2 } from "lucide-react";
+import { Award, Eye, History, Loader2, Pencil, Plus, Save, Signature, Trash2 } from "lucide-react";
 import { useHris } from "@/lib/store";
 import { Modal } from "@/components/Modal";
 import { FileViewer, type ViewerFile } from "@/components/FileViewer";
@@ -17,6 +17,9 @@ import {
   saeScores,
   saeSignatures,
   saveHeadPart,
+  editHeadPart,
+  saeEditChanges,
+  type SaeEdit,
   saeHeads,
   saveHrPart,
   saePassMark,
@@ -318,8 +321,9 @@ export function HrPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation
 }
 
 // ---- The Department Head's part -------------------------------------------------------
-
-export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluation; onClose: () => void; onChanged: () => void }) {
+// `edit`: changing a part already signed (phase 97) — saved with a reason to
+// the edit history; the signature stays.
+export function HeadPartModal({ e, onClose, onChanged, edit }: { e: SalesAdminEvaluation; onClose: () => void; onChanged: () => void; edit?: boolean }) {
   const { currentEmployee } = useHris();
   const items = jobItems(e.form);
   // The caller's own part: the first or the second head's.
@@ -331,6 +335,7 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
     job: items.map((_, i) => mine?.job?.[i] ?? null),
   }));
   const [hasSignature, setHasSignature] = useState(false);
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof SaeHeadPart>(k: K, v: SaeHeadPart[K]) => setPart((p) => ({ ...p, [k]: v }));
@@ -341,7 +346,8 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
     setBusy(sign ? "sign" : "save");
     setError(null);
     try {
-      await saveHeadPart(e.id, slot, part, sign ? currentEmployee.id : null);
+      if (edit) await editHeadPart(e.id, part, reason);
+      else await saveHeadPart(e.id, slot, part, sign ? currentEmployee.id : null);
       onChanged();
       onClose();
     } catch (err) {
@@ -352,13 +358,18 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
   }
 
   return (
-    <Modal open wide onClose={() => !busy && onClose()} title={`Job Performance — ${e.employeeName} (${e.purpose})`}>
+    <Modal open wide onClose={() => !busy && onClose()} title={`${edit ? "Edit " : ""}Job Performance — ${e.employeeName} (${e.purpose})`}>
       <div className="space-y-5 text-sm">
         <p className="text-[var(--text-secondary)]">
           As the Department Head, rate {e.employeeName}&rsquo;s job performance, then give your overall rating, comment and recommendation. HR rates the Behavior
           {e.form === "sales_admin" ? " and enters the sales" : ""}.
           {e.head2Id && ` ${slot === "head" ? e.head2Name || "The other head" : e.headName || "The other head"} also rates Job Performance; your ratings are averaged.`}
         </p>
+        {edit && (
+          <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-[var(--text-secondary)]">
+            You already signed this. Your changes are saved to the evaluation&rsquo;s <b>edit history</b> (what changed, by whom and when), which HR and everyone who can see the evaluation can read. Your signature stays.
+          </div>
+        )}
         <ScaleLegend />
         <div className="space-y-1.5">
           {items.map((j, i) => (
@@ -394,8 +405,25 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
           <textarea value={part.comment} onChange={(ev) => set("comment", ev.target.value)} rows={3} maxLength={3000} className={input} />
         </div>
         <AwardFields award={part.award ?? ""} justification={part.awardJustification ?? ""} onAward={(v) => set("award", v)} onJustification={(v) => set("awardJustification", v)} />
-        <MySignature onChange={setHasSignature} />
+        {edit ? (
+          <div>
+            <label className={label}>Reason for the change (optional)</label>
+            <input value={reason} onChange={(ev) => setReason(ev.target.value)} maxLength={500} placeholder="e.g. Corrected a rating after reviewing the KPI report" className={input} />
+          </div>
+        ) : (
+          <MySignature onChange={setHasSignature} />
+        )}
         {error && <div className="text-xs text-[var(--status-critical)]">{error}</div>}
+        {edit ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            <button onClick={onClose} disabled={!!busy} className={secondary}>
+              Cancel
+            </button>
+            <button onClick={() => save(false)} disabled={!!busy || !ready} className={primary}>
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <Pencil size={15} />} Save changes
+            </button>
+          </div>
+        ) : (
         <div className="flex flex-wrap justify-end gap-2">
           <button onClick={() => save(false)} disabled={!!busy} className={secondary}>
             {busy === "save" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save draft
@@ -404,7 +432,8 @@ export function HeadPartModal({ e, onClose, onChanged }: { e: SalesAdminEvaluati
             {busy === "sign" ? <Loader2 size={15} className="animate-spin" /> : <Signature size={15} />} Sign &amp; submit
           </button>
         </div>
-        {!ready && <div className="text-right text-xs text-[var(--text-muted)]">To sign: rate every item and give the overall rating and recommendation (and a justification for a suggested award).</div>}
+        )}
+        {!ready && <div className="text-right text-xs text-[var(--text-muted)]">{edit ? "To save:" : "To sign:"} rate every item and give the overall rating and recommendation (and a justification for a suggested award).</div>}
       </div>
     </Modal>
   );
@@ -574,5 +603,41 @@ export function ViewSaeButton({ e }: { e: SalesAdminEvaluation }) {
       {error && <div className="text-[11px] text-[var(--status-critical)]">{error}</div>}
       {viewer && <FileViewer file={viewer} onClose={() => (URL.revokeObjectURL(viewer.url), setViewer(null))} />}
     </>
+  );
+}
+
+// ---- Edit history (phase 97) ----------------------------------------------------------
+
+export function EditHistory({ e, edits }: { e: SalesAdminEvaluation; edits: SaeEdit[] }) {
+  const [open, setOpen] = useState(false);
+  if (!edits.length) return null;
+  const when = (x: string) => new Date(x).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
+  const last = edits[edits.length - 1];
+  return (
+    <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/5 text-xs">
+      <button onClick={() => setOpen((x) => !x)} className="flex w-full items-center gap-1.5 px-3 py-2 text-left font-medium text-[var(--text-secondary)]">
+        <History size={13} className="shrink-0 text-amber-500" /> Edit history ({edits.length}) — last edited {when(last.editedAt)} by {last.editorName}
+        <span className="ml-auto text-[var(--text-muted)]">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <ol className="space-y-2 border-t border-amber-400/20 px-3 py-2">
+          {edits
+            .slice()
+            .reverse()
+            .map((x) => {
+              const changes = saeEditChanges(e.form, x.before, x.after);
+              return (
+                <li key={x.id}>
+                  <div className="text-[var(--text-primary)]">
+                    <b>{x.editorName}</b> edited the {x.part === "head2" ? "second head’s" : "Department Head’s"} part · <span className="text-[var(--text-muted)]">{when(x.editedAt)}</span>
+                  </div>
+                  {x.reason && <div className="text-[var(--text-secondary)]">Reason: {x.reason}</div>}
+                  <ul className="mt-0.5 list-disc pl-5 text-[var(--text-secondary)]">{changes.length ? changes.map((c, i) => <li key={i}>{c}</li>) : <li>No visible change</li>}</ul>
+                </li>
+              );
+            })}
+        </ol>
+      )}
+    </div>
   );
 }

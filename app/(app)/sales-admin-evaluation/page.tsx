@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ClipboardList, Loader2, Plus, RotateCcw, Settings2, Table2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ClipboardList, Loader2, Pencil, Plus, RotateCcw, Settings2, Table2, Trash2 } from "lucide-react";
 import { ManageEvaluatorsModal } from "@/components/sales-admin-eval/ManageEvaluators";
 import { EvaluationSummary } from "@/components/sales-admin-eval/EvaluationSummary";
 import { HrSheetModal } from "@/components/sales-admin-eval/HrSheet";
@@ -15,8 +15,9 @@ import { Badge } from "@/components/Badge";
 import { departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import { effectiveJobPerformanceEvaluatorId } from "@/lib/performance-eval";
 import type { Employee } from "@/lib/types";
-import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, reopenSaePart, saeMyTurn, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
+import { createSalesAdminEvaluation, deleteSalesAdminEvaluation, fetchSaeEdits, reopenSaePart, saeEditableSlot, saeMyTurn, type SaeEdit, saeStatusLabel, SAE_FORMS, SAE_PURPOSES, SAE_WEIGHTS, SAE_WEIGHTS_GENERAL, type SaeForm, type SalesAdminEvaluation } from "@/lib/sales-admin-eval";
 import {
+  EditHistory,
   HeadPartModal,
   HrPartModal,
   input,
@@ -46,7 +47,12 @@ export default function SalesAdminEvaluationPage() {
   const [sheet, setSheet] = useState(false);
   const [headSheet, setHeadSheet] = useState(false);
   const [bulk, setBulk] = useState(false);
-  const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" } | null>(null);
+  const [open, setOpen] = useState<{ id: string; as: "hr" | "head" | "recommend" | "edit" } | null>(null);
+  // Heads' edits to their signed parts (phase 97), reloaded with the evaluations.
+  const [edits, setEdits] = useState<SaeEdit[]>([]);
+  useEffect(() => {
+    if (items) fetchSaeEdits().then(setEdits);
+  }, [items]);
   const [deleting, setDeleting] = useState<SalesAdminEvaluation | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -174,6 +180,11 @@ export default function SalesAdminEvaluationPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={st.tone}>{st.label}</Badge>
                   <ViewSaeButton e={e} />
+                  {saeEditableSlot(e, me) && (
+                    <button onClick={() => setOpen({ id: e.id, as: "edit" })} className={secondary} title="Change your signed Job Performance part — saved to the edit history">
+                      <Pencil size={13} /> Edit my part
+                    </button>
+                  )}
                   {isHr && (e.status === "open" || e.status === "vc" || (e.status === "done" && !e.vcId && !e.chairmanId)) && e.hrSignedAt && (
                     <button onClick={() => act(() => reopenSaePart(e.id, "hr"))} disabled={busy} className={secondary} title="Unlock HR's part to edit it">
                       <RotateCcw size={13} /> Edit HR&rsquo;s part
@@ -199,6 +210,7 @@ export default function SalesAdminEvaluationPage() {
               <ScoreSummary e={e} />
               <div className="mt-3">
                 <Recommendations e={e} />
+                <EditHistory e={e} edits={edits.filter((x) => x.evaluationId === e.id)} />
               </div>
             </div>
           );
@@ -212,6 +224,7 @@ export default function SalesAdminEvaluationPage() {
       {creating && <NewEvaluationModal employees={employees} onClose={() => setCreating(false)} onCreated={async (id) => (await reload(), setCreating(false), setOpen({ id, as: "hr" }))} />}
       {opened && open?.as === "hr" && <HrPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {opened && open?.as === "head" && <HeadPartModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
+      {opened && open?.as === "edit" && <HeadPartModal edit e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {opened && open?.as === "recommend" && <RecommendModal e={opened} onClose={() => setOpen(null)} onChanged={reload} />}
       {deleting && (
         <Modal open onClose={() => !busy && setDeleting(null)} title="Delete evaluation?">
