@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Download, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Pencil, Users } from "lucide-react";
+import { EditLeaveBalancesModal } from "./EditLeaveBalances";
 import { useHris } from "@/lib/store";
 import { departmentName, formatDate, fullName, positionTitle } from "@/lib/helpers";
 import { balanceFor, creditPeriodOf, isSemiannual, paidLeaveEligibleFrom } from "@/lib/leave-policy";
@@ -22,7 +23,10 @@ const fmt = (n: number) => String(Math.round(n * 100) / 100);
 const applies = (e: Employee, lt: LeaveType) => !((lt.id === "lt-ml" && e.gender === "Male") || (lt.id === "lt-pl" && e.gender === "Female"));
 
 export function LeaveBalances({ today }: { today: string }) {
-  const { employees, leaveTypes, leaveRequests, leaveCreditAdjustments } = useHris();
+  const { employees, leaveTypes, leaveRequests, leaveCreditAdjustments, currentUser } = useHris();
+  // HR edits balances (the HR Manager only, by RLS); Upper Management views.
+  const canEdit = !!currentUser?.roles.includes("hr_admin");
+  const [editing, setEditing] = useState<Employee | null>(null);
   const [open, setOpen] = useState(true);
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("all");
@@ -123,7 +127,7 @@ export function LeaveBalances({ today }: { today: string }) {
         <>
           <p className="mt-1 mb-3 text-xs text-[var(--text-muted)]">
             Remaining days for {periodNote}, counting approved and pending leave. <b className="text-[var(--text-secondary)]">Vacation and Sick Leave:</b>{" "}only the current half-year&rsquo;s balance can be used
-            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used; unused Jan–Jun Vacation Leave goes to the 13th month pay</>}. Paid Vacation and Sick Leave start after 1 year of service; until then the balance is 0.
+            {Number(today.slice(5, 7)) > 6 && <> — the unused Jan–Jun days can no longer be used; unused Jan–Jun Vacation Leave goes to the 13th month pay</>}. Paid Vacation and Sick Leave start after 1 year of service; until then the balance is 0.{canEdit && <> Click the pencil beside a name to edit their balances.</>}
           </p>
           <div className="max-h-[520px] overflow-auto rounded-lg border border-[var(--border-hairline)]">
             <table className="w-full min-w-[900px] text-sm">
@@ -160,7 +164,14 @@ export function LeaveBalances({ today }: { today: string }) {
                 {shown.map(({ e, cells }) => (
                   <tr key={e.id} className="border-b border-[var(--gridline)] last:border-0">
                     <td className="sticky left-0 min-w-[220px] bg-[var(--surface-1)] px-3 py-1.5">
-                      <div className="font-medium text-[var(--text-primary)]">{fullName(e)}</div>
+                      <div className="flex items-center gap-1.5 font-medium text-[var(--text-primary)]">
+                        {fullName(e)}
+                        {canEdit && (
+                          <button onClick={() => setEditing(e)} className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--gridline)]/50 hover:text-[var(--series-1)]" aria-label={`Edit ${fullName(e)}'s leave balances`} title="Edit leave balances">
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </div>
                       <div className="text-[11px] text-[var(--text-muted)]">
                         {departmentName(e.departmentId)} · {positionTitle(e.positionId)}
                       </div>
@@ -218,6 +229,7 @@ export function LeaveBalances({ today }: { today: string }) {
           </div>
         </>
       )}
+      {editing && <EditLeaveBalancesModal employee={editing} types={types.filter((lt) => applies(editing, lt))} today={today} onClose={() => setEditing(null)} />}
     </div>
   );
 }
