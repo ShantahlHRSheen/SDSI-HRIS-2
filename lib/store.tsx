@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { Session } from "@supabase/supabase-js";
 import { fullName, nextEmployeeNumber, setReferenceData } from "./helpers";
 import { setLeaveCreditContext, type LeaveCreditAdjustment } from "./leave-policy";
-import { fetchLeaveCreditAdjustments } from "./supabase/leave-credits";
+import { fetchLeaveCreditAdjustments, upsertLeaveCreditAdjustments } from "./supabase/leave-credits";
 import { getSupabaseClient } from "./supabase/client";
 import { reportSaveError } from "./save-errors";
 import { companyStorageKey, currentCompany } from "./companies";
@@ -249,6 +249,9 @@ interface HrisContextShape {
   salaryAdjustments: SalaryAdjustment[];
   // HR's leave credit adjustments (balances from the leave sheet).
   leaveCreditAdjustments: LeaveCreditAdjustment[];
+  // HR edits leave balances: sets these adjustments (replacing the same
+  // employee / leave type / period).
+  saveLeaveCreditAdjustments: (list: LeaveCreditAdjustment[], updatedBy: string | null) => Promise<void>;
   salaryAdjustmentsError: string | null;
   addSalaryAdjustment: (input: SalaryAdjustmentInput) => Promise<boolean>;
   updateSalaryAdjustment: (id: string, patch: Partial<Omit<SalaryAdjustmentInput, "periodId">>) => Promise<boolean>;
@@ -549,6 +552,15 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [supabaseSession]);
+  const saveLeaveCreditAdjustments = useCallback(
+    async (list: LeaveCreditAdjustment[], updatedBy: string | null) => {
+      const key = (a: LeaveCreditAdjustment) => `${a.employeeId}|${a.leaveTypeId}|${a.periodKey}`;
+      if (supabaseSession) await upsertLeaveCreditAdjustments(list, updatedBy);
+      const keys = new Set(list.map(key));
+      setLeaveCreditAdjustments((cur) => [...cur.filter((a) => !keys.has(key(a))), ...list]);
+    },
+    [supabaseSession],
+  );
 
   // Loaded on their own so a missing table (migration not run yet) doesn't
   // stop the rest of the app from loading.
@@ -1904,6 +1916,7 @@ export function HrisProvider({ children }: { children: React.ReactNode }) {
     generatedBirForms: state.generatedBirForms,
     salaryAdjustments,
     leaveCreditAdjustments,
+    saveLeaveCreditAdjustments,
     salaryAdjustmentsError,
     addSalaryAdjustment,
     updateSalaryAdjustment,
